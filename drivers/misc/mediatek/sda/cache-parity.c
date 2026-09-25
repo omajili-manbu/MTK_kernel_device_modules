@@ -420,7 +420,7 @@ static irqreturn_t cache_parity_isr_v3(int irq, void *dev_id)
 		 *    SERR = 0x12.
 		 */
 		if (hwirq == cache_parity.arm_dsu_ecc_hwirq) {
-			if (is_midr_in_range_list(read_cpuid_id(), bypass_list)) {
+			if (is_midr_in_range_list(bypass_list) /* rodin stage2: 6.18 drops the midr arg */) {
 				if ((serr == 0x2) || (serr == 0xC) || (serr == 0x12)) {
 					cpu = raw_smp_processor_id();
 					ECC_LOG("Cache ECC error, cpu%d serviced irq%d\n", cpu, irq);
@@ -429,7 +429,7 @@ static irqreturn_t cache_parity_isr_v3(int irq, void *dev_id)
 				}
 			}
 		} else {
-			if (is_midr_in_range_list(read_cpuid_id(), cpu_list)) {
+			if (is_midr_in_range_list(cpu_list) /* rodin stage2: 6.18 drops the midr arg */) {
 				if ((serr == 0x2) || (serr == 0xC) || (serr == 0x12)) {
 					cpu = raw_smp_processor_id();
 					ECC_LOG("Cache ECC error, cpu%d serviced irq%d\n", cpu, irq);
@@ -519,7 +519,7 @@ static irqreturn_t cache_parity_isr_v2(int irq, void *dev_id)
 	       "irq", irq, "misc0_el1", misc0, "status_el1", status);
 
 #ifdef CONFIG_ARM64_ERRATUM_1800710
-	if (is_midr_in_range_list(read_cpuid_id(), erratum_1800710_cpu_list)) {
+	if (is_midr_in_range_list(erratum_1800710_cpu_list) /* rodin stage2: 6.18 drops the midr arg */) {
 		if ((status & ECC_CE_BIT) == ECC_CE_AT_LEAST_ONE_ERR &&
 		    (status & ECC_SERR_BIT) == ECC_SERR_FROM_DATA_BUFF) {
 			ECC_LOG("%s %s hit, may cause stale translation\n",

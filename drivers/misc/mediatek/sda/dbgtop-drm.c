@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/printk.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_sda.h" /* rodin stage2: kernel mtk_sip_svc.h lacks SDA SIP id */
 #include "rodin_sip_66.h"
 #include <linux/arm-smccc.h>
 #include "sda.h"

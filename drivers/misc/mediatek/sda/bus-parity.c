@@ -23,6 +23,7 @@
 #include <linux/workqueue.h>
 #include <linux/sched/clock.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_sda.h" /* rodin stage2: kernel mtk_sip_svc.h lacks SDA SIP id */
 #include <mt-plat/aee.h>
 #include "sda.h"
 #include "dbg_error_flag.h"

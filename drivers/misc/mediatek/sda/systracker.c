@@ -23,6 +23,7 @@
 #include <linux/string.h>
 #include <linux/sched/clock.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_sda.h" /* rodin stage2: kernel mtk_sip_svc.h lacks SDA SIP id */
 #include <linux/arm-smccc.h>
 #include <linux/unistd.h>
 #include <mt-plat/aee.h>
@@ -234,7 +235,9 @@ static ssize_t tracker_status_store(struct device_driver *driver, const char *bu
 static DRIVER_ATTR(tracker_status, 0664, tracker_status_show, tracker_status_store);
 
 static int systracker_watchpoint_probe(struct platform_device *pdev);
-static void systracker_watchpoint_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
+static void systracker_watchpoint_remove(struct platform_device *pdev); /* rodin stage2: 6.18 .remove is void */
+
+static const struct of_device_id systracker_of_ids[] = {
 	{ .compatible = TRACKER_COMPATIBLE, },
 	{}
 };
