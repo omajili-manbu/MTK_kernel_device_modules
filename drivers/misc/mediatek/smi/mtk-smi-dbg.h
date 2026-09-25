@@ -66,6 +66,11 @@ enum SMI_DBG_VER {
 
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_SMI)
 
+/* rodin stage2: SMI 内建后调用方（mtk_iommu/vcp/cmdq...）在此拿原型；
+ * 真身在 mtk-smi.c，vendor <soc/mediatek/smi.h> 被内核同名头遮蔽拿不到。 */
+s32 mtk_smi_dbg_hang_detect(char *user);
+void mtk_smi_dbg_hang_detect_force_dump(char *user, u64 larb_skip_id, u64 comm_skip_id);
+
 int mtk_smi_set_disp_ops(const struct smi_disp_ops *ops);
 int mtk_smi_set_hw_sema_ops(const struct smi_hw_sema_ops *ops);
 int mtk_smi_dbg_register_notifier(struct notifier_block *nb);

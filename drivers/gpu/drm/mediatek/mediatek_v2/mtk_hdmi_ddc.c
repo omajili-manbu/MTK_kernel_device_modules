@@ -894,14 +894,13 @@ err_clk_disable:
 	return ret;
 }
 
-static int mtk_hdmi_ddc_remove(struct platform_device *pdev)
-{
+static void mtk_hdmi_ddc_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_hdmi_ddc *ddc = platform_get_drvdata(pdev);
 
 	i2c_del_adapter(&ddc->adap);
 	clk_disable_unprepare(ddc->clk);
 
-	return 0;
 }
 
 static const struct of_device_id mtk_hdmi_ddc_match[] = {

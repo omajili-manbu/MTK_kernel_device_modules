@@ -942,8 +942,8 @@ free_ap_rg_info:
 	return ret;
 }
 
-static int emimpu_remove(struct platform_device *pdev)
-{
+static void emimpu_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct emi_mpu *mpu = platform_get_drvdata(pdev);
 
 	dev_info(&pdev->dev, "driver removed\n");
@@ -954,7 +954,6 @@ static int emimpu_remove(struct platform_device *pdev)
 
 	global_emi_mpu = NULL;
 
-	return 0;
 }
 
 static struct platform_driver emimpu_driver = {

@@ -3799,8 +3799,8 @@ error_dev_init:
 	return ret;
 }
 
-static int disp_aal_remove(struct platform_device *pdev)
-{
+static void disp_aal_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_disp_aal *priv = dev_get_drvdata(&pdev->dev);
 
 	component_del(&pdev->dev, &mtk_disp_aal_component_ops);
@@ -3811,7 +3811,6 @@ static int disp_aal_remove(struct platform_device *pdev)
 		mtk_leds_unregister_notifier(&leds_init_notifier);
 #endif
 
-	return 0;
 }
 
 static const struct mtk_disp_aal_data mt6768_aal_driver_data = {

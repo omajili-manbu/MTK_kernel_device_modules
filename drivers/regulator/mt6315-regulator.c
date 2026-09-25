@@ -11,6 +11,11 @@
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+/* rodin stage2: the 6.18 kernel tree ships an upstream mt6315-regulator.h that
+ * lacks the vendor enum (MT6315_ID_VBUCK1/.../ID_MAX) and MT6315_SLAVE_ID_*.
+ * Pull the vendor copy first -- both share the same include guard, so the
+ * kernel copy becomes a no-op (mtk-scpsys-mt6765.c r25 precedent). */
+#include "../../include/linux/regulator/mt6315-regulator.h"
 #include <linux/regulator/mt6315-regulator.h>
 #include <linux/regulator/of_regulator.h>
 

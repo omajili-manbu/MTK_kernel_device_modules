@@ -2195,10 +2195,9 @@ static int mtk_dpc_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int mtk_dpc_remove(struct platform_device *pdev)
-{
+static void mtk_dpc_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	DPCFUNC();
-	return 0;
 }
 
 static void mtk_dpc_shutdown(struct platform_device *pdev)

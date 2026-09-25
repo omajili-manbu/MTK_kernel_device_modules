@@ -11056,14 +11056,13 @@ err:
 	return ret;
 }
 
-static int mtk_disp_oddmr_remove(struct platform_device *pdev)
-{
+static void mtk_disp_oddmr_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_disp_oddmr *priv = dev_get_drvdata(&pdev->dev);
 
 	component_del(&pdev->dev, &mtk_disp_oddmr_component_ops);
 	mtk_ddp_comp_pm_disable(&priv->ddp_comp);
 
-	return 0;
 }
 
 static const struct mtk_disp_oddmr_data mt6985_oddmr_driver_data = {

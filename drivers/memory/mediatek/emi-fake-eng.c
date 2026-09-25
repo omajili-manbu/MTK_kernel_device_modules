@@ -467,11 +467,10 @@ out:
 
 static DRIVER_ATTR_RW(emi_fake_eng);
 
-static int emi_fake_eng_remove(struct platform_device *pdev)
-{
+static void emi_fake_eng_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	dev_info(&pdev->dev, "driver removed\n");
 	fakeng = NULL;
-	return 0;
 }
 
 static int emi_fake_eng_probe(struct platform_device *pdev)

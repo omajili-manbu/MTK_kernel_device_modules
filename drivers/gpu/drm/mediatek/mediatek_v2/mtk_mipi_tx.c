@@ -7267,10 +7267,9 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
 				   mipi_tx->pll);
 }
 
-static int mtk_mipi_tx_remove(struct platform_device *pdev)
-{
+static void mtk_mipi_tx_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	of_clk_del_provider(pdev->dev.of_node);
-	return 0;
 }
 
 static const struct mtk_mipitx_data mt2701_mipitx_data = {

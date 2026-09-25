@@ -544,13 +544,12 @@ err_put_ctrl:
 	return err;
 }
 
-static int mtk_spmi_remove(struct platform_device *pdev)
-{
+static void mtk_spmi_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct spmi_controller *ctrl = platform_get_drvdata(pdev);
 
 	spmi_controller_remove(ctrl);
 	spmi_controller_put(ctrl);
-	return 0;
 }
 
 static const struct of_device_id mtk_spmi_match_table[] = {

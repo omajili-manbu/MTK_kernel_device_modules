@@ -534,8 +534,8 @@ err_disable_clk:
 	return ret;
 }
 
-static int mt6577_auxadc_remove(struct platform_device *pdev)
-{
+static void mt6577_auxadc_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
 	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
 
@@ -546,7 +546,6 @@ static int mt6577_auxadc_remove(struct platform_device *pdev)
 
 	clk_disable_unprepare(adc_dev->adc_clk);
 
-	return 0;
 }
 
 static SIMPLE_DEV_PM_OPS(mt6577_auxadc_pm_ops,

@@ -400,10 +400,9 @@ static int systracker_watchpoint_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int systracker_watchpoint_remove(struct platform_device *pdev)
-{
+static void systracker_watchpoint_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	dev_info(&pdev->dev, "systracker watchpoint removed.\n");
-	return 0;
 }
 
 static int __init systracker_watchpoint_init(void)

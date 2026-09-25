@@ -847,12 +847,11 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_dpi_remove(struct platform_device *pdev)
-{
+static void mtk_dpi_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	component_del(&pdev->dev, &mtk_dpi_component_ops);
 	pm_runtime_disable(&pdev->dev);
 
-	return 0;
 }
 
 struct platform_driver mtk_dpi_driver = {

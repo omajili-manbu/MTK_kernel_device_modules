@@ -3,6 +3,7 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/clk.h>
+#include <linux/platform_device.h> /* rodin stage2: 6.18 header pruning */
 #include <linux/iopoll.h>
 #include <linux/interrupt.h>
 #include <linux/irqdomain.h>
@@ -2281,7 +2282,7 @@ err_put_ctrl:
 	return err;
 }
 
-static int mtk_spmi_remove(struct platform_device *pdev)
+static void mtk_spmi_remove(struct platform_device *pdev)
 {
 	struct spmi_controller *ctrl = platform_get_drvdata(pdev);
 	struct pmif *arb = spmi_controller_get_drvdata(ctrl);
@@ -2290,8 +2291,7 @@ static int mtk_spmi_remove(struct platform_device *pdev)
 		irq_domain_remove(arb->domain);
 	spmi_controller_remove(ctrl);
 	spmi_controller_put(ctrl);
-	return 0;
-}
+} /* rodin stage2: 6.18 .remove is void */
 
 static const struct of_device_id mtk_spmi_match_table[] = {
 	{

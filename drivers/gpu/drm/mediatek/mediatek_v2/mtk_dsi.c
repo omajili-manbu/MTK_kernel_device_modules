@@ -15603,8 +15603,8 @@ error:
 	return -EPROBE_DEFER;
 }
 
-static int mtk_dsi_remove(struct platform_device *pdev)
-{
+static void mtk_dsi_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_dsi *dsi = platform_get_drvdata(pdev);
 
 #if IS_ENABLED(CONFIG_ENABLE_DSI_HOTPLUG)
@@ -15619,7 +15619,6 @@ static int mtk_dsi_remove(struct platform_device *pdev)
 
 	mtk_ddp_comp_pm_disable(&dsi->ddp_comp);
 
-	return 0;
 }
 
 struct platform_driver mtk_dsi_driver = {

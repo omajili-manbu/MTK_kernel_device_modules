@@ -17,6 +17,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_emimpu.h" /* rodin stage2: kernel mtk_sip_svc.h lacks EMI MPU SIP id */
 #include <soc/mediatek/emi.h>
 
 struct emi_mpu_test_v2 {

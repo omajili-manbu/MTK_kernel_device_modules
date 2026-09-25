@@ -12085,8 +12085,8 @@ static void mtk_drm_shutdown(struct platform_device *pdev)
 	}
 }
 
-static int mtk_drm_remove(struct platform_device *pdev)
-{
+static void mtk_drm_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_drm_private *private = platform_get_drvdata(pdev);
 	struct drm_device *drm = private->drm;
 	int i;
@@ -12105,7 +12105,6 @@ static int mtk_drm_remove(struct platform_device *pdev)
 #ifdef CONFIG_MTK_FB_MMDVFS_SUPPORT
 	kfree(disp_perfs);
 #endif
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP

@@ -15,6 +15,7 @@
 #include <linux/io.h>
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_emimpu.h" /* rodin stage2: kernel mtk_sip_svc.h lacks EMI MPU SIP id */
 #include <soc/mediatek/emi.h>
 
 DEFINE_SPINLOCK(emidbg_lock);

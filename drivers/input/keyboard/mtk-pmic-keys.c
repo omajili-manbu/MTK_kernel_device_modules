@@ -15,6 +15,16 @@
 #include <linux/pm_wakeup.h>
 #include <linux/regmap.h>
 #include <linux/device.h>
+/* rodin stage2: 6.18 kernel tree ships upstream mfd headers for the same chips;
+ * the vendor copies carry extra/renumbered register macros the driver needs.
+ * Pull vendor copies first -- same include guards, so the kernel angle-includes
+ * below become no-ops (mtk-scpsys-mt6765.c r25 precedent). */
+#include "../../../include/linux/mfd/mt6359p/registers.h"
+#include "../../../include/linux/mfd/mt6397/registers.h"
+#include "../../../include/linux/mfd/mt6358/core.h"
+#include "../../../include/linux/mfd/mt6397/core.h"
+#include "../../../include/linux/mfd/mt6357/registers.h"
+#include "../../../include/linux/mfd/mt6357/core.h"
 #include <linux/mfd/mt6323/registers.h>
 #include <linux/mfd/mt6359p/registers.h>
 #include <linux/mfd/mt6363/registers.h>

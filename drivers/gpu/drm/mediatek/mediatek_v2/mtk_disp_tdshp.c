@@ -1151,8 +1151,8 @@ error_dev_init:
 	return ret;
 }
 
-static int disp_tdshp_remove(struct platform_device *pdev)
-{
+static void disp_tdshp_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_disp_tdshp *priv = dev_get_drvdata(&pdev->dev);
 
 	pr_notice("%s+\n", __func__);
@@ -1160,7 +1160,6 @@ static int disp_tdshp_remove(struct platform_device *pdev)
 
 	mtk_ddp_comp_pm_disable(&priv->ddp_comp);
 	pr_notice("%s-\n", __func__);
-	return 0;
 }
 
 static const struct mtk_disp_tdshp_data mt6983_tdshp_driver_data = {

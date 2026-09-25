@@ -21,14 +21,8 @@
 /* rodin r25: 6.18 gates this struct behind CONFIG_MTK_SMI; the smi driver is
  * a blob in this batch, so keep the identical upstream layout available.
  * RODIN_..._FALLBACK is shared with mtk_iommu.h (same-TU collision). */
-#if !IS_ENABLED(CONFIG_MTK_SMI) && !defined(RODIN_MTK_SMI_LARB_IOMMU_FALLBACK)
-#define RODIN_MTK_SMI_LARB_IOMMU_FALLBACK
-struct mtk_smi_larb_iommu {
-	struct device *dev;
-	unsigned int   mmu;
-	unsigned char  bank[32];
-};
-#endif
+/* rodin stage2: local fallback removed -- the vendor smi.h is now ported
+ * into include/soc/mediatek/smi.h and always provides struct mtk_smi_larb_iommu. */
 
 #if (IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_SMMU_V3) && \
 	IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG))

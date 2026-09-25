@@ -1091,9 +1091,8 @@ static int cmdq_bdg_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int cmdq_bdg_remove(struct platform_device *pdev)
-{
-	return 0;
+static void cmdq_bdg_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 }
 
 static const struct of_device_id cmdq_bdg_of_ids[] = {

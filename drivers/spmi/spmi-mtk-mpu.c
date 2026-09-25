@@ -3,6 +3,8 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/device.h>
+#include <linux/platform_device.h> /* rodin stage2: 6.18 header pruning */
+#include <linux/of.h> /* of_property_read_u32 */
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -56,8 +58,8 @@ static void enable_kernel_mpu(void)
 	u32 pmic_all_rgn_en = 0, rgn_en = 0, rgn_en_2 = 0;
 	int err;
 
-	struct pmif_mpu_timer *pmt = from_timer(pmt,
-				&(mpu_timer.mpu_enable_timer), mpu_enable_timer);
+	struct pmif_mpu_timer *pmt = timer_container_of(pmt,
+				&(mpu_timer.mpu_enable_timer), mpu_enable_timer); /* rodin stage2: from_timer renamed in 6.18 */
 	struct pmif_mpu *mpu_arb = pmt->mpu_arb;
 	struct platform_device *mpu_pdev = pmt->mpu_pdev;
 
@@ -192,9 +194,8 @@ static int mtk_spmi_pmif_mpu_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_spmi_pmif_mpu_remove(struct platform_device *pdev)
+static void mtk_spmi_pmif_mpu_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */
 {
-	return 0;
 }
 
 static const struct of_device_id mtk_spmi_pmif_mpu_match_table[] = {

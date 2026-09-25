@@ -647,8 +647,8 @@ out_sysfs_remove:
 	return ret;
 }
 
-static int mtk_iommu_remove(struct platform_device *pdev)
-{
+static void mtk_iommu_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
 
 	iommu_device_sysfs_remove(&data->iommu);
@@ -660,7 +660,6 @@ static int mtk_iommu_remove(struct platform_device *pdev)
 	clk_disable_unprepare(data->bclk);
 	devm_free_irq(&pdev->dev, data->irq, data);
 	component_master_del(&pdev->dev, &mtk_iommu_com_ops);
-	return 0;
 }
 
 static int __maybe_unused mtk_iommu_suspend(struct device *dev)

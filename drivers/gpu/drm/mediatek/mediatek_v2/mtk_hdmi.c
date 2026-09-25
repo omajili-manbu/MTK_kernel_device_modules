@@ -4117,8 +4117,8 @@ static int mtk_drm_hdmi_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_drm_hdmi_remove(struct platform_device *pdev)
-{
+static void mtk_drm_hdmi_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_hdmi *hdmi = platform_get_drvdata(pdev);
 
 	cec_notifier_set_phys_addr(hdmi->notifier, CEC_PHYS_ADDR_INVALID);
@@ -4127,7 +4127,6 @@ static int mtk_drm_hdmi_remove(struct platform_device *pdev)
 	mtk_hdmi_clk_disable(hdmi);
 	hdmitx_debug_uninit();
 
-	return 0;
 }
 
 struct ipi_cmd_s {

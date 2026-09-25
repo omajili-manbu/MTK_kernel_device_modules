@@ -18,6 +18,7 @@
 #include <linux/io.h>
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_emimpu.h" /* rodin stage2: kernel mtk_sip_svc.h lacks EMI MPU SIP id */
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <mt-plat/aee.h>

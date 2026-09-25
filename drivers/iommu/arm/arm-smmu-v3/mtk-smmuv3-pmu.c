@@ -1155,8 +1155,8 @@ out_unregister:
 	return err;
 }
 
-static int smmu_pmu_remove(struct platform_device *pdev)
-{
+static void smmu_pmu_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct smmu_pmu *smmu_pmu = platform_get_drvdata(pdev);
 
 	if (smmu_pmu->pmu_device)
@@ -1165,7 +1165,6 @@ static int smmu_pmu_remove(struct platform_device *pdev)
 	perf_pmu_unregister(&smmu_pmu->pmu);
 	cpuhp_state_remove_instance_nocalls(cpuhp_state_num, &smmu_pmu->node);
 
-	return 0;
 }
 
 static irqreturn_t smmu_pmu_handle_irq_impl(int irq_num, struct device *dev)

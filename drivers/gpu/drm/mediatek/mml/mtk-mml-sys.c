@@ -2765,10 +2765,9 @@ static int probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int remove(struct platform_device *pdev)
-{
+static void remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	mml_sys_destroy(pdev, platform_get_drvdata(pdev), &mml_comp_ops);
-	return 0;
 }
 
 static const struct mml_data mt6893_mml_data = {

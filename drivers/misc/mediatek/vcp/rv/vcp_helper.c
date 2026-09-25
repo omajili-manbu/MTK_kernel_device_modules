@@ -10,6 +10,10 @@
  * CONFIG_DEVICE_MODULES_MTK_SMI becomes builtin. */
 #if !IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_SMI)
 #define mtk_smi_dbg_hang_detect(...) do { } while (0)
+#else
+/* rodin stage2: mtk-smi 已内建，真身在 vendor mtk-smi.c；内核 <soc/mediatek/smi.h>
+ * 同名遮蔽拿不到 vendor 原型（vendor include/soc/mediatek/smi.h:58），此处 extern。 */
+extern s32 mtk_smi_dbg_hang_detect(char *user);
 #endif
 #include <linux/init.h>         /* needed by module macros */
 #include <linux/fs.h>           /* needed by file_operations* */

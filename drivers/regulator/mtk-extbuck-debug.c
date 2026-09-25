@@ -4,6 +4,7 @@
 
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of.h> /* rodin stage2: 6.18 of_device.h slimmed, of_device_id needs of.h */
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 

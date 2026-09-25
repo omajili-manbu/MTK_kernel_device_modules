@@ -3044,8 +3044,8 @@ out_runtime_disable:
 	return ret;
 }
 
-static int mtk_iommu_remove(struct platform_device *pdev)
-{
+static void mtk_iommu_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
 #ifndef CONFIG_ARM64
 	struct mtk_iommu_data *frstdata =
@@ -3073,7 +3073,6 @@ static int mtk_iommu_remove(struct platform_device *pdev)
 			arm_iommu_release_mapping(mtk_mapping);
 	}
 #endif
-	return 0;
 }
 
 static int __maybe_unused mtk_iommu_runtime_suspend(struct device *dev)

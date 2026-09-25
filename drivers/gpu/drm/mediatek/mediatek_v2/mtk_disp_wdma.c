@@ -2648,14 +2648,13 @@ static int mtk_disp_wdma_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int mtk_disp_wdma_remove(struct platform_device *pdev)
-{
+static void mtk_disp_wdma_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_disp_wdma *priv = dev_get_drvdata(&pdev->dev);
 
 	component_del(&pdev->dev, &mtk_disp_wdma_component_ops);
 	mtk_ddp_comp_pm_disable(&priv->ddp_comp);
 
-	return 0;
 }
 
 static const struct mtk_disp_wdma_data mt6779_wdma_driver_data = {

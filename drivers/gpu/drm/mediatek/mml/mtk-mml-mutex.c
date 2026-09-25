@@ -700,11 +700,10 @@ static int probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int remove(struct platform_device *pdev)
-{
+static void remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	component_del(&pdev->dev, &mml_comp_ops);
 	component_del(&pdev->dev, &mml_comp_ops);
-	return 0;
 }
 
 static const struct mutex_data mt6983_mutex_data = {

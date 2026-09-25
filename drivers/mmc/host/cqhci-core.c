@@ -479,7 +479,7 @@ static int cqhci_dma_map(struct mmc_host *host, struct mmc_request *mrq)
 	return sg_count;
 }
 
-static void cqhci_set_tran_desc(u8 *desc, dma_addr_t addr, int len, bool end,
+void cqhci_set_tran_desc(u8 *desc, dma_addr_t addr, int len, bool end, /* rodin stage2: 6.18 cqhci.h declares it non-static (crypto split) */
 				bool dma64)
 {
 	__le32 *attr = (__le32 __force *)desc;

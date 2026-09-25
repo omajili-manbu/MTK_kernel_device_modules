@@ -2662,7 +2662,7 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 		clk = i2c->clk_pmic;
 	}
 
-	strlcpy(i2c->adap.name, I2C_DRV_NAME, sizeof(i2c->adap.name));
+	strscpy(i2c->adap.name, I2C_DRV_NAME, sizeof(i2c->adap.name)); /* rodin stage2: strlcpy removed in 6.18 */
 
 	if (i2c->ch_offset_i2c == i2c->i2c_offset_scp) {
 		if (i2c->clk_src_in_hz)
@@ -2726,7 +2726,7 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_i2c_remove(struct platform_device *pdev)
+static void mtk_i2c_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */
 {
 	struct mtk_i2c *i2c = platform_get_drvdata(pdev);
 
@@ -2745,8 +2745,6 @@ static int mtk_i2c_remove(struct platform_device *pdev)
 	}
 
 	i2c_del_adapter(&i2c->adap);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP

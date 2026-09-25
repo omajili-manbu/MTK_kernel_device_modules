@@ -38521,9 +38521,8 @@ SKIP_OVLSYS_CONFIG:
 	return 0;
 }
 
-static int mtk_ddp_remove(struct platform_device *pdev)
-{
-	return 0;
+static void mtk_ddp_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 }
 
 static const struct of_device_id ddp_driver_dt_match[] = {

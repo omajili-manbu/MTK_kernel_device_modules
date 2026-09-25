@@ -4530,8 +4530,8 @@ error:
 	return -EPROBE_DEFER;
 }
 
-static int mtk_drm_dp_remove(struct platform_device *pdev)
-{
+static void mtk_drm_dp_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_dp *mtk_dp = platform_get_drvdata(pdev);
 
 	if (mtk_dp->dptx_wq)
@@ -4540,7 +4540,6 @@ static int mtk_drm_dp_remove(struct platform_device *pdev)
 	mutex_destroy(&dp_lock);
 	drm_connector_cleanup(&mtk_dp->conn);
 
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP

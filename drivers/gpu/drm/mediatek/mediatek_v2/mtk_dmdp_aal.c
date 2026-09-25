@@ -589,14 +589,13 @@ error_dev_init:
 	return ret;
 }
 
-static int disp_mdp_aal_remove(struct platform_device *pdev)
-{
+static void disp_mdp_aal_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_dmdp_aal *priv = dev_get_drvdata(&pdev->dev);
 
 	component_del(&pdev->dev, &mtk_dmdp_aal_component_ops);
 	mtk_ddp_comp_pm_disable(&priv->ddp_comp);
 
-	return 0;
 }
 
 static const struct mtk_dmdp_aal_data mt6885_dmdp_aal_driver_data = {

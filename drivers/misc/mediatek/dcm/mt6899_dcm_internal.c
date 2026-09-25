@@ -8,6 +8,7 @@
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_dcm.h" /* rodin stage2: kernel mtk_sip_svc.h lacks DCM SIP id */
 #include <linux/kernel.h>
 #include <linux/of.h>
 #include <linux/of_address.h>

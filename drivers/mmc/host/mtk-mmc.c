@@ -4712,8 +4712,8 @@ host_free:
 	return ret;
 }
 
-static int msdc_drv_remove(struct platform_device *pdev)
-{
+static void msdc_drv_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mmc_host *mmc;
 	struct msdc_host *host;
 
@@ -4743,7 +4743,6 @@ static int msdc_drv_remove(struct platform_device *pdev)
 	msdc_uninstall_tracepoints();
 	mmc_mtk_biolog_exit();
 
-	return 0;
 }
 
 static void msdc_save_reg(struct msdc_host *host)

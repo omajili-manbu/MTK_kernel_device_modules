@@ -18,6 +18,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_emimpu.h" /* rodin stage2: kernel mtk_sip_svc.h lacks EMI MPU SIP id */
 #include <mt-plat/aee.h>
 #include <linux/ratelimit.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
@@ -825,8 +826,8 @@ static int smpu_probe(struct platform_device *pdev)
 
 	return 0;
 }
-static int smpu_remove(struct platform_device *pdev)
-{
+static void smpu_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct smpu *mpu = platform_get_drvdata(pdev);
 
 	dev_info(&pdev->dev, "driver removed\n");
@@ -842,7 +843,6 @@ static int smpu_remove(struct platform_device *pdev)
 	else if (!strcmp(mpu->name, "skp"))
 		global_nkp = NULL;
 
-	return 0;
 }
 
 static struct platform_driver smpu_driver = {

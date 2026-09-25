@@ -4,6 +4,7 @@
 
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of.h> /* rodin stage2: 6.18 of_device.h slimmed */
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/spmi.h>
@@ -149,11 +150,9 @@ static int mtk_spmi_pmic_debug_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int mtk_spmi_pmic_debug_remove(struct platform_device *pdev)
+static void mtk_spmi_pmic_debug_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */
 {
 	device_remove_file(&pdev->dev, &dev_attr_pmic_access);
-
-	return 0;
 }
 
 static const struct of_device_id mtk_spmi_pmic_debug_of_match[] = {

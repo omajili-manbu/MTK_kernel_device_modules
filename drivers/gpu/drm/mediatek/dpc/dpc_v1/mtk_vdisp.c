@@ -408,9 +408,8 @@ void mtk_vdisp_dpc_register_v1(const struct dpc_funcs *funcs)
 }
 EXPORT_SYMBOL(mtk_vdisp_dpc_register_v1);
 
-static int mtk_vdisp_remove(struct platform_device *pdev)
-{
-	return 0;
+static void mtk_vdisp_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 }
 
 static const struct of_device_id mtk_vdisp_driver_v1_dt_match[] = {

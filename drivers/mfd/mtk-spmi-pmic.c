@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h> /* rodin stage2: 6.18 of_device.h slimmed, devm_of_platform_populate */
 #include <linux/of_irq.h>
 #include <linux/regmap.h>
 #include <linux/spmi.h>
