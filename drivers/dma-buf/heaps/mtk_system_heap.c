@@ -16,6 +16,7 @@
 #include <linux/highmem.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
@@ -1353,7 +1354,7 @@ static struct dma_buf *mtk_slc_heap_allocate(struct dma_heap *heap,
 				       &mtk_slc_heap_buf_ops);
 }
 
-static long mtk_get_pool_size(struct dma_heap *heap)
+static __maybe_unused long mtk_get_pool_size(struct dma_heap *heap)
 {
 	struct mtk_heap_priv_info *heap_priv;
 
@@ -1366,12 +1367,10 @@ static long mtk_get_pool_size(struct dma_heap *heap)
 
 static const struct dma_heap_ops system_heap_ops = {
 	.allocate = system_heap_allocate,
-	.get_pool_size = mtk_get_pool_size,
 };
 
 static const struct dma_heap_ops mtk_mm_heap_ops = {
 	.allocate = mtk_mm_heap_allocate,
-	.get_pool_size = mtk_get_pool_size,
 };
 
 static const struct dma_heap_ops mtk_slc_heap_ops = {
@@ -1453,8 +1452,6 @@ static int system_heap_buf_priv_dump(const struct dma_buf *dmabuf,
 
 static int set_heap_dev_dma(struct device *heap_dev)
 {
-	int err = 0;
-
 	if (!heap_dev)
 		return -EINVAL;
 
@@ -1467,12 +1464,8 @@ static int set_heap_dev_dma(struct device *heap_dev)
 		if (!heap_dev->dma_parms)
 			return -ENOMEM;
 
-		err = dma_set_max_seg_size(heap_dev, (unsigned int)DMA_BIT_MASK(64));
-		if (err) {
-			devm_kfree(heap_dev, heap_dev->dma_parms);
-			dev_err(heap_dev, "Failed to set DMA segment size, err:%d\n", err);
-			return err;
-		}
+		/* rodin r25: 6.18 dma_set_max_seg_size() returns void */
+		dma_set_max_seg_size(heap_dev, (unsigned int)DMA_BIT_MASK(64));
 	}
 
 	return 0;
@@ -1789,4 +1782,5 @@ EXPORT_SYMBOL_GPL(dma_buf_get_gid);
 module_init(mtk_system_heap_create);
 module_exit(mtk_system_heap_exit);
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
+MODULE_IMPORT_NS("DMA_BUF_HEAP");

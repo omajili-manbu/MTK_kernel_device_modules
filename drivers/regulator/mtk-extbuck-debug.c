@@ -96,11 +96,10 @@ static int extbuck_debug_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int extbuck_debug_remove(struct platform_device *pdev)
-{
+static void extbuck_debug_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	device_remove_file(&pdev->dev, &dev_attr_extbuck_access);
 
-	return 0;
+	return;
 }
 
 static const struct of_device_id extbuck_debug_of_match[] = {

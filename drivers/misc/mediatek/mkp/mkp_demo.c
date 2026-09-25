@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) "MKP: " fmt
 
 #include <trace/hooks/vendor_hooks.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <trace/hooks/avc.h>
 #include <trace/hooks/creds.h>
 #include <trace/hooks/selinux.h>

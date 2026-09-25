@@ -510,7 +510,7 @@ static void kwdt_time_sync(void)
 }
 
 #if IS_ENABLED(CONFIG_ARM64)
-static const int irq_to_ipi_type(int irq)
+static int irq_to_ipi_type(int irq)
 {
 	struct irq_desc **ipi_desc = ipi_desc_get();
 	struct irq_desc *desc = irq_to_desc(irq);
@@ -526,7 +526,7 @@ static const int irq_to_ipi_type(int irq)
 	return -1;
 }
 #else
-static const int irq_to_ipi_type(int irq)
+static int irq_to_ipi_type(int irq)
 {
 	int temp_irq = 0;
 	int num = 0;
@@ -609,7 +609,7 @@ static void show_irq_info(char *addr)
 	log_hwt_irq_info(addr, "%s\n", msg);
 
 	/*record irq info*/
-	for (irq = 1; irq < min_t(int, nr_irqs, MAX_IRQ_NUM); irq++) {
+	for (irq = 1; irq < min_t(int, irq_get_nr_irqs(), MAX_IRQ_NUM); irq++) {
 		index = 0;
 		memset(msg, 0, SZ_256);
 		desc = irq_to_desc(irq);
@@ -628,7 +628,7 @@ static void show_irq_info(char *addr)
 				 * read desc->kstat_irqs maybe encounter data race.
 				 * use data_race bypass iterator_category
 				 */
-					data_race(*per_cpu_ptr(desc->kstat_irqs, j)));
+					data_race(per_cpu_ptr(desc->kstat_irqs, j)->cnt) /* rodin r25: kstat_irqs is struct irqstat per-cpu in 6.18 */);
 				index += len;
 				if (index >= SZ_256 - 2) {
 					index = SZ_256 - 2;
@@ -719,19 +719,19 @@ static void show_irq_count(void)
 		return;
 	if (toprgu_base)
 		iowrite32(WDT_RST_RELOAD, toprgu_base + WDT_RST);
-	for (irq = 0; irq < min_t(int, nr_irqs, MAX_IRQ_NUM); irq++) {
+	for (irq = 0; irq < min_t(int, irq_get_nr_irqs(), MAX_IRQ_NUM); irq++) {
 		desc = irq_to_desc(irq);
 		if (desc && desc->kstat_irqs) {
 			 /*
 			  * read desc->kstat_irqs maybe encounter data race.
 			  * use data_race bypass iterator_category
 			  */
-			irq_counts[irq] = data_race(*per_cpu_ptr(desc->kstat_irqs, unkick_cpu));
+			irq_counts[irq] = data_race(per_cpu_ptr(desc->kstat_irqs, unkick_cpu)->cnt);
 		}
 	}
 	mdelay(2000);
 	aee_sram_fiq_log("show irq count in 2s:\n");
-	for (irq = 0; irq < min_t(int, nr_irqs, MAX_IRQ_NUM); irq++) {
+	for (irq = 0; irq < min_t(int, irq_get_nr_irqs(), MAX_IRQ_NUM); irq++) {
 		desc = irq_to_desc(irq);
 		if (!desc || !desc->kstat_irqs)
 			continue;
@@ -739,7 +739,7 @@ static void show_irq_count(void)
 		 * read desc->kstat_irqs maybe encounter data race.
 		 * use data_race bypass iterator_category
 		 */
-		count = data_race(*per_cpu_ptr(desc->kstat_irqs, unkick_cpu));
+		count = data_race(per_cpu_ptr(desc->kstat_irqs, unkick_cpu)->cnt);
 		if (count == irq_counts[irq])
 			continue;
 
@@ -769,7 +769,7 @@ static void show_irq_count(void)
 }
 
 #if IS_ENABLED(CONFIG_SMP)
-static struct __call_single_data wdt_csd[MAX_CPUNR];
+static call_single_data_t wdt_csd[MAX_CPUNR]; /* rodin r25: 6.18 carries the alignment on the typedef */ /* rodin r25: smp_call_function_single_async wants 32B-aligned csd */
 #endif
 static void kwdt_dump_func(void)
 {
@@ -1109,7 +1109,7 @@ static void kwdt_process_kick(int local_bit, int cpu,
 	if ((local_bit & (get_check_bit() & s_s2idle)) == (get_check_bit() & s_s2idle)) {
 		all_k_timer_t = sched_clock();
 		if (timer_pending(&aee_dump_timer))
-			del_timer(&aee_dump_timer);
+			timer_delete(&aee_dump_timer);
 		aee_dump_timer_t = 0;
 		cpus_skip_bit = 0;
 		msg_buf[5] = 'k';
@@ -1386,7 +1386,7 @@ static int wdt_pm_notify(struct notifier_block *notify_block,
 
 		spin_lock_bh(&lock);
 		if (timer_pending(&aee_dump_timer))
-			del_timer(&aee_dump_timer);
+			timer_delete(&aee_dump_timer);
 		aee_dump_timer_t = 0;
 		g_hang_detected = 0;
 		spin_unlock_bh(&lock);

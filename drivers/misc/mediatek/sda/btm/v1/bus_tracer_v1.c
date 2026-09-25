@@ -4,6 +4,7 @@
  */
 
 #include <linux/circ_buf.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/module.h>

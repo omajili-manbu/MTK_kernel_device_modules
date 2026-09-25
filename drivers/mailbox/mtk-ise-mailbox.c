@@ -4,6 +4,7 @@
  */
 
 #include "mtk-ise-mailbox.h"
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 
 static void __iomem *mbox_base;
 static uint32_t real_drv;
@@ -411,10 +412,9 @@ static int ise_mbox_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int ise_mbox_remove(struct platform_device *pdev)
-{
+static void ise_mbox_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	mutex_destroy(&mbox_lock);
-	return 0;
+	return;
 }
 
 static const struct of_device_id ise_mbox_of_ids[] = {

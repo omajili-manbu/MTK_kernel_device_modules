@@ -13,5 +13,5 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/hw_sem
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/iommu
 
 
-obj-$(CONFIG_MTK_MMINFRA) += mtk-mminfra-debug.o mtk-mminfra-imax.o
+obj-$(CONFIG_MTK_MMINFRA_DEBUG_STACK) += mtk-mminfra-debug.o mtk-mminfra-imax.o
 obj-$(CONFIG_MTK_MMINFRA) += mm-fake-engine.o

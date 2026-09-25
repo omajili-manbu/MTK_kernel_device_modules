@@ -4,6 +4,13 @@
  */
 
 #include <linux/module.h>       /* needed by all modules */
+
+/* rodin r25: mtk-smi stays a 6.6 blob in this batch, so its debug hook has no
+ * vmlinux definition. Stub it here; the guard flips automatically once
+ * CONFIG_DEVICE_MODULES_MTK_SMI becomes builtin. */
+#if !IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_SMI)
+#define mtk_smi_dbg_hang_detect(...) do { } while (0)
+#endif
 #include <linux/init.h>         /* needed by module macros */
 #include <linux/fs.h>           /* needed by file_operations* */
 #include <linux/miscdevice.h>   /* needed by miscdevice* */
@@ -788,7 +795,7 @@ static void vcp_A_set_ready(void)
 {
 	pr_debug("[VCP] %s()\n", __func__);
 #if VCP_BOOT_TIME_OUT_MONITOR
-	del_timer(&vcp_ready_timer[VCP_A_ID].tl);
+	timer_delete(&vcp_ready_timer[VCP_A_ID].tl);
 #endif
 	vcp_A_notify_work.flags = 1;
 	vcp_schedule_work(&vcp_A_notify_work);
@@ -1226,7 +1233,7 @@ int vcp_disable_pm_clk(enum feature_id id)
 		wait_vcp_ready_to_reboot();
 
 #if VCP_BOOT_TIME_OUT_MONITOR
-		del_timer(&vcp_ready_timer[VCP_A_ID].tl);
+		timer_delete(&vcp_ready_timer[VCP_A_ID].tl);
 #endif
 		vcp_wait_core_stop_timeout(1);
 
@@ -1299,7 +1306,7 @@ static int vcp_pm_event(struct notifier_block *notifier
 				flush_workqueue(vcp_logger_workqueue);
 #endif
 #if VCP_BOOT_TIME_OUT_MONITOR
-				del_timer(&vcp_ready_timer[VCP_A_ID].tl);
+				timer_delete(&vcp_ready_timer[VCP_A_ID].tl);
 #endif
 				vcp_wait_core_stop_timeout(1);
 				vcp_disable_dapc();
@@ -1334,7 +1341,7 @@ static int vcp_pm_event(struct notifier_block *notifier
 				flush_workqueue(vcp_logger_workqueue);
 #endif
 #if VCP_BOOT_TIME_OUT_MONITOR
-				del_timer(&vcp_ready_timer[VCP_A_ID].tl);
+				timer_delete(&vcp_ready_timer[VCP_A_ID].tl);
 #endif
 
 				vcp_wait_awake_count();
@@ -2368,10 +2375,8 @@ static int vcp_reserve_memory_ioremap(struct platform_device *pdev, struct devic
 			sizeof(*dma_dev->dma_parms), GFP_KERNEL);
 	}
 	if (dma_dev->dma_parms) {
-		ret = dma_set_max_seg_size(dma_dev,
-			(unsigned int)DMA_BIT_MASK(64));
-		if (ret)
-			dev_info(dma_dev, "Failed to set DMA segment size\n");
+		dma_set_max_seg_size(dma_dev,
+			(unsigned int)DMA_BIT_MASK(64)); /* rodin r25: void in 6.18 */
 	}
 
 	for (id = 0; id < NUMS_MEM_ID; id++) {
@@ -2945,18 +2950,15 @@ static int vcp_io_device_probe(struct platform_device *pdev)
 			sizeof(*vcp_io_devs[vcp_support-1]->dma_parms), GFP_KERNEL);
 	}
 	if (vcp_io_devs[vcp_support-1]->dma_parms) {
-		ret = dma_set_max_seg_size(vcp_io_devs[vcp_support-1],
-			(unsigned int)DMA_BIT_MASK(64));
-		if (ret)
-			dev_info(vcp_io_devs[vcp_support-1], "Failed to set DMA segment size\n");
+		dma_set_max_seg_size(vcp_io_devs[vcp_support-1],
+			(unsigned int)DMA_BIT_MASK(64)); /* rodin r25: void in 6.18 */
 	}
 
 	return 0;
 }
 
-static int vcp_io_device_remove(struct platform_device *dev)
-{
-	return 0;
+static void vcp_io_device_remove(struct platform_device *dev) /* rodin r25: 6.18 remove is void */{
+	return;
 }
 
 void mbox_setup_pin_table(unsigned int mbox)
@@ -3122,9 +3124,8 @@ static int vcp_infra_vcp_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int vcp_infra_vcp_remove(struct platform_device *dev)
-{
-	return 0;
+static void vcp_infra_vcp_remove(struct platform_device *dev) /* rodin r25: 6.18 remove is void */{
+	return;
 }
 
 static int vcp_device_probe(struct platform_device *pdev)
@@ -3551,8 +3552,7 @@ void dump_vcp_irq_status(void)
 EXPORT_SYMBOL_GPL(dump_vcp_irq_status);
 
 
-static int vcp_device_remove(struct platform_device *pdev)
-{
+static void vcp_device_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	pm_runtime_disable(&pdev->dev);
 
 	kfree(vcp_mbox_info);
@@ -3562,7 +3562,7 @@ static int vcp_device_remove(struct platform_device *pdev)
 	kfree(vcp_mbox_pin_send);
 	vcp_mbox_pin_send = NULL;
 
-	return 0;
+	return;
 }
 
 static void vcp_device_shutdown(struct platform_device *pdev)
@@ -4003,7 +4003,7 @@ static void __exit vcp_exit(void)
 
 #if VCP_BOOT_TIME_OUT_MONITOR
 	for (i = 0; i < VCP_CORE_TOTAL ; i++)
-		del_timer(&vcp_ready_timer[i].tl);
+		timer_delete(&vcp_ready_timer[i].tl);
 #endif
 	platform_driver_unregister(&mtk_vcp_io_acp_codec);
 	platform_driver_unregister(&mtk_vcp_io_acp_venc);
@@ -4023,5 +4023,5 @@ module_exit(vcp_exit);
 
 MODULE_DESCRIPTION("MEDIATEK Module VCP driver");
 MODULE_AUTHOR("Mediatek");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL");

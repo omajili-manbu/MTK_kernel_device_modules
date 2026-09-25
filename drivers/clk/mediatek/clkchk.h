@@ -4,6 +4,7 @@
  * Author: Owen Chen <owen.chen@mediatek.com>
  */
 #include <linux/pm_domain.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/regmap.h>
 
 #ifndef __MTK_CLK_CHK_H

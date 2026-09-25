@@ -3,6 +3,7 @@
 // Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/platform_device.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/mfd/mt6359p/registers.h>
 #include <linux/mfd/mt6397/core.h>
 #include <linux/module.h>

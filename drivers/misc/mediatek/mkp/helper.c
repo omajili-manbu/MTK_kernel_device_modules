@@ -7,21 +7,8 @@
 
 DEBUG_SET_LEVEL(DEBUG_LEVEL_ERR);
 
-int is_vmalloc_or_module_addr(const void *x)
-{
-	/*
-	 * ARM, x86-64 and sparc64 put modules in a special place,
-	 * and fall back on vmalloc() if that fails. Others
-	 * just put it in the vmalloc space.
-	 */
-#if IS_ENABLED(CONFIG_MODULES) && defined(MODULES_VADDR)
-	unsigned long addr = (unsigned long)x;
-
-	if (addr >= MODULES_VADDR && addr < MODULES_END)
-		return 1;
-#endif
-	return is_vmalloc_addr(x);
-}
+/* rodin r25: the local copy of is_vmalloc_or_module_addr() was dropped --
+ * 6.18 exports it (GPL) from mm/vmalloc.c; callers keep using helper.h. */
 
 static int call_helper(enum helper_ops ops, uint32_t policy, uint32_t handle)
 {

@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
@@ -21,6 +22,12 @@
 #include "scpsys.h"
 #include "mtk-scpsys.h"
 
+/* rodin r25: the 6.18 kernel tree ships an older mt6765-power.h that both
+ * lacks the vendor macros (MD1/DIS/DPY/IFR/NR) and renumbers the shared
+ * ones (CAM/CONN/ISP/...). Pull the vendor copy first -- both headers
+ * share the same include guard, so the kernel copy becomes a no-op and
+ * this legacy platform file keeps vendor semantics. */
+#include "../../../include/dt-bindings/power/mt6765-power.h"
 #include <dt-bindings/power/mt6765-power.h>
 
 

@@ -7,6 +7,7 @@
 #define __MTK_SCPSYS_H__
 
 #include <linux/pm_domain.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include "scpsys.h"
 
 #define MTK_POLL_DELAY_US		10

@@ -420,5 +420,25 @@ void aee_reinit_die_lock(void)
 	raw_spin_lock_init(p_die_lock);
 }
 
+/* rodin r25: aee_get_stext/etext/init_begin exist only in the MODULE
+ * branch upstream; as builtins reference the kernel section symbols
+ * directly. */
+#include <asm/sections.h>
+
+unsigned long aee_get_stext(void)
+{
+	return (unsigned long)_stext;
+}
+
+unsigned long aee_get_etext(void)
+{
+	return (unsigned long)_etext;
+}
+
+unsigned long aee_get_init_begin(void)
+{
+	return (unsigned long)__init_begin;
+}
+
 #endif
 

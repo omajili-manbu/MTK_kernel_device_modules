@@ -10,6 +10,7 @@
  *
  */
 #include <linux/cdev.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/fs.h>
 
 #include <linux/module.h>

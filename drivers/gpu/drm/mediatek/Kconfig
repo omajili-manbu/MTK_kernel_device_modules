@@ -67,3 +67,12 @@ source "$(KCONFIG_EXT_PREFIX)drivers/gpu/drm/mediatek/mediatek_v2/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/gpu/drm/mediatek/mml/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/gpu/drm/mediatek/dummy_drm/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/gpu/drm/mediatek/dpc/Kconfig"
+
+config MTK_DRM_V2_FULL
+	bool "build full mediatek-drm v2 stack (rodin: scoped out of builtin batch 2)"
+	default n
+	help
+	  rodin r25: mtk_sync/mtk_panel_ext/mtk_disp_notify build builtin under
+	  DEVICE_MODULES_DRM_MEDIATEK, while the mediatek-drm driver itself,
+	  mediatek_v2/ and mml/ stay behind this switch until their 6.18 point
+	  fixes land. Default n keeps them out of the kernel image.

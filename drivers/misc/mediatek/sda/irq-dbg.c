@@ -11,6 +11,7 @@
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_66.h"
 #include <linux/sched.h>
 #include <linux/preempt.h>
 #include <linux/sched/cputime.h>

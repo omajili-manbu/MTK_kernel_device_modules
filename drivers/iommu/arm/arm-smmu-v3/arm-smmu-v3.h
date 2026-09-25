@@ -339,21 +339,14 @@ struct arm_smmu_impl {
 	void (*get_resv_regions)(struct device *dev, struct list_head *head);
 	int (*smmu_irq_handler)(int irq, void *dev);
 	int (*smmu_evt_handler)(int irq, void *dev, u64 *evt);
-	int (*report_device_fault)(struct arm_smmu_device *smmu,
-				   struct arm_smmu_master *master,
-				   u64 *evt,
-				   struct iommu_fault_event *fault_evt);
+	/* rodin r25: removed in 6.18 (iopf rework / dev-feature API) */
 	void (*smmu_setup_features)(struct arm_smmu_master *master,
 				    u32 sid, __le64 *dst);
 	int (*def_domain_type)(struct device *dev);
-	bool (*dev_has_feature)(struct device *dev,
-				enum iommu_dev_features feat);
-	bool (*dev_feature_enabled)(struct device *dev,
-				    enum iommu_dev_features feat);
-	bool (*dev_enable_feature)(struct device *dev,
-				   enum iommu_dev_features feat);
-	bool (*dev_disable_feature)(struct device *dev,
-				    enum iommu_dev_features feat);
+	/* rodin r25: removed in 6.18 (iopf rework / dev-feature API) */
+	/* rodin r25: removed in 6.18 (iopf rework / dev-feature API) */
+	/* rodin r25: removed in 6.18 (iopf rework / dev-feature API) */
+	/* rodin r25: removed in 6.18 (iopf rework / dev-feature API) */
 	int (*map_pages)(struct arm_smmu_domain *smmu_domain, unsigned long iova,
 			 phys_addr_t paddr, size_t pgsize, size_t pgcount,
 			 int prot, gfp_t gfp, size_t *mapped);

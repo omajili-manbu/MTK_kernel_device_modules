@@ -11,7 +11,10 @@ vcp-$(CONFIG_MTK_TINYSYS_VCP_SUPPORT) += vcp_feature_table.o
 vcp-$(CONFIG_MTK_TINYSYS_VCP_SUPPORT) += vcp_awake.o
 vcp-$(CONFIG_MTK_TINYSYS_VCP_SUPPORT) += vcp_hwvoter_dbg.o
 
-ccflags-y += -D DEBUG_DO -fno-pic -mcmodel=large
+# rodin r25: -fno-pic -mcmodel=large dropped -- as a builtin these TUs
+# link into the KASLR-relocated vmlinux, which rejects their
+# R_AARCH64_MOVW_UABS_* absolute relocations. Kernel default model works.
+ccflags-y += -D DEBUG_DO
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/vcp/include
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/vcp/rv

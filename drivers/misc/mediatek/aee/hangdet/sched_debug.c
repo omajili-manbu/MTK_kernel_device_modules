@@ -410,8 +410,6 @@ void print_cfs_rq_at_AEE(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 	SEQ_printf_at_AEE(m, "\n");
 	SEQ_printf_at_AEE(m, "cfs_rq[%d]:\n", cpu);
 #endif
-	SEQ_printf_at_AEE(m, "  .%-30s: %lld.%06ld\n", "exec_clock",
-			SPLIT_NS(cfs_rq->exec_clock));
 
 #if NO_EXPORT
 	locked = raw_spin_trylock_n_irqsave(&rq->lock,
@@ -443,8 +441,6 @@ void print_cfs_rq_at_AEE(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 		cfs_rq->nr_spread_over);
 #endif
 
-	SEQ_printf_at_AEE(m, "  .%-30s: %d\n",
-			"nr_running", cfs_rq->nr_running);
 	SEQ_printf_at_AEE(m, "  .%-30s: %ld\n", "load", cfs_rq->load.weight);
 #if IS_ENABLED(CONFIG_SMP)
 	SEQ_printf_at_AEE(m, "  .%-30s: %lu\n", "load_avg",
@@ -514,12 +510,8 @@ void print_rt_rq_at_AEE(struct seq_file *m, int cpu, struct rt_rq *rt_rq)
 
 	P(rt_nr_running);
 #if IS_ENABLED(CONFIG_SMP)
-	PU(rt_nr_migratory);
 #endif
 
-	P(rt_throttled);
-	PN(rt_time);
-	PN(rt_runtime);
 
 #undef PN
 #undef PU
@@ -578,7 +570,6 @@ void print_dl_rq_at_AEE(struct seq_file *m, int cpu, struct dl_rq *dl_rq)
 
 	PU(dl_nr_running);
 #if IS_ENABLED(CONFIG_SMP)
-	PU(dl_nr_migratory);
 	dl_bw = &cpu_rq(cpu)->rd->dl_bw;
 #else
 	dl_bw = &dl_rq->dl_bw;
@@ -749,3 +740,7 @@ void sysrq_sched_debug_show_at_AEE(void)
 #endif
 }
 /*** *** *** Print sched debug information at aee END *** *** ***/
+
+/* rodin r25: 6.18 removed cfs_rq.exec_clock/nr_running and
+ * rt_rq.rt_time/rt_runtime/rt_nr_migratory/rt_throttled and
+ * dl_rq.dl_nr_migratory; the corresponding debug prints are dropped. */

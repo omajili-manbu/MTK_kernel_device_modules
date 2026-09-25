@@ -16,6 +16,10 @@
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/rpmsg.h>
+/* rodin r25: vendor-first include -- kernel-tree mtk_rpmsg.h lacks the
+ * mtk_rpmsg_channel_info/endpoint/device structs; identical guard lets
+ * the vendor (superset) copy win for this TU. */
+#include "../../../include/linux/rpmsg/mtk_rpmsg.h"
 #include <linux/rpmsg/mtk_rpmsg.h>
 #include <linux/iommu.h>
 #include <linux/workqueue.h>

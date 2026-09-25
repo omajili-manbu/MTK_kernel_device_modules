@@ -10,11 +10,25 @@
 #include <linux/iommu.h>
 #include <linux/io-pgtable.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h> /* rodin r25: of_find_device_by_node */
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/interrupt.h>
 #include <soc/mediatek/smi.h>
 
 #include <dt-bindings/memory/mtk-memory-port.h>
 #include "arm-smmu-v3.h"
+
+/* rodin r25: 6.18 gates this struct behind CONFIG_MTK_SMI; the smi driver is
+ * a blob in this batch, so keep the identical upstream layout available.
+ * RODIN_..._FALLBACK is shared with mtk_iommu.h (same-TU collision). */
+#if !IS_ENABLED(CONFIG_MTK_SMI) && !defined(RODIN_MTK_SMI_LARB_IOMMU_FALLBACK)
+#define RODIN_MTK_SMI_LARB_IOMMU_FALLBACK
+struct mtk_smi_larb_iommu {
+	struct device *dev;
+	unsigned int   mmu;
+	unsigned char  bank[32];
+};
+#endif
 
 #if (IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_SMMU_V3) && \
 	IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG))
@@ -554,7 +568,7 @@ struct mtk_smmu_fault_param {
 struct mtk_iommu_fault_event {
 	struct mtk_smmu_fault_param mtk_fault_param[SMMU_TFM_TYPE_NUM][SMMU_TBU_CNT_MAX];
 	struct mtk_smmu_fault_param *first_fault_param;
-	struct iommu_fault_event fault_evt;
+	struct iopf_fault fault_evt; /* rodin r25: iommu_fault_event removed in 6.18 */
 };
 
 struct mtk_smmu_ops {

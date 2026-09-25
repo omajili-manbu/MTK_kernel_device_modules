@@ -4,6 +4,7 @@
  */
 
 #include <linux/vmalloc.h>         /* needed by vmalloc */
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/sysfs.h>
 #include <linux/device.h>       /* needed by device_* */
 #include <linux/workqueue.h>

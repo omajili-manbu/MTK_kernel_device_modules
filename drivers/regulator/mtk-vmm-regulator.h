@@ -6,6 +6,7 @@
 #ifndef _ISP_DVFS_H
 #define _ISP_DVFS_H
 #include <linux/mutex.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/types.h>
 #include <linux/remoteproc.h>
 #include <linux/workqueue.h>

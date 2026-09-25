@@ -17,6 +17,13 @@
 #include <linux/seq_file.h>
 #include "pinctrl-paris.h"
 
+/* rodin r25: GPIO_DYNAMIC_BASE is a private constant of kernel
+ * drivers/gpio/gpiolib.c (no header exports it); mirror the 6.18 value.
+ * Re-check on every kernel upgrade. */
+#ifndef GPIO_DYNAMIC_BASE
+#define GPIO_DYNAMIC_BASE		512
+#endif
+
 #define PULL_DELAY 50 /* in ms */
 #define FUN_3STATE "gpio_get_value_tristate"
 

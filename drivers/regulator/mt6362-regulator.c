@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/mfd/mt6362.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>

@@ -3,6 +3,7 @@
 // Copyright (c) 2019 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/mfd/mt6358/registers.h>
 #include <linux/mfd/mt6397/core.h>
 #include <linux/module.h>

@@ -3,11 +3,11 @@ ccflags-y += -I$(srctree)/drivers/pinctrl/mediatek
 
 # Core
 ifeq ($(CONFIG_DEVICE_MODULES_EINT_MTK),m)
-obj-m += pinctrl-mtk-v2.o
+obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += pinctrl-mtk-v2.o
 else ifeq ($(CONFIG_DEVICE_MODULES_PINCTRL_MTK_V2),m)
-obj-m += pinctrl-mtk-v2.o
+obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += pinctrl-mtk-v2.o
 else ifeq ($(CONFIG_DEVICE_MODULES_PINCTRL_MTK_PARIS),m)
-obj-m += pinctrl-mtk-v2.o
+obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += pinctrl-mtk-v2.o
 endif
 
 ifeq ($(CONFIG_DEVICE_MODULES_EINT_MTK),y)

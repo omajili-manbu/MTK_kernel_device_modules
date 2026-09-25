@@ -4,6 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/clk.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>

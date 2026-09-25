@@ -12,6 +12,10 @@
 #include <linux/spinlock.h>
 #include <linux/sched/clock.h>
 #include <linux/rpmsg.h>
+/* rodin r25: vendor-first include -- kernel-tree mtk_rpmsg.h lacks the
+ * mtk_rpmsg_channel_info/endpoint/device structs; identical guard lets
+ * the vendor (superset) copy win for this TU. */
+#include "../../../include/linux/rpmsg/mtk_rpmsg.h"
 #include <linux/rpmsg/mtk_rpmsg.h>
 #include <linux/soc/mediatek/mtk-mbox.h>
 #include <linux/soc/mediatek/mtk_tinysys_ipi.h>

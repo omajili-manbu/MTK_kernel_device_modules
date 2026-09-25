@@ -4,6 +4,7 @@
  * Author: Ming-Fan Chen <ming-fan.chen@mediatek.com>
  */
 #include <dt-bindings/interconnect/mtk,mmqos.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 //#include <dt-bindings/interconnect/mtk,mt6768-emi.h>
 #include <dt-bindings/memory/mt6768-larb-port.h>
 #include <linux/module.h>

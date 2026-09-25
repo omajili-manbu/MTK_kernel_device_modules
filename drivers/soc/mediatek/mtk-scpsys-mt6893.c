@@ -3,6 +3,7 @@
 // Copyright (c) 2021 MediaTek Inc.
 // Author: Owen Chen <owen.chen@mediatek.com>
 #include <linux/clk.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>

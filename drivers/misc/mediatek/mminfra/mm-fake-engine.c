@@ -27,9 +27,7 @@ static void mm_config_dma_mask(struct device *dev)
 		dma_mask_bit, ret);
 
 	if (dev->dma_parms) {
-		ret = dma_set_max_seg_size(dev, UINT_MAX);
-		if (ret)
-			pr_notice("%s Failed to set DMA segment size\n", __func__);
+		dma_set_max_seg_size(dev, UINT_MAX); /* rodin r25: void in 6.18 */
 	}
 }
 
@@ -43,10 +41,9 @@ static int mm_fake_eng_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mm_fake_eng_remove(struct platform_device *pdev)
+static void mm_fake_eng_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */
 {
 	pr_notice("%s for smmu fake dev", __func__);
-	return 0;
 }
 
 static const struct of_device_id mm_fake_eng_of_ids[] = {

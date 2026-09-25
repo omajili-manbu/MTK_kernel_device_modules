@@ -3,6 +3,7 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>

@@ -333,7 +333,7 @@ static __init int mrdump_parse_chosen(struct mrdump_params *mparams)
 		}
 
 		if (of_property_read_string(node, "mrdump,lk", &lkver) == 0) {
-			strlcpy(mparams->lk_version, lkver,
+			strscpy(mparams->lk_version, lkver,
 				sizeof(mparams->lk_version));
 			pr_notice("%s: lk version %s\n", __func__, lkver);
 		}

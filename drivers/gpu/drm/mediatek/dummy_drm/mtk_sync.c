@@ -195,7 +195,8 @@ static bool mtk_sync_timeline_fence_signaled(struct dma_fence *fence)
 {
 	struct sync_timeline *parent = dma_fence_parent(fence);
 
-	return !__dma_fence_is_later(fence->seqno, parent->value, fence->ops);
+	/* rodin r25: 6.18 __dma_fence_is_later(fence, f1, f2) */
+	return !__dma_fence_is_later(fence, fence->seqno, parent->value);
 }
 
 static bool mtk_sync_timeline_fence_enable_signaling(struct dma_fence *fence)

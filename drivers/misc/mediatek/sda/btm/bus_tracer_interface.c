@@ -27,13 +27,7 @@ static const struct of_device_id bus_tracer_of_ids[] = {
 };
 
 static int bus_tracer_probe(struct platform_device *pdev);
-static int bus_tracer_remove(struct platform_device *pdev);
-static int bus_tracer_suspend(struct platform_device *pdev, pm_message_t state);
-static int bus_tracer_resume(struct platform_device *pdev);
-
-static char *bus_tracer_dump_buf;
-
-static struct bus_tracer bus_tracer_drv = {
+static void bus_tracer_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	.plt_drv = {
 		.driver = {
 			.name = "bus_tracer",

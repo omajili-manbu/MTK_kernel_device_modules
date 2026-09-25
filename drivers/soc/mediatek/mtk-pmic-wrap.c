@@ -4,6 +4,8 @@
  * Author: Flora Fu, MediaTek
  */
 #include <linux/clk.h>
+#include <linux/of_platform.h> /* rodin r25: 6.18 header pruning */
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -5316,9 +5318,8 @@ err_out_wrap:
 	return ret;
 }
 
-static int pwrap_remove(struct platform_device *pdev)
-{
-	return 0;
+static void pwrap_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
+	return;
 }
 
 static struct platform_driver pwrap_drv = {

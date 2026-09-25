@@ -20,6 +20,7 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h> /* for SMC ID table */
+#include "../../sda/rodin_sip_66.h" /* rodin r25: vendor SMC ids */
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 #include <uapi/linux/sched/types.h>

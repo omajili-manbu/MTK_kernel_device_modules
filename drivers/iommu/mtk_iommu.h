@@ -19,6 +19,25 @@
 #include <soc/mediatek/smi.h>
 #include <dt-bindings/memory/mtk-memory-port.h>
 
+/* rodin r25: 6.18 gates these behind CONFIG_MTK_SMI (kernel symbol, =n
+ * here -- the smi driver stays a 6.6 blob); keep the identical upstream
+ * layout available. Same fallback pattern as mtk-smmu-v3.h; the
+ * RODIN_..._FALLBACK guard keeps the two headers from defining the
+ * struct twice in the same TU. */
+#if !IS_ENABLED(CONFIG_MTK_SMI) && !defined(RODIN_MTK_SMI_LARB_IOMMU_FALLBACK)
+#define RODIN_MTK_SMI_LARB_IOMMU_FALLBACK
+struct mtk_smi_larb_iommu {
+	struct device *dev;
+	unsigned int   mmu;
+	unsigned char  bank[32];
+};
+#endif
+/* MTK_SMI_MMU_EN needs its own guard: the struct guard above may already
+ * have been consumed by mtk-smmu-v3.h in the same TU. */
+#ifndef MTK_SMI_MMU_EN
+#define MTK_SMI_MMU_EN(port)	BIT(port)
+#endif
+
 #define MTK_LARB_COM_MAX	16
 #define MTK_LARB_SUBCOM_MAX	4
 

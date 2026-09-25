@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/printk.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include "rodin_sip_66.h"
 #include <linux/arm-smccc.h>
 #include "sda.h"
 
@@ -220,13 +221,11 @@ static int mtk_dbgtop_drm_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_dbgtop_drm_remove(struct platform_device *pdev)
+static void mtk_dbgtop_drm_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */
 {
 	dev_info(&pdev->dev, "driver removed\n");
 
 	global_dbgtop_drm = NULL;
-
-	return 0;
 }
 
 #if IS_ENABLED(CONFIG_OF)

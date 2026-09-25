@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-obj-y += arm/
+obj-$(CONFIG_DEVICE_MODULES_ARM_SMMU_V3) += arm/
 
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/iommu
 

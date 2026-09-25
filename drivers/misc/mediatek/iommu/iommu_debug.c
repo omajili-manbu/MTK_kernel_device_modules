@@ -8,7 +8,7 @@
 #include <linux/bitfield.h>
 #include <linux/bits.h>
 #include <linux/iova.h>
-#include <linux/io-pgtable-arm.h>
+#include "rodin_io_pgtable_arm_66.h"
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/of_platform.h>
@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h> /* rodin r25: 6.18 header pruning */
 #include <linux/sched/clock.h>
 #if IS_ENABLED(CONFIG_STACKTRACE)
 #include <linux/stacktrace.h>

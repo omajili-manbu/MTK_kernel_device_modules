@@ -18,3 +18,11 @@ config MTK_MMINFRA_DEBUG
 	  enable this in userdebug/eng load. With this extension enabled, you
 	  can use adb command to dynamically do MMINFRA debug items. This extension
 	  is by default disabled on user load for security concern.
+
+config MTK_MMINFRA_DEBUG_STACK
+	bool "mminfra debug/imax stack (rodin: scoped out of builtin batch 2)"
+	default n
+	help
+	  rodin r25: mm-fake-engine builds builtin under MTK_MMINFRA, while
+	  mtk-mminfra-debug/imax stay behind this switch until their smmu-v3
+	  header chain is ported to 6.18. Default n keeps them as blobs.

@@ -10,6 +10,7 @@
 #define __PINCTRL_MTK_COMMON_V2_H
 
 #include <linux/gpio/driver.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 
 #define MTK_INPUT      0
 #define MTK_OUTPUT     1
@@ -391,4 +392,11 @@ int mtk_pinconf_adv_drive_get_raw(struct mtk_pinctrl *hw,
 				  const struct mtk_pin_desc *desc, u32 *val);
 
 bool mtk_is_virt_gpio(struct mtk_pinctrl *hw, unsigned int gpio_n);
+
+/* rodin r25: kernel-tree dt-bindings/pinctrl/mt65xx.h (shadowing the vendor
+ * copy) lacks MTK_PULL_SET_RSEL_MAX; vendor value 207 == MTK_PULL_SET_RSEL_111.
+ * Single guard covering paris.c / common-v2.c / common-v2_debug.c. */
+#ifndef MTK_PULL_SET_RSEL_MAX
+#define MTK_PULL_SET_RSEL_MAX		207
+#endif
 #endif /* __PINCTRL_MTK_COMMON_V2_H */

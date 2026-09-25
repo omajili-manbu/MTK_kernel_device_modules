@@ -131,5 +131,16 @@ int mtk_deferred_freelist_init(void)
 	}
 	sched_set_normal(mtk_freelist_task, 19);
 
-	return register_shrinker(&mtk_freelist_shrinker, "");
+	struct shrinker *mtk_freelist_shrinker_p;
+
+	/* rodin r25: 6.18 replaced register_shrinker with shrinker_alloc/register */
+	mtk_freelist_shrinker_p = shrinker_alloc(0, "mtk-dmabuf-deferred-free");
+	if (!mtk_freelist_shrinker_p)
+		return -ENOMEM;
+	mtk_freelist_shrinker_p->count_objects = mtk_freelist_shrinker.count_objects;
+	mtk_freelist_shrinker_p->scan_objects = mtk_freelist_shrinker.scan_objects;
+	mtk_freelist_shrinker_p->seeks = mtk_freelist_shrinker.seeks;
+	mtk_freelist_shrinker_p->batch = mtk_freelist_shrinker.batch;
+	shrinker_register(mtk_freelist_shrinker_p);
+	return 0;
 }

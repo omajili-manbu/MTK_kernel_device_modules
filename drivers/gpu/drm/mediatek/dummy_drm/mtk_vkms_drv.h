@@ -7,6 +7,7 @@
 #define _MTK_VKMS_DRV_H_
 
 #include <linux/hrtimer.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 
 #include <drm/drm.h>
 #include <drm/drm_gem.h>

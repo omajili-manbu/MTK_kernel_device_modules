@@ -7,6 +7,7 @@
 	pr_notice("[CLKDBG] %s:%d: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 #include <linux/device.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
@@ -1323,8 +1324,7 @@ static int clkdbg_probe(struct platform_device *pdev)
 	return r;
 }
 
-static int clkdbg_remove(struct platform_device *pdev)
-{
+static void clkdbg_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	int r;
 
 	r = pm_runtime_put_sync(&pdev->dev);
@@ -1332,7 +1332,7 @@ static int clkdbg_remove(struct platform_device *pdev)
 		pr_warn("%s(): pm_runtime_put_sync(%d)\n", __func__, r);
 	pm_runtime_disable(&pdev->dev);
 
-	return r;
+	return;
 }
 
 struct pdev_drv {

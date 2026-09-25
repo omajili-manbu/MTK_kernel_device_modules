@@ -317,13 +317,12 @@ static int cmdq_resume(struct device *dev)
 	return 0;
 }
 
-static int cmdq_remove(struct platform_device *pdev)
-{
+static void cmdq_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	struct cmdq *cmdq = platform_get_drvdata(pdev);
 
 	clk_unprepare(cmdq->clock);
 
-	return 0;
+	return;
 }
 
 static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)

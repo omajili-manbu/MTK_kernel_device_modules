@@ -4,6 +4,7 @@
  */
 #ifdef __aarch64__
 #include <asm/pointer_auth.h>
+#include <asm/stacktrace/frame.h> /* rodin r25: 6.18 moved struct frame_record here */
 #include <asm/stacktrace/common.h>
 #endif
 #include <asm/current.h>

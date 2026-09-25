@@ -6,6 +6,7 @@
  */
 
 #include "pinctrl-mtk-mt6877.h"
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include "pinctrl-paris.h"
 
 /* MT6877 have multiple bases to program pin configuration listed as the below:

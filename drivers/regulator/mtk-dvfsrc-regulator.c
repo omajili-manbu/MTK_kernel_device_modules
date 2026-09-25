@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/of.h> /* rodin r25: of_match_ptr lives here in 6.18 */
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/regulator/driver.h>

@@ -4,6 +4,7 @@
  * Author: Wendy-ST Lin <wendy-st.lin@mediatek.com>
  */
 #include <dt-bindings/interconnect/mtk,mmqos.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <dt-bindings/interconnect/mtk,emi.h>
 #include <dt-bindings/memory/mt6991-larb-port.h>
 #include <linux/module.h>

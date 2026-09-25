@@ -38,7 +38,7 @@ void mrdump_arch_fill_machdesc(struct mrdump_machdesc *machdesc_p)
 	machdesc_p->kernel_pac_mask = (uint64_t)system_supports_address_auth() ?
 		ptrauth_kernel_pac_mask() : 0;
 #if defined(KIMAGE_VADDR)
-	machdesc_p->kimage_vaddr = KIMAGE_VADDR;
+	machdesc_p->kimage_vaddr = (unsigned long)_text;
 #endif
 	machdesc_p->kimage_offset = kaslr_offset();
 	machdesc_p->kimage_voffset = (unsigned long)kimage_voffset;
@@ -137,7 +137,7 @@ void mrdump_arch_show_regs(const struct pt_regs *regs)
 	pr_info("sp : %016llx\n", sp);
 
 	if (system_uses_irq_prio_masking())
-		pr_info("pmr_save: %08llx\n", regs->pmr_save);
+		pr_info("pmr: %08x\n", regs->pmr); /* rodin r25: 6.18 pt_regs replaced pmr_save with u32 pmr */
 
 	i = top_reg;
 

@@ -19,6 +19,23 @@
 
 struct mrdump_control_block *mrdump_cblock;
 
+/* rodin r25: hang_detect.c (now builtin) calls these two hooks declared
+ * __weak in mt-plat/mrdump.h with no definition anywhere; as a builtin
+ * calling a weak-undefined symbol, the -Bsymbolic vmlinux link materializes
+ * PLT entries + JUMP_SLOTs and trips the vmlinux.lds ASSERTs. No-op stubs
+ * keep the "hook absent => size 0 => skip" behavior and bind locally. */
+void __weak mlog_get_buffer(char **ptr, int *size)
+{
+	*ptr = NULL;
+	*size = 0;
+}
+
+void __weak get_msdc_aee_buffer(unsigned long *buff, unsigned long *size)
+{
+	*buff = 0;
+	*size = 0;
+}
+
 static unsigned long mrdump_output_lbaooo;
 
 #if IS_ENABLED(CONFIG_SYSFS)

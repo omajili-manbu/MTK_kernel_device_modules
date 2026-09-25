@@ -874,4 +874,4 @@ int mini_rdump_reserve_memory(struct reserved_mem *rmem)
 
 RESERVEDMEM_OF_DECLARE(reserve_memory_minirdump, "mediatek,minirdump",
 		       mini_rdump_reserve_memory);
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+MODULE_IMPORT_NS("ANDROID_GKI_VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver"); /* rodin r25: 6.18 GKI prefixed the ns */

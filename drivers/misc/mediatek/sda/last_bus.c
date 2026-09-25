@@ -359,11 +359,10 @@ static int last_bus_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int last_bus_remove(struct platform_device *pdev)
-{
+static void last_bus_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	dev_info(&pdev->dev, "driver removed\n");
 
-	return 0;
+	return;
 }
 
 static const struct of_device_id last_bus_of_ids[] = {

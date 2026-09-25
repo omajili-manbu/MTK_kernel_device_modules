@@ -7,6 +7,7 @@
 #define __VCP_EXCEP_H__
 
 #include <linux/sizes.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include "vcp_helper.h"
 #include "vcp_ipi_pin.h"
 

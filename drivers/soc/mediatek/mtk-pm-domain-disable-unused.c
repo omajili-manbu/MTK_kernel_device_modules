@@ -4,6 +4,7 @@
 // Author: Owen Chen <owen.chen@mediatek.com>
 
 #include <linux/kernel.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>

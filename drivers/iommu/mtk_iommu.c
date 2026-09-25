@@ -1029,7 +1029,8 @@ static inline void mtk_iommu_isr_setup(struct mtk_iommu_data *data, unsigned lon
 
 static void mtk_iommu_isr_restart(struct timer_list *t)
 {
-	struct mtk_iommu_data *data = from_timer(data, t, iommu_isr_pause_timer);
+	/* rodin r25: 6.18 renamed from_timer() to timer_container_of() */
+	struct mtk_iommu_data *data = timer_container_of(data, t, iommu_isr_pause_timer);
 
 	mtk_iommu_isr_setup(data, 1);
 
@@ -1743,8 +1744,6 @@ static void mtk_iommu_domain_free(struct iommu_domain *domain)
 
 static int mtk_iommu_set_dev_dma(struct device *dev)
 {
-	int ret = 0;
-
 	if (!dev)
 		return -EINVAL;
 
@@ -1756,12 +1755,8 @@ static int mtk_iommu_set_dev_dma(struct device *dev)
 			return -ENOMEM;
 	}
 
-	ret = dma_set_max_seg_size(dev,
-				   (unsigned int)DMA_BIT_MASK(34));
-	if (ret) {
-		dev_info(dev, "Failed to set DMA segment size\n");
-		return ret;
-	}
+	/* rodin r25: 6.18 dma_set_max_seg_size() returns void */
+	dma_set_max_seg_size(dev, (unsigned int)DMA_BIT_MASK(34));
 
 	return 0;
 }
@@ -1957,8 +1952,8 @@ static void mtk_iommu_iotlb_sync(struct iommu_domain *domain,
 				       dom->data);
 }
 
-static void mtk_iommu_sync_map(struct iommu_domain *domain, unsigned long iova,
-			       size_t size)
+static int mtk_iommu_sync_map(struct iommu_domain *domain, unsigned long iova, /* rodin r25: 6.18 returns int */
+			      size_t size)
 {
 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
 	int ret;
@@ -1966,7 +1961,7 @@ static void mtk_iommu_sync_map(struct iommu_domain *domain, unsigned long iova,
 	if (iova > (iova + size)) {
 		pr_err("map invalid iova range : 0x%lx ~ 0x%lx\n",
 		       iova, iova + size);
-		return;
+		return 0;
 	}
 
 #if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG)
@@ -1985,6 +1980,8 @@ static void mtk_iommu_sync_map(struct iommu_domain *domain, unsigned long iova,
 	}
 
 	mtk_iommu_tlb_flush_range_sync(iova, size, size, dom->data);
+
+	return 0;
 }
 
 static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
@@ -2096,7 +2093,7 @@ static struct iommu_group *mtk_iommu_device_group(struct device *dev)
 	return group;
 }
 
-static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+static int mtk_iommu_of_xlate(struct device *dev, const struct of_phandle_args *args) /* rodin r25: 6.18 const */
 {
 	struct platform_device *m4updev;
 

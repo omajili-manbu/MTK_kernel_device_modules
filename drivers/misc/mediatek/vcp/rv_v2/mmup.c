@@ -4,6 +4,7 @@
  */
 
 #include <linux/of.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/io.h>
 #include <linux/of_irq.h>
 /* mmup mbox/ipi related */
@@ -347,8 +348,7 @@ static int mmup_device_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int mmup_device_remove(struct platform_device *pdev)
-{
+static void mmup_device_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	kfree(mmup_mbox_info);
 	mmup_mbox_info = NULL;
 	kfree(mmup_mbox_pin_recv);
@@ -356,7 +356,7 @@ static int mmup_device_remove(struct platform_device *pdev)
 	kfree(mmup_mbox_pin_send);
 	mmup_mbox_pin_send = NULL;
 
-	return 0;
+	return;
 }
 
 static const struct of_device_id mmup_of_ids[] = {

@@ -78,11 +78,19 @@ void timer_list_debug_exit(void)
 	timer_list_info = NULL;
 }
 
+/* rodin r25: 6.18 hrtimer_setup requires the callback; this per-cpu timer is
+ * never armed, so a dummy NORESTART callback keeps the debug printout intact. */
+static enum hrtimer_restart rodin_debug_hrtimer_dummy(struct hrtimer *t)
+{
+	return HRTIMER_NORESTART;
+}
+
 void percpu_debug_timer_init(void)
 {
 	struct hrtimer *hrtimer = this_cpu_ptr(&debug_hrtimer);
 
-	hrtimer_init(hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_PINNED_HARD);
+	hrtimer_setup(hrtimer, rodin_debug_hrtimer_dummy, CLOCK_MONOTONIC,
+		      HRTIMER_MODE_ABS_PINNED_HARD);
 	per_cpu(debug_hrtimer_ready, smp_processor_id()) = 1;
 }
 

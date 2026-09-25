@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/interconnect-provider.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -290,7 +291,6 @@ static int emi_icc_get_bw(struct icc_node *node, u32 *avg, u32 *peak)
 	return 0;
 }
 
-static int emi_icc_remove(struct platform_device *pdev);
 static int emi_icc_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -308,7 +308,7 @@ static int emi_icc_probe(struct platform_device *pdev)
 
 	if (!match) {
 		dev_err(dev, "invalid compatible string\n");
-		return -ENODEV;
+		return -EINVAL;
 	}
 
 	desc = match->data;
@@ -360,20 +360,19 @@ static int emi_icc_probe(struct platform_device *pdev)
 		goto err;
 
 	platform_set_drvdata(pdev, mtk_icc);
+
 	return 0;
 err:
 	icc_nodes_remove(provider);
 	return ret;
 }
 
-static int emi_icc_remove(struct platform_device *pdev)
+static void emi_icc_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */
 {
 	struct mtk_icc_provider *mtk_icc = platform_get_drvdata(pdev);
 
 	icc_provider_deregister(&mtk_icc->provider);
 	icc_nodes_remove(&mtk_icc->provider);
-
-	return 0;
 }
 
 static struct platform_driver emi_icc_driver = {

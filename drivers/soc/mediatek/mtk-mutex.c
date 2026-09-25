@@ -491,9 +491,8 @@ static int mtk_mutex_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_mutex_remove(struct platform_device *pdev)
-{
-	return 0;
+static void mtk_mutex_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
+	return;
 }
 
 static const struct of_device_id mutex_driver_dt_match[] = {

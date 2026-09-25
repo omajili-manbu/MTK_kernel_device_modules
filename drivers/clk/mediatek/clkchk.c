@@ -7,6 +7,7 @@
 	pr_notice("[CLKDBG] %s:%d: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 #include <linux/interrupt.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/notifier.h>
 #include <linux/of.h>
 #include <linux/of_address.h>

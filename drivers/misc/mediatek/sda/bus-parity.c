@@ -635,14 +635,13 @@ static int bus_parity_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int bus_parity_remove(struct platform_device *pdev)
-{
+static void bus_parity_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	dev_info(&pdev->dev, "driver removed\n");
 
 	flush_work(&mcu_bp.wk);
 	flush_work(&infra_bp.wk);
 
-	return 0;
+	return;
 }
 
 static const struct of_device_id bus_parity_of_ids[] = {

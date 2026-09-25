@@ -89,7 +89,7 @@ static int dump_bt_done;
 static bool reboot_flag;
 static struct name_list *white_list;
 #if IS_ENABLED(CONFIG_MTK_AEE_IPANIC)
-static struct pt_regs saved_regs;
+static struct pt_regs saved_regs __maybe_unused; /* rodin r25: only used under CONFIG_MTK_HANG_DETECT_DB */
 #endif
 
 unsigned int monitor_hang_boot_up_enable;
@@ -1987,4 +1987,4 @@ module_exit(monitor_hang_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek MonitorHang Driver");
 MODULE_AUTHOR("MediaTek Inc.");
-MODULE_IMPORT_NS(MINIDUMP);
+MODULE_IMPORT_NS("MINIDUMP"); /* rodin r25: string-literal syntax */

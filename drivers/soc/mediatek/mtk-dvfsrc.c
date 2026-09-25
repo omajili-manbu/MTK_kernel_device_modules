@@ -3,6 +3,8 @@
  * Copyright (C) 2018 MediaTek Inc.
  */
 #include <linux/arm-smccc.h>
+#include <linux/of_platform.h> /* rodin r25: 6.18 header pruning */
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
@@ -2310,14 +2312,13 @@ static const struct dvfsrc_soc_data mt6899_data = {
 	.emi_ddr_bw_en = true,
 };
 
-static int mtk_dvfsrc_remove(struct platform_device *pdev)
-{
+static void mtk_dvfsrc_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	struct mtk_dvfsrc *dvfsrc = platform_get_drvdata(pdev);
 
 	platform_device_unregister(dvfsrc->regulator);
 	platform_device_unregister(dvfsrc->icc);
 
-	return 0;
+	return;
 }
 
 static const struct of_device_id mtk_dvfsrc_of_match[] = {

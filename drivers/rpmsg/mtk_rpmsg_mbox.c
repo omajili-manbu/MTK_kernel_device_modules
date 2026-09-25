@@ -13,6 +13,10 @@
 
 #include "rpmsg_internal.h"
 #include <linux/soc/mediatek/mtk-mbox.h>
+/* rodin r25: vendor-first include -- kernel-tree mtk_rpmsg.h lacks the
+ * mtk_rpmsg_channel_info/endpoint/device structs; identical guard lets
+ * the vendor (superset) copy win for this TU. */
+#include "../../include/linux/rpmsg/mtk_rpmsg.h"
 #include <linux/rpmsg/mtk_rpmsg.h>
 
 #define to_mtk_rpmsg_device(r) container_of(r, struct mtk_rpmsg_device, rpdev)
@@ -130,7 +134,8 @@ mtk_rpmsg_create_channel(struct mtk_rpmsg_device *mdev, u32 chan_id, char *name)
 	mbdev = mdev->mbdev;
 	spin_lock_init(&mchan->channel_lock);
 	mchan->info.src = chan_id;
-	strlcpy(mchan->info.name, name, RPMSG_NAME_SIZE);
+	/* rodin r25: strlcpy removed in 6.18 */
+	strscpy(mchan->info.name, name, RPMSG_NAME_SIZE);
 
 	count = mbdev->recv_count;
 	for (i = 0; i < count; ++i) {

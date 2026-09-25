@@ -3,6 +3,7 @@
 // Copyright (c) 2021 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/mfd/mt6368/registers.h>
 #include <linux/module.h>
 #include <linux/of_device.h>

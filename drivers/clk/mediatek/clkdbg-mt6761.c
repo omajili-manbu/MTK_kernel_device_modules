@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk-provider.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/seq_file.h>

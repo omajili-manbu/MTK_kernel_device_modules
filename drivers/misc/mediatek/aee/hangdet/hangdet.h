@@ -14,8 +14,8 @@ void timer_list_debug_init(void);
 void timer_list_debug_exit(void);
 
 #if !IS_ENABLED(CONFIG_ARM64)
-extern int nr_ipi_get(void);
-extern struct irq_desc **ipi_desc_get(void);
+/* rodin r25: nt nr_ipi_get(voi stubbed in hangdet.c (6.18 removed the export) */
+/* rodin r25: truct irq_desc **ipi_desc_get(voi stubbed in hangdet.c (6.18 removed the export) */
 #define __pa_nodebug(x)		__virt_to_phys_nodebug((unsigned long)(x))
 #else
 struct slp_history {

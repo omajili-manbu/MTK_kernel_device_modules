@@ -7,6 +7,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include "pinctrl-mtk-mt6761.h"
 #include "pinctrl-paris.h"
 

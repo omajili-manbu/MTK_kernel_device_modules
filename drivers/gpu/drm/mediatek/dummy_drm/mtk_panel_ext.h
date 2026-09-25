@@ -111,15 +111,9 @@ enum MTK_PANEL_SPR_OUTPUT_MODE {
 	MTK_PANEL_PACKED_SPR_12_BITS,
 };
 
-enum MTK_PANEL_SPR_MODE {
-	MTK_PANEL_RGBG_BGRG_TYPE = 0,
-	MTK_PANEL_BGRG_RGBG_TYPE,
-	MTK_PANEL_RGBRGB_BGRBGR_TYPE,
-	MTK_PANEL_BGRBGR_RGBRGB_TYPE,
-	MTK_PANEL_RGBRGB_BRGBRG_TYPE,
-	MTK_PANEL_BRGBRG_RGBRGB_TYPE,
-	MTK_PANEL_EXT_TYPE,
-};
+/* rodin r25: the local "enum MTK_PANEL_SPR_MODE" was dropped here --
+ * <uapi/drm/mediatek_drm.h> (included above) already defines a
+ * value-identical superset. */
 
 
 struct esd_check_item {

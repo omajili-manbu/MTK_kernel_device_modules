@@ -10,6 +10,7 @@
  */
 
 #include <linux/gpio/driver.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/of_address.h>
@@ -250,15 +251,6 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 	case PIN_CONFIG_SLEW_RATE:
 		/* regard all non-zero value as enable */
 		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SR, !!arg);
-		break;
-	case PIN_CONFIG_OUTPUT:
-		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DO,
-				       arg);
-		if (err)
-			break;
-
-		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DIR,
-				       MTK_OUTPUT);
 		break;
 	case PIN_CONFIG_INPUT_SCHMITT:
 	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
@@ -865,17 +857,19 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned int gpio)
 	return !!value;
 }
 
-static void mtk_gpio_set(struct gpio_chip *chip, unsigned int gpio, int value)
+static int mtk_gpio_set(struct gpio_chip *chip, unsigned int gpio, int value) /* rodin r25: 6.18 gpio_chip->set returns int */
 {
 	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
 	const struct mtk_pin_desc *desc;
 
 	if (gpio >= hw->soc->npins)
-		return;
+		return -EINVAL;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[gpio];
 
 	(void)mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DO, !!value);
+
+	return 0;
 }
 
 static int mtk_gpio_direction_input(struct gpio_chip *chip, unsigned int gpio)
@@ -885,7 +879,7 @@ static int mtk_gpio_direction_input(struct gpio_chip *chip, unsigned int gpio)
 	if (gpio >= hw->soc->npins)
 		return -EINVAL;
 
-	return pinctrl_gpio_direction_input(chip->base + gpio);
+	return pinctrl_gpio_direction_input(chip, gpio);
 }
 
 static int mtk_gpio_direction_output(struct gpio_chip *chip, unsigned int gpio,
@@ -898,7 +892,7 @@ static int mtk_gpio_direction_output(struct gpio_chip *chip, unsigned int gpio,
 
 	mtk_gpio_set(chip, gpio, value);
 
-	return pinctrl_gpio_direction_output(chip->base + gpio);
+	return pinctrl_gpio_direction_output(chip, gpio);
 }
 
 static int mtk_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
@@ -1354,14 +1348,6 @@ static int mt63xx_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		err = mt63xx_hw_set_value(hw, pin, PINCTRL_PIN_REG_DIR,
 				       MTK_INPUT);
 		break;
-	case PIN_CONFIG_OUTPUT:
-		err = mt63xx_hw_set_value(hw, pin, PINCTRL_PIN_REG_DIR,
-				       MTK_OUTPUT);
-		if (err)
-			goto err;
-
-		err = mt63xx_hw_set_value(hw, pin, PINCTRL_PIN_REG_DO, arg);
-		break;
 	case PIN_CONFIG_INPUT_SCHMITT:
 	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
 		/* arg = 1: Input mode & SMT enable
@@ -1534,14 +1520,16 @@ static int mt63xx_gpio_get(struct gpio_chip *chip, unsigned int gpio)
 	return !!value;
 }
 
-static void mt63xx_gpio_set(struct gpio_chip *chip, unsigned int gpio, int value)
+static int mt63xx_gpio_set(struct gpio_chip *chip, unsigned int gpio, int value) /* rodin r25: 6.18 gpio_chip->set returns int */
 {
 	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
 
 	if (gpio >= hw->soc->npins)
-		return;
+		return -EINVAL;
 
 	(void)mt63xx_hw_set_value(hw, gpio, PINCTRL_PIN_REG_DO, !!value);
+
+	return 0;
 }
 
 static int mt63xx_gpio_direction_input(struct gpio_chip *chip, unsigned int gpio)
@@ -1551,7 +1539,7 @@ static int mt63xx_gpio_direction_input(struct gpio_chip *chip, unsigned int gpio
 	if (gpio >= hw->soc->npins)
 		return -EINVAL;
 
-	return pinctrl_gpio_direction_input(chip->base + gpio);
+	return pinctrl_gpio_direction_input(chip, gpio);
 }
 
 static int mt63xx_gpio_direction_output(struct gpio_chip *chip, unsigned int gpio,
@@ -1564,7 +1552,7 @@ static int mt63xx_gpio_direction_output(struct gpio_chip *chip, unsigned int gpi
 
 	mt63xx_gpio_set(chip, gpio, value);
 
-	return pinctrl_gpio_direction_output(chip->base + gpio);
+	return pinctrl_gpio_direction_output(chip, gpio);
 }
 
 static int mt63xx_build_gpiochip(struct mtk_pinctrl *hw, struct device_node *np)

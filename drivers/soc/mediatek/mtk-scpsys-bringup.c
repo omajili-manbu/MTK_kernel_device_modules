@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -72,10 +73,9 @@ static int scpsys_bring_up_probe(struct platform_device *pdev)
 	return r;
 }
 
-static int scpsys_bring_up_remove(struct platform_device *pdev)
-{
+static void scpsys_bring_up_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 	pm_runtime_put_sync(&pdev->dev);
-	return 0;
+	return;
 }
 
 static struct platform_driver scpsys_bring_up = {

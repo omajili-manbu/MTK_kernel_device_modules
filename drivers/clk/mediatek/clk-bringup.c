@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/clk-provider.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -88,9 +89,8 @@ static int bring_up_probe(struct platform_device *pdev)
 	return r;
 }
 
-static int bring_up_remove(struct platform_device *pdev)
-{
-	return 0;
+static void bring_up_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
+	return;
 }
 
 static struct platform_driver bring_up = {

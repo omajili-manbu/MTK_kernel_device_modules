@@ -5,6 +5,7 @@
 #define MBOX_TIMESTAMP
 
 #include <linux/kernel.h>
+#include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/of_device.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -326,12 +327,11 @@ static const struct of_device_id tinysys_mbox_of_ids[] = {
 	{}
 };
 
-static int tinysys_mbox_remove(struct platform_device *pdev)
-{
+static void tinysys_mbox_remove(struct platform_device *pdev) /* rodin r25: 6.18 remove is void */{
 #ifdef CONFIG_MTK_SCMI_TIMEOUT_HOOK
 	unregister_trace_android_vh_scmi_timeout_sync(scmi_timeout_set, NULL);
 #endif
-	return 0;
+	return;
 }
 
 static struct platform_driver tinysys_mbox_drv = {
