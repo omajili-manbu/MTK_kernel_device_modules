@@ -36,9 +36,6 @@
 #include <linux/mmc/slot-gpio.h>
 
 #include "cqhci.h"
-/* rodin: 6.18 removed mmc_can_gpio_cd(); lib/compat-6.6-block.c re-exports
- * the 6.6 implementation, so only the prototype is missing here. */
-extern bool mmc_can_gpio_cd(struct mmc_host *host);
 
 #define MAX_BD_NUM          1024
 #define MSDC_NR_CLOCKS      3
@@ -2838,7 +2835,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
 
 	if (!(mmc->caps & MMC_CAP_NONREMOVABLE) &&
-	    !mmc_can_gpio_cd(mmc) &&
+	    !mmc_host_can_gpio_cd(mmc) && /* rodin: 6.18 native name (was mmc_can_gpio_cd) */
 	    host->dev_comp->use_internal_cd) {
 		/*
 		 * Is removable but no GPIO declared, so

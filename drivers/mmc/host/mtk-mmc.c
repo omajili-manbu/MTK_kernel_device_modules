@@ -40,9 +40,6 @@
 #include "../core/mmc_ops.h"
 #include "../core/core.h"
 #include "cqhci.h"
-/* rodin: 6.18 removed mmc_can_gpio_cd(); lib/compat-6.6-block.c re-exports
- * the 6.6 implementation, so only the prototype is missing here. */
-extern bool mmc_can_gpio_cd(struct mmc_host *host);
 #include "mtk-mmc.h"
 #include "mtk-mmc-dbg.h"
 #include "rpmb-mtk.h"
@@ -4539,7 +4536,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	}
 
 	if (!(mmc->caps & MMC_CAP_NONREMOVABLE) &&
-	    !mmc_can_gpio_cd(mmc) &&
+	    !mmc_host_can_gpio_cd(mmc) && /* rodin: 6.18 native name (was mmc_can_gpio_cd) */
 	    host->dev_comp->use_internal_cd) {
 		/*
 		 * Is removable but no GPIO declared, so
