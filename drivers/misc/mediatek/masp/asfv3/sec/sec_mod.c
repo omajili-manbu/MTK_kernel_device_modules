@@ -301,10 +301,9 @@ int masp_probe(struct platform_device *dev)
 }
 
 
-int masp_remove(struct platform_device *dev)
+void masp_remove(struct platform_device *dev) /* rodin s3b: 6.18 .remove returns void */
 {
 	sec_exit();
-	return 0;
 }
 
 static struct platform_driver masp_driver = {

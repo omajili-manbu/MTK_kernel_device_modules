@@ -9,6 +9,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/platform_device.h> /* rodin s3b: 6.18 header slimming */
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include "mtk_pbm.h"

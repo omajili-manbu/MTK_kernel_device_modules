@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/pm_qos.h>
+#include <linux/platform_device.h> /* rodin s3b: 6.18 header slimming */
 #include <linux/power_supply.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
@@ -1029,7 +1030,7 @@ static int pbm_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int pbm_remove(struct platform_device *pdev)
+static void pbm_remove(struct platform_device *pdev) /* rodin s3b: 6.18 .remove returns void */
 {
 	struct cpu_pbm_policy *pbm_policy, *pbm_policy_t;
 
@@ -1044,8 +1045,6 @@ static int pbm_remove(struct platform_device *pdev)
 		list_del(&pbm_policy->cpu_pbm_list);
 		kfree(pbm_policy);
 	}
-
-	return 0;
 }
 
 static const struct of_device_id pbm_of_match[] = {
