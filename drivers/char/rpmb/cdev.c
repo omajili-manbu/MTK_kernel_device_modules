@@ -11,7 +11,7 @@
 #include <linux/slab.h>
 #include <linux/capability.h>
 
-#include <linux/rpmb.h>
+#include "../../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 
 #include "rpmb-cdev.h"
 

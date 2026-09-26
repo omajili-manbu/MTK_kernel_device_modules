@@ -4679,7 +4679,7 @@ skip_hwcq:
 	ret = mmc_dbg_register(mmc);
 #endif
 
-#if IS_ENABLED(CONFIG_RPMB)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_RPMB)
 	ret = mmc_rpmb_register(mmc);
 #endif
 	msdc_install_tracepoints(host);

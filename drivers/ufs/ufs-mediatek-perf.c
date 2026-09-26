@@ -21,7 +21,7 @@
 #include <linux/printk.h>
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
-#include <linux/rpmb.h>
+#include "../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 #include <linux/stddef.h>
 #include <linux/tracepoint.h>
 #include <scsi/scsi_proto.h>
@@ -1159,7 +1159,7 @@ static void ufs_mtk_trace_vh_compl_command(void *data, struct ufs_hba *hba, stru
 
 	ufs_mtk_perf_heurisic_req_done(hba, cmd);
 
-#if IS_ENABLED(CONFIG_RPMB)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_RPMB)
 	ufs_rpmb_vh_compl_command(hba, lrbp);
 #endif
 

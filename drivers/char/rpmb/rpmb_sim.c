@@ -12,7 +12,7 @@
 #include <linux/scatterlist.h>
 #include <linux/sizes.h>
 
-#include <linux/rpmb.h>
+#include "../../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 
 static const char id[] = "RPMB:SIM";
 #define CAPACITY_UNIT SZ_128K

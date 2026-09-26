@@ -13,7 +13,7 @@
 #include <linux/delay.h>
 #include <linux/dev_printk.h>
 #include <linux/kern_levels.h>
-#include <linux/rpmb.h>
+#include "../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 #include <linux/soc/mediatek/mtk_ise_lpm.h>
 #include <linux/soc/mediatek/mtk-ise-mbox.h>
 #include <linux/stddef.h>

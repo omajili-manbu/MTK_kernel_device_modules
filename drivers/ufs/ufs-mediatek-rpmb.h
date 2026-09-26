@@ -6,9 +6,9 @@
 #ifndef _UFS_MEDIATEK_RPMB_H
 #define _UFS_MEDIATEK_RPMB_H
 
-#if IS_ENABLED(CONFIG_RPMB)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_RPMB)
 
-#include <linux/rpmb.h>
+#include "../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 
 void ufs_mtk_rpmb_init(struct ufs_hba *hba);
 struct rpmb_dev *ufs_mtk_rpmb_get_raw_dev(void);
@@ -19,7 +19,7 @@ void ufs_rpmb_vh_compl_command(struct ufs_hba *hba, struct ufshcd_lrb *lrbp);
 #define ufs_mtk_rpmb_init(...)
 #define ufs_rpmb_vh_compl_command(...)
 
-#endif /* CONFIG_RPMB */
+#endif /* CONFIG_DEVICE_MODULES_RPMB */
 
 #endif /* _UFS_MEDIATEK_RPMB_H */
 

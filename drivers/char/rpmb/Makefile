@@ -11,9 +11,9 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/mmc/core
 ccflags-y += -I$(srctree)/drivers/mmc/host
 ccflags-y += -I$(srctree)/drivers/mmc/core
 
-obj-$(CONFIG_RPMB) += rpmb-mtk.o
+obj-$(CONFIG_DEVICE_MODULES_RPMB) += rpmb-mtk.o
 
-obj-$(CONFIG_RPMB) += rpmb.o
+obj-$(CONFIG_DEVICE_MODULES_RPMB) += rpmb.o
 rpmb-objs += core.o
 rpmb-$(CONFIG_RPMB_INTF_DEV) += cdev.o
 obj-$(CONFIG_RPMB_SIM) += rpmb_sim.o

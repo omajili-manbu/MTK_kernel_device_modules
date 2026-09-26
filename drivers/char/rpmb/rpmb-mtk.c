@@ -26,7 +26,7 @@
 #include <linux/of.h>
 #include <linux/proc_fs.h>
 #include <linux/random.h>
-#include <linux/rpmb.h>
+#include "../../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 #include <linux/scatterlist.h>
 #include <linux/sched.h>
 #include <linux/semaphore.h>
@@ -138,7 +138,9 @@ static struct nl_rpmb_send_req nl_rpmb_req;
 
 #define RPMB_NAME "rpmb"
 
+#ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif /* rodin rpmb: 6.18 minmax.h provides MIN */
 
 
 enum ufs_ioctl {
@@ -307,7 +309,7 @@ void rpmb_req_copy_data_for_hmac(u8 *buf, struct rpmb_frame *f)
 	buf += size;
 }
 
-static int hmac_sha256(const char *keybytes, u32 klen, const char *str,
+static int rpmb_hmac_sha256(const char *keybytes, u32 klen, const char *str,
 			size_t len, u8 *hmac)
 {
 	struct shash_desc *shash;
@@ -378,8 +380,8 @@ static int rpmb_cal_hmac(struct rpmb_frame *frame, int blk_cnt,
 		buf += RPMB_SZ_CAL_HMAC;
 	}
 
-	if (hmac_sha256(key, RPMB_SZ_KEY, buf_start, RPMB_SZ_CAL_HMAC * blk_cnt, key_mac) != 0)
-		MSG(ERR, "hmac_sha256() return error!\n");
+	if (rpmb_hmac_sha256(key, RPMB_SZ_KEY, buf_start, RPMB_SZ_CAL_HMAC * blk_cnt, key_mac) != 0)
+		MSG(ERR, "rpmb_hmac_sha256() return error!\n");
 
 	kfree(buf_start);
 
@@ -599,10 +601,10 @@ static int rpmb_req_get_wc_ufs(u8 region, u8 *keybytes, u32 *wc, u8 *frame)
 			/*
 			 * Authenticate response write counter frame.
 			 */
-			if (hmac_sha256(keybytes, RPMB_SZ_KEY,
+			if (rpmb_hmac_sha256(keybytes, RPMB_SZ_KEY,
 					rpmbdata.ocmd.frames->data,
 					RPMB_SZ_CAL_HMAC, hmac) != 0)
-				MSG(ERR, "hmac_sha256() return error!\n");
+				MSG(ERR, "rpmb_hmac_sha256() return error!\n");
 
 			if (memcmp(hmac, rpmbdata.ocmd.frames->key_mac,
 				   RPMB_SZ_MAC) != 0) {
@@ -1160,10 +1162,10 @@ static int rpmb_req_ioctl_write_data_ufs(struct rpmb_ioc_param *param)
 
 		iCnt--;
 
-		if (hmac_sha256(rpmb_key, RPMB_SZ_KEY, dataBuf_start,
+		if (rpmb_hmac_sha256(rpmb_key, RPMB_SZ_KEY, dataBuf_start,
 				RPMB_SZ_CAL_HMAC * tran_blkcnt,
 				rpmbdata.icmd.frames[iCnt].key_mac) != 0)
-			MSG(ERR, "hmac_sha256() return error!\n");
+			MSG(ERR, "rpmb_hmac_sha256() return error!\n");
 
 		/*
 		 * Send write data request.
@@ -1186,10 +1188,10 @@ static int rpmb_req_ioctl_write_data_ufs(struct rpmb_ioc_param *param)
 		 * 2. check result.
 		 * 3. compare write counter is increamented.
 		 */
-		if (hmac_sha256(rpmb_key, RPMB_SZ_KEY,
+		if (rpmb_hmac_sha256(rpmb_key, RPMB_SZ_KEY,
 				rpmbdata.ocmd.frames->data,
 				RPMB_SZ_CAL_HMAC, hmac) != 0)
-			MSG(ERR, "hmac_sha256() return error!\n");
+			MSG(ERR, "rpmb_hmac_sha256() return error!\n");
 
 		if (memcmp(hmac, rpmbdata.ocmd.frames->key_mac,
 			   RPMB_SZ_MAC) != 0) {
@@ -1399,10 +1401,10 @@ static int rpmb_req_ioctl_read_data_ufs(struct rpmb_ioc_param *param)
 		/*
 		 * Authenticate response read data frame.
 		 */
-		if (hmac_sha256(rpmb_key, RPMB_SZ_KEY,
+		if (rpmb_hmac_sha256(rpmb_key, RPMB_SZ_KEY,
 			    dataBuf_start, size_for_hmac * tran_blkcnt,
 			    hmac) != 0)
-			MSG(ERR, "hmac_sha256() return error!\n");
+			MSG(ERR, "rpmb_hmac_sha256() return error!\n");
 
 		if (memcmp(hmac, rpmbdata.ocmd.frames[iCnt].key_mac,
 			RPMB_SZ_MAC) != 0) {
@@ -1975,7 +1977,7 @@ int rpmb_req_get_wc_emmc(struct mmc_card *card, u8 *key, u32 *wc)
 		 * Authenticate response write counter frame.
 		 */
 		if (key) {
-			hmac_sha256(key, 32, rpmb_frame->data, 284, hmac);
+			rpmb_hmac_sha256(key, 32, rpmb_frame->data, 284, hmac);
 			if (memcmp(hmac, rpmb_frame->mac, RPMB_SZ_MAC) != 0) {
 				MSG(ERR, "%s, hmac compare error!!!\n",
 					__func__);
@@ -2123,7 +2125,7 @@ int rpmb_req_ioctl_write_data_emmc(struct mmc_card *card,
 
 		iCnt--;
 
-		hmac_sha256(param->keybytes, 32, dataBuf_start, 284 * tran_blkcnt,
+		rpmb_hmac_sha256(param->keybytes, 32, dataBuf_start, 284 * tran_blkcnt,
 				rpmb_frame[iCnt].mac);
 
 		/*
@@ -2142,7 +2144,7 @@ int rpmb_req_ioctl_write_data_emmc(struct mmc_card *card,
 		 * 2. check result.
 		 * 3. compare write counter is increamented.
 		 */
-		hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284, hmac);
+		rpmb_hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284, hmac);
 
 		if (memcmp(hmac, rpmb_frame->mac, RPMB_SZ_MAC) != 0) {
 			MSG(ERR, "%s, hmac compare error!!!\n", __func__);
@@ -2217,7 +2219,7 @@ int rpmb_req_ioctl_write_data_emmc(struct mmc_card *card,
 		memcpy(rpmb_frame->data,
 			param->databytes + iCnt * RPMB_SZ_DATA, tran_size);
 
-		hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284,
+		rpmb_hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284,
 			rpmb_frame->mac);
 
 		ret = emmc_rpmb_req_handle(card, &rpmb_req);
@@ -2230,7 +2232,7 @@ int rpmb_req_ioctl_write_data_emmc(struct mmc_card *card,
 		/*
 		 * Authenticate response write data frame.
 		 */
-		hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284, hmac);
+		rpmb_hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284, hmac);
 
 		if (memcmp(hmac, rpmb_frame->mac, RPMB_SZ_MAC) != 0) {
 			MSG(ERR, "%s, hmac compare error!!!\n", __func__);
@@ -2386,7 +2388,7 @@ int rpmb_req_ioctl_read_data_emmc(struct mmc_card *card,
 		/*
 		 * Authenticate response read data frame.
 		 */
-		hmac_sha256(param->keybytes,
+		rpmb_hmac_sha256(param->keybytes,
 			32, dataBuf_start, 284 * tran_blkcnt, hmac);
 
 		if (memcmp(hmac, rpmb_frame[iCnt].mac, RPMB_SZ_MAC) != 0) {
@@ -2459,7 +2461,7 @@ int rpmb_req_ioctl_read_data_emmc(struct mmc_card *card,
 		/*
 		 * Authenticate response read data frame.
 		 */
-		hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284, hmac);
+		rpmb_hmac_sha256(param->keybytes, 32, rpmb_frame->data, 284, hmac);
 
 		if (memcmp(hmac, rpmb_frame->mac, RPMB_SZ_MAC) != 0) {
 			MSG(ERR, "%s, hmac compare error!!!\n", __func__);

@@ -11,7 +11,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 
-#include <linux/rpmb.h>
+#include "../../../include/linux/rpmb.h" /* rodin rpmb: vendor-first -- 6.18 kernel rpmb.h is a different framework (rpmb_descr); kernel CONFIG_RPMB stays =n */
 #include "rpmb-cdev.h"
 
 static DEFINE_IDA(rpmb_ida);
@@ -312,7 +312,7 @@ static void rpmb_dev_release(struct device *dev)
 {
 	struct rpmb_dev *rdev = to_rpmb_dev(dev);
 
-	ida_simple_remove(&rpmb_ida, rdev->id);
+	ida_free(&rpmb_ida, rdev->id);
 	kfree(rdev);
 }
 
@@ -522,7 +522,7 @@ struct rpmb_dev *rpmb_dev_register(struct device *dev,
 	if (!rdev)
 		return ERR_PTR(-ENOMEM);
 
-	id = ida_simple_get(&rpmb_ida, 0, 0, GFP_KERNEL);
+	id = ida_alloc(&rpmb_ida, GFP_KERNEL);
 	if (id < 0) {
 		ret = id;
 		goto exit;
@@ -555,7 +555,7 @@ struct rpmb_dev *rpmb_dev_register(struct device *dev,
 
 exit:
 	if (id >= 0)
-		ida_simple_remove(&rpmb_ida, id);
+		ida_free(&rpmb_ida, id);
 	kfree(rdev);
 	return ERR_PTR(ret);
 }

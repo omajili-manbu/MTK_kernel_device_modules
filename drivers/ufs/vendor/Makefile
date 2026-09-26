@@ -24,8 +24,8 @@ ufs-mediatek-mod-y                              += ../ufs-mediatek.o ../ufs-medi
 endif
 
 ufs-mediatek-mod-$(CONFIG_MTK_BLOCK_IO_TRACER)  += ../ufs-mediatek-btag.o
-ufs-mediatek-mod-$(CONFIG_RPMB)                 += ../ufs-mediatek-rpmb.o
-ufs-mediatek-mod-$(CONFIG_RPMB)                 += ../ufs-mediatek-ise-dummy.o
+ufs-mediatek-mod-$(CONFIG_DEVICE_MODULES_RPMB)                 += ../ufs-mediatek-rpmb.o
+ufs-mediatek-mod-$(CONFIG_DEVICE_MODULES_RPMB)                 += ../ufs-mediatek-ise-dummy.o
 ufs-mediatek-mod-$(CONFIG_UFSFEATURE)           += ufsfeature.o ufsfeature-mimic.o
 ufs-mediatek-mod-$(CONFIG_UFSSHPB)              += ufsshpb.o
 ufs-mediatek-mod-$(CONFIG_UFSTW)                += ufstw.o
@@ -46,8 +46,8 @@ ufs-mediatek-mod-ise-y                              += ../ufs-mediatek.o ../ufs-
 endif
 
 ufs-mediatek-mod-ise-$(CONFIG_MTK_BLOCK_IO_TRACER)  += ../ufs-mediatek-btag.o
-ufs-mediatek-mod-ise-$(CONFIG_RPMB)                 += ../ufs-mediatek-rpmb.o
-ufs-mediatek-mod-ise-$(CONFIG_RPMB)                 += ../ufs-mediatek-ise.o
+ufs-mediatek-mod-ise-$(CONFIG_DEVICE_MODULES_RPMB)                 += ../ufs-mediatek-rpmb.o
+ufs-mediatek-mod-ise-$(CONFIG_DEVICE_MODULES_RPMB)                 += ../ufs-mediatek-ise.o
 ufs-mediatek-mod-ise-$(CONFIG_UFSFEATURE)           += ufsfeature.o ufsfeature-mimic.o
 ufs-mediatek-mod-ise-$(CONFIG_UFSSHPB)              += ufsshpb.o
 ufs-mediatek-mod-ise-$(CONFIG_UFSTW)                += ufstw.o
