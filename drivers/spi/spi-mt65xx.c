@@ -480,7 +480,8 @@ static void mtk_spi_error_dump(struct spi_controller *ctlr,
 	spin_lock_irqsave(&mdata->eh_spi_lock, flags);
 
 	if (mdata->use_spimem || master->can_dma(master, NULL, mdata->cur_transfer)) {
-		/* rodin stage2: mt_irq_dump_status (MTK irqchip debug) absent in 6.18 GKI; dropped */
+		/* rodin stage2: prototype comes from the vendor-first platform_data
+		 * header; the symbol is exported by the built-in irq-dbg driver. */
 		/* timeout occurred due to no response to irq, check if IP irq bit is raised.*/
 		spi_debug("status0:0x%.8x\n", readl(mdata->base + SPI_STATUS0_REG));
 	}
