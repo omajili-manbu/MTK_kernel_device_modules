@@ -108,7 +108,7 @@ enum lhbm_cmd_type {
 	TYPE_MAX
 };
 
-struct drm_display_mode *get_mode_by_id(struct drm_connector *connector,
+static struct drm_display_mode *get_mode_by_id(struct drm_connector *connector,
 	unsigned int mode);
 
 #define lcm_dcs_write_seq(ctx, seq...) \

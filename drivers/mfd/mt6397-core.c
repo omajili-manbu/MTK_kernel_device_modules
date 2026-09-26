@@ -14,9 +14,11 @@
 #include <linux/mfd/mt6323/core.h>
 #include <linux/mfd/mt6357/core.h>
 #include <linux/mfd/mt6358/core.h>
-#include <linux/mfd/mt6359p/core.h>
+#include "../../include/linux/mfd/mt6359p/core.h" /* rodin: kernel shadow lacks PMIC ids */
 #include <linux/mfd/mt6366/core.h>
 #include <linux/mfd/mt6397/core.h>
+/* rodin b3c: vendor mt6359p SWCID (0xa) absent from the kernel mt6359p headers */
+#define MT6359P_SWCID 0xa
 #include <linux/mfd/mt6323/registers.h>
 #include <linux/mfd/mt6357/registers.h>
 #include <linux/mfd/mt6358/registers.h>

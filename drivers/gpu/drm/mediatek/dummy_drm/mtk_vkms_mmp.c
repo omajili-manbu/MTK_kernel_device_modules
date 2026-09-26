@@ -9,7 +9,7 @@
 
 #include "mtk_vkms_drv.h"
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 #define DISP_REG_OVL_L0_PITCH (0x044UL)
 #define L_PITCH_FLD_SRC_PITCH REG_FLD_MSB_LSB(15, 0)
 

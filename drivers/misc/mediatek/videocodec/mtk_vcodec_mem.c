@@ -220,4 +220,4 @@ int mtk_vcodec_free_buffer(struct mtk_vcodec_queue *vcodec_queue,
 
 	return ret;
 }
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

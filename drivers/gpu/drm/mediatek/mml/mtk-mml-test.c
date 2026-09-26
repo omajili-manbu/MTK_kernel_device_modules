@@ -5,6 +5,7 @@
 
 #include <linux/debugfs.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/dma-fence.h>
 #include <linux/dma-heap.h>
 #include <linux/dma-buf.h>
@@ -2960,4 +2961,4 @@ struct platform_driver mtk_mml_test_drv = {
 		.of_match_table = test_of_ids,
 	},
 };
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

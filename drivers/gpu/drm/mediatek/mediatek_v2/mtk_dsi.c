@@ -12,6 +12,7 @@
 #include <drm/drm_bridge.h>
 #include <drm/drm_encoder.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/clk.h>
 #include <linux/clocksource.h>
 #include <linux/sched.h>
@@ -5782,10 +5783,9 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 
 	if (dsi->panel) {
 		DDP_PROFILE("[PROFILE] %s panel init start\n", __func__);
-		if (((!dsi->doze_enabled && !dsi->pending_switch) || force_lcm_update)
-			&& drm_panel_prepare(dsi->panel)) {
-			DDPPR_ERR("failed to prepare the panel\n");
-			goto out;
+		if ((!dsi->doze_enabled && !dsi->pending_switch) || force_lcm_update) {
+			/* rodin: 6.18 drm_panel_prepare is void; error path undetectable */
+			drm_panel_prepare(dsi->panel);
 		}
 		CRTC_MMP_MARK(0, dsi_resume, 1, 1);
 
@@ -5895,7 +5895,9 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 		mtk_dsi_start(dsi);
 
 	if (dsi->panel) {
-		if (!dsi->pending_switch && drm_panel_enable(dsi->panel)) {
+		if (!dsi->pending_switch) {
+			/* rodin: 6.18 drm_panel_enable is void */
+			drm_panel_enable(dsi->panel);
 			DDPPR_ERR("failed to enable the panel\n");
 			goto err_dsi_power_off;
 		}
@@ -6074,7 +6076,9 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi, struct cmdq_pkt *cmdq_ha
 #ifdef CONFIG_MI_DISP_ESD_CHECK
 		mi_disp_err_flag_esd_check_switch(&dsi->ddp_comp.mtk_crtc->base, false);
 #endif
-		if (drm_panel_disable(dsi->panel)) {
+		/* rodin: 6.18 drm_panel_disable is void */
+		drm_panel_disable(dsi->panel);
+		if (false) {
 			DRM_ERROR("failed to disable the panel\n");
 			return;
 		}
@@ -6125,10 +6129,10 @@ SKIP_WAIT_FRAME_DONE:
 	/* 3. turn off panel or set to doze mode */
 	if (dsi->panel) {
 		if ((!new_doze_state && !skip_panel_switch) || force_lcm_update) {
-			if (drm_panel_unprepare(dsi->panel))
-				DRM_ERROR("failed to unprepare the panel\n");
+			/* rodin: 6.18 drm_panel_unprepare is void */
+			drm_panel_unprepare(dsi->panel);
 #ifdef CONFIG_MI_DISP
-			else {
+			{
 				mi_dsi_panel_mi_cfg_state_update(dsi, MI_DISP_DPMS_POWERDOWN);
 			}
 #endif
@@ -16406,8 +16410,8 @@ int Panel_Master_dsi_config_entry(struct drm_crtc *crtc,
 			name, config_value);
 	} else if (!strcmp(name, "PM_DRIVER_IC_RESET") && (!config_value)) {
 		if (dsi->panel) {
-			if (drm_panel_prepare(dsi->panel))
-				DDPPR_ERR("failed to enable the panel\n");
+			/* rodin: 6.18 drm_panel_prepare is void */
+			drm_panel_prepare(dsi->panel);
 		}
 	}
 	/* enable esd check */

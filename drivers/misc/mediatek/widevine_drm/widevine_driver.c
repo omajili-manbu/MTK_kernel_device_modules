@@ -234,5 +234,5 @@ module_init(mtk_wv_init);
 module_exit(mtk_wv_exit);
 MODULE_AUTHOR("Shan Zhang <shan.zhang@mediatek.com>");
 MODULE_DESCRIPTION("Widevine Drm Driver");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL");

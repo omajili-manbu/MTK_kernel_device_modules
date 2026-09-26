@@ -4,6 +4,7 @@
  * Author: Iris-SC Yang <iris-sc.yang@mediatek.com>
  */
 #include <linux/time.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 
 #include <media/v4l2-device.h>
 #include <media/v4l2-mem2mem.h>
@@ -1550,7 +1551,7 @@ static int mml_m2m_open(struct file *file)
 	file->private_data = &ctx->fh;
 	ctx->fh.m2m_ctx = ctx->m2m_ctx;
 	ctx->fh.ctrl_handler = &ctx->ctrl_handler;
-	v4l2_fh_add(&ctx->fh);
+	v4l2_fh_add(&ctx->fh, file); /* rodin: 6.18 takes filp */
 
 	mutex_unlock(&v4l2_dev->m2m_mutex);
 
@@ -1610,7 +1611,7 @@ static int mml_m2m_release(struct file *file)
 
 		mutex_lock(&v4l2_dev->m2m_mutex);
 		file->private_data = NULL;
-		v4l2_fh_del(&ctx->fh);
+		v4l2_fh_del(&ctx->fh, file); /* rodin: 6.18 takes filp */
 		v4l2_fh_exit(&ctx->fh);
 		mutex_unlock(&v4l2_dev->m2m_mutex);
 

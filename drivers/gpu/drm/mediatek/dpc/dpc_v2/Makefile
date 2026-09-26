@@ -25,11 +25,12 @@ ifeq ($(strip $(MGK_INTERNAL)),true)
 ccflags-y += -DDISP_VIDLE_ENABLE
 endif
 
-obj-$(CONFIG_MTK_DPC) := mtk_dpc_v2.o
+# rodin: device ships only dpc_v1 blobs; v2 modules would double-register
+# obj-$(CONFIG_MTK_DPC) := mtk_dpc_v2.o
 
 mtk_dpc_v2-objs += mtk_dpc_driver.o
 mtk_dpc_v2-objs += mtk_dpc_mmp.o
 
-obj-$(CONFIG_MTK_DPC) += mtk_vdisp_v2.o
+# obj-$(CONFIG_MTK_DPC) += mtk_vdisp_v2.o
 mtk_vdisp_v2-objs += mtk_vdisp.o
 mtk_vdisp_v2-objs += mtk_vdisp_avs.o

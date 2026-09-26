@@ -17,6 +17,24 @@
 
 #include "cmdq-sec.h"
 #include "cmdq-sec-iwc-common.h"
+
+/* rodin b3c: stage-4 providers are not builtin yet (cmdq-sec-drv needs
+ * MTK_GZ_TZ_SYSTEM=y, mtk_sec_heap needs MTK_TRUSTED_MEMORY_SUBSYSTEM=y).
+ * Weak no-ops keep vmlinux linking now; the stage-4 batches' strong exports
+ * override these automatically when the providers flip to =y. The secure
+ * display paths fail gracefully (-ENODEV / unclassified) until then. */
+s32 __weak cmdq_sec_pkt_set_data(struct cmdq_pkt *pkt, const u64 dapc_engine,
+	const u64 port_sec_engine, const enum CMDQ_SEC_SCENARIO scenario,
+	const enum cmdq_sec_meta_type meta_type) { return -ENODEV; }
+s32 __weak cmdq_sec_pkt_write_reg_disp(struct cmdq_pkt *pkt, u32 addr, u64 base,
+	const enum CMDQ_IWC_ADDR_METADATA_TYPE type,
+	const u32 offset, const u32 size, const u32 port, u32 sec_id) { return -ENODEV; }
+void __weak cmdq_sec_pkt_set_mtee(struct cmdq_pkt *pkt, const bool enable) {}
+void __weak cmdq_sec_pkt_set_secid(struct cmdq_pkt *pkt, int32_t sec_id) {}
+void __weak cmdq_sec_mbox_stop(struct cmdq_client *cl) {}
+int __weak is_mtk_sec_heap_dmabuf(const struct dma_buf *dmabuf) { return 0; }
+int __weak dmabuf_to_sec_id(const struct dma_buf *dmabuf, u32 *sec_hdl) { return -1; }
+int __weak dmabuf_to_tmem_type(const struct dma_buf *dmabuf, u32 *sec_hdl) { return -1; }
 #include "cmdq-sec-mailbox.h"
 #include "mtk_heap.h"
 #include "mtk_drm_gem.h"
@@ -571,4 +589,4 @@ MODULE_AUTHOR("Aaron Chung <Aaron.Chung@mediatek.com>");
 MODULE_DESCRIPTION("MTK DRM secure Display");
 MODULE_LICENSE("GPL v2");
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

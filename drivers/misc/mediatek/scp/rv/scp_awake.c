@@ -71,7 +71,7 @@ int scp_awake_lock(void *_scp_id)
 	}
 
 	scp_awake_count = (int *)&scp_awake_counts[scp_id];
-	core_id = core_ids[scp_id];
+	core_id = core_ids_scp[scp_id];
 
 	if (is_scp_ready(scp_id) == 0) {
 		pr_notice("%s: %s not enabled\n", __func__, core_id);
@@ -220,7 +220,7 @@ int scp_awake_unlock(void *_scp_id)
 	}
 
 	scp_awake_count = (int *)&scp_awake_counts[scp_id];
-	core_id = core_ids[scp_id];
+	core_id = core_ids_scp[scp_id];
 
 	if (is_scp_ready(scp_id) == 0) {
 		pr_notice("%s: %s not enabled\n", __func__, core_id);

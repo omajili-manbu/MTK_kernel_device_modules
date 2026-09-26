@@ -2370,7 +2370,7 @@ static void dpc_enable_v1(const u8 en)
 				dpc_base + DISP_REG_DPC_EN);
 	} else {
 		if (dbg_vidle_timeout && g_te_duration)
-			del_timer_sync(&g_priv->dpc_timer);
+			timer_delete_sync(&g_priv->dpc_timer);
 		/* disable inten to avoid burst irq */
 		dpc_irq_enable(DPC_SUBSYS_DISP, false, false);
 		dpc_irq_enable(DPC_SUBSYS_MML, false, false);
@@ -3335,7 +3335,7 @@ static int dpc_config_v1(const enum mtk_dpc_subsys subsys, bool en)
 
 	if (!en) {
 		if (dbg_vidle_timeout && g_te_duration)
-			del_timer_sync(&g_priv->dpc_timer);
+			timer_delete_sync(&g_priv->dpc_timer);
 		if (g_idle_ratio_debug) {
 			mtk_dpc_idle_ratio_debug(DPC_VIDLE_RATIO_STOP);
 			mtk_dpc_idle_ratio_debug(DPC_VIDLE_RATIO_DUMP);

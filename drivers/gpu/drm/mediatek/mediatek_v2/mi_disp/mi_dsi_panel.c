@@ -7,6 +7,7 @@
 #define pr_fmt(fmt)	"mi-dsi-panel:[%s:%d] " fmt, __func__, __LINE__
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/rtc.h>

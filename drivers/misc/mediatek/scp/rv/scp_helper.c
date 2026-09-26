@@ -169,7 +169,7 @@ static DEFINE_MUTEX(scp_A_notify_mutex);
 static DEFINE_MUTEX(scp_feature_mutex);
 static DEFINE_MUTEX(scp_register_sensor_mutex);
 
-char *core_ids[SCP_CORE_TOTAL] = {"SCP A"};
+char *core_ids_scp[SCP_CORE_TOTAL] = {"SCP A"};
 DEFINE_SPINLOCK(scp_awake_spinlock);
 /* set flag after driver initial done */
 static bool driver_init_done;
@@ -850,7 +850,7 @@ static void scp_A_set_ready(void)
 {
 	pr_debug("[SCP] %s()\n", __func__);
 #if SCP_BOOT_TIME_OUT_MONITOR
-	del_timer(&scp_ready_timer[SCP_A_ID].tl);
+	timer_delete(&scp_ready_timer[SCP_A_ID].tl);
 #endif
 	scp_A_notify_work.flags = 1;
 	scp_schedule_work(&scp_A_notify_work);
@@ -1062,64 +1062,64 @@ static inline ssize_t scp_A_reg_status_show(struct device *kobj
 	sap_show_last_regs();
 
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_status = %08x\n", c0_m->status);
+		"c0h0_status = %08x\n", c0_m_scp->status);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_pc = %08x\n", c0_m->pc);
+		"c0h0_pc = %08x\n", c0_m_scp->pc);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_lr = %08x\n", c0_m->lr);
+		"c0h0_lr = %08x\n", c0_m_scp->lr);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_sp = %08x\n", c0_m->sp);
+		"c0h0_sp = %08x\n", c0_m_scp->sp);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_pc_latch = %08x\n", c0_m->pc_latch);
+		"c0h0_pc_latch = %08x\n", c0_m_scp->pc_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_lr_latch = %08x\n", c0_m->lr_latch);
+		"c0h0_lr_latch = %08x\n", c0_m_scp->lr_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h0_sp_latch = %08x\n", c0_m->sp_latch);
+		"c0h0_sp_latch = %08x\n", c0_m_scp->sp_latch);
 	if (!scpreg.twohart)
 		goto core1;
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h1_pc = %08x\n", c0_t1_m->pc);
+		"c0h1_pc = %08x\n", c0_t1_m_scp->pc);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h1_lr = %08x\n", c0_t1_m->lr);
+		"c0h1_lr = %08x\n", c0_t1_m_scp->lr);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h1_sp = %08x\n", c0_t1_m->sp);
+		"c0h1_sp = %08x\n", c0_t1_m_scp->sp);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h1_pc_latch = %08x\n", c0_t1_m->pc_latch);
+		"c0h1_pc_latch = %08x\n", c0_t1_m_scp->pc_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h1_lr_latch = %08x\n", c0_t1_m->lr_latch);
+		"c0h1_lr_latch = %08x\n", c0_t1_m_scp->lr_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c0h1_sp_latch = %08x\n", c0_t1_m->sp_latch);
+		"c0h1_sp_latch = %08x\n", c0_t1_m_scp->sp_latch);
 core1:
 	if (scpreg.core_nums == 1)
 		goto end;
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_status = %08x\n", c1_m->status);
+		"c1h0_status = %08x\n", c1_m_scp->status);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_pc = %08x\n", c1_m->pc);
+		"c1h0_pc = %08x\n", c1_m_scp->pc);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_lr = %08x\n", c1_m->lr);
+		"c1h0_lr = %08x\n", c1_m_scp->lr);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_sp = %08x\n", c1_m->sp);
+		"c1h0_sp = %08x\n", c1_m_scp->sp);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_pc_latch = %08x\n", c1_m->pc_latch);
+		"c1h0_pc_latch = %08x\n", c1_m_scp->pc_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_lr_latch = %08x\n", c1_m->lr_latch);
+		"c1h0_lr_latch = %08x\n", c1_m_scp->lr_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h0_sp_latch = %08x\n", c1_m->sp_latch);
+		"c1h0_sp_latch = %08x\n", c1_m_scp->sp_latch);
 	if (!scpreg.twohart)
 		goto end;
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h1_pc = %08x\n", c1_t1_m->pc);
+		"c1h1_pc = %08x\n", c1_t1_m_scp->pc);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h1_lr = %08x\n", c1_t1_m->lr);
+		"c1h1_lr = %08x\n", c1_t1_m_scp->lr);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h1_sp = %08x\n", c1_t1_m->sp);
+		"c1h1_sp = %08x\n", c1_t1_m_scp->sp);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h1_pc_latch = %08x\n", c1_t1_m->pc_latch);
+		"c1h1_pc_latch = %08x\n", c1_t1_m_scp->pc_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h1_lr_latch = %08x\n", c1_t1_m->lr_latch);
+		"c1h1_lr_latch = %08x\n", c1_t1_m_scp->lr_latch);
 	len += scnprintf(buf + len, PAGE_SIZE - len,
-		"c1h1_sp_latch = %08x\n", c1_t1_m->sp_latch);
+		"c1h1_sp_latch = %08x\n", c1_t1_m_scp->sp_latch);
 
 end:
 	len += sap_print_last_regs(buf + len, PAGE_SIZE - len);
@@ -1891,7 +1891,7 @@ static void scp_control_feature(enum feature_id id, bool enable)
 	}
 	mutex_lock(&scp_feature_mutex);
 
-	feature_table[id].enable = enable;
+	feature_table_scp[id].enable = enable;
 
 	if (scp_dvfs_feature_enable())
 		scp_expected_freq = scp_get_freq();
@@ -1948,13 +1948,13 @@ int sensor_control_scp(enum feature_id id, int freq)
 		pr_debug("[SCP]register sensor id err");
 		return -EINVAL;
 	}
-	/* because feature_table is a global variable
+	/* because feature_table_scp is a global variable
 	 * use mutex lock to protect it from
 	 * accessing in the same time
 	 */
 	mutex_lock(&scp_register_sensor_mutex);
 	if (freq) {
-		feature_table[id].freq = freq;
+		feature_table_scp[id].freq = freq;
 		/* register sensor */
 		scp_control_feature(id, true);
 	} else
@@ -2444,14 +2444,14 @@ static int scp_feature_table_probe(struct platform_device *pdev)
 			return -1;
 		}
 
-		if (feature_id != feature_table[i].feature) {
+		if (feature_id != feature_table_scp[i].feature) {
 			pr_notice("[SCP] %s: feature id don't match(%d:%d):line %d\n",
-				__func__, feature_id, feature_table[i].feature,
+				__func__, feature_id, feature_table_scp[i].feature,
 				__LINE__);
 			return -1;
 		}
 
-		/* because feature_table data member is bit-field */
+		/* because feature_table_scp data member is bit-field */
 		ret = of_property_read_u32_index(pdev->dev.of_node,
 			"scp-feature-tbl",
 			i * feaure_tbl_item_size + 1,
@@ -2462,7 +2462,7 @@ static int scp_feature_table_probe(struct platform_device *pdev)
 				__func__, i, __LINE__);
 			return -1;
 		}
-		feature_table[i].freq = frequency;
+		feature_table_scp[i].freq = frequency;
 
 		ret = of_property_read_u32_index(pdev->dev.of_node,
 			"scp-feature-tbl",
@@ -2474,7 +2474,7 @@ static int scp_feature_table_probe(struct platform_device *pdev)
 				__func__, i, __LINE__);
 			return -1;
 		}
-		feature_table[i].sys_id = core_id;
+		feature_table_scp[i].sys_id = core_id;
 	}
 	return 0;
 }
@@ -3211,7 +3211,7 @@ static int scp_device_probe(struct platform_device *pdev)
 			pr_notice("[SCP]mbox%d enable irq fail\n", i);
 			continue;
 		}
-		mbox_setup_pin_table(i);
+		mbox_setup_pin_table_scp(i);
 	}
 
 	for (i = 0; i < IRQ_NUMBER; i++) {
@@ -3295,7 +3295,7 @@ static void scp_device_shutdown(struct platform_device *dev)
 	system_shutdown = true;
 }
 
-static int scp_device_remove(struct platform_device *dev)
+static void scp_device_remove(struct platform_device *dev)
 {
 	if (scp_mbox_info) {
 		kfree(scp_mbox_info);
@@ -3310,7 +3310,7 @@ static int scp_device_remove(struct platform_device *dev)
 		scp_mbox_pin_send = NULL;
 	}
 
-	return 0;
+	return;
 }
 
 static int scpsys_device_probe(struct platform_device *pdev)
@@ -3601,7 +3601,7 @@ static void __exit scp_exit(void)
 
 #if SCP_BOOT_TIME_OUT_MONITOR
 	for (i = 0; i < SCP_CORE_TOTAL ; i++)
-		del_timer(&scp_ready_timer[i].tl);
+		timer_delete(&scp_ready_timer[i].tl);
 #endif
 }
 

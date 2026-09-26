@@ -5,6 +5,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/time64.h>
 #include <uapi/linux/sched/types.h>
 

@@ -29,7 +29,7 @@
 // We need to import module name
 #if KERNEL_VERSION(5, 17, 0) <= LINUX_VERSION_CODE
 #include <linux/module.h>
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 #endif
 #endif
 #ifdef CONFIG_ION

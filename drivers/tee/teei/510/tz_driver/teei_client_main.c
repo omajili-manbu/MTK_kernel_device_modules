@@ -1506,7 +1506,7 @@ static void teei_client_exit(void)
 }
 
 MODULE_LICENSE("GPL v2");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_AUTHOR("TEEI <www.microtrust.com>");
 MODULE_DESCRIPTION("TEEI Agent");
 MODULE_VERSION("1.00");

@@ -174,7 +174,7 @@ static void _testcase_sync_token_timer_loop_func(unsigned long data)
 	cmdqCoreSetEvent(data);
 
 	if (test_timer_stop) {
-		del_timer(&test_timer);
+		timer_delete(&test_timer);
 		return;
 	}
 
@@ -209,7 +209,7 @@ static void testcase_sync_token(void)
 
 		/* clear token */
 		cmdqCoreClearEvent(CMDQ_SYNC_TOKEN_USER_0);
-		del_timer(&test_timer);
+		timer_delete(&test_timer);
 	} while (0);
 
 	CMDQ_MSG("%s, timeout case\n", __func__);
@@ -389,8 +389,8 @@ static void testcase_async_request(void)
 	cmdq_task_destroy(hReqA);
 	cmdq_task_destroy(hReqB);
 
-	del_timer(&timer_reqA);
-	del_timer(&timer_reqB);
+	timer_delete(&timer_reqA);
+	timer_delete(&timer_reqB);
 
 	CMDQ_LOG("%s END\n", __func__);
 }
@@ -461,7 +461,7 @@ static void testcase_multiple_async_request(void)
 	cmdqCoreClearEvent(CMDQ_SYNC_TOKEN_USER_0);
 
 	test_timer_stop = true;
-	del_timer(&test_timer);
+	timer_delete(&test_timer);
 
 	CMDQ_LOG("%s END\n", __func__);
 }
@@ -519,7 +519,7 @@ static void testcase_async_request_partial_engine(void)
 	/* clear token */
 	for (i = 0; i < ARRAY_SIZE(scn); i++) {
 		cmdqCoreClearEvent(CMDQ_SYNC_TOKEN_USER_0 + i);
-		del_timer(&timers[i]);
+		timer_delete(&timers[i]);
 	}
 
 	if (timers != NULL) {
@@ -593,7 +593,7 @@ static void testcase_sync_token_threaded(void)
 	/* clear token */
 	for (i = 0; i < ARRAY_SIZE(scn); ++i) {
 		cmdq_task_destroy(handles[i]);
-		del_timer(&eventTimer[i]);
+		timer_delete(&eventTimer[i]);
 	}
 
 	CMDQ_LOG("%s END\n", __func__);
@@ -647,7 +647,7 @@ static void testcase_loop(void)
 
 	CMDQ_LOG("%s stop timer\n", __func__);
 	cmdq_task_destroy(hLoopReq);
-	del_timer(&g_loopTimer);
+	timer_delete(&g_loopTimer);
 
 	CMDQ_LOG("%s end\n", __func__);
 }
@@ -4995,7 +4995,7 @@ void testmbox_loop(void)
 
 	CMDQ_LOG("%s stop timer\n", __func__);
 	cmdq_mbox_stop(clt);
-	del_timer(&g_loopTimer);
+	timer_delete(&g_loopTimer);
 	cmdq_pkt_destroy(pkt);
 
 	CMDQ_LOG("%s end\n", __func__);
@@ -5178,7 +5178,7 @@ void testmbox_async_flush(bool threaded)
 	cmdqCoreClearEvent(CMDQ_SYNC_TOKEN_USER_0);
 
 	test_timer_stop = true;
-	del_timer(&test_timer);
+	timer_delete(&test_timer);
 
 	CMDQ_LOG("%s END\n", __func__);
 }

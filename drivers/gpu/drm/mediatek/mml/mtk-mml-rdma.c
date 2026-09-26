@@ -2888,5 +2888,5 @@ MODULE_PARM_DESC(rdma_debug, "mml rdma debug case");
 
 MODULE_AUTHOR("Dennis-YC Hsieh <dennis-yc.hsieh@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek SoC display MML RDMA driver");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

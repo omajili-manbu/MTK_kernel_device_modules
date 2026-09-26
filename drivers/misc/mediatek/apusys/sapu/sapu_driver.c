@@ -258,4 +258,4 @@ long apusys_sapu_internal_ioctl(struct file *filep, unsigned int cmd, void __use
 	return ret;
 }
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

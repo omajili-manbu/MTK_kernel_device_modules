@@ -48,7 +48,7 @@ struct scp_feature_tb {
 		 sys_id:1;	/* max = 1, run at which subsys? */
 };
 
-extern struct scp_feature_tb feature_table[NUM_FEATURE_ID];
+extern struct scp_feature_tb feature_table_scp[NUM_FEATURE_ID];
 
 #endif
 

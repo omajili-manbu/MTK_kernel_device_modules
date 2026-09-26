@@ -3,12 +3,19 @@
 // Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/interrupt.h>
+
+/* rodin b3c: kernel mt6397/core.h enum + mt6359p/registers.h (same guards) lack
+ * the MT6359P entries; values from the vendor headers */
+enum {
+	MT6359P_CHIP_ID = 0x59,
+	MT6359P_SWCID = 0xa,
+};
 #include <linux/mfd/mt6357/core.h>
 #include <linux/mfd/mt6357/registers.h>
 #include <linux/mfd/mt6358/core.h>
 #include <linux/mfd/mt6358/registers.h>
-#include <linux/mfd/mt6359p/core.h>
-#include <linux/mfd/mt6359p/registers.h>
+#include "../../include/linux/mfd/mt6359p/core.h" /* rodin: kernel shadow lacks PMIC ids */
+#include "../../include/linux/mfd/mt6359p/registers.h" /* rodin: kernel shadow lacks PMIC regs */
 #include <linux/mfd/mt6366/core.h>
 #include <linux/mfd/mt6397/core.h>
 #include <linux/module.h>

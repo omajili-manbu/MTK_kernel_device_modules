@@ -5421,6 +5421,6 @@ static void isp_tasklet_func_fdvt(unsigned long data)
 module_init(FDVT_Init);
 module_exit(FDVT_Exit);
 MODULE_DESCRIPTION("Camera FDVT driver");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_AUTHOR("MM3SW5");
 MODULE_LICENSE("GPL");

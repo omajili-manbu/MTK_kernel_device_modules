@@ -525,4 +525,4 @@ static int __init exporter_init(void)
 
 module_init(exporter_init)
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

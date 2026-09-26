@@ -3845,8 +3845,10 @@ void mtk_dp_enable_4k60(int enable)
 }
 
 static enum drm_mode_status mtk_dp_conn_mode_valid(struct drm_connector *conn,
-		struct drm_display_mode *mode)
+		const struct drm_display_mode *mode_const) /* rodin: 6.18 const */
 {
+	/* vendor adjusts mode->clock locally; keep 6.6 behavior via a cast view */
+	struct drm_display_mode *mode = (struct drm_display_mode *)mode_const;
 	int plat_limit_array = ARRAY_SIZE(dp_plat_limit);
 	int i;
 	struct mtk_dp *mtk_dp = mtk_dp_ctx_from_conn(conn);

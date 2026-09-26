@@ -61,7 +61,7 @@ struct sap_device {
 	struct sap_status_reg status_reg;
 };
 
-static const struct reg_save_st reg_save_list[] = {
+static const struct reg_save_st reg_save_list_scp[] = {
 	{0x00040000, 0x180},
 	{0x00042000, 0x260},
 	{0x00043000, 0x120},
@@ -101,21 +101,21 @@ static void sap_register_dump(uint8_t *out, uint8_t *out_end)
 	int i = 0;
 	void *from = NULL;
 	uint32_t *buf = (uint32_t *)out;
-	int size_limit = sizeof(reg_save_list) / sizeof(struct reg_save_st);
+	int size_limit = sizeof(reg_save_list_scp) / sizeof(struct reg_save_st);
 
 	for (i = 0; i < size_limit; i++) {
-		if (((void *)buf + reg_save_list[i].size
+		if (((void *)buf + reg_save_list_scp[i].size
 			+ sizeof(struct reg_save_st)) > (void *)out_end) {
 			pr_notice("%s overflow\n", __func__);
 			break;
 		}
-		*buf = reg_save_list[i].addr;
+		*buf = reg_save_list_scp[i].addr;
 		buf++;
-		*buf = reg_save_list[i].size;
+		*buf = reg_save_list_scp[i].size;
 		buf++;
-		from = sap_dev.regdump_virt + (reg_save_list[i].addr & 0xfffff);
-		memcpy_from_scp(buf, from, reg_save_list[i].size);
-		buf += (reg_save_list[i].size / sizeof(uint32_t));
+		from = sap_dev.regdump_virt + (reg_save_list_scp[i].addr & 0xfffff);
+		memcpy_from_scp(buf, from, reg_save_list_scp[i].size);
+		buf += (reg_save_list_scp[i].size / sizeof(uint32_t));
 	}
 }
 
@@ -632,9 +632,9 @@ static int sap_device_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int sap_device_remove(struct platform_device *dev)
+static void sap_device_remove(struct platform_device *dev)
 {
-	return 0;
+	return;
 }
 
 static const struct of_device_id sap_of_ids[] = {

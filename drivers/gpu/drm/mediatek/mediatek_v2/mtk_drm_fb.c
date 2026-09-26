@@ -133,7 +133,9 @@ mtk_drm_framebuffer_init(struct drm_device *dev,
 	if (!mtk_fb)
 		return ERR_PTR(-ENOMEM);
 
-	drm_helper_mode_fill_fb_struct(dev, &mtk_fb->base, mode);
+	drm_helper_mode_fill_fb_struct(dev, &mtk_fb->base,
+			drm_get_format_info(dev, mode->pixel_format, mode->modifier[0]),
+			mode); /* rodin: 6.18 4-arg + 3-arg info */
 
 	mtk_fb->gem_obj = obj;
 
@@ -200,6 +202,7 @@ int mtk_fb_wait(struct drm_framebuffer *fb)
 
 struct drm_framebuffer *
 mtk_drm_mode_fb_create(struct drm_device *dev, struct drm_file *file,
+		       const struct drm_format_info *info, /* rodin: 6.18 adds info */
 		       const struct drm_mode_fb_cmd2 *cmd)
 {
 	struct mtk_drm_fb *mtk_fb = NULL;

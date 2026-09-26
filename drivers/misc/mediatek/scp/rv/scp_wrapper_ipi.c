@@ -154,7 +154,7 @@ enum scp_ipi_status scp_ipi_send(enum ipi_id id, void *buf,
 		tmp_id = id;
 
 	if (is_scp_ready(scp_id) == 0) {
-		pr_notice("[SCP] %s: %s not ready\n", __func__, core_ids[scp_id]);
+		pr_notice("[SCP] %s: %s not ready\n", __func__, core_ids_scp[scp_id]);
 		return SCP_IPI_NOT_READY;
 	}
 
@@ -244,7 +244,7 @@ bool mbox_check_recv_table(unsigned int id)
 	return false;
 }
 
-void mbox_setup_pin_table(unsigned int mbox)
+void mbox_setup_pin_table_scp(unsigned int mbox)
 {
 	int i, last_ofs = 0, last_idx = 0, last_slot = 0, last_sz = 0;
 

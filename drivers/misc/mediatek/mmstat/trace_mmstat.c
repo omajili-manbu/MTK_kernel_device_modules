@@ -531,4 +531,4 @@ module_exit(trace_mmstat_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek mmstat tracer");
 MODULE_AUTHOR("MediaTek Inc.");
-MODULE_IMPORT_NS(MINIDUMP);
+MODULE_IMPORT_NS("MINIDUMP");

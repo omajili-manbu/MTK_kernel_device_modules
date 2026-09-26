@@ -2439,7 +2439,7 @@ void hdmi_hdcp_stop_task(void)
 
 	HDMI_FUNC();
 	if (hdmi->hdcp_timer.function)
-		del_timer_sync(&hdmi->hdcp_timer);
+		timer_delete_sync(&hdmi->hdcp_timer);
 	memset((void *)&hdmi->hdcp_timer, 0, sizeof(hdmi->hdcp_timer));
 }
 

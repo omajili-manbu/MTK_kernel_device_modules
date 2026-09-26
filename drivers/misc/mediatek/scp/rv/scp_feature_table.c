@@ -9,7 +9,7 @@
 #include "scp.h"
 
 /*scp feature list*/
-struct scp_feature_tb feature_table[NUM_FEATURE_ID] = {
+struct scp_feature_tb feature_table_scp[NUM_FEATURE_ID] = {
 /* VFFP:20 + default:5 */
 	{
 		.feature	= VOW_FEATURE_ID,

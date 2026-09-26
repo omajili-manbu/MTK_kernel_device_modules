@@ -417,8 +417,8 @@ uint32_t scp_get_freq(void)
 	 * calculate scp frequence
 	 */
 	for (i = 0; i < NUM_FEATURE_ID; i++) {
-		if (feature_table[i].enable == 1)
-			sum += feature_table[i].freq;
+		if (feature_table_scp[i].enable == 1)
+			sum += feature_table_scp[i].freq;
 	}
 	/*
 	 * calculate scp sensor frequence
@@ -870,8 +870,8 @@ static int mt_scp_dvfs_ctrl_proc_show(struct seq_file *m, void *v)
 
 	for (i = 0; i < NUM_FEATURE_ID; i++)
 		seq_printf(m, "feature=%d, freq=%d, enable=%d\n",
-			feature_table[i].feature, feature_table[i].freq,
-			feature_table[i].enable);
+			feature_table_scp[i].feature, feature_table_scp[i].freq,
+			feature_table_scp[i].enable);
 
 	for (i = 0; i < NUM_SENSOR_TYPE; i++)
 		seq_printf(m, "sensor id=%d, freq=%d, enable=%d\n",
@@ -916,7 +916,7 @@ static ssize_t mt_scp_dvfs_ctrl_proc_write(
 		} else if (!strcmp(cmd, "opp")) {
 			if (dvfs_opp == -1) {
 				pr_info("remove the opp setting of command\n");
-				feature_table[VCORE_TEST_FEATURE_ID].freq = 0;
+				feature_table_scp[VCORE_TEST_FEATURE_ID].freq = 0;
 				scp_deregister_feature(
 						VCORE_TEST_FEATURE_ID);
 			} else if (dvfs_opp >= 0 &&
@@ -931,8 +931,8 @@ static ssize_t mt_scp_dvfs_ctrl_proc_write(
 				 */
 				for (i = 0; i < NUM_FEATURE_ID; i++) {
 					if (i != VCORE_TEST_FEATURE_ID &&
-						feature_table[i].enable == 1)
-						sum += feature_table[i].freq;
+						feature_table_scp[i].enable == 1)
+						sum += feature_table_scp[i].freq;
 				}
 
 				/*
@@ -955,8 +955,8 @@ static ssize_t mt_scp_dvfs_ctrl_proc_write(
 
 				for (i = 0; i < NUM_FEATURE_ID; i++)
 					if (VCORE_TEST_FEATURE_ID ==
-						feature_table[i].feature) {
-						feature_table[i].freq =
+						feature_table_scp[i].feature) {
+						feature_table_scp[i].freq =
 							added_freq;
 						break;
 					}
@@ -1648,9 +1648,9 @@ fail:
 /***************************************
  * this function should never be called
  ****************************************/
-static int mt_scp_dvfs_pdrv_remove(struct platform_device *pdev)
+static void mt_scp_dvfs_pdrv_remove(struct platform_device *pdev)
 {
-	return 0;
+	return;
 }
 
 static const struct dev_pm_ops mt_scp_dvfs_pm_ops = {

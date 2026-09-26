@@ -12,6 +12,7 @@
 #include <cmdq-util.h>
 #include <linux/sched/clock.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/ratelimit.h>
 
 #include "mtk-mml-core.h"

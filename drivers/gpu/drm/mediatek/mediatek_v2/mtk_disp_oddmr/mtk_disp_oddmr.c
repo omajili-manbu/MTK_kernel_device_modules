@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/workqueue.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/time.h>
 #include <linux/sched.h>
 #include <uapi/linux/sched/types.h>

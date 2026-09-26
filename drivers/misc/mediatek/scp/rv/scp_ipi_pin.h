@@ -22,7 +22,7 @@ enum {
 	SCP_CORE1_ID = 1,
 };
 
-extern char *core_ids[SCP_CORE_TOTAL];
+extern char *core_ids_scp[SCP_CORE_TOTAL];
 
 extern void scp_reset_awake_counts(void);
 extern int scp_clr_spm_reg(void *unused);

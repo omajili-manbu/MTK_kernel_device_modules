@@ -801,7 +801,7 @@ static struct mtk_panel_params ext_params_120hz = {
 	//.prefetch_time = PREFETCH_TIME,
 };
 
-struct drm_display_mode *get_mode_by_id(struct drm_connector *connector,
+static struct drm_display_mode *get_mode_by_id(struct drm_connector *connector,
 	unsigned int mode)
 {
 	struct drm_display_mode *m = NULL;

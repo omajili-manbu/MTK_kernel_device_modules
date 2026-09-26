@@ -31,6 +31,7 @@ extern u32 *disp_perfs;
 #endif
 
 #include <linux/module.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 int debug_vidle_bw;
 module_param(debug_vidle_bw, int, 0644);
 

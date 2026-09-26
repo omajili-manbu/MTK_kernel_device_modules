@@ -6,7 +6,9 @@ config DEVICE_MODULES_DRM_MEDIATEK
 	depends on COMMON_CLK
 	depends on HAVE_ARM_SMCCC
 	depends on OF
-	depends on DEVICE_MODULES_MTK_MMSYS
+	# rodin b3c: 6.18 kernel MTK_MMSYS=y already provides mtk_mmsys_* (kernel
+	# side wins the clash, vendor mmsys stays =n); accept either provider
+	depends on DEVICE_MODULES_MTK_MMSYS || MTK_MMSYS
 	select DRM_DISPLAY_DP_HELPER
 	select DRM_DISPLAY_HELPER
 	select DRM_GEM_DMA_HELPER

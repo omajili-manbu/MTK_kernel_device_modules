@@ -16,6 +16,8 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_vblank.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
+#include <linux/iommu.h> /* rodin: 6.18 header thinning */
 #include <linux/component.h>
 #include <linux/iommu.h>
 #include <linux/of_address.h>
@@ -9352,7 +9354,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 
 	if (mtk_drm_helper_get_opt(private->helper_opt,
 			MTK_DRM_OPT_USE_M4U)) {
-		if (!iommu_present(&platform_bus_type)) {
+		if (!device_iommu_mapped(drm->dev)) { /* rodin: 6.18 removed iommu_present */
 			DDPINFO("%s, iommu not ready\n", __func__);
 			return -EPROBE_DEFER;
 		}
@@ -9528,11 +9530,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 		goto put_dma_dev;
 	}
 
-	ret = dma_set_max_seg_size(dma_dev, (unsigned int)DMA_BIT_MASK(32));
-	if (ret) {
-		dev_err(dma_dev, "Failed to set DMA segment size\n");
-		goto err_unset_dma_parms;
-	}
+	dma_set_max_seg_size(dma_dev, (unsigned int)DMA_BIT_MASK(32)); /* rodin: 6.18 void */
 
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 	drm_kms_helper_poll_init(drm);
@@ -10145,103 +10143,103 @@ int mtk_drm_ioctl_mml_ctrl(struct drm_device *dev, void *data, struct drm_file *
 
 static const struct drm_ioctl_desc mtk_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(MTK_GEM_CREATE, mtk_gem_create_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GEM_MAP_OFFSET, mtk_gem_map_offset_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GEM_SUBMIT, mtk_gem_submit_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_SESSION_CREATE, mtk_drm_session_create_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_SESSION_DESTROY, mtk_drm_session_destroy_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_LAYERING_RULE, mtk_layering_rule_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_CRTC_GETFENCE, mtk_drm_crtc_getfence_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_CRTC_FENCE_REL, mtk_drm_crtc_fence_release_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_CRTC_GETSFFENCE,
 			  mtk_drm_crtc_get_sf_fence_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_SET_MSYNC_PARAMS,
 			  mtk_drm_set_msync_params_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GET_MSYNC_PARAMS,
 			  mtk_drm_get_msync_params_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_WAIT_REPAINT, mtk_drm_wait_repaint_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GET_DISPLAY_CAPS, mtk_drm_get_display_caps_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_SET_DDP_MODE, mtk_drm_set_ddp_mode,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GET_SESSION_INFO, mtk_drm_get_info_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GET_MASTER_INFO, mtk_drm_get_master_info_ioctl,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_SUPPORT_COLOR_TRANSFORM,
 				mtk_drm_ioctl_ccorr_support_color_matrix,
-				DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_GET_LCM_INDEX, mtk_drm_ioctl_get_lcm_index,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_GET_PANELS_INFO, mtk_drm_ioctl_get_all_connector_panel_info,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_HDMI_GET_DEV_INFO, mtk_drm_dp_get_dev_info,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_HDMI_AUDIO_ENABLE, mtk_drm_dp_audio_enable,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_HDMI_AUDIO_CONFIG, mtk_drm_dp_audio_config,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_HDMI_GET_CAPABILITY, mtk_drm_dp_get_cap,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_MML_GEM_SUBMIT, mtk_drm_ioctl_mml_gem_submit,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_GET_CHIST, mtk_drm_ioctl_chist_get_hist,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_GET_CHIST_CAPS, mtk_drm_ioctl_chist_get_caps,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_SET_CHIST_CONFIG, mtk_drm_ioctl_chist_set_config,
-			  DRM_UNLOCKED),
+			 0),
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 	DRM_IOCTL_DEF_DRV(MTK_FACTORY_LCM_AUTO_TEST, mtk_drm_fm_lcm_auto_test,
-			  DRM_UNLOCKED),
+			 0),
 #endif
 	DRM_IOCTL_DEF_DRV(MTK_GET_PQ_CAPS, mtk_drm_ioctl_ccorr_get_pq_caps,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_DRM_SET_LEASE_INFO, mtk_drm_set_lease_info_ioctl,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_DRM_GET_LEASE_INFO, mtk_drm_get_lease_info_ioctl,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_ODDMR_LOAD_PARAM, mtk_drm_ioctl_oddmr_load_param,
-			  DRM_UNLOCKED),
+			 0),
 	DRM_IOCTL_DEF_DRV(MTK_ODDMR_CTL, mtk_drm_ioctl_oddmr_ctl,
-				  DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_KICK_IDLE, mtk_drm_ioctl_kick_idle,
-				  DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_PQ_FRAME_CONFIG, mtk_drm_ioctl_pq_frame_config,
-				DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_GET_MODE_EXT_INFO, mtk_drm_get_mode_ext_info_ioctl,
-				  DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_PQ_PROXY_IOCTL, mtk_drm_ioctl_pq_proxy,
-				  DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_HWVSYNC_ON, mtk_drm_hwvsync_on_ioctl,
-				  DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_DUMMY_CMD_ON, mtk_drm_dummy_cmd_on_ioctl,
-				  DRM_UNLOCKED),
+				 0),
 	DRM_IOCTL_DEF_DRV(MTK_ESD_STAT_CHK, mtk_drm_esd_recovery_check_ioctl,
-				  DRM_UNLOCKED),
-	DRM_IOCTL_DEF_DRV(MTK_MML_CTRL, mtk_drm_ioctl_mml_ctrl, DRM_UNLOCKED),
+				 0),
+	DRM_IOCTL_DEF_DRV(MTK_MML_CTRL, mtk_drm_ioctl_mml_ctrl, 0),
 	DRM_IOCTL_DEF_DRV(MTK_DEBUG_LOG, mtk_disp_ioctl_debug_log_switch,
-					DRM_UNLOCKED),
+					 0),
 	DRM_IOCTL_DEF_DRV(MTK_SEC_HND_TO_GEM_HND, mtk_drm_sec_hnd_to_gem_hnd,
-			DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			DRM_AUTH | DRM_RENDER_ALLOW),
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	DRM_IOCTL_DEF_DRV(MTK_SET_OVL_LAYER, mtk_drm_set_ovl_layer,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_MAP_DMA_BUF, mtk_drm_map_dma_buf,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_UNMAP_DMA_BUF, mtk_drm_unmap_dma_buf,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
+			  DRM_AUTH | DRM_RENDER_ALLOW),
 #endif
 };
 
@@ -12343,5 +12341,5 @@ MODULE_SOFTDEP("pre: panel-serdes-max96789");
 #endif
 MODULE_AUTHOR("YT SHEN <yt.shen@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek SoC DRM driver");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

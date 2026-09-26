@@ -87,7 +87,7 @@
 int mml_rsz_fw_comb = 1;
 module_param(mml_rsz_fw_comb, int, 0644);
 
-int mml_force_rsz;
+static int mml_force_rsz;
 module_param(mml_force_rsz, int, 0644);
 
 enum rsz_dbg_ver {

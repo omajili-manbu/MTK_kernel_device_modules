@@ -2278,5 +2278,5 @@ module_init(camera_pda_init);
 module_exit(camera_pda_exit);
 MODULE_DESCRIPTION("Camera PDA driver");
 MODULE_AUTHOR("MM6SW3");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL");

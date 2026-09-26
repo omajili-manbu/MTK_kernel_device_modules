@@ -24,6 +24,7 @@
 #include <drm/drm_vblank.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <drm/drm_crtc.h>
 #include <linux/kmemleak.h>
 #include <linux/time.h>
@@ -20722,9 +20723,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
 			 "disp_crtc%u_wakelock",
 			 drm_crtc_index(&mtk_crtc->base));
 
+		/* rodin: 6.18 removed wakeup_source_create/add; register() covers both */
 		mtk_crtc->wk_lock =
-			wakeup_source_create(mtk_crtc->wk_lock_name);
-		wakeup_source_add(mtk_crtc->wk_lock);
+			wakeup_source_register(NULL, mtk_crtc->wk_lock_name);
 	}
 
 	/* set bpc by panel info */

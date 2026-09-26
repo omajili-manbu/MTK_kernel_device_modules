@@ -17,7 +17,7 @@ DEBUG_SET_LEVEL(DEBUG_LEVEL_ERR);
 
 static int policy;
 
-MODULE_IMPORT_NS(MINIDUMP);
+MODULE_IMPORT_NS("MINIDUMP");
 static int start_protect(void)
 {
 	unsigned long pcpu_unit_size = 0, ppcpu_unit_size = 0, prev_pcpu_offset = 0;

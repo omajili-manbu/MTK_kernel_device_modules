@@ -179,7 +179,7 @@ static bool mtk_sync_timeline_fence_signaled(struct dma_fence *fence)
 {
 	struct sync_timeline *parent = dma_fence_parent(fence);
 
-	return !__dma_fence_is_later(fence->seqno, parent->value, fence->ops);
+	return !__dma_fence_is_later(fence, fence->seqno, parent->value); /* rodin: 6.18 sig */
 }
 
 static bool mtk_sync_timeline_fence_enable_signaling(struct dma_fence *fence)
@@ -280,7 +280,7 @@ struct sync_timeline *mtk_sync_timeline_create(const char *name)
 
 	kref_init(&obj->kref);
 	obj->context = dma_fence_context_alloc(1);
-	strlcpy(obj->name, name, sizeof(obj->name));
+	strscpy(obj->name, name, sizeof(obj->name)); /* rodin: 6.18 */
 
 	obj->pt_tree = RB_ROOT;
 	INIT_LIST_HEAD(&obj->pt_list);

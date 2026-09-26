@@ -35,20 +35,20 @@
 #define MML_IR_MAX_OPP		2
 
 /* max hrt in MB/s, see mmqos hrt support */
-int mml_max_hrt = 6988;
+static int mml_max_hrt = 6988;
 module_param(mml_max_hrt, int, 0644);
 
 /* 0: auto
  * 1: always
  * 1: always + pq
  */
-int mml_force_rsz;
+static int mml_force_rsz;
 module_param(mml_force_rsz, int, 0644);
 
-int mml_rgbrot;
+static int mml_rgbrot;
 module_param(mml_rgbrot, int, 0644);
 
-int mml_path_mode;
+static int mml_path_mode;
 module_param(mml_path_mode, int, 0644);
 
 /* debug param
@@ -56,7 +56,7 @@ module_param(mml_path_mode, int, 0644);
  * 1: force enable
  * 2: force disable
  */
-int mml_racing;
+static int mml_racing;
 module_param(mml_racing, int, 0644);
 
 /* debug param
@@ -65,10 +65,10 @@ module_param(mml_racing, int, 0644);
  * 2: force disable
  * 3: force enable
  */
-int mml_dl;
+static int mml_dl;
 module_param(mml_dl, int, 0644);
 
-int mml_opp_check = 1;
+static int mml_opp_check = 1;
 module_param(mml_opp_check, int, 0644);
 
 int mml_rrot;
@@ -82,11 +82,11 @@ module_param(mml_rrot, int, 0644);
 int mml_rrot_single = 2;
 module_param(mml_rrot_single, int, 0644);
 
-int mml_racing_rsz = 1;
+static int mml_racing_rsz = 1;
 module_param(mml_racing_rsz, int, 0644);
 
 #ifndef MML_FPGA
-int mml_dpc = 1;
+static int mml_dpc = 1;
 #else
 int mml_dpc;
 #endif
@@ -95,7 +95,7 @@ module_param(mml_dpc, int, 0644);
 /* 0: off
  * 1: on
  */
-int mml_binning = 1;
+static int mml_binning = 1;
 module_param(mml_binning, int, 0644);
 
 int mml_shadow = 1;

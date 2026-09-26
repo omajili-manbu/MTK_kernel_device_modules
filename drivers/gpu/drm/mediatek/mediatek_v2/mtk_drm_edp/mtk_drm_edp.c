@@ -2943,7 +2943,7 @@ static void mtk_edp_remove(struct platform_device *pdev)
 		pr_info("%s unregister_pm_notifier failed %d", EDPTX_DEBUG_INFO, ret);
 
 	if (mtk_edp->data->bridge_type != DRM_MODE_CONNECTOR_eDP)
-		del_timer_sync(&mtk_edp->debounce_timer);
+		timer_delete_sync(&mtk_edp->debounce_timer);
 	platform_device_unregister(mtk_edp->phy_dev);
 }
 

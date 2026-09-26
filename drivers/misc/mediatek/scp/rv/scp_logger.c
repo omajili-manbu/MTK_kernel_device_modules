@@ -116,8 +116,8 @@ static wait_queue_head_t scp_A_logwait;
 static DEFINE_MUTEX(scp_logger_mutex);
 static char *scp_last_logger;
 /*global value*/
-unsigned int r_pos_debug;
-unsigned int log_ctl_debug;
+unsigned int r_pos_debug_scp;
+unsigned int log_ctl_debug_scp;
 static struct mutex scp_logger_mutex;
 
 /* ipi message buffer */
@@ -257,11 +257,11 @@ ssize_t scp_A_log_read(char __user *data, size_t len)
 		datalen = len;
 
 	/*debug for logger pos fail*/
-	r_pos_debug = r_pos;
-	log_ctl_debug = SCP_A_log_ctl->buff_ofs;
+	r_pos_debug_scp = r_pos;
+	log_ctl_debug_scp = SCP_A_log_ctl->buff_ofs;
 	if (r_pos >= DRAM_BUF_LEN) {
 		pr_usrdebug("[SCP] %s(): r_pos >= DRAM_BUF_LEN,%x,%x\n",
-			__func__, r_pos_debug, log_ctl_debug);
+			__func__, r_pos_debug_scp, log_ctl_debug_scp);
 		datalen = 0;
 		goto error;
 	}

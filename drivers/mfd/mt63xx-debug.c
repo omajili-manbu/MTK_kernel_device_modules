@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/mod_devicetable.h> /* rodin: of_device_id complete type */
 #include <linux/regmap.h>
 
 struct mt63xx_consumer_data {

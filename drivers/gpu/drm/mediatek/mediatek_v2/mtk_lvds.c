@@ -206,7 +206,7 @@ static void mtk_lvds_bridge_disable(struct drm_bridge *bridge)
 	if (ret < 0)
 		DRM_ERROR("Failed to disable power domain: %d\n", ret);
 
-	if (drm_panel_disable(lvds->panel)) {
+	/* rodin: 6.18 void */ { if (drm_panel_disable(lvds->panel)) {} } if (false) {
 		DRM_ERROR("failed to disable panel\n");
 		return;
 	}
@@ -225,7 +225,7 @@ static void mtk_lvds_bridge_post_disable(struct drm_bridge *bridge)
 	if (!lvds->powered)
 		return;
 
-	if (drm_panel_unprepare(lvds->panel)) {
+	/* rodin: 6.18 void */ drm_panel_unprepare(lvds->panel); if (false) {
 		DRM_ERROR("failed to unprepare panel\n");
 		return;
 	}
@@ -262,7 +262,7 @@ static void mtk_lvds_pre_enable(struct drm_bridge *bridge)
 	if (lvds->powered)
 		return;
 
-	if (drm_panel_prepare(lvds->panel)) {
+	/* rodin: 6.18 void */ drm_panel_prepare(lvds->panel); if (false) {
 		DRM_ERROR("failed to prepare panel\n");
 		return;
 	}
@@ -314,7 +314,7 @@ static void mtk_lvds_bridge_enable(struct drm_bridge *bridge)
 	       lvds->regs + LVDS_CTRL00);
 	writel(0x102ce4, lvds->regs + LVDS_CTRL02);
 
-	if (drm_panel_enable(lvds->panel)) {
+	/* rodin: 6.18 void */ drm_panel_enable(lvds->panel); if (false) {
 		DRM_ERROR("failed to enable panel\n");
 		phy_power_off(lvds->phy);
 		clk_disable_unprepare(lvds->clkts_clk_gate);

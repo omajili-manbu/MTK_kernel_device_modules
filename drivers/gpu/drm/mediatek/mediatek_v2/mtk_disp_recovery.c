@@ -743,7 +743,7 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 				continue;
 			}
 			CRTC_MMP_MARK(index, esd_check, 0x57A7, esd_ctx->chk_retry);
-			del_timer_sync(&esd_ctx->esd_timer);
+			timer_delete_sync(&esd_ctx->esd_timer);
 			mtk_drm_esd_testing_process(esd_ctx, true);
 		} while (esd_ctx->chk_retry > 0);
 

@@ -43,7 +43,7 @@ extern int wake_up_scp(void);
 
 extern unsigned char *scp_send_buff[SCP_CORE_TOTAL];
 extern unsigned char *scp_recv_buff[SCP_CORE_TOTAL];
-extern char *core_ids[SCP_CORE_TOTAL];
+extern char *core_ids_scp[SCP_CORE_TOTAL];
 
 extern void scp_reset_awake_counts(void);
 extern int scp_awake_counts[];

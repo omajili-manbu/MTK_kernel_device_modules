@@ -123,7 +123,7 @@ static DEFINE_MUTEX(scp_A_notify_mutex);
 static DEFINE_MUTEX(scp_feature_mutex);
 static DEFINE_MUTEX(scp_register_sensor_mutex);
 
-char *core_ids[SCP_CORE_TOTAL] = {"SCP A"};
+char *core_ids_scp[SCP_CORE_TOTAL] = {"SCP A"};
 
 DEFINE_SPINLOCK(scp_awake_spinlock);
 
@@ -447,7 +447,7 @@ static void scp_A_set_ready(void)
 	pr_debug("[SCP] %s()\n", __func__);
 	scp_timeout_times = 0;
 #if SCP_BOOT_TIME_OUT_MONITOR
-	del_timer(&(scp_ready_timer[SCP_A_ID].tl));
+	timer_delete(&(scp_ready_timer[SCP_A_ID].tl));
 #endif
 #if SCP_RECOVERY_SUPPORT
 	atomic_set(&scp_reset_status, RESET_STATUS_STOP);
@@ -1224,7 +1224,7 @@ void scp_register_feature(enum feature_id id)
 		return;
 	}
 
-	/* because feature_table is a global variable,
+	/* because feature_table_scp is a global variable,
 	 * use mutex lock to protect it from accessing in the same time
 	 */
 	mutex_lock(&scp_feature_mutex);
@@ -1237,8 +1237,8 @@ void scp_register_feature(enum feature_id id)
 	}
 
 	for (i = 0; i < NUM_FEATURE_ID; i++) {
-		if (feature_table[i].feature == id)
-			feature_table[i].enable = 1;
+		if (feature_table_scp[i].feature == id)
+			feature_table_scp[i].enable = 1;
 	}
 #if SCP_DVFS_INIT_ENABLE
 	scp_expected_freq = scp_get_freq();
@@ -1294,8 +1294,8 @@ void scp_deregister_feature(enum feature_id id)
 	}
 
 	for (i = 0; i < NUM_FEATURE_ID; i++) {
-		if (feature_table[i].feature == id)
-			feature_table[i].enable = 0;
+		if (feature_table_scp[i].feature == id)
+			feature_table_scp[i].enable = 0;
 	}
 #if SCP_DVFS_INIT_ENABLE
 	scp_expected_freq = scp_get_freq();
@@ -1342,7 +1342,7 @@ void scp_register_sensor(enum feature_id id, enum scp_sensor_id sensor_id)
 		pr_debug("[SCP]register sensor id err");
 		return;
 	}
-	/* because feature_table is a global variable
+	/* because feature_table_scp is a global variable
 	 * use mutex lock to protect it from
 	 * accessing in the same time
 	 */
@@ -1370,7 +1370,7 @@ void scp_deregister_sensor(enum feature_id id, enum scp_sensor_id sensor_id)
 		pr_debug("[SCP]deregister sensor id err");
 		return;
 	}
-	/* because feature_table is a global variable
+	/* because feature_table_scp is a global variable
 	 * use mutex lock to protect it from
 	 * accessing in the same time
 	 */
@@ -1783,7 +1783,7 @@ static int scp_device_probe(struct platform_device *pdev)
 			continue;
 		}
 
-		feature_table[f_idx].freq = f_mcps;
+		feature_table_scp[f_idx].freq = f_mcps;
 		pr_err("[SCP] feature maps: <%d  %d>\n", f_idx, f_mcps);
 	}
 
@@ -1807,9 +1807,9 @@ static int scp_device_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int scp_device_remove(struct platform_device *dev)
+static void scp_device_remove(struct platform_device *dev)
 {
-	return 0;
+	return;
 }
 
 static int scpsys_device_probe(struct platform_device *pdev)
@@ -1828,9 +1828,9 @@ static int scpsys_device_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int scpsys_device_remove(struct platform_device *dev)
+static void scpsys_device_remove(struct platform_device *dev)
 {
-	return 0;
+	return;
 }
 
 static const struct of_device_id scp_of_ids[] = {
@@ -2058,7 +2058,7 @@ static void __exit scp_exit(void)
 
 #if SCP_BOOT_TIME_OUT_MONITOR
 	for (i = 0; i < SCP_CORE_TOTAL ; i++)
-		del_timer(&(scp_ready_timer[i].tl));
+		timer_delete(&(scp_ready_timer[i].tl));
 #endif
 
 	scp_excep_cleanup();

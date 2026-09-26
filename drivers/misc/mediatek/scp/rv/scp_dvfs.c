@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/ktime.h>
 #include <linux/mfd/syscon.h>
+#include <linux/mfd/mt6397/core.h> /* rodin: mt6397_chip complete type */
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -467,9 +468,9 @@ static uint32_t sum_required_freq(uint32_t core_id)
 	 */
 	for (i = 0; i < NUM_FEATURE_ID; i++) {
 		if (i != VCORE_TEST_FEATURE_ID &&
-			feature_table[i].enable == 1 &&
-			feature_table[i].sys_id == core_id)
-			sum += feature_table[i].freq;
+			feature_table_scp[i].enable == 1 &&
+			feature_table_scp[i].sys_id == core_id)
+			sum += feature_table_scp[i].freq;
 	}
 
 	return sum;
@@ -492,7 +493,7 @@ static uint32_t _mt_scp_dvfs_set_test_freq(uint32_t sum)
 			break;
 		}
 	}
-	feature_table[VCORE_TEST_FEATURE_ID].freq = added_freq;
+	feature_table_scp[VCORE_TEST_FEATURE_ID].freq = added_freq;
 	pr_notice("[%s]test freq: %d + %d = %d (MHz)\n",
 			__func__,
 			sum,
@@ -527,7 +528,7 @@ uint32_t scp_get_freq(void)
 
 		if (single_core_sum > sum) {
 			sum = single_core_sum;
-			feature_table[VCORE_TEST_FEATURE_ID].sys_id = i;
+			feature_table_scp[VCORE_TEST_FEATURE_ID].sys_id = i;
 		}
 	}
 
@@ -1246,8 +1247,8 @@ static int mt_scp_dvfs_ctrl_proc_show(struct seq_file *m, void *v)
 
 	for (i = 0; i < NUM_FEATURE_ID; i++)
 		seq_printf(m, "feature=%d, freq=%d, enable=%d\n",
-			feature_table[i].feature, feature_table[i].freq,
-			feature_table[i].enable);
+			feature_table_scp[i].feature, feature_table_scp[i].freq,
+			feature_table_scp[i].enable);
 
 	return 0;
 }
@@ -1287,7 +1288,7 @@ static ssize_t mt_scp_dvfs_ctrl_proc_write(
 			if (dvfs_opp == NO_SCP_DEBUG_OPP) {
 				/* deregister dvfs debug feature */
 				pr_info("remove the opp setting of command\n");
-				feature_table[VCORE_TEST_FEATURE_ID].freq = 0;
+				feature_table_scp[VCORE_TEST_FEATURE_ID].freq = 0;
 				current_scp_debug_opp = dvfs_opp;
 				scp_deregister_feature(
 						VCORE_TEST_FEATURE_ID);
@@ -2938,11 +2939,11 @@ DTS_INIT_FAILED:
 /***************************************
  * this function should never be called
  ****************************************/
-static int mt_scp_dvfs_pdrv_remove(struct platform_device *pdev)
+static void mt_scp_dvfs_pdrv_remove(struct platform_device *pdev)
 {
 	if (!scp_dvfs_feature_enable()) {
 		pr_notice("bypass scp dvfs pdrv remove\n");
-		return 0;
+		return;
 	}
 
 	kfree(g_dvfs_dev.opp);
@@ -2951,7 +2952,7 @@ static int mt_scp_dvfs_pdrv_remove(struct platform_device *pdev)
 	kfree(g_dvfs_dev.ulposc_hw.cali_freq);
 	kfree(g_dvfs_dev.ulposc_hw.cali_configs);
 
-	return 0;
+	return;
 }
 
 static struct platform_driver mt_scp_dvfs_pdrv __refdata = {

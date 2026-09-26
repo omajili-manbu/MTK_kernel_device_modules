@@ -4129,9 +4129,9 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 
 		mtk_ovl_exdma_stash_config(comp, handle);
 		mtk_ovl_replace_bootup_mva(comp, handle, params, fb_info);
-		if (priv->data->mmsys_id == MMSYS_MT6989 ||
-			priv->data->mmsys_id == MMSYS_MT6991)
-			iommu_dev_disable_feature(comp->dev, IOMMU_DEV_FEAT_BYPASS_S1);
+		/* rodin: 6.18 removed the iommu_dev_*_feature API (BYPASS_S1 toggle
+		 * gone); bootup-MVA replace keeps default S1 translation */
+		(void)priv;
 		break;
 	}
 	case BACKUP_INFO_CMP: {

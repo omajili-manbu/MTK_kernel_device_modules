@@ -188,23 +188,23 @@ enum scp_ipi_status scp_ipi_send(enum ipi_id id, void *buf,
 	}
 	if (is_scp_ready(scp_id) == 0) {
 		/* pr_err("[SCP] %s: %s not enabled, id=%d\n", __func__
-		 *					, core_ids[scp_id], id);
+		 *					, core_ids_scp[scp_id], id);
 		 */
 		pr_notice("[SCP] %s: %s not ready\n", __func__,
-			core_ids[scp_id]);
+			core_ids_scp[scp_id]);
 		scp_ipi_desc[id].error_count++;
 		return SCP_IPI_ERROR;
 	}
 	if (len > sizeof(scp_send_obj[scp_id]->share_buf) || buf == NULL) {
 		pr_err("[SCP] %s: %s buffer error\n", __func__,
-			core_ids[scp_id]);
+			core_ids_scp[scp_id]);
 		scp_ipi_desc[id].error_count++;
 		return SCP_IPI_ERROR;
 	}
 #if SCP_RECOVERY_SUPPORT
 	if (atomic_read(&scp_reset_status) == RESET_STATUS_START) {
 		pr_notice("[SCP] %s: %s reset start\n", __func__,
-			core_ids[scp_id]);
+			core_ids_scp[scp_id]);
 		scp_ipi_desc[id].error_count++;
 		return SCP_IPI_ERROR;
 	}
@@ -214,7 +214,7 @@ enum scp_ipi_status scp_ipi_send(enum ipi_id id, void *buf,
 		if ((scp_ipi_id_record_count % PRINT_THRESHOLD == 0) ||
 			(scp_ipi_id_record_count % PRINT_THRESHOLD == 1)) {
 			pr_err("[SCP] %s:%s %d mutex busy, owner=%d\n",
-				__func__, core_ids[scp_id], id,
+				__func__, core_ids_scp[scp_id], id,
 				scp_ipi_mutex_owner[scp_id]);
 		}
 		scp_ipi_desc[id].busy_count++;
@@ -225,7 +225,7 @@ enum scp_ipi_status scp_ipi_send(enum ipi_id id, void *buf,
 	if (scp_awake_lock((void *)scp_id) == -1) {
 		mutex_unlock(&scp_ipi_mutex[scp_id]);
 		pr_err("[SCP] %s: %s ipi error, awake scp fail\n", __func__,
-			core_ids[scp_id]);
+			core_ids_scp[scp_id]);
 		scp_ipi_desc[id].error_count++;
 		return SCP_IPI_ERROR;
 	}
@@ -238,7 +238,7 @@ enum scp_ipi_status scp_ipi_send(enum ipi_id id, void *buf,
 		if ((scp_ipi_id_record_count % PRINT_THRESHOLD == 0) ||
 			(scp_ipi_id_record_count % PRINT_THRESHOLD == 1)) {
 			pr_err("[SCP] %s:%s %d ap->scp busy,last time=%d\n",
-				__func__, core_ids[scp_id], id,
+				__func__, core_ids_scp[scp_id], id,
 				scp_ipi_owner[scp_id]);
 			scp_A_dump_regs();
 		}
