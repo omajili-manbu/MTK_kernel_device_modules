@@ -20,7 +20,7 @@ void arm_ffa_bus_exit(void);
 bool ffa_device_is_valid(struct ffa_device *ffa_dev);
 void ffa_device_match_uuid(struct ffa_device *ffa_dev, const uuid_t *uuid);
 
-#if IS_ENABLED(CONFIG_ARM_FFA_SMCCC)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)
 int __init ffa_transport_init(ffa_fn **invoke_ffa_fn);
 #else
 static inline int __init ffa_transport_init(ffa_fn **invoke_ffa_fn)

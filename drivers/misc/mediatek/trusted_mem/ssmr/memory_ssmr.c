@@ -630,7 +630,7 @@ EXPORT_SYMBOL(get_ssmr_dev);
 
 bool is_ffa_enabled(void)
 {
-#if IS_ENABLED(CONFIG_ARM_FFA_TRANSPORT)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)
 	struct device_node *dt_node;
 
 	dt_node = of_find_node_by_name(NULL, FFA_ENABLED_DT_UNAME);

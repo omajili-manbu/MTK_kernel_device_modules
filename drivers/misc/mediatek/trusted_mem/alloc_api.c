@@ -184,7 +184,7 @@ int trusted_mem_api_query_pa(enum TRUSTED_MEM_REQ_TYPE mem_type, u32 alignment,
 			u32 size, u32 *refcount, u64 *handle,
 			u8 *owner, u32 id, u32 clean, uint64_t *phy_addr)
 {
-#if IS_ENABLED(CONFIG_ARM_FFA_TRANSPORT)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)
 	if (is_ffa_enabled())
 		return tmem_query_ffa_handle_to_pa(*handle, phy_addr);
 	else
@@ -201,7 +201,7 @@ EXPORT_SYMBOL(trusted_mem_api_query_pa);
 
 int trusted_mem_ffa_query_pa(u64 *handle, uint64_t *phy_addr)
 {
-#if IS_ENABLED(CONFIG_ARM_FFA_TRANSPORT)
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)
 	if (is_ffa_enabled())
 		return tmem_query_ffa_handle_to_pa(*handle, phy_addr);
 	else

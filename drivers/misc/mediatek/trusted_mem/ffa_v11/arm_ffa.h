@@ -160,7 +160,7 @@ static inline void *ffa_dev_get_drvdata(struct ffa_device *fdev)
 	return dev_get_drvdata(&fdev->dev);
 }
 
-#if IS_REACHABLE(CONFIG_ARM_FFA_TRANSPORT)
+#if IS_REACHABLE(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)
 struct ffa_device *ffa_device_register(const uuid_t *uuid, int vm_id,
 				       const struct ffa_ops *ops);
 void ffa_device_unregister(struct ffa_device *ffa_dev);
@@ -191,7 +191,7 @@ static inline void ffa_driver_unregister(struct ffa_driver *driver) {}
 static inline
 bool ffa_device_is_valid(struct ffa_device *ffa_dev) { return false; }
 
-#endif /* CONFIG_ARM_FFA_TRANSPORT */
+#endif /* CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT */
 
 #define ffa_register(driver) \
 	ffa_driver_register(driver, THIS_MODULE, KBUILD_MODNAME)

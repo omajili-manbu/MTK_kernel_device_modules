@@ -6,6 +6,7 @@
 
 #include <linux/printk.h>
 #include <linux/kvm.h>
+#include <asm/virt.h> /* rodin: 6.18 is_protected_kvm_enabled lives here */
 
 #include "common.h"
 

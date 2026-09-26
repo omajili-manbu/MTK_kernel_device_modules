@@ -32,8 +32,12 @@ ifneq ($(filter y m,$(CONFIG_ALLOC_TMEM_WITH_HIGH_FREQ)),)
 trusted_mem-y += tmemperf/tmemperf.o
 endif # !CONFIG_ALLOC_TMEM_WITH_HIGH_FREQ
 
-ifneq ($(filter y m,$(CONFIG_ARM_FFA_TRANSPORT)),)
-obj-m += tmem_ffa.o
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)),)
+# rodin: was CONFIG_ARM_FFA_TRANSPORT (kernel arm_ffa symbol, kept =n to avoid
+# ffa_bus_type/ffa_driver_register collisions with this fork). Rewired to the
+# rodin-only gate DEVICE_MODULES_ARM_FFA_TRANSPORT; tmem_ffa is gated separately
+# (DEVICE_MODULES_TMEM_FFA, off until the vendor_dlkm stage flips it to =y).
+obj-$(CONFIG_DEVICE_MODULES_TMEM_FFA) += tmem_ffa.o
 tmem_ffa-y += dev_mgr.o
 tmem_ffa-y += entry.o
 tmem_ffa-y += region_mgr.o
@@ -48,7 +52,7 @@ ifneq ($(filter y m,$(CONFIG_ALLOC_TMEM_WITH_HIGH_FREQ)),)
 tmem_ffa-y += tmemperf/tmemperf.o
 endif # !CONFIG_ALLOC_TMEM_WITH_HIGH_FREQ
 
-obj-m += ffa_v11.o
+obj-$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT) += ffa_v11.o
 ffa_v11-y += ffa_v11/bus.o
 ffa_v11-y += ffa_v11/driver.o
 ffa_v11-y += ffa_v11/smccc.o
@@ -64,7 +68,7 @@ endif # !TCORE_PROFILING_SUPPORT
 
 ifeq ($(TCORE_MEMORY_LEAK_DETECTION_SUPPORT),y)
 trusted_mem-y += mld_helper.o
-ifneq ($(filter y m,$(CONFIG_ARM_FFA_TRANSPORT)),)
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)),)
 tmem_ffa-y += mld_helper.o
 endif
 ccflags-y += -DTCORE_MEMORY_LEAK_DETECTION_SUPPORT
@@ -77,7 +81,7 @@ trusted_mem-y += tests/ut_cases.o
 trusted_mem-y += tests/ut_ssheap.o
 endif # !CONFIG_TEST_MTK_TRUSTED_MEMORY
 
-ifneq ($(filter y m,$(CONFIG_ARM_FFA_TRANSPORT)),)
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)),)
 ifeq ($(CONFIG_TEST_MTK_TRUSTED_MEMORY),m)
 tmem_ffa-y += tests/ut_common.o
 tmem_ffa-y += tests/ut_server.o
@@ -97,7 +101,7 @@ trusted_mem-y += tee_devices.o
 ccflags-y += -DTEE_DEVICES_SUPPORT
 trusted_mem-y += tee_impl/tee_invoke.o
 
-ifneq ($(filter y m,$(CONFIG_ARM_FFA_TRANSPORT)),)
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)),)
 tmem_ffa-y += tee_devices.o
 tmem_ffa-y += tee_impl/tee_invoke.o
 endif
@@ -105,7 +109,7 @@ endif
 ifneq ($(filter y m,$(CONFIG_MICROTRUST_TEE_SUPPORT)\
 				  $(CONFIG_TRUSTONIC_TEE_SUPPORT)),)
 trusted_mem-y += tee_impl/tee_ops.o
-ifneq ($(filter y m,$(CONFIG_ARM_FFA_TRANSPORT)),)
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)),)
 tmem_ffa-y += tee_impl/tee_ops.o
 endif
 endif
@@ -121,7 +125,7 @@ trusted_mem-y += mtee_impl/mtee_invoke.o
 trusted_mem-y += mtee_impl/tmem_carveout_heap.o
 ccflags-y += -DMTEE_DEVICES_SUPPORT
 
-ifneq ($(filter y m,$(CONFIG_ARM_FFA_TRANSPORT)),)
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_ARM_FFA_TRANSPORT)),)
 tmem_ffa-y += mtee_devices.o
 tmem_ffa-y += mtee_impl/mtee_ops.o
 tmem_ffa-y += mtee_impl/mtee_invoke.o
