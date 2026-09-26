@@ -7,9 +7,9 @@
 #include <linux/bitfield.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
-#include <linux/mfd/mt6357/registers.h>
-#include <linux/mfd/mt6358/registers.h>
-#include <linux/mfd/mt6359p/registers.h>
+#include "../../../../include/linux/mfd/mt6357/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor FGADC regs */
+#include "../../../../include/linux/mfd/mt6358/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor FGADC regs */
+#include "../../../../include/linux/mfd/mt6359p/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor FGADC regs */
 #include <linux/mfd/mt6377/registers.h>
 #include <linux/mfd/mt6397/core.h>
 #include <linux/math64.h>
@@ -23,6 +23,12 @@
 #include <linux/slab.h>
 
 #include "mtk_battery_oc_throttling.h"
+
+/* rodin s3a: kernel mt6397/core.h enum lacks the 6359P variant; it shares
+ * silicon id 0x59 with MT6359 (vendor core.h enum has both) */
+#ifndef MT6359P_CHIP_ID
+#define MT6359P_CHIP_ID		MT6359_CHIP_ID
+#endif
 
 #define MT6375_FGADC_CUR_CON1		0x2E9
 #define MT6375_FGADC_CUR_CON2		0x2EB

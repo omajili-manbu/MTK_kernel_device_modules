@@ -9,9 +9,9 @@
 #include <linux/linear_range.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/mfd/mt6357/registers.h>
-#include <linux/mfd/mt6358/registers.h>
-#include <linux/mfd/mt6359p/registers.h>
+#include "../../../../include/linux/mfd/mt6357/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor CHRDET regs */
+#include "../../../../include/linux/mfd/mt6358/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor CHRDET regs */
+#include "../../../../include/linux/mfd/mt6359p/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor CHRDET regs */
 #include <linux/mfd/mt6363/registers.h>
 #include <linux/mfd/mt6377/registers.h>
 #include <linux/mfd/mt6397/core.h>
