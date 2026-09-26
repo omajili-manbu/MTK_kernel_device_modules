@@ -14,6 +14,7 @@
 #include <linux/notifier.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
+#include <linux/platform_device.h> /* rodin: 6.18 header thinning */
 #include <linux/panic_notifier.h>
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
@@ -255,7 +256,7 @@ static int mtk_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 
 	latency = readl_relaxed(c->reg_bases[REG_FREQ_LATENCY]);
 	if (!latency)
-		latency = CPUFREQ_ETERNAL;
+		latency = UINT_MAX; /* rodin: 6.18 dropped CPUFREQ_ETERNAL (-1U) */
 
 	/* us convert to ns */
 	policy->cpuinfo.transition_latency = latency * 1000;
@@ -288,20 +289,18 @@ static int mtk_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static int mtk_cpufreq_hw_cpu_exit(struct cpufreq_policy *policy)
+static void mtk_cpufreq_hw_cpu_exit(struct cpufreq_policy *policy) /* rodin: 6.18 .exit is void */
 {
 	struct cpufreq_mtk *c;
 
 	c = mtk_freq_domain_map[policy->cpu];
 	if (!c) {
 		pr_info("No scaling support for CPU%d\n", policy->cpu);
-		return -ENODEV;
+		return;
 	}
 
 	/* HW should be in paused state now */
 	writel_relaxed(0x0, c->reg_bases[REG_FREQ_ENABLE]);
-
-	return 0;
 }
 
 static void mtk_cpufreq_register_em(struct cpufreq_policy *policy)
@@ -318,6 +317,10 @@ static void mtk_cpufreq_register_em(struct cpufreq_policy *policy)
 	em_dev_register_perf_domain(get_cpu_device(policy->cpu), c->nr_opp, &em_cb, policy->cpus,
 			true);
 }
+
+/* rodin: 6.18 dropped cpufreq_generic_attr; lib/compat-6.6-net.c re-exports
+ * the 6.6 array, so only the declaration is missing here. */
+extern struct freq_attr *cpufreq_generic_attr[];
 
 static struct cpufreq_driver cpufreq_mtk_hw_driver = {
 	.flags		= CPUFREQ_NEED_INITIAL_FREQ_CHECK |
@@ -695,10 +698,10 @@ release_region:
 	return ret;
 }
 
-static int mtk_cpufreq_hw_driver_remove(struct platform_device *pdev)
+static void mtk_cpufreq_hw_driver_remove(struct platform_device *pdev)
 {
 	cpufreq_unregister_driver(&cpufreq_mtk_hw_driver);
-	return 0;
+	return;
 }
 
 static const struct of_device_id mtk_cpufreq_hw_match[] = {

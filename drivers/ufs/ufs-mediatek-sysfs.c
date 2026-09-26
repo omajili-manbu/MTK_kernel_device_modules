@@ -39,6 +39,16 @@ struct eyemon_cmd {
 	u32 value;
 };
 
+/* rodin: 6.18 unipro.h defines these as macros (same values); undef so the
+ * vendor enum members below keep their names */
+#undef RX_EYEMON_ENABLE
+#undef RX_EYEMON_TIMING_STEPS
+#undef RX_EYEMON_VOLTAGE_STEPS
+#undef RX_EYEMON_TARGET_TEST_COUNT
+#undef RX_EYEMON_TESTED_COUNT
+#undef RX_EYEMON_ERROR_COUNT
+#undef RX_EYEMON_START
+
 enum eyemon_attr {
 	RX_EYEMON_CAPABILITY			= 0xF1,
 	RX_EYEMON_TIMING_MAX_STEPS_CAPABILITY	= 0xF2,

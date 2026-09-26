@@ -9,6 +9,7 @@
 #include <linux/bitops.h>
 #include <linux/cdev.h>
 #include <linux/of_device.h>
+#include <linux/of.h> /* rodin: 6.18 header thinning */
 #include <linux/pm_qos.h>
 #include <linux/spinlock_types.h>
 #include <linux/workqueue.h>
@@ -16,6 +17,8 @@
 #include <ufs/ufs.h>
 #include <ufs/ufshcd.h>
 #include <ufs/ufshci.h>
+#include "../../../drivers/ufs/host/ufshcd-pltfrm.h" /* rodin: 6.18 pwr negotiation rework moved
+					      * ufs_host_params here */
 
 #include "ufs-mediatek-mbrain.h"
 #include "ufs-mediatek-rpmb.h"
@@ -287,6 +290,7 @@ struct ufs_mtk_host {
 	bool clk_scale_up;
 	bool clk_scale_forbid;
 	atomic_t clkscale_control;
+	atomic_t scsi_block_reqs_cnt; /* rodin: 6.18 removed hba->scsi_block_reqs_cnt */
 	atomic_t skip_btag;
 	atomic_t dbg_tp_unregister;
 	u16 ref_clk_ungating_wait_us;

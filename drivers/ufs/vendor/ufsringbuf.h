@@ -42,7 +42,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sysfs.h>
 #include <linux/seq_file.h>
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <scsi/scsi_common.h>
 #include <linux/kernel.h>
 #include <linux/random.h>

@@ -38,7 +38,9 @@ ccflags-y += -I$(srctree)/drivers/ufs/
 ccflags-y += -I$(srctree)/drivers/ufs/core/
 ccflags-y += -I$(srctree)/drivers/ufs/host/
 
-obj-$(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)      += ufs-mediatek-mod-ise.o
+# rodin: mod-ise variant not shipped on rodin (device blob is ufs-mediatek-mod);
+# building both =y composites collides at link time
+# obj-$(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)      += ufs-mediatek-mod-ise.o
 ifeq ($(CONFIG_UFS_MEDIATEK_MT6893),y)
 ufs-mediatek-mod-ise-y                              += ../ufs-mediatek-perf.o ../ufs-mediatek-sysfs.o ../ufs-mediatek-mimic.o ../ufs-mediatek-mbrain.o
 else

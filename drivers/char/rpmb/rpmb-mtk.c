@@ -31,6 +31,7 @@
 #include <linux/sched.h>
 #include <linux/semaphore.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>

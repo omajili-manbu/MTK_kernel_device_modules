@@ -36,6 +36,9 @@
 #include <linux/mmc/slot-gpio.h>
 
 #include "cqhci.h"
+/* rodin: 6.18 removed mmc_can_gpio_cd(); lib/compat-6.6-block.c re-exports
+ * the 6.6 implementation, so only the prototype is missing here. */
+extern bool mmc_can_gpio_cd(struct mmc_host *host);
 
 #define MAX_BD_NUM          1024
 #define MSDC_NR_CLOCKS      3

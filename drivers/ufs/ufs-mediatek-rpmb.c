@@ -7,7 +7,7 @@
  */
 
 #include <asm-generic/errno-base.h>
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <linux/async.h>
 #include <linux/container_of.h>
 #include <linux/delay.h>
@@ -203,7 +203,7 @@ static void ufs_mtk_rpmb_purge_tmr_update(struct ufs_hba *hba, bool activate)
 	} else if (!activate && host->purge_active) {
 		host->purge_active = false;
 		ufshcd_rpm_put(hba);
-		del_timer(&host->purge_timer);
+		timer_delete(&host->purge_timer); /* rodin: 6.18 */
 		dev_info(hba->dev, "wl rpm put -");
 	} else if (activate && host->purge_active) {
 		/* Simply refresh timer */

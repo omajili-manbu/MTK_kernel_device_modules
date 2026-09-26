@@ -40,6 +40,9 @@
 #include "../core/mmc_ops.h"
 #include "../core/core.h"
 #include "cqhci.h"
+/* rodin: 6.18 removed mmc_can_gpio_cd(); lib/compat-6.6-block.c re-exports
+ * the 6.6 implementation, so only the prototype is missing here. */
+extern bool mmc_can_gpio_cd(struct mmc_host *host);
 #include "mtk-mmc.h"
 #include "mtk-mmc-dbg.h"
 #include "rpmb-mtk.h"
@@ -4420,7 +4423,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	if (ret)
 		goto host_free;
 
-	mmc->cqe_recovery_reset_always = 1;
+	/* rodin: 6.18 dropped mmc_host.cqe_recovery_reset_always (cqhci recovery rework
+	 * makes the full-reset path the default); vendor always-on setting is inert here */
 
 	host->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(host->base)) {
@@ -5015,8 +5019,13 @@ static void msdc_vh_mmc_update_mmc_queue(void *data,
 	if (!mmc_card_mmc(card))
 		return;
 
-	cache_enabled = !!test_bit(QUEUE_FLAG_WC, &mq->queue->queue_flags);
-	blk_queue_write_cache(mq->queue, cache_enabled, false);
+	cache_enabled = !!(mq->queue->limits.features & BLK_FEAT_WRITE_CACHE);
+	/* rodin: 6.18 moved write-cache/FUA to queue limits features */
+	if (cache_enabled)
+		mq->queue->limits.features |= BLK_FEAT_WRITE_CACHE;
+	else
+		mq->queue->limits.features &= ~BLK_FEAT_WRITE_CACHE;
+	mq->queue->limits.features &= ~BLK_FEAT_FUA;
 	blk_queue_flag_set(QUEUE_FLAG_SAME_FORCE, mq->queue);
 	dev_dbg(mmc_dev(card->host), "disable fua and force complete on same CPU in mmc queue\n");
 }

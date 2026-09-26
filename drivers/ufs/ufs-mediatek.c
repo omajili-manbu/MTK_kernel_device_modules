@@ -74,8 +74,8 @@ static void _ufs_mtk_clk_scale(struct ufs_hba *hba, bool scale_up);
 static const struct ufs_dev_quirk ufs_mtk_dev_fixups[] = {
 	{ .wmanufacturerid = UFS_ANY_VENDOR,
 	  .model = UFS_ANY_MODEL,
-	  .quirk = UFS_DEVICE_QUIRK_DELAY_AFTER_LPM |
-		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM },
+	  .quirk = UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM },
+	  /* rodin: UFS_DEVICE_QUIRK_DELAY_AFTER_LPM removed in 6.18 (core always delays) */
 	{ .wmanufacturerid = UFS_VENDOR_SKHYNIX,
 	  .model = "H9HQ21AFAMZDAR",
 	  .quirk = UFS_DEVICE_QUIRK_SUPPORT_EXTENDED_FEATURES },
@@ -820,7 +820,7 @@ static void ufs_mtk_mcq_disable_irq(struct ufs_hba *hba)
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
 	u32 irq, i;
 
-	if (!is_mcq_enabled(hba))
+	if (!hba->mcq_enabled)
 		return;
 
 	if (host->mcq_nr_intr == 0)
@@ -838,7 +838,7 @@ static void ufs_mtk_mcq_enable_irq(struct ufs_hba *hba)
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
 	u32 irq, i;
 
-	if (!is_mcq_enabled(hba))
+	if (!hba->mcq_enabled)
 		return;
 
 	if (host->mcq_nr_intr == 0)
@@ -1519,7 +1519,7 @@ static int ufs_mtk_cpu_online_notify(unsigned int cpu, struct hlist_node *node)
 	host = hlist_entry_safe(node, struct ufs_mtk_host, cpuhp_node);
 	hba = host->hba;
 
-	if (is_mcq_enabled(hba) && cpu != 0) {
+	if (hba->mcq_enabled && cpu != 0) {
 		ufs_mtk_mcq_set_irq_affinity(hba, cpu);
 
 		/* Migrate irq of cpu0 to cpu3 */
@@ -1707,8 +1707,8 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 	host->ufs_wake_lock = wakeup_source_register(NULL, "ufs_wake_lock");
 
 #ifdef CONFIG_PM_SLEEP
-	hrtimer_init(&host->rq_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	host->rq_timer.function = rq_timer_fn;
+	hrtimer_setup(&host->rq_timer, rq_timer_fn,
+		      CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 #endif
 
 	if (host->caps & UFS_MTK_CAP_DISABLE_MCQ || !ufs_host_mcq_support(hba))
@@ -1791,19 +1791,19 @@ static int ufs_mtk_pre_pwr_change(struct ufs_hba *hba,
 				  struct ufs_pa_layer_attr *dev_req_params)
 {
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
-	struct ufs_dev_params host_cap;
+	struct ufs_host_params host_params; /* rodin: 6.18 pwr negotiation rework */
 	int ret;
 
-	ufshcd_init_pwr_dev_param(&host_cap);
-	host_cap.hs_rx_gear = UFS_HS_G5;
-	host_cap.hs_tx_gear = UFS_HS_G5;
+	ufshcd_init_host_params(&host_params);
+	host_params.hs_rx_gear = UFS_HS_G5;
+	host_params.hs_tx_gear = UFS_HS_G5;
 
 	if ((dev_max_params->pwr_rx == SLOW_MODE) ||
 		(dev_max_params->pwr_tx == SLOW_MODE)) {
-		host_cap.desired_working_mode = UFS_PWM_MODE;
+		host_params.desired_working_mode = UFS_PWM_MODE;
 	}
 
-	ret = ufshcd_get_pwr_dev_param(&host_cap,
+	ret = ufshcd_negotiate_pwr_params(&host_params,
 				       dev_max_params,
 				       dev_req_params);
 	if (ret) {
@@ -1898,8 +1898,7 @@ static int ufs_mtk_pre_pwr_change(struct ufs_hba *hba,
 
 static int ufs_mtk_pwr_change_notify(struct ufs_hba *hba,
 				     enum ufs_notify_change_status stage,
-				     struct ufs_pa_layer_attr *dev_max_params,
-				     struct ufs_pa_layer_attr *dev_req_params)
+				     struct ufs_pa_layer_attr *dev_req_params) /* rodin: 6.18 drops dev_max_params */
 {
 	int ret = 0;
 	static u32 reg;
@@ -1910,7 +1909,7 @@ static int ufs_mtk_pwr_change_notify(struct ufs_hba *hba,
 			reg = ufshcd_readl(hba, REG_AUTO_HIBERNATE_IDLE_TIMER);
 			ufs_mtk_auto_hibern8_disable(hba);
 		}
-		ret = ufs_mtk_pre_pwr_change(hba, dev_max_params,
+		ret = ufs_mtk_pre_pwr_change(hba, &hba->max_pwr_info.info,
 					     dev_req_params);
 		break;
 	case POST_CHANGE:
@@ -2057,13 +2056,17 @@ static int ufs_mtk_device_reset(struct ufs_hba *hba)
 
 static void ufs_mtk_scsi_unblock_requests(struct ufs_hba *hba)
 {
-	if (atomic_dec_and_test(&hba->scsi_block_reqs_cnt))
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba); /* rodin: counter moved to host struct */
+
+	if (atomic_dec_and_test(&host->scsi_block_reqs_cnt))
 		scsi_unblock_requests(hba->host);
 }
 
 static void ufs_mtk_scsi_block_requests(struct ufs_hba *hba)
 {
-	if (atomic_inc_return(&hba->scsi_block_reqs_cnt) == 1)
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+
+	if (atomic_inc_return(&host->scsi_block_reqs_cnt) == 1)
 		scsi_block_requests(hba->host);
 }
 
@@ -2206,7 +2209,7 @@ rpm:
 	}
 
 	/* Start change power mode */
-	err = ufshcd_config_pwr_mode(hba, &pwr_info);
+	err = ufshcd_config_pwr_mode(hba, &pwr_info, UFSHCD_PMC_POLICY_DONT_FORCE); /* rodin: 6.18 adds policy */
 	if (err) {
 		dev_err(hba->dev, "%s: Failed setting power mode, err = %d\n",
 				__func__, err);
@@ -2322,14 +2325,8 @@ static void _ufshcd_enable_intr(struct ufs_hba *hba, u32 intrs)
 {
 	u32 set = ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
 
-	if (hba->ufs_version == ufshci_version(1, 0)) {
-		u32 rw;
-
-		rw = set & INTERRUPT_MASK_RW_VER_10;
-		set = rw | ((set ^ intrs) & intrs);
-	} else {
-		set |= intrs;
-	}
+	/* rodin: 6.18 dropped UFS 1.0 (INTERRUPT_MASK_RW_VER_10); rodin devices are >= 2.0 */
+	set |= intrs;
 
 	ufshcd_writel(hba, set, REG_INTERRUPT_ENABLE);
 }
@@ -2375,7 +2372,7 @@ static int ufs_mtk_link_set_hpm(struct ufs_hba *hba)
 	if (err)
 		return err;
 
-	if (is_mcq_enabled(hba)) {
+	if (hba->mcq_enabled) {
 		ufs_mtk_config_mcq(hba, false);
 		/* Enable required interrupts */
 		_ufshcd_enable_intr(hba, UFSHCD_ENABLE_MTK_MCQ_INTRS);
@@ -2658,7 +2655,7 @@ static int ufs_mtk_apply_dev_quirks(struct ufs_hba *hba)
 	u16 mid = dev_info->wmanufacturerid;
 	unsigned int cpu;
 
-	if (is_mcq_enabled(hba)) {
+	if (hba->mcq_enabled) {
 		/* Use none scheduler for mcq */
 		if (hba->host->nr_hw_queues > 1) {
 			hba->host->tag_set.flags |=
@@ -2713,15 +2710,15 @@ static void ufs_mtk_fixup_dev_quirks(struct ufs_hba *hba)
 	if (STR_PRFX_EQUAL("H9HQ15AFAMBDAR", dev_info->model))
 		host->caps |= UFS_MTK_CAP_BROKEN_VCC | UFS_MTK_CAP_ALLOW_VCCQX_LPM;
 
-	if (ufs_mtk_is_broken_vcc(hba) && hba->vreg_info.vcc &&
-	    (hba->dev_quirks & UFS_DEVICE_QUIRK_DELAY_AFTER_LPM)) {
+	if (ufs_mtk_is_broken_vcc(hba) && hba->vreg_info.vcc) {
+		/* rodin: DELAY_AFTER_LPM quirk removed in 6.18; the generic table
+		 * entry matched every device, so this guard was always true */
 		hba->vreg_info.vcc->always_on = true;
 		/*
 		 * VCC will be kept always-on thus we don't
 		 * need any delay during regulator operations
 		 */
-		hba->dev_quirks &= ~(UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM |
-			UFS_DEVICE_QUIRK_DELAY_AFTER_LPM);
+		hba->dev_quirks &= ~UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM;
 	}
 
 	ufs_mtk_vreg_fix_vcc(hba);
@@ -3001,6 +2998,7 @@ out:
 }
 
 static int ufs_mtk_clk_scale_notify(struct ufs_hba *hba, bool scale_up,
+				    unsigned long freq, /* rodin: 6.18 adds freq */
 				    enum ufs_notify_change_status status)
 {
 	if (!ufshcd_is_clkscaling_supported(hba) || !hba->clk_scaling.is_enabled)
@@ -3318,7 +3316,7 @@ out:
  *
  * Always return 0
  */
-static int ufs_mtk_remove(struct platform_device *pdev)
+static void ufs_mtk_remove(struct platform_device *pdev)
 {
 	struct ufs_hba *hba = platform_get_drvdata(pdev);
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
@@ -3336,7 +3334,7 @@ static int ufs_mtk_remove(struct platform_device *pdev)
 
 	ufs_mtk_uninstall_tracepoints();
 
-	return 0;
+	return;
 }
 
 #ifdef CONFIG_PM_SLEEP

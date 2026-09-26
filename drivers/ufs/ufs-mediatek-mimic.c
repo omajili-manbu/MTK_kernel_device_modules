@@ -5,7 +5,7 @@
  *	Po-Wen Kao <powen.kao@mediatek.com>
  */
 #include <asm-generic/errno-base.h>
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dbg.h>
 
@@ -85,13 +85,17 @@ out:
 
 void ufsm_scsi_unblock_requests(struct ufs_hba *hba)
 {
-	if (atomic_dec_and_test(&hba->scsi_block_reqs_cnt))
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba); /* rodin: 6.18 moved counter */
+
+	if (atomic_dec_and_test(&host->scsi_block_reqs_cnt))
 		scsi_unblock_requests(hba->host);
 }
 
 void ufsm_scsi_block_requests(struct ufs_hba *hba)
 {
-	if (atomic_inc_return(&hba->scsi_block_reqs_cnt) == 1)
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+
+	if (atomic_inc_return(&host->scsi_block_reqs_cnt) == 1)
 		scsi_block_requests(hba->host);
 }
 
@@ -99,14 +103,8 @@ void ufsm_disable_intr(struct ufs_hba *hba, u32 intrs)
 {
 	u32 set = ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
 
-	if (hba->ufs_version == ufshci_version(1, 0)) {
-		u32 rw;
-
-		rw = (set & INTERRUPT_MASK_RW_VER_10) &
-			~(intrs & INTERRUPT_MASK_RW_VER_10);
-		set = rw | ((set & intrs) & ~INTERRUPT_MASK_RW_VER_10);
-
-	} else {
+	/* rodin: 6.18 dropped UFS 1.0 (INTERRUPT_MASK_RW_VER_10); rodin devices are >= 2.0 */
+	if (true) {
 		set &= ~intrs;
 	}
 
