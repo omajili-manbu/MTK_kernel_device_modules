@@ -43,6 +43,7 @@
 #include <linux/sched.h>
 #include <linux/poll.h>
 #include <linux/power_supply.h>
+#include "rodin_psy_compat.h" /* rodin stage2: phandle API rename */
 #include <linux/pm_wakeup.h>
 #include <linux/time.h>
 #include <linux/mutex.h>

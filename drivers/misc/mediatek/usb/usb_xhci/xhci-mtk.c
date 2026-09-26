@@ -15,6 +15,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_wakeirq.h>
@@ -731,7 +733,7 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
 		return ret;
 
 	if (usb_hcd_is_primary_hcd(hcd))
-		ret = xhci_mtk_sch_init(mtk);
+		ret = xhci_mtk_sch_init_mtk(mtk);
 
 	return ret;
 }
@@ -775,10 +777,10 @@ static int xhci_mtk_bus_resume(struct usb_hcd *hcd)
 
 static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
 	.reset = xhci_mtk_setup,
-	.add_endpoint = xhci_mtk_add_ep,
-	.drop_endpoint = xhci_mtk_drop_ep,
-	.check_bandwidth = xhci_mtk_check_bandwidth,
-	.reset_bandwidth = xhci_mtk_reset_bandwidth,
+	.add_endpoint = xhci_mtk_add_ep_mtk,
+	.drop_endpoint = xhci_mtk_drop_ep_mtk,
+	.check_bandwidth = xhci_mtk_check_bandwidth_mtk,
+	.reset_bandwidth = xhci_mtk_reset_bandwidth_mtk,
 	.bus_suspend = xhci_mtk_bus_suspend,
 	.bus_resume = xhci_mtk_bus_resume,
 };
@@ -994,7 +996,7 @@ put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
 
 dealloc_usb2_hcd:
-	xhci_mtk_sch_exit(mtk);
+	xhci_mtk_sch_exit_mtk(mtk);
 	usb_remove_hcd(hcd);
 
 disable_device_wakeup:
@@ -1021,9 +1023,9 @@ void xhci_mtk_halt_and_cleanup(struct xhci_hcd *xhci)
 
 	spin_lock_irq(&xhci->lock);
 	/*  wait for HCHalted */
-	xhci_halt(xhci);
+	xhci_halt_mtk(xhci);
 
-	xhci_cleanup_command_queue(xhci);
+	xhci_cleanup_command_queue_mtk(xhci);
 
 	/* return any pending urbs, remove may be waiting for them */
 	for (i = 0; i <= HCS_MAX_SLOTS(xhci->hcs_params1); i++) {
@@ -1062,7 +1064,7 @@ static void xhci_mtk_remove(struct platform_device *pdev)
 		usb_put_hcd(shared_hcd);
 
 	usb_put_hcd(hcd);
-	xhci_mtk_sch_exit(mtk);
+	xhci_mtk_sch_exit_mtk(mtk);
 	clk_bulk_disable_unprepare(BULK_CLKS_NUM, mtk->clks);
 	regulator_bulk_disable(BULK_VREGS_NUM, mtk->supplies);
 
@@ -1092,10 +1094,10 @@ static int __maybe_unused xhci_mtk_suspend(struct device *dev)
 
 	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
 	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
-	del_timer_sync(&hcd->rh_timer);
+	timer_delete_sync(&hcd->rh_timer);
 	if (shared_hcd) {
 		clear_bit(HCD_FLAG_POLL_RH, &shared_hcd->flags);
-		del_timer_sync(&shared_hcd->rh_timer);
+		timer_delete_sync(&shared_hcd->rh_timer);
 	}
 
 	ret = xhci_mtk_host_disable(mtk);

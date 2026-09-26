@@ -25,6 +25,7 @@
 #include "bq25601.h"
 #include "charger_class.h"
 #include <linux/power_supply.h>
+#include "rodin_psy_compat.h" /* rodin stage2: phandle API rename */
 #include <linux/regulator/driver.h>
 #include "mtk_charger.h"
 
@@ -1366,12 +1367,12 @@ static enum power_supply_property bq25601_psy_properties[] = {
 	POWER_SUPPLY_PROP_USB_TYPE,
 };
 
-static enum power_supply_usb_type bq25601_usb_types[] = {
-	POWER_SUPPLY_USB_TYPE_UNKNOWN,
-	POWER_SUPPLY_USB_TYPE_SDP,
-	POWER_SUPPLY_USB_TYPE_DCP,
-	POWER_SUPPLY_USB_TYPE_CDP,
-};
+/* rodin stage2: 6.18 power_supply_desc.usb_types is a BIT() bitmap */
+static const u32 bq25601_usb_types =
+	BIT(POWER_SUPPLY_USB_TYPE_UNKNOWN) |
+	BIT(POWER_SUPPLY_USB_TYPE_SDP) |
+	BIT(POWER_SUPPLY_USB_TYPE_DCP) |
+	BIT(POWER_SUPPLY_USB_TYPE_CDP);
 
 static int psy_bq25601_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
@@ -1473,8 +1474,7 @@ static int bq25601_driver_probe(struct i2c_client *client)
 	info->psy_desc.properties = bq25601_psy_properties;
 	info->psy_desc.num_properties = ARRAY_SIZE(bq25601_psy_properties);
 	info->psy_desc.get_property = psy_bq25601_get_property;
-	info->psy_desc.usb_types = bq25601_usb_types,
-	info->psy_desc.num_usb_types = ARRAY_SIZE(bq25601_usb_types),
+	info->psy_desc.usb_types = bq25601_usb_types;
 
 	info->psy_cfg.drv_data = info;
 	info->psy_cfg.of_node = client->dev.of_node;

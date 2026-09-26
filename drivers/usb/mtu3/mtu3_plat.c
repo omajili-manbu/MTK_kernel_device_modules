@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h>
 #include <linux/of_irq.h>
 #include <linux/gpio/consumer.h>
 #include <linux/platform_device.h>
@@ -1455,7 +1456,7 @@ put_powerdomains:
 	return ret;
 }
 
-static int mtu3_remove(struct platform_device *pdev)
+static void mtu3_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */
 {
 	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
 
@@ -1476,7 +1477,7 @@ static int mtu3_remove(struct platform_device *pdev)
 		ssusb_host_exit(ssusb);
 		break;
 	default:
-		return -EINVAL;
+		break;
 	}
 
 	ssusb_rscs_exit(ssusb);
@@ -1486,7 +1487,6 @@ static int mtu3_remove(struct platform_device *pdev)
 	pm_runtime_put_noidle(&pdev->dev);
 	pm_runtime_set_suspended(&pdev->dev);
 
-	return 0;
 }
 
 static void mtu3_shutdown(struct platform_device *pdev)

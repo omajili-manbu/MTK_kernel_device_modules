@@ -231,8 +231,8 @@ static int usb_boost_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int usb_boost_remove(struct platform_device *pdev)
-{
+static void usb_boost_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct usb_policy *req_policy, *tmp;
 
 	list_for_each_entry_safe(req_policy, tmp, &usb_policy_list, list) {
@@ -241,7 +241,6 @@ static int usb_boost_remove(struct platform_device *pdev)
 		kfree(req_policy);
 	}
 
-	return 0;
 }
 
 static const struct of_device_id usb_boost_of_match[] = {

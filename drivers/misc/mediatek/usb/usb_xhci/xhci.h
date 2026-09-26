@@ -2090,38 +2090,38 @@ static inline int xhci_link_trb_quirk(struct xhci_hcd *xhci)
 }
 
 /* xHCI debugging */
-char *xhci_get_slot_state(struct xhci_hcd *xhci,
+char *xhci_get_slot_state_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *ctx);
 void xhci_dbg_trace_(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
 			const char *fmt, ...);
 
 /* xHCI memory management */
-void xhci_mem_cleanup(struct xhci_hcd *xhci);
-int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags);
-void xhci_free_virt_device(struct xhci_hcd *xhci, int slot_id);
-int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id, struct usb_device *udev, gfp_t flags);
-int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *udev);
-void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_hcd *xhci,
+void xhci_mem_cleanup_mtk(struct xhci_hcd *xhci);
+int xhci_mem_init_mtk(struct xhci_hcd *xhci, gfp_t flags);
+void xhci_free_virt_device_mtk(struct xhci_hcd *xhci, int slot_id);
+int xhci_alloc_virt_device_mtk(struct xhci_hcd *xhci, int slot_id, struct usb_device *udev, gfp_t flags);
+int xhci_setup_addressable_virt_dev_mtk(struct xhci_hcd *xhci, struct usb_device *udev);
+void xhci_copy_ep0_dequeue_into_input_ctx_mtk(struct xhci_hcd *xhci,
 		struct usb_device *udev);
 unsigned int xhci_get_endpoint_index_(struct usb_endpoint_descriptor *desc);
-unsigned int xhci_last_valid_endpoint(u32 added_ctxs);
-void xhci_endpoint_zero(struct xhci_hcd *xhci, struct xhci_virt_device *virt_dev, struct usb_host_endpoint *ep);
-void xhci_update_tt_active_eps(struct xhci_hcd *xhci,
+unsigned int xhci_last_valid_endpoint_mtk(u32 added_ctxs);
+void xhci_endpoint_zero_mtk(struct xhci_hcd *xhci, struct xhci_virt_device *virt_dev, struct usb_host_endpoint *ep);
+void xhci_update_tt_active_eps_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		int old_active_eps);
-void xhci_clear_endpoint_bw_info(struct xhci_bw_info *bw_info);
-void xhci_update_bw_info(struct xhci_hcd *xhci,
+void xhci_clear_endpoint_bw_info_mtk(struct xhci_bw_info *bw_info);
+void xhci_update_bw_info_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *in_ctx,
 		struct xhci_input_control_ctx *ctrl_ctx,
 		struct xhci_virt_device *virt_dev);
-void xhci_endpoint_copy(struct xhci_hcd *xhci,
+void xhci_endpoint_copy_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *in_ctx,
 		struct xhci_container_ctx *out_ctx,
 		unsigned int ep_index);
-void xhci_slot_copy(struct xhci_hcd *xhci,
+void xhci_slot_copy_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *in_ctx,
 		struct xhci_container_ctx *out_ctx);
-int xhci_endpoint_init(struct xhci_hcd *xhci, struct xhci_virt_device *virt_dev,
+int xhci_endpoint_init_mtk(struct xhci_hcd *xhci, struct xhci_virt_device *virt_dev,
 		struct usb_device *udev, struct usb_host_endpoint *ep,
 		gfp_t mem_flags);
 struct xhci_ring *xhci_ring_alloc_(struct xhci_hcd *xhci,
@@ -2129,39 +2129,39 @@ struct xhci_ring *xhci_ring_alloc_(struct xhci_hcd *xhci,
 		enum xhci_ring_type type, unsigned int max_packet, gfp_t flags);
 void xhci_remove_stream_mapping_(struct xhci_ring *ring);
 void xhci_ring_free_(struct xhci_hcd *xhci, struct xhci_ring *ring);
-int xhci_ring_expansion(struct xhci_hcd *xhci, struct xhci_ring *ring,
+int xhci_ring_expansion_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		unsigned int num_trbs, gfp_t flags);
 void xhci_initialize_ring_info_(struct xhci_ring *ring,
 			unsigned int cycle_state);
-void xhci_free_endpoint_ring(struct xhci_hcd *xhci,
+void xhci_free_endpoint_ring_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		unsigned int ep_index);
-struct xhci_stream_info *xhci_alloc_stream_info(struct xhci_hcd *xhci,
+struct xhci_stream_info *xhci_alloc_stream_info_mtk(struct xhci_hcd *xhci,
 		unsigned int num_stream_ctxs,
 		unsigned int num_streams,
 		unsigned int max_packet, gfp_t flags);
-void xhci_free_stream_info(struct xhci_hcd *xhci,
+void xhci_free_stream_info_mtk(struct xhci_hcd *xhci,
 		struct xhci_stream_info *stream_info);
-void xhci_setup_streams_ep_input_ctx(struct xhci_hcd *xhci,
+void xhci_setup_streams_ep_input_ctx_mtk(struct xhci_hcd *xhci,
 		struct xhci_ep_ctx *ep_ctx,
 		struct xhci_stream_info *stream_info);
-void xhci_setup_no_streams_ep_input_ctx(struct xhci_ep_ctx *ep_ctx,
+void xhci_setup_no_streams_ep_input_ctx_mtk(struct xhci_ep_ctx *ep_ctx,
 		struct xhci_virt_ep *ep);
-void xhci_free_device_endpoint_resources(struct xhci_hcd *xhci,
+void xhci_free_device_endpoint_resources_mtk(struct xhci_hcd *xhci,
 	struct xhci_virt_device *virt_dev, bool drop_control_ep);
-struct xhci_ring *xhci_dma_to_transfer_ring(
+struct xhci_ring *xhci_dma_to_transfer_ring_mtk(
 		struct xhci_virt_ep *ep,
 		u64 address);
 struct xhci_command *xhci_alloc_command_(struct xhci_hcd *xhci,
 		bool allocate_completion, gfp_t mem_flags);
 struct xhci_command *xhci_alloc_command__with_ctx(struct xhci_hcd *xhci,
 		bool allocate_completion, gfp_t mem_flags);
-void xhci_urb_free_priv(struct urb_priv *urb_priv);
+void xhci_urb_free_priv_mtk(struct urb_priv *urb_priv);
 void xhci_free_command_(struct xhci_hcd *xhci,
 		struct xhci_command *command);
-struct xhci_container_ctx *xhci_alloc_container_ctx(struct xhci_hcd *xhci,
+struct xhci_container_ctx *xhci_alloc_container_ctx_mtk(struct xhci_hcd *xhci,
 		int type, gfp_t flags);
-void xhci_free_container_ctx(struct xhci_hcd *xhci,
+void xhci_free_container_ctx_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *ctx);
 void
 xhci_free_interrupter_(struct xhci_hcd *xhci, struct xhci_interrupter *ir);
@@ -2169,7 +2169,7 @@ struct xhci_interrupter *
 xhci_create_secondary_interrupter_(struct usb_hcd *hcd, int num_seg, int intr_num);
 void xhci_remove_secondary_interrupter_(struct usb_hcd
 				*hcd, struct xhci_interrupter *ir);
-void xhci_skip_sec_intr_events(struct xhci_hcd *xhci,
+void xhci_skip_sec_intr_events_mtk(struct xhci_hcd *xhci,
 		struct xhci_ring *ring, struct xhci_interrupter *ir);
 void xhci_link_segments_(struct xhci_segment *prev,
 		struct xhci_segment *next,
@@ -2177,13 +2177,13 @@ void xhci_link_segments_(struct xhci_segment *prev,
 
 /* xHCI host controller glue */
 typedef void (*xhci_get_quirks_t)(struct device *, struct xhci_hcd *);
-int xhci_handshake(void __iomem *ptr, u32 mask, u32 done, u64 timeout_us);
+int xhci_handshake_mtk(void __iomem *ptr, u32 mask, u32 done, u64 timeout_us);
 int xhci_handshake_check_state(struct xhci_hcd *xhci, void __iomem *ptr,
 		u32 mask, u32 done, int usec, unsigned int exit_state);
-void xhci_quiesce(struct xhci_hcd *xhci);
-int xhci_halt(struct xhci_hcd *xhci);
-int xhci_start(struct xhci_hcd *xhci);
-int xhci_reset(struct xhci_hcd *xhci, u64 timeout_us);
+void xhci_quiesce_mtk(struct xhci_hcd *xhci);
+int xhci_halt_mtk(struct xhci_hcd *xhci);
+int xhci_start_mtk(struct xhci_hcd *xhci);
+int xhci_reset_mtk(struct xhci_hcd *xhci, u64 timeout_us);
 int xhci_run_(struct usb_hcd *hcd);
 int xhci_gen_setup_(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks);
 void xhci_shutdown_(struct usb_hcd *hcd);
@@ -2200,16 +2200,16 @@ int xhci_update_hub_device_(struct usb_hcd *hcd, struct usb_device *hdev,
 			   struct usb_tt *tt, gfp_t mem_flags);
 int xhci_address_device_(struct usb_hcd *hcd, struct usb_device *udev,
 			       unsigned int timeout_ms);
-int xhci_disable_slot(struct xhci_hcd *xhci, u32 slot_id);
+int xhci_disable_slot_mtk(struct xhci_hcd *xhci, u32 slot_id);
 int xhci_ext_cap_init_(struct xhci_hcd *xhci);
 
 int xhci_suspend_(struct xhci_hcd *xhci, bool do_wakeup);
 int xhci_resume_(struct xhci_hcd *xhci, pm_message_t msg);
 
-irqreturn_t xhci_irq(struct usb_hcd *hcd);
+irqreturn_t xhci_irq_mtk(struct usb_hcd *hcd);
 irqreturn_t xhci_msi_irq(int irq, void *hcd);
-int xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev);
-int xhci_alloc_tt_info(struct xhci_hcd *xhci,
+int xhci_alloc_dev_mtk(struct usb_hcd *hcd, struct usb_device *udev);
+int xhci_alloc_tt_info_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		struct usb_device *hdev,
 		struct usb_tt *tt, gfp_t mem_flags);
@@ -2223,90 +2223,90 @@ dma_addr_t xhci_trb_virt_to_dma_(struct xhci_segment *seg, union xhci_trb *trb);
 struct xhci_segment *trb_in_td(struct xhci_hcd *xhci,
 		struct xhci_segment *start_seg, union xhci_trb *start_trb,
 		union xhci_trb *end_trb, dma_addr_t suspect_dma, bool debug);
-int xhci_is_vendor_info_code(struct xhci_hcd *xhci, unsigned int trb_comp_code);
+int xhci_is_vendor_info_code_mtk(struct xhci_hcd *xhci, unsigned int trb_comp_code);
 void xhci_ring_cmd_db_(struct xhci_hcd *xhci);
-int xhci_queue_slot_control(struct xhci_hcd *xhci, struct xhci_command *cmd,
+int xhci_queue_slot_control_mtk(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		u32 trb_type, u32 slot_id);
-int xhci_queue_address_device(struct xhci_hcd *xhci, struct xhci_command *cmd,
+int xhci_queue_address_device_mtk(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		dma_addr_t in_ctx_ptr, u32 slot_id, enum xhci_setup_dev);
-int xhci_queue_vendor_command(struct xhci_hcd *xhci, struct xhci_command *cmd,
+int xhci_queue_vendor_command_mtk(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		u32 field1, u32 field2, u32 field3, u32 field4);
 int xhci_queue_stop_endpoint_(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		int slot_id, unsigned int ep_index, int suspend);
-int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
+int xhci_queue_ctrl_tx_mtk(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
 		int slot_id, unsigned int ep_index);
-int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
+int xhci_queue_bulk_tx_mtk(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
 		int slot_id, unsigned int ep_index);
-int xhci_queue_intr_tx(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
+int xhci_queue_intr_tx_mtk(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
 		int slot_id, unsigned int ep_index);
-int xhci_queue_isoc_tx_prepare(struct xhci_hcd *xhci, gfp_t mem_flags,
+int xhci_queue_isoc_tx_prepare_mtk(struct xhci_hcd *xhci, gfp_t mem_flags,
 		struct urb *urb, int slot_id, unsigned int ep_index);
-int xhci_queue_configure_endpoint(struct xhci_hcd *xhci,
+int xhci_queue_configure_endpoint_mtk(struct xhci_hcd *xhci,
 		struct xhci_command *cmd, dma_addr_t in_ctx_ptr, u32 slot_id,
 		bool command_must_succeed);
-int xhci_queue_evaluate_context(struct xhci_hcd *xhci, struct xhci_command *cmd,
+int xhci_queue_evaluate_context_mtk(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		dma_addr_t in_ctx_ptr, u32 slot_id, bool command_must_succeed);
 int xhci_vendor_queue_command_(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		u32 field1, u32 field2, u32 field3, u32 field4, bool command_must_succeed);
-int xhci_queue_reset_ep(struct xhci_hcd *xhci, struct xhci_command *cmd,
+int xhci_queue_reset_ep_mtk(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		int slot_id, unsigned int ep_index,
 		enum xhci_ep_reset_type reset_type);
-int xhci_queue_reset_device(struct xhci_hcd *xhci, struct xhci_command *cmd,
+int xhci_queue_reset_device_mtk(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		u32 slot_id);
 void xhci_cleanup_stalled_ring(struct xhci_hcd *xhci, unsigned int slot_id,
 			       unsigned int ep_index, unsigned int stream_id,
 			       struct xhci_td *td);
 void xhci_stop_endpoint_command_watchdog(struct timer_list *t);
-void xhci_handle_command_timeout(struct work_struct *work);
+void xhci_handle_command_timeout_mtk(struct work_struct *work);
 
-void xhci_ring_ep_doorbell(struct xhci_hcd *xhci, unsigned int slot_id,
+void xhci_ring_ep_doorbell_mtk(struct xhci_hcd *xhci, unsigned int slot_id,
 		unsigned int ep_index, unsigned int stream_id);
-void xhci_ring_doorbell_for_active_rings(struct xhci_hcd *xhci,
+void xhci_ring_doorbell_for_active_rings_mtk(struct xhci_hcd *xhci,
 		unsigned int slot_id,
 		unsigned int ep_index);
-void xhci_cleanup_command_queue(struct xhci_hcd *xhci);
-void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring);
-unsigned int count_trbs(u64 addr, u64 len);
+void xhci_cleanup_command_queue_mtk(struct xhci_hcd *xhci);
+void inc_deq_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring);
+unsigned int count_trbs_mtk(u64 addr, u64 len);
 int xhci_stop_endpoint_sync_(struct xhci_hcd *xhci, struct xhci_virt_ep *ep,
 			int suspend, gfp_t gfp_flags);
-void xhci_update_erst_dequeue(struct xhci_hcd *xhci,
+void xhci_update_erst_dequeue_mtk(struct xhci_hcd *xhci,
 			struct xhci_interrupter *ir, bool clear_ehb);
 
 /* xHCI roothub code */
-void xhci_set_link_state(struct xhci_hcd *xhci, struct xhci_port *port,
+void xhci_set_link_state_mtk(struct xhci_hcd *xhci, struct xhci_port *port,
 				u32 link_state);
-void xhci_test_and_clear_bit(struct xhci_hcd *xhci, struct xhci_port *port,
+void xhci_test_and_clear_bit_mtk(struct xhci_hcd *xhci, struct xhci_port *port,
 				u32 port_bit);
 int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue, u16 wIndex,
 		char *buf, u16 wLength);
-int xhci_hub_status_data(struct usb_hcd *hcd, char *buf);
-int xhci_find_raw_port_number(struct usb_hcd *hcd, int port1);
-struct xhci_hub *xhci_get_rhub(struct usb_hcd *hcd);
+int xhci_hub_status_data_mtk(struct usb_hcd *hcd, char *buf);
+int xhci_find_raw_port_number_mtk(struct usb_hcd *hcd, int port1);
+struct xhci_hub *xhci_get_rhub_mtk(struct usb_hcd *hcd);
 
-void xhci_hc_died(struct xhci_hcd *xhci);
+void xhci_hc_died_mtk(struct xhci_hcd *xhci);
 
 #ifdef CONFIG_PM
 int xhci_bus_suspend_(struct usb_hcd *hcd);
 int xhci_bus_resume_(struct usb_hcd *hcd);
-unsigned long xhci_get_resuming_ports(struct usb_hcd *hcd);
+unsigned long xhci_get_resuming_ports_mtk(struct usb_hcd *hcd);
 #else
 #define	xhci_bus_suspend_	NULL
 #define	xhci_bus_resume_		NULL
-#define	xhci_get_resuming_ports	NULL
+#define	xhci_get_resuming_ports_mtk	NULL
 #endif	/* CONFIG_PM */
 
 u32 xhci_port_state_to_neutral_(u32 state);
 int xhci_find_slot_id_by_port_(struct usb_hcd *hcd, struct xhci_hcd *xhci,
 		u16 port);
-void xhci_ring_device(struct xhci_hcd *xhci, int slot_id);
+void xhci_ring_device_mtk(struct xhci_hcd *xhci, int slot_id);
 
 /* xHCI contexts */
-struct xhci_input_control_ctx *xhci_get_input_control_ctx(struct xhci_container_ctx *ctx);
+struct xhci_input_control_ctx *xhci_get_input_control_ctx_mtk(struct xhci_container_ctx *ctx);
 struct xhci_slot_ctx *xhci_get_slot_ctx_(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx);
 struct xhci_ep_ctx *xhci_get_ep_ctx__(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx,
 		unsigned int ep_index);
 
-struct xhci_ring *xhci_triad_to_transfer_ring(struct xhci_hcd *xhci,
+struct xhci_ring *xhci_triad_to_transfer_ring_mtk(struct xhci_hcd *xhci,
 		unsigned int slot_id, unsigned int ep_index,
 		unsigned int stream_id);
 
@@ -2334,7 +2334,7 @@ int xhci_sideband_interrupter_id_(struct xhci_sideband *sb);
 static inline struct xhci_ring *xhci_urb_to_transfer_ring(struct xhci_hcd *xhci,
 								struct urb *urb)
 {
-	return xhci_triad_to_transfer_ring(xhci, urb->dev->slot_id,
+	return xhci_triad_to_transfer_ring_mtk(xhci, urb->dev->slot_id,
 					xhci_get_endpoint_index_(&urb->ep->desc),
 					urb->stream_id);
 }

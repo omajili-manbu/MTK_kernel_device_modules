@@ -22,6 +22,7 @@
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/power_supply.h>
+#include <linux/alarmtimer.h> /* rodin stage2 */
 #include <linux/iio/consumer.h>
 #include <linux/time.h>
 
@@ -2311,13 +2312,12 @@ static void dfx_report_det_work_func(struct work_struct *work)
 	start_dfx_report_timer(info);
 }
 
-static enum alarmtimer_restart dfx_report_timer_handler(struct alarm *alarm, ktime_t now)
+static void dfx_report_timer_handler(struct alarm *alarm, ktime_t now) /* rodin stage2: 6.18 alarm callback is void */
 {
 	struct mtk_charger *info = container_of(alarm, struct mtk_charger, dfx_report_timer);
 
 	cancel_delayed_work(&info->dfx_report_det_work);
 	schedule_delayed_work(&info->dfx_report_det_work, msecs_to_jiffies(1000));
-	return ALARMTIMER_NORESTART;
 }
 
 int step_jeita_init(struct mtk_charger *info, struct device *dev)

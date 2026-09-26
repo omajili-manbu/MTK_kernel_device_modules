@@ -10,7 +10,7 @@
 
 #include "xhci.h"
 
-char *xhci_get_slot_state(struct xhci_hcd *xhci,
+char *xhci_get_slot_state_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *ctx)
 {
 	struct xhci_slot_ctx *slot_ctx = xhci_get_slot_ctx_(xhci, ctx);

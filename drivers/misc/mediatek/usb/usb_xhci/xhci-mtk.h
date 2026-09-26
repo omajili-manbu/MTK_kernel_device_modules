@@ -182,13 +182,13 @@ static inline struct xhci_hcd_mtk *hcd_to_mtk(struct usb_hcd *hcd)
 	return dev_get_drvdata(hcd->self.controller);
 }
 
-int xhci_mtk_sch_init(struct xhci_hcd_mtk *mtk);
-void xhci_mtk_sch_exit(struct xhci_hcd_mtk *mtk);
-int xhci_mtk_add_ep(struct usb_hcd *hcd, struct usb_device *udev,
+int xhci_mtk_sch_init_mtk(struct xhci_hcd_mtk *mtk);
+void xhci_mtk_sch_exit_mtk(struct xhci_hcd_mtk *mtk);
+int xhci_mtk_add_ep_mtk(struct usb_hcd *hcd, struct usb_device *udev,
 		    struct usb_host_endpoint *ep);
-int xhci_mtk_drop_ep(struct usb_hcd *hcd, struct usb_device *udev,
+int xhci_mtk_drop_ep_mtk(struct usb_hcd *hcd, struct usb_device *udev,
 		     struct usb_host_endpoint *ep);
-int xhci_mtk_check_bandwidth(struct usb_hcd *hcd, struct usb_device *udev);
-void xhci_mtk_reset_bandwidth(struct usb_hcd *hcd, struct usb_device *udev);
+int xhci_mtk_check_bandwidth_mtk(struct usb_hcd *hcd, struct usb_device *udev);
+void xhci_mtk_reset_bandwidth_mtk(struct usb_hcd *hcd, struct usb_device *udev);
 
 #endif		/* _XHCI_MTK_H_ */

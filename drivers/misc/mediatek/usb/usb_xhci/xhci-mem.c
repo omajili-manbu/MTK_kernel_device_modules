@@ -492,7 +492,7 @@ fail:
 }
 EXPORT_SYMBOL_GPL(xhci_ring_alloc_);
 
-void xhci_free_endpoint_ring(struct xhci_hcd *xhci,
+void xhci_free_endpoint_ring_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		unsigned int ep_index)
 {
@@ -508,7 +508,7 @@ void xhci_free_endpoint_ring(struct xhci_hcd *xhci,
  * Expand an existing ring.
  * Allocate a new ring which has same segment numbers and link the two rings.
  */
-int xhci_ring_expansion(struct xhci_hcd *xhci, struct xhci_ring *ring,
+int xhci_ring_expansion_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring,
 				unsigned int num_new_segs, gfp_t flags)
 {
 	struct xhci_segment	*first;
@@ -538,15 +538,15 @@ int xhci_ring_expansion(struct xhci_hcd *xhci, struct xhci_ring *ring,
 	}
 
 	xhci_link_rings(xhci, ring, first, last, num_new_segs);
-	trace_xhci_ring_expansion(ring);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_ring_expansion,
+	trace_xhci_ring_expansion_mtk(ring);
+	xhci_dbg_trace_(xhci, trace_xhci_dbg_ring_expansion_mtk,
 			"ring expansion succeed, now has %d segments",
 			ring->num_segs);
 
 	return 0;
 }
 
-struct xhci_container_ctx *xhci_alloc_container_ctx(struct xhci_hcd *xhci,
+struct xhci_container_ctx *xhci_alloc_container_ctx_mtk(struct xhci_hcd *xhci,
 						    int type, gfp_t flags)
 {
 	struct xhci_container_ctx *ctx;
@@ -578,7 +578,7 @@ struct xhci_container_ctx *xhci_alloc_container_ctx(struct xhci_hcd *xhci,
 	return ctx;
 }
 
-void xhci_free_container_ctx(struct xhci_hcd *xhci,
+void xhci_free_container_ctx_mtk(struct xhci_hcd *xhci,
 			     struct xhci_container_ctx *ctx)
 {
 	struct xhci_vendor_ops *ops = xhci_vendor_get_ops_(xhci);
@@ -594,7 +594,7 @@ void xhci_free_container_ctx(struct xhci_hcd *xhci,
 	kfree(ctx);
 }
 
-struct xhci_input_control_ctx *xhci_get_input_control_ctx(
+struct xhci_input_control_ctx *xhci_get_input_control_ctx_mtk(
 					      struct xhci_container_ctx *ctx)
 {
 	if (ctx->type != XHCI_CTX_TYPE_INPUT)
@@ -671,7 +671,7 @@ static struct xhci_stream_ctx *xhci_alloc_stream_ctx(struct xhci_hcd *xhci,
 				mem_flags, dma);
 }
 
-struct xhci_ring *xhci_dma_to_transfer_ring(
+struct xhci_ring *xhci_dma_to_transfer_ring_mtk(
 		struct xhci_virt_ep *ep,
 		u64 address)
 {
@@ -690,7 +690,7 @@ struct xhci_ring *xhci_dma_to_transfer_ring(
  * the number of streams the driver wants to use.  This is because the number of
  * stream context array entries must be a power of two.
  */
-struct xhci_stream_info *xhci_alloc_stream_info(struct xhci_hcd *xhci,
+struct xhci_stream_info *xhci_alloc_stream_info_mtk(struct xhci_hcd *xhci,
 		unsigned int num_stream_ctxs,
 		unsigned int num_streams,
 		unsigned int max_packet, gfp_t mem_flags)
@@ -804,7 +804,7 @@ cleanup_trbs:
  * Sets the MaxPStreams field and the Linear Stream Array field.
  * Sets the dequeue pointer to the stream context array.
  */
-void xhci_setup_streams_ep_input_ctx(struct xhci_hcd *xhci,
+void xhci_setup_streams_ep_input_ctx_mtk(struct xhci_hcd *xhci,
 		struct xhci_ep_ctx *ep_ctx,
 		struct xhci_stream_info *stream_info)
 {
@@ -814,7 +814,7 @@ void xhci_setup_streams_ep_input_ctx(struct xhci_hcd *xhci,
 	 * fls(0) = 0, fls(0x1) = 1, fls(0x10) = 2, fls(0x100) = 3, etc.
 	 */
 	max_primary_streams = fls(stream_info->num_stream_ctxs) - 2;
-	xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change,
+	xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change_mtk,
 			"Setting number of stream ctx array entries to %u",
 			1 << (max_primary_streams + 1));
 	ep_ctx->ep_info &= cpu_to_le32(~EP_MAXPSTREAMS_MASK);
@@ -828,7 +828,7 @@ void xhci_setup_streams_ep_input_ctx(struct xhci_hcd *xhci,
  * Reinstalls the "normal" endpoint ring (at its previous dequeue mark,
  * not at the beginning of the ring).
  */
-void xhci_setup_no_streams_ep_input_ctx(struct xhci_ep_ctx *ep_ctx,
+void xhci_setup_no_streams_ep_input_ctx_mtk(struct xhci_ep_ctx *ep_ctx,
 		struct xhci_virt_ep *ep)
 {
 	dma_addr_t addr;
@@ -841,7 +841,7 @@ void xhci_setup_no_streams_ep_input_ctx(struct xhci_ep_ctx *ep_ctx,
  *
  * Caller should fix the endpoint context streams fields.
  */
-void xhci_free_stream_info(struct xhci_hcd *xhci,
+void xhci_free_stream_info_mtk(struct xhci_hcd *xhci,
 		struct xhci_stream_info *stream_info)
 {
 	int cur_stream;
@@ -907,7 +907,7 @@ static void xhci_free_tt_info(struct xhci_hcd *xhci,
 	}
 }
 
-int xhci_alloc_tt_info(struct xhci_hcd *xhci,
+int xhci_alloc_tt_info_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		struct usb_device *hdev,
 		struct usb_tt *tt, gfp_t mem_flags)
@@ -952,7 +952,7 @@ free_tts:
  * will be manipulated by the configure endpoint, allocate device, or update
  * hub functions while this function is removing the TT entries from the list.
  */
-void xhci_free_virt_device(struct xhci_hcd *xhci, int slot_id)
+void xhci_free_virt_device_mtk(struct xhci_hcd *xhci, int slot_id)
 {
 	struct xhci_virt_device *dev;
 	int i;
@@ -968,16 +968,16 @@ void xhci_free_virt_device(struct xhci_hcd *xhci, int slot_id)
 	if (!dev)
 		return;
 
-	trace_xhci_free_virt_device(dev);
+	trace_xhci_free_virt_device_mtk(dev);
 
 	if (dev->tt_info)
 		old_active_eps = dev->tt_info->active_eps;
 
 	for (i = 0; i < 31; i++) {
 		if (dev->eps[i].ring)
-			xhci_free_endpoint_ring(xhci, dev, i);
+			xhci_free_endpoint_ring_mtk(xhci, dev, i);
 		if (dev->eps[i].stream_info)
-			xhci_free_stream_info(xhci,
+			xhci_free_stream_info_mtk(xhci,
 					dev->eps[i].stream_info);
 		/*
 		 * Endpoints are normally deleted from the bandwidth list when
@@ -996,12 +996,12 @@ void xhci_free_virt_device(struct xhci_hcd *xhci, int slot_id)
 	/* If this is a hub, free the TT(s) from the TT list */
 	xhci_free_tt_info(xhci, dev, slot_id);
 	/* If necessary, update the number of active TTs on this root port */
-	xhci_update_tt_active_eps(xhci, dev, old_active_eps);
+	xhci_update_tt_active_eps_mtk(xhci, dev, old_active_eps);
 
 	if (dev->in_ctx)
-		xhci_free_container_ctx(xhci, dev->in_ctx);
+		xhci_free_container_ctx_mtk(xhci, dev->in_ctx);
 	if (dev->out_ctx)
-		xhci_free_container_ctx(xhci, dev->out_ctx);
+		xhci_free_container_ctx_mtk(xhci, dev->out_ctx);
 
 	if (dev->udev && dev->udev->slot_id)
 		dev->udev->slot_id = 0;
@@ -1047,11 +1047,11 @@ static void xhci_free_virt_devices_depth_first(struct xhci_hcd *xhci, int slot_i
 	}
 out:
 	/* we are now at a leaf device */
-	xhci_debugfs_remove_slot(xhci, slot_id);
-	xhci_free_virt_device(xhci, slot_id);
+	xhci_debugfs_remove_slot_mtk(xhci, slot_id);
+	xhci_free_virt_device_mtk(xhci, slot_id);
 }
 
-int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
+int xhci_alloc_virt_device_mtk(struct xhci_hcd *xhci, int slot_id,
 		struct usb_device *udev, gfp_t flags)
 {
 	struct xhci_virt_device *dev;
@@ -1070,14 +1070,14 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 	dev->slot_id = slot_id;
 
 	/* Allocate the (output) device context that will be used in the HC. */
-	dev->out_ctx = xhci_alloc_container_ctx(xhci, XHCI_CTX_TYPE_DEVICE, flags);
+	dev->out_ctx = xhci_alloc_container_ctx_mtk(xhci, XHCI_CTX_TYPE_DEVICE, flags);
 	if (!dev->out_ctx)
 		goto fail;
 
 	xhci_dbg(xhci, "Slot %d output ctx = 0x%pad (dma)\n", slot_id, &dev->out_ctx->dma);
 
 	/* Allocate the (input) device context for address device command */
-	dev->in_ctx = xhci_alloc_container_ctx(xhci, XHCI_CTX_TYPE_INPUT, flags);
+	dev->in_ctx = xhci_alloc_container_ctx_mtk(xhci, XHCI_CTX_TYPE_INPUT, flags);
 	if (!dev->in_ctx)
 		goto fail;
 
@@ -1106,7 +1106,7 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 		 &xhci->dcbaa->dev_context_ptrs[slot_id],
 		 le64_to_cpu(xhci->dcbaa->dev_context_ptrs[slot_id]));
 
-	trace_xhci_alloc_virt_device(dev);
+	trace_xhci_alloc_virt_device_mtk(dev);
 
 	xhci->devs[slot_id] = dev;
 
@@ -1114,15 +1114,15 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 fail:
 
 	if (dev->in_ctx)
-		xhci_free_container_ctx(xhci, dev->in_ctx);
+		xhci_free_container_ctx_mtk(xhci, dev->in_ctx);
 	if (dev->out_ctx)
-		xhci_free_container_ctx(xhci, dev->out_ctx);
+		xhci_free_container_ctx_mtk(xhci, dev->out_ctx);
 	kfree(dev);
 
 	return 0;
 }
 
-void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_hcd *xhci,
+void xhci_copy_ep0_dequeue_into_input_ctx_mtk(struct xhci_hcd *xhci,
 		struct usb_device *udev)
 {
 	struct xhci_virt_device *virt_dev;
@@ -1152,7 +1152,7 @@ void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_hcd *xhci,
  * is attached to (or the roothub port its ancestor hub is attached to).  All we
  * know is the index of that port under either the USB 2.0 or the USB 3.0
  * roothub, but that doesn't give us the real index into the HW port status
- * registers. Call xhci_find_raw_port_number() to get real index.
+ * registers. Call xhci_find_raw_port_number_mtk() to get real index.
  */
 static u32 xhci_find_real_port_number(struct xhci_hcd *xhci,
 		struct usb_device *udev)
@@ -1169,11 +1169,11 @@ static u32 xhci_find_real_port_number(struct xhci_hcd *xhci,
 			top_dev = top_dev->parent)
 		/* Found device below root hub */;
 
-	return	xhci_find_raw_port_number(hcd, top_dev->portnum);
+	return	xhci_find_raw_port_number_mtk(hcd, top_dev->portnum);
 }
 
 /* Setup an xHCI virtual device for a Set Address command */
-int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *udev)
+int xhci_setup_addressable_virt_dev_mtk(struct xhci_hcd *xhci, struct usb_device *udev)
 {
 	struct xhci_virt_device *dev;
 	struct xhci_ep_ctx	*ep0_ctx;
@@ -1288,9 +1288,9 @@ int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *ud
 	ep0_ctx->deq = cpu_to_le64(dev->eps[0].ring->first_seg->dma |
 				   dev->eps[0].ring->cycle_state);
 
-	trace_xhci_setup_addressable_virt_device(dev);
+	trace_xhci_setup_addressable_virt_device_mtk(dev);
 
-	/* Steps 7 and 8 were done in xhci_alloc_virt_device() */
+	/* Steps 7 and 8 were done in xhci_alloc_virt_device_mtk() */
 
 	return 0;
 }
@@ -1502,7 +1502,7 @@ static u32 xhci_get_max_esit_payload(struct usb_device *udev,
 /* Set up an endpoint with one ring segment.  Do not allocate stream rings.
  * Drivers will have to call usb_alloc_streams() to do that.
  */
-int xhci_endpoint_init(struct xhci_hcd *xhci,
+int xhci_endpoint_init_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		struct usb_device *udev,
 		struct usb_host_endpoint *ep,
@@ -1609,7 +1609,7 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	return 0;
 }
 
-void xhci_endpoint_zero(struct xhci_hcd *xhci,
+void xhci_endpoint_zero_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		struct usb_host_endpoint *ep)
 {
@@ -1628,7 +1628,7 @@ void xhci_endpoint_zero(struct xhci_hcd *xhci,
 	 */
 }
 
-void xhci_clear_endpoint_bw_info(struct xhci_bw_info *bw_info)
+void xhci_clear_endpoint_bw_info_mtk(struct xhci_bw_info *bw_info)
 {
 	bw_info->ep_interval = 0;
 	bw_info->mult = 0;
@@ -1638,7 +1638,7 @@ void xhci_clear_endpoint_bw_info(struct xhci_bw_info *bw_info)
 	bw_info->max_esit_payload = 0;
 }
 
-void xhci_update_bw_info(struct xhci_hcd *xhci,
+void xhci_update_bw_info_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *in_ctx,
 		struct xhci_input_control_ctx *ctrl_ctx,
 		struct xhci_virt_device *virt_dev)
@@ -1658,7 +1658,7 @@ void xhci_update_bw_info(struct xhci_hcd *xhci,
 		 */
 		if (!EP_IS_ADDED(ctrl_ctx, i) && EP_IS_DROPPED(ctrl_ctx, i)) {
 			/* Dropped endpoint */
-			xhci_clear_endpoint_bw_info(bw_info);
+			xhci_clear_endpoint_bw_info_mtk(bw_info);
 			continue;
 		}
 
@@ -1696,7 +1696,7 @@ void xhci_update_bw_info(struct xhci_hcd *xhci,
  * Useful when you want to change one particular aspect of the endpoint and then
  * issue a configure endpoint command.
  */
-void xhci_endpoint_copy(struct xhci_hcd *xhci,
+void xhci_endpoint_copy_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *in_ctx,
 		struct xhci_container_ctx *out_ctx,
 		unsigned int ep_index)
@@ -1722,7 +1722,7 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
  * issue a configure endpoint command.  Only the context entries field matters,
  * but we'll copy the whole thing anyway.
  */
-void xhci_slot_copy(struct xhci_hcd *xhci,
+void xhci_slot_copy_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *in_ctx,
 		struct xhci_container_ctx *out_ctx)
 {
@@ -1864,7 +1864,7 @@ struct xhci_command *xhci_alloc_command__with_ctx(struct xhci_hcd *xhci,
 	if (!command)
 		return NULL;
 
-	command->in_ctx = xhci_alloc_container_ctx(xhci, XHCI_CTX_TYPE_INPUT,
+	command->in_ctx = xhci_alloc_container_ctx_mtk(xhci, XHCI_CTX_TYPE_INPUT,
 						   mem_flags);
 	if (!command->in_ctx) {
 		kfree(command->completion);
@@ -1874,7 +1874,7 @@ struct xhci_command *xhci_alloc_command__with_ctx(struct xhci_hcd *xhci,
 	return command;
 }
 
-void xhci_urb_free_priv(struct urb_priv *urb_priv)
+void xhci_urb_free_priv_mtk(struct urb_priv *urb_priv)
 {
 	kfree(urb_priv);
 }
@@ -1882,7 +1882,7 @@ void xhci_urb_free_priv(struct urb_priv *urb_priv)
 void xhci_free_command_(struct xhci_hcd *xhci,
 		struct xhci_command *command)
 {
-	xhci_free_container_ctx(xhci,
+	xhci_free_container_ctx_mtk(xhci,
 			command->in_ctx);
 	kfree(command->completion);
 	kfree(command);
@@ -1937,7 +1937,7 @@ xhci_remove_interrupter(struct xhci_hcd *xhci, struct xhci_interrupter *ir)
 		tmp &= ERST_SIZE_MASK;
 		writel(tmp, &ir->ir_set->erst_size);
 
-		xhci_update_erst_dequeue(xhci, ir, true);
+		xhci_update_erst_dequeue_mtk(xhci, ir, true);
 	}
 }
 
@@ -2004,7 +2004,7 @@ void xhci_remove_secondary_interrupter_(struct usb_hcd *hcd, struct xhci_interru
 	 * Cleanup secondary interrupter to ensure there are no pending events.
 	 * This also updates event ring dequeue pointer back to the start.
 	 */
-	xhci_skip_sec_intr_events(xhci, ir->event_ring, ir);
+	xhci_skip_sec_intr_events_mtk(xhci, ir->event_ring, ir);
 	intr_num = ir->intr_num;
 
 	xhci_remove_interrupter(xhci, ir);
@@ -2019,7 +2019,7 @@ void xhci_remove_secondary_interrupter_(struct usb_hcd *hcd, struct xhci_interru
 }
 EXPORT_SYMBOL_GPL(xhci_remove_secondary_interrupter_);
 
-void xhci_mem_cleanup(struct xhci_hcd *xhci)
+void xhci_mem_cleanup_mtk(struct xhci_hcd *xhci)
 {
 	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
 	int i, j, num_ports;
@@ -2042,7 +2042,7 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 		xhci_ring_free_(xhci, xhci->cmd_ring);
 	xhci->cmd_ring = NULL;
 	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Freed command ring");
-	xhci_cleanup_command_queue(xhci);
+	xhci_cleanup_command_queue_mtk(xhci);
 
 	num_ports = HCS_MAX_PORTS(xhci->hcs_params1);
 	for (i = 0; i < num_ports && xhci->rh_bw; i++) {
@@ -2562,7 +2562,7 @@ free_ir:
 }
 EXPORT_SYMBOL_GPL(xhci_create_secondary_interrupter_);
 
-int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
+int xhci_mem_init_mtk(struct xhci_hcd *xhci, gfp_t flags)
 {
 	struct xhci_interrupter *ir;
 	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
@@ -2575,7 +2575,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	INIT_LIST_HEAD(&xhci->cmd_list);
 
 	/* init command timeout work */
-	INIT_DELAYED_WORK(&xhci->cmd_timer, xhci_handle_command_timeout);
+	INIT_DELAYED_WORK(&xhci->cmd_timer, xhci_handle_command_timeout_mtk);
 	init_completion(&xhci->cmd_ring_stop_completion);
 
 	page_size = readl(&xhci->op_regs->page_size);
@@ -2733,8 +2733,8 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	return 0;
 
 fail:
-	xhci_halt(xhci);
-	xhci_reset(xhci, XHCI_RESET_SHORT_USEC);
-	xhci_mem_cleanup(xhci);
+	xhci_halt_mtk(xhci);
+	xhci_reset_mtk(xhci, XHCI_RESET_SHORT_USEC);
+	xhci_mem_cleanup_mtk(xhci);
 	return -ENOMEM;
 }

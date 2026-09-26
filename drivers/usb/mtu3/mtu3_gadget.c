@@ -57,7 +57,7 @@ static void mtu3_set_u2_lpm(struct mtu3 *mtu, enum mtu3_u2_lpm_mode mode)
 
 static void mtu3_u2_lpm_timer_func(struct timer_list *t)
 {
-	struct mtu3 *mtu = from_timer(mtu, t, lpm_timer);
+	struct mtu3 *mtu = timer_container_of(mtu, t, lpm_timer);
 	struct mtu3_ep *mep;
 	unsigned long flags;
 	int i;

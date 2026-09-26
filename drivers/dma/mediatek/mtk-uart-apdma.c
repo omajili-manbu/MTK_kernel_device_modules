@@ -740,15 +740,16 @@ static void mtk_uart_apdma_start_tx(struct mtk_chan *c)
 	if (d->vd.tx.callback_param != NULL) {
 		struct uart_8250_port *p = (struct uart_8250_port *)d->vd.tx.callback_param;
 		struct uart_state *u_state = p->port.state;
-		struct circ_buf *xmit = &u_state->xmit;
-		const char *ptr = xmit->buf + xmit->tail;
-		int tx_size = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
-		int dump_len = min(tx_size, UART_RECORD_MAXLEN);
+		unsigned int tx_size = kfifo_len(&u_state->port.xmit_fifo);
+		unsigned int dump_len =
+			min_t(unsigned int, tx_size, (unsigned int)UART_RECORD_MAXLEN);
 
 		if (u_state != NULL) {
 			if (c->rec_info[idx].trans_len <= UART_RECORD_MAXLEN)
-				memcpy(c->rec_info[idx].rec_buf, ptr,
-					min((unsigned int)dump_len, c->rec_info[idx].trans_len));
+				kfifo_out_peek(&u_state->port.xmit_fifo,
+					c->rec_info[idx].rec_buf,
+					min_t(unsigned int, dump_len,
+					      (unsigned int)c->rec_info[idx].trans_len));
 		} else {
 			c->chan_debug_value = DMA_U_STATE; /* u_state==NULL */
 		}
@@ -1609,8 +1610,8 @@ err_no_dma:
 	return rc;
 }
 
-static int mtk_uart_apdma_remove(struct platform_device *pdev)
-{
+static void mtk_uart_apdma_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk_uart_apdmadev *mtkd = platform_get_drvdata(pdev);
 
 	of_dma_controller_free(pdev->dev.of_node);
@@ -1621,7 +1622,6 @@ static int mtk_uart_apdma_remove(struct platform_device *pdev)
 
 	pm_runtime_disable(&pdev->dev);
 
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP

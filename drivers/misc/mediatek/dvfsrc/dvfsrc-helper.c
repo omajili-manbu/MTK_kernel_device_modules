@@ -586,7 +586,9 @@ static void dvfsrc_force_opp(struct mtk_dvfsrc *dvfsrc, u32 opp)
 		if (__ratelimit(&dvfsrc_ratelimit_force))
 			pr_info("dvfsrc_force_opp\n");
 
-		if (dvfsrc->dvd->mmdvfs_notify && (opp != 0xFF)) {
+		/* rodin stage2: mmdvfs cluster (MTK_MMDVFS) lands with batch 4; the
+		 * debug force-opp vcore notify activates when it does. */
+		if (IS_ENABLED(CONFIG_MTK_MMDVFS) && dvfsrc->dvd->mmdvfs_notify && (opp != 0xFF)) {
 			if (dvfsrc->force_opp_idx == 0xFF) {
 				mtk_mmdvfs_debug_force_vcore_notify(
 					dvfsrc->opp_desc->opps[0].vcore_opp);
@@ -599,7 +601,8 @@ static void dvfsrc_force_opp(struct mtk_dvfsrc *dvfsrc, u32 opp)
 		mtk_dvfsrc_send_request(dvfsrc->dev->parent,
 			MTK_DVFSRC_CMD_FORCEOPP_REQUEST, opp);
 
-		if (dvfsrc->dvd->mmdvfs_notify && (dvfsrc->force_opp_idx != 0xFF)) {
+		if (IS_ENABLED(CONFIG_MTK_MMDVFS) &&
+				dvfsrc->dvd->mmdvfs_notify && (dvfsrc->force_opp_idx != 0xFF)) {
 			if (opp == 0xFF) {
 				mtk_mmdvfs_debug_force_vcore_notify(
 					dvfsrc->opp_desc->opps[max_opp].vcore_opp);
@@ -1589,8 +1592,8 @@ static int mtk_dvfsrc_helper_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_dvfsrc_helper_remove(struct platform_device *pdev)
-{
+static void mtk_dvfsrc_helper_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct device *dev = &pdev->dev;
 	struct mtk_dvfsrc *dvfsrc = platform_get_drvdata(pdev);
 
@@ -1598,7 +1601,6 @@ static int mtk_dvfsrc_helper_remove(struct platform_device *pdev)
 	dvfsrc_unregister_sysfs(dev);
 	platform_driver_unregister(&mtk_dvfsrc_mt6397_driver);
 	dvfsrc_drv = NULL;
-	return 0;
 }
 
 static const struct of_device_id mtk_dvfsrc_helper_of_match[] = {

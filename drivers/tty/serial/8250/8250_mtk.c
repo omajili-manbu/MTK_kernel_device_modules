@@ -1823,7 +1823,7 @@ static int mtk8250_startup(struct uart_port *port)
 
 	if (up->dma) {
 		data->rx_status = DMA_RX_START;
-		uart_circ_clear(&port->state->xmit);
+		kfifo_reset(&port->state->port.xmit_fifo);
 	}
 #endif
 	memset(&port->icount, 0, sizeof(port->icount));
@@ -2889,8 +2889,8 @@ err_pm_disable:
 	return err;
 }
 
-static int mtk8250_remove(struct platform_device *pdev)
-{
+static void mtk8250_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */{
+
 	struct mtk8250_data *data = platform_get_drvdata(pdev);
 
 	pm_runtime_get_sync(&pdev->dev);
@@ -2909,7 +2909,6 @@ static int mtk8250_remove(struct platform_device *pdev)
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		mtk8250_runtime_suspend(&pdev->dev);
 
-	return 0;
 }
 
 static int __maybe_unused mtk8250_suspend(struct device *dev)

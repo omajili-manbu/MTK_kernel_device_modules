@@ -244,8 +244,7 @@ static inline void on_pe_timer_timeout(
 }
 #endif	/* CONFIG_USB_POWER_DELIVERY */
 
-static enum alarmtimer_restart
-	tcpc_timer_call(struct alarm *alarm, ktime_t now)
+static void tcpc_timer_call(struct alarm *alarm, ktime_t now)
 {
 	struct tcpc_timer *tcpc_timer =
 		container_of(alarm, struct tcpc_timer, alarm);
@@ -256,7 +255,6 @@ static enum alarmtimer_restart
 
 	atomic_dec_if_positive(&tcpc->suspend_pending);
 
-	return ALARMTIMER_NORESTART;
 }
 
 /*

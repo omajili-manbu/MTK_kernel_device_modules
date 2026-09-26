@@ -442,7 +442,7 @@ static void xhci_debugfs_create_context_files(struct xhci_hcd *xhci,
 				  parent, &xhci_context_fops);
 }
 
-void xhci_debugfs_create_endpoint(struct xhci_hcd *xhci,
+void xhci_debugfs_create_endpoint_mtk(struct xhci_hcd *xhci,
 				  struct xhci_virt_device *dev,
 				  int ep_index)
 {
@@ -469,7 +469,7 @@ void xhci_debugfs_create_endpoint(struct xhci_hcd *xhci,
 	spriv->eps[ep_index] = epriv;
 }
 
-void xhci_debugfs_remove_endpoint(struct xhci_hcd *xhci,
+void xhci_debugfs_remove_endpoint_mtk(struct xhci_hcd *xhci,
 				  struct xhci_virt_device *dev,
 				  int ep_index)
 {
@@ -565,7 +565,7 @@ static int xhci_stream_context_array_show(struct seq_file *s, void *unused)
 }
 DEFINE_SHOW_ATTRIBUTE(xhci_stream_context_array);
 
-void xhci_debugfs_create_stream_files(struct xhci_hcd *xhci,
+void xhci_debugfs_create_stream_files_mtk(struct xhci_hcd *xhci,
 				      struct xhci_virt_device *dev,
 				      int ep_index)
 {
@@ -590,7 +590,7 @@ void xhci_debugfs_create_stream_files(struct xhci_hcd *xhci,
 			    &xhci_stream_context_array_fops);
 }
 
-void xhci_debugfs_create_slot(struct xhci_hcd *xhci, int slot_id)
+void xhci_debugfs_create_slot_mtk(struct xhci_hcd *xhci, int slot_id)
 {
 	struct xhci_slot_priv	*priv;
 	struct xhci_virt_device	*dev = xhci->devs[slot_id];
@@ -610,7 +610,7 @@ void xhci_debugfs_create_slot(struct xhci_hcd *xhci, int slot_id)
 	xhci_debugfs_create_context_files(xhci, priv->root, slot_id);
 }
 
-void xhci_debugfs_remove_slot(struct xhci_hcd *xhci, int slot_id)
+void xhci_debugfs_remove_slot_mtk(struct xhci_hcd *xhci, int slot_id)
 {
 	int			i;
 	struct xhci_slot_priv	*priv;
@@ -651,7 +651,7 @@ static void xhci_debugfs_create_ports(struct xhci_hcd *xhci,
 	}
 }
 
-void xhci_debugfs_init(struct xhci_hcd *xhci)
+void xhci_debugfs_init_mtk(struct xhci_hcd *xhci)
 {
 	struct device		*dev = xhci_to_hcd(xhci)->self.controller;
 
@@ -703,7 +703,7 @@ void xhci_debugfs_init(struct xhci_hcd *xhci)
 	xhci_debugfs_create_ports(xhci, xhci->debugfs_root);
 }
 
-void xhci_debugfs_exit(struct xhci_hcd *xhci)
+void xhci_debugfs_exit_mtk(struct xhci_hcd *xhci)
 {
 	struct xhci_regset	*rgs, *tmp;
 
@@ -715,12 +715,12 @@ void xhci_debugfs_exit(struct xhci_hcd *xhci)
 		xhci_debugfs_free_regset(rgs);
 }
 
-void __init xhci_debugfs_create_root(void)
+void __init xhci_debugfs_create_root_mtk(void)
 {
 	xhci_debugfs_root = debugfs_create_dir("xhci", usb_debug_root);
 }
 
-void __exit xhci_debugfs_remove_root(void)
+void __exit xhci_debugfs_remove_root_mtk(void)
 {
 	debugfs_remove_recursive(xhci_debugfs_root);
 	xhci_debugfs_root = NULL;

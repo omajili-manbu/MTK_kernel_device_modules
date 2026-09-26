@@ -44,6 +44,11 @@
 #include <linux/sched.h>
 #include <linux/poll.h>
 #include <linux/power_supply.h>
+#include <linux/alarmtimer.h>
+/* rodin stage2: 6.18 renamed devm_power_supply_get_by_phandle -> _get_by_reference (same signature) */
+#define devm_power_supply_get_by_phandle(dev, property) \
+	devm_power_supply_get_by_reference((dev), (property))
+ /* rodin stage2: alarm callback enum */
 #include <linux/pm_wakeup.h>
 #include <linux/rtc.h>
 #include <linux/time.h>
@@ -4238,8 +4243,7 @@ static int charger_pm_event(struct notifier_block *notifier,
 }
 #endif /* CONFIG_PM */
 
-static enum alarmtimer_restart
-	mtk_charger_alarm_timer_func(struct alarm *alarm, ktime_t now)
+static void mtk_charger_alarm_timer_func(struct alarm *alarm, ktime_t now) /* rodin stage2: 6.18 alarm callback is void */
 {
 	struct mtk_charger *info =
 	container_of(alarm, struct mtk_charger, charger_timer);
@@ -4249,8 +4253,6 @@ static enum alarmtimer_restart
 	} else {
 		__pm_stay_awake(info->charger_wakelock);
 	}
-
-	return ALARMTIMER_NORESTART;
 }
 
 static void mtk_charger_init_timer(struct mtk_charger *info)
@@ -4456,14 +4458,14 @@ static int psy_charger_property_is_writeable(struct power_supply *psy,
 	}
 }
 
-static const enum power_supply_usb_type charger_psy_usb_types[] = {
-	POWER_SUPPLY_USB_TYPE_UNKNOWN,
-	POWER_SUPPLY_USB_TYPE_SDP,
-	POWER_SUPPLY_USB_TYPE_DCP,
-	POWER_SUPPLY_USB_TYPE_CDP,
-	POWER_SUPPLY_USB_TYPE_PD,
-	POWER_SUPPLY_USB_TYPE_PD_PPS,
-};
+/* rodin stage2: 6.18 power_supply_desc.usb_types is a BIT() bitmap */
+static const u32 charger_psy_usb_types_bitmap =
+	BIT(POWER_SUPPLY_USB_TYPE_UNKNOWN) |
+	BIT(POWER_SUPPLY_USB_TYPE_SDP) |
+	BIT(POWER_SUPPLY_USB_TYPE_DCP) |
+	BIT(POWER_SUPPLY_USB_TYPE_CDP) |
+	BIT(POWER_SUPPLY_USB_TYPE_PD) |
+	BIT(POWER_SUPPLY_USB_TYPE_PD_PPS);
 
 static const enum power_supply_property charger_psy_properties[] = {
 	POWER_SUPPLY_PROP_ONLINE,
@@ -6428,8 +6430,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->enable_hv_charging = true;
 	info->psy_desc1.name = "mtk-master-charger";
 	info->psy_desc1.type = POWER_SUPPLY_TYPE_UNKNOWN;
-	info->psy_desc1.usb_types = charger_psy_usb_types;
-	info->psy_desc1.num_usb_types = ARRAY_SIZE(charger_psy_usb_types);
+	info->psy_desc1.usb_types = charger_psy_usb_types_bitmap;
 	info->psy_desc1.properties = charger_psy_properties;
 	info->psy_desc1.num_properties = ARRAY_SIZE(charger_psy_properties);
 	info->psy_desc1.get_property = psy_charger_get_property;
@@ -6467,8 +6468,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->psy_desc2.name = "mtk-slave-charger";
 	info->psy_desc2.type = POWER_SUPPLY_TYPE_UNKNOWN;
-	info->psy_desc2.usb_types = charger_psy_usb_types;
-	info->psy_desc2.num_usb_types = ARRAY_SIZE(charger_psy_usb_types);
+	info->psy_desc2.usb_types = charger_psy_usb_types_bitmap;
 	info->psy_desc2.properties = charger_psy_properties;
 	info->psy_desc2.num_properties = ARRAY_SIZE(charger_psy_properties);
 	info->psy_desc2.get_property = psy_charger_get_property;
@@ -6485,8 +6485,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->psy_dvchg_desc1.name = "mtk-mst-div-chg";
 	info->psy_dvchg_desc1.type = POWER_SUPPLY_TYPE_UNKNOWN;
-	info->psy_dvchg_desc1.usb_types = charger_psy_usb_types;
-	info->psy_dvchg_desc1.num_usb_types = ARRAY_SIZE(charger_psy_usb_types);
+	info->psy_dvchg_desc1.usb_types = charger_psy_usb_types_bitmap;
 	info->psy_dvchg_desc1.properties = charger_psy_properties;
 	info->psy_dvchg_desc1.num_properties =
 		ARRAY_SIZE(charger_psy_properties);
@@ -6504,8 +6503,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->psy_dvchg_desc2.name = "mtk-slv-div-chg";
 	info->psy_dvchg_desc2.type = POWER_SUPPLY_TYPE_UNKNOWN;
-	info->psy_dvchg_desc2.usb_types = charger_psy_usb_types;
-	info->psy_dvchg_desc2.num_usb_types = ARRAY_SIZE(charger_psy_usb_types);
+	info->psy_dvchg_desc2.usb_types = charger_psy_usb_types_bitmap;
 	info->psy_dvchg_desc2.properties = charger_psy_properties;
 	info->psy_dvchg_desc2.num_properties =
 		ARRAY_SIZE(charger_psy_properties);
@@ -6523,8 +6521,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->psy_hvdvchg_desc1.name = "mtk-mst-hvdiv-chg";
 	info->psy_hvdvchg_desc1.type = POWER_SUPPLY_TYPE_UNKNOWN;
-	info->psy_hvdvchg_desc1.usb_types = charger_psy_usb_types;
-	info->psy_hvdvchg_desc1.num_usb_types = ARRAY_SIZE(charger_psy_usb_types);
+	info->psy_hvdvchg_desc1.usb_types = charger_psy_usb_types_bitmap;
 	info->psy_hvdvchg_desc1.properties = charger_psy_properties;
 	info->psy_hvdvchg_desc1.num_properties =
 					     ARRAY_SIZE(charger_psy_properties);
@@ -6542,8 +6539,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->psy_hvdvchg_desc2.name = "mtk-slv-hvdiv-chg";
 	info->psy_hvdvchg_desc2.type = POWER_SUPPLY_TYPE_UNKNOWN;
-	info->psy_hvdvchg_desc2.usb_types = charger_psy_usb_types;
-	info->psy_hvdvchg_desc2.num_usb_types = ARRAY_SIZE(charger_psy_usb_types);
+	info->psy_hvdvchg_desc2.usb_types = charger_psy_usb_types_bitmap;
 	info->psy_hvdvchg_desc2.properties = charger_psy_properties;
 	info->psy_hvdvchg_desc2.num_properties =
 					     ARRAY_SIZE(charger_psy_properties);
@@ -6662,7 +6658,15 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		mtk_charger_force_disable_power_path(info, CHG1_SETTING, true);
 
 	info->charger_notifier.notifier_call = screen_state_for_charger_callback;
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_DRM_MEDIATEK)
 	ret = mi_disp_register_client(&info->charger_notifier);
+#else
+	/* rodin stage2: mi_disp_notifier belongs to the mediatek-drm composite
+	 * (deferred display batch); registering against the 6.6 mediatek-drm
+	 * blob is impossible for built-in code, so the screen-state charger
+	 * notifier activates when that cluster lands. */
+	ret = 0;
+#endif
 	if (ret < 0) {
 		chr_err("%s register screen state callback failed\n",__func__);
 	}
@@ -6673,15 +6677,13 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_charger_remove(struct platform_device *dev)
+static void mtk_charger_remove(struct platform_device *dev) /* rodin stage2: 6.18 .remove is void */
 {
 	struct mtk_charger *info = platform_get_drvdata(dev);
 
 	if (info->jeita_support)
 		cancel_delayed_work_sync(&info->charge_monitor_work);
 	charger_partition_exit();
-
-	return 0;
 }
 
 static void mtk_charger_shutdown(struct platform_device *dev)

@@ -36,12 +36,12 @@ DECLARE_EVENT_CLASS(xhci_log_msg,
 	TP_printk("%s", __get_str(msg))
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_address,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_address_mtk,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_context_change,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_context_change_mtk,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
@@ -51,12 +51,12 @@ DEFINE_EVENT(xhci_log_msg, xhci_dbg_quirks_,
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_reset_ep,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_reset_ep_mtk,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_cancel_urb,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_cancel_urb_mtk,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
@@ -66,7 +66,7 @@ DEFINE_EVENT(xhci_log_msg, xhci_dbg_init_,
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_ring_expansion,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_ring_expansion_mtk,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
@@ -102,7 +102,7 @@ DECLARE_EVENT_CLASS(xhci_log_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_ctx, xhci_address_ctx,
+DEFINE_EVENT(xhci_log_ctx, xhci_address_ctx_mtk,
 	TP_PROTO(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx,
 		 unsigned int ep_num),
 	TP_ARGS(xhci, ctx, ep_num)
@@ -131,12 +131,12 @@ DECLARE_EVENT_CLASS(xhci_log_trb,
 	)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_handle_event,
+DEFINE_EVENT(xhci_log_trb, xhci_handle_event_mtk,
 	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
 	TP_ARGS(ring, trb)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_handle_command,
+DEFINE_EVENT(xhci_log_trb, xhci_handle_command_mtk,
 	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
 	TP_ARGS(ring, trb)
 );
@@ -146,22 +146,22 @@ DEFINE_EVENT(xhci_log_trb, xhci_handle_transfer_,
 	TP_ARGS(ring, trb)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_queue_trb,
+DEFINE_EVENT(xhci_log_trb, xhci_queue_trb_mtk,
 	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
 	TP_ARGS(ring, trb)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_event,
+DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_event_mtk,
 	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
 	TP_ARGS(ring, trb)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_transfer,
+DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_transfer_mtk,
 	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
 	TP_ARGS(ring, trb)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_dbc_gadget_ep_queue,
+DEFINE_EVENT(xhci_log_trb, xhci_dbc_gadget_ep_queue_mtk,
 	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
 	TP_ARGS(ring, trb)
 );
@@ -192,7 +192,7 @@ DECLARE_EVENT_CLASS(xhci_log_free_virt_dev,
 	)
 );
 
-DEFINE_EVENT(xhci_log_free_virt_dev, xhci_free_virt_device,
+DEFINE_EVENT(xhci_log_free_virt_dev, xhci_free_virt_device_mtk,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
@@ -229,22 +229,22 @@ DECLARE_EVENT_CLASS(xhci_log_virt_dev,
 	)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_alloc_virt_device,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_alloc_virt_device_mtk,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_device,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_device_mtk,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_addressable_virt_device,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_addressable_virt_device_mtk,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_stop_device,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_stop_device_mtk,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
@@ -330,22 +330,22 @@ DECLARE_EVENT_CLASS(xhci_log_ep_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_stop_ep,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_stop_ep_mtk,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_set_deq_ep,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_set_deq_ep_mtk,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_reset_ep,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_reset_ep_mtk,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_config_ep,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_config_ep_mtk,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
@@ -376,47 +376,47 @@ DECLARE_EVENT_CLASS(xhci_log_slot_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_alloc_dev,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_alloc_dev_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_free_dev,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_free_dev_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_disable_slot,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_disable_slot_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_discover_or_reset_device,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_discover_or_reset_device_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_setup_device_slot,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_setup_device_slot_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_addr_dev,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_addr_dev_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_reset_dev,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_reset_dev_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_set_deq,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_set_deq_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_configure_endpoint,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_configure_endpoint_mtk,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
@@ -436,12 +436,12 @@ DECLARE_EVENT_CLASS(xhci_log_ctrl_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_address_ctrl_ctx,
+DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_address_ctrl_ctx_mtk,
 	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
 	TP_ARGS(ctrl_ctx)
 );
 
-DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_configure_endpoint_ctrl_ctx,
+DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_configure_endpoint_ctrl_ctx_mtk,
 	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
 	TP_ARGS(ctrl_ctx)
 );
@@ -494,17 +494,17 @@ DEFINE_EVENT(xhci_log_ring, xhci_ring_free_,
 	TP_ARGS(ring)
 );
 
-DEFINE_EVENT(xhci_log_ring, xhci_ring_expansion,
+DEFINE_EVENT(xhci_log_ring, xhci_ring_expansion_mtk,
 	TP_PROTO(struct xhci_ring *ring),
 	TP_ARGS(ring)
 );
 
-DEFINE_EVENT(xhci_log_ring, xhci_inc_enq,
+DEFINE_EVENT(xhci_log_ring, xhci_inc_enq_mtk,
 	TP_PROTO(struct xhci_ring *ring),
 	TP_ARGS(ring)
 );
 
-DEFINE_EVENT(xhci_log_ring, xhci_inc_deq,
+DEFINE_EVENT(xhci_log_ring, xhci_inc_deq_mtk,
 	TP_PROTO(struct xhci_ring *ring),
 	TP_ARGS(ring)
 );
@@ -526,17 +526,17 @@ DECLARE_EVENT_CLASS(xhci_log_portsc,
 			      )
 );
 
-DEFINE_EVENT(xhci_log_portsc, xhci_handle_port_status,
+DEFINE_EVENT(xhci_log_portsc, xhci_handle_port_status_mtk,
 	     TP_PROTO(u32 portnum, u32 portsc),
 	     TP_ARGS(portnum, portsc)
 );
 
-DEFINE_EVENT(xhci_log_portsc, xhci_get_port_status,
+DEFINE_EVENT(xhci_log_portsc, xhci_get_port_status_mtk,
 	     TP_PROTO(u32 portnum, u32 portsc),
 	     TP_ARGS(portnum, portsc)
 );
 
-DEFINE_EVENT(xhci_log_portsc, xhci_hub_status_data,
+DEFINE_EVENT(xhci_log_portsc, xhci_hub_status_data_mtk,
 	     TP_PROTO(u32 portnum, u32 portsc),
 	     TP_ARGS(portnum, portsc)
 );
@@ -557,12 +557,12 @@ DECLARE_EVENT_CLASS(xhci_log_doorbell,
 	)
 );
 
-DEFINE_EVENT(xhci_log_doorbell, xhci_ring_ep_doorbell,
+DEFINE_EVENT(xhci_log_doorbell, xhci_ring_ep_doorbell_mtk,
 	     TP_PROTO(u32 slot, u32 doorbell),
 	     TP_ARGS(slot, doorbell)
 );
 
-DEFINE_EVENT(xhci_log_doorbell, xhci_ring_host_doorbell,
+DEFINE_EVENT(xhci_log_doorbell, xhci_ring_host_doorbell_mtk,
 	     TP_PROTO(u32 slot, u32 doorbell),
 	     TP_ARGS(slot, doorbell)
 );
@@ -591,22 +591,22 @@ DECLARE_EVENT_CLASS(xhci_dbc_log_request,
 	)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_alloc_request,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_alloc_request_mtk,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_free_request,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_free_request_mtk,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_queue_request,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_queue_request_mtk,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_giveback_request,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_giveback_request_mtk,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );

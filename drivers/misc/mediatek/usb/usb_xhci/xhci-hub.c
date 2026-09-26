@@ -11,7 +11,7 @@
 
 
 #include <linux/slab.h>
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <linux/bitfield.h>
 
 #include "xhci.h"
@@ -487,7 +487,7 @@ EXPORT_SYMBOL_GPL(xhci_find_slot_id_by_port_);
  * to complete.
  * suspend will set to 1, if suspend bit need to set in command.
  */
-static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
+static int xhci_stop_device_mtk(struct xhci_hcd *xhci, int slot_id, int suspend)
 {
 	struct xhci_virt_device *virt_dev;
 	struct xhci_command *cmd;
@@ -500,7 +500,7 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 	if (!virt_dev)
 		return -ENODEV;
 
-	trace_xhci_stop_device(virt_dev);
+	trace_xhci_stop_device_mtk(virt_dev);
 
 	cmd = xhci_alloc_command_(xhci, true, GFP_NOIO);
 	if (!cmd)
@@ -565,7 +565,7 @@ cmd_cleanup:
 /*
  * Ring device, it rings the all doorbells unconditionally.
  */
-void xhci_ring_device(struct xhci_hcd *xhci, int slot_id)
+void xhci_ring_device_mtk(struct xhci_hcd *xhci, int slot_id)
 {
 	int i, s;
 	struct xhci_virt_ep *ep;
@@ -575,9 +575,9 @@ void xhci_ring_device(struct xhci_hcd *xhci, int slot_id)
 
 		if (ep->ep_state & EP_HAS_STREAMS) {
 			for (s = 1; s < ep->stream_info->num_streams; s++)
-				xhci_ring_ep_doorbell(xhci, slot_id, i, s);
+				xhci_ring_ep_doorbell_mtk(xhci, slot_id, i, s);
 		} else if (ep->ring && ep->ring->dequeue) {
-			xhci_ring_ep_doorbell(xhci, slot_id, i, 0);
+			xhci_ring_ep_doorbell_mtk(xhci, slot_id, i, 0);
 		}
 	}
 
@@ -665,7 +665,7 @@ static void xhci_clear_port_change_bit(struct xhci_hcd *xhci, u16 wValue,
 		 wIndex + 1, port_change_bit, port_status);
 }
 
-struct xhci_hub *xhci_get_rhub(struct usb_hcd *hcd)
+struct xhci_hub *xhci_get_rhub_mtk(struct usb_hcd *hcd)
 {
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
@@ -725,7 +725,7 @@ static void xhci_port_set_test_mode(struct xhci_hcd *xhci,
 	writel(temp, port->addr + PORTPMSC);
 	xhci->test_mode = test_mode;
 	if (test_mode == USB_TEST_FORCE_ENABLE)
-		xhci_start(xhci);
+		xhci_start_mtk(xhci);
 }
 
 static int xhci_enter_test_mode(struct xhci_hcd *xhci,
@@ -741,8 +741,8 @@ static int xhci_enter_test_mode(struct xhci_hcd *xhci,
 		if (!xhci->devs[i])
 			continue;
 
-		retval = xhci_disable_slot(xhci, i);
-		xhci_free_virt_device(xhci, i);
+		retval = xhci_disable_slot_mtk(xhci, i);
+		xhci_free_virt_device_mtk(xhci, i);
 		if (retval)
 			xhci_err(xhci, "Failed to disable slot %d, %d. Enter test mode anyway\n",
 				 i, retval);
@@ -758,7 +758,7 @@ static int xhci_enter_test_mode(struct xhci_hcd *xhci,
 		xhci_set_port_power(xhci, xhci->usb2_rhub.ports[i], false, flags);
 	/* Stop the controller */
 	xhci_dbg(xhci, "Stop controller\n");
-	retval = xhci_halt(xhci);
+	retval = xhci_halt_mtk(xhci);
 	if (retval)
 		return retval;
 	/* Disable runtime PM for test mode */
@@ -781,16 +781,16 @@ static int xhci_exit_test_mode(struct xhci_hcd *xhci)
 	}
 	if (xhci->test_mode == USB_TEST_FORCE_ENABLE &&
 		!(xhci->xhc_state & XHCI_STATE_HALTED)) {
-		retval = xhci_halt(xhci);
+		retval = xhci_halt_mtk(xhci);
 		if (retval)
 			return retval;
 	}
 	pm_runtime_allow(xhci_to_hcd(xhci)->self.controller);
 	xhci->test_mode = 0;
-	return xhci_reset(xhci, XHCI_RESET_SHORT_USEC);
+	return xhci_reset_mtk(xhci, XHCI_RESET_SHORT_USEC);
 }
 
-void xhci_set_link_state(struct xhci_hcd *xhci, struct xhci_port *port,
+void xhci_set_link_state_mtk(struct xhci_hcd *xhci, struct xhci_port *port,
 			 u32 link_state)
 {
 	u32 temp;
@@ -834,7 +834,7 @@ static void xhci_set_remote_wake_mask(struct xhci_hcd *xhci,
 }
 
 /* Test and clear port RWC bit */
-void xhci_test_and_clear_bit(struct xhci_hcd *xhci, struct xhci_port *port,
+void xhci_test_and_clear_bit_mtk(struct xhci_hcd *xhci, struct xhci_port *port,
 			     u32 port_bit)
 {
 	u32 temp;
@@ -920,7 +920,7 @@ static void xhci_del_comp_mod_timer(struct xhci_hcd *xhci, u32 status,
 	if ((xhci->port_status_u0 != all_ports_seen_u0) && port_in_u0) {
 		xhci->port_status_u0 |= 1 << wIndex;
 		if (xhci->port_status_u0 == all_ports_seen_u0) {
-			del_timer_sync(&xhci->comp_mode_recovery_timer);
+			timer_delete_sync(&xhci->comp_mode_recovery_timer);
 			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
 				"All USB3 ports have entered U0 already!");
 			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
@@ -982,8 +982,8 @@ static int xhci_handle_usb2_port_link_resume(struct xhci_port *port,
 		reinit_completion(&port->rexit_done);
 		port->rexit_active = true;
 
-		xhci_test_and_clear_bit(xhci, port, PORT_PLC);
-		xhci_set_link_state(xhci, port, XDEV_U0);
+		xhci_test_and_clear_bit_mtk(xhci, port, PORT_PLC);
+		xhci_set_link_state_mtk(xhci, port, XDEV_U0);
 
 		spin_unlock_irqrestore(&xhci->lock, *flags);
 		time_left = wait_for_completion_timeout(
@@ -998,7 +998,7 @@ static int xhci_handle_usb2_port_link_resume(struct xhci_port *port,
 				xhci_dbg(xhci, "slot_id is zero\n");
 				return -ENODEV;
 			}
-			xhci_ring_device(xhci, slot_id);
+			xhci_ring_device_mtk(xhci, slot_id);
 		} else {
 			int port_status = readl(port->addr);
 
@@ -1151,7 +1151,7 @@ static void xhci_get_usb2_port_status(struct xhci_port *port, u32 *status,
  *  - Stop the Synopsys redriver Compliance Mode polling.
  *  - Drop and reacquire the xHCI lock, in order to wait for port resume.
  */
-static u32 xhci_get_port_status(struct usb_hcd *hcd,
+static u32 xhci_get_port_status_mtk(struct usb_hcd *hcd,
 		struct xhci_bus_state *bus_state,
 	u16 wIndex, u32 raw_port_status,
 		unsigned long *flags)
@@ -1162,7 +1162,7 @@ static u32 xhci_get_port_status(struct usb_hcd *hcd,
 	struct xhci_hub *rhub;
 	struct xhci_port *port;
 
-	rhub = xhci_get_rhub(hcd);
+	rhub = xhci_get_rhub_mtk(hcd);
 	port = rhub->ports[wIndex];
 
 	/* common wPortChange bits */
@@ -1219,7 +1219,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	struct xhci_port *port;
 	int portnum1;
 
-	rhub = xhci_get_rhub(hcd);
+	rhub = xhci_get_rhub_mtk(hcd);
 	ports = rhub->ports;
 	max_ports = rhub->num_ports;
 	bus_state = &rhub->bus_state;
@@ -1264,12 +1264,12 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		port = ports[portnum1 - 1];
 		temp = readl(port->addr);
 		if (temp == ~(u32)0) {
-			xhci_hc_died(xhci);
+			xhci_hc_died_mtk(xhci);
 			retval = -ENODEV;
 			break;
 		}
-		trace_xhci_get_port_status(wIndex, temp);
-		status = xhci_get_port_status(hcd, bus_state, wIndex, temp,
+		trace_xhci_get_port_status_mtk(wIndex, temp);
+		status = xhci_get_port_status_mtk(hcd, bus_state, wIndex, temp,
 					      &flags);
 		if (status == 0xffffffff)
 			goto error;
@@ -1310,7 +1310,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		wIndex--;
 		temp = readl(port->addr);
 		if (temp == ~(u32)0) {
-			xhci_hc_died(xhci);
+			xhci_hc_died_mtk(xhci);
 			retval = -ENODEV;
 			break;
 		}
@@ -1325,7 +1325,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			temp = readl(port->addr);
 			if ((temp & PORT_PLS_MASK) != XDEV_U0) {
 				/* Resume the port to U0 first */
-				xhci_set_link_state(xhci, port, XDEV_U0);
+				xhci_set_link_state_mtk(xhci, port, XDEV_U0);
 				spin_unlock_irqrestore(&xhci->lock, flags);
 				msleep(10);
 				spin_lock_irqsave(&xhci->lock, flags);
@@ -1350,10 +1350,10 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			}
 			/* unlock to execute stop endpoint commands */
 			spin_unlock_irqrestore(&xhci->lock, flags);
-			xhci_stop_device(xhci, slot_id, 1);
+			xhci_stop_device_mtk(xhci, slot_id, 1);
 			spin_lock_irqsave(&xhci->lock, flags);
 
-			xhci_set_link_state(xhci, port, XDEV_U3);
+			xhci_set_link_state_mtk(xhci, port, XDEV_U3);
 
 			spin_unlock_irqrestore(&xhci->lock, flags);
 			msleep(10); /* wait device to enter */
@@ -1385,7 +1385,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			if (link_state == USB_SS_PORT_LS_RX_DETECT) {
 				xhci_dbg(xhci, "Enable port %d-%d\n",
 					 hcd->self.busnum, portnum1);
-				xhci_set_link_state(xhci, port,	link_state);
+				xhci_set_link_state_mtk(xhci, port,	link_state);
 				temp = readl(port->addr);
 				break;
 			}
@@ -1417,7 +1417,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 
 				xhci_dbg(xhci, "Enable compliance mode transition for port %d-%d\n",
 					 hcd->self.busnum, portnum1);
-				xhci_set_link_state(xhci, port, link_state);
+				xhci_set_link_state_mtk(xhci, port, link_state);
 
 				temp = readl(port->addr);
 				break;
@@ -1455,7 +1455,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 					reinit_completion(&port->u3exit_done);
 				}
 				if (pls <= XDEV_U3) /* U1, U2, U3 */
-					xhci_set_link_state(xhci, port, USB_SS_PORT_LS_U0);
+					xhci_set_link_state_mtk(xhci, port, USB_SS_PORT_LS_U0);
 				if (!wait_u0) {
 					if (pls > XDEV_U3)
 						goto error;
@@ -1480,10 +1480,10 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 					 * commands */
 					spin_unlock_irqrestore(&xhci->lock,
 								flags);
-					xhci_stop_device(xhci, slot_id, 1);
+					xhci_stop_device_mtk(xhci, slot_id, 1);
 					spin_lock_irqsave(&xhci->lock, flags);
 				}
-				xhci_set_link_state(xhci, port, USB_SS_PORT_LS_U3);
+				xhci_set_link_state_mtk(xhci, port, USB_SS_PORT_LS_U3);
 				spin_unlock_irqrestore(&xhci->lock, flags);
 				while (retries--) {
 					usleep_range(4000, 8000);
@@ -1565,7 +1565,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		wIndex--;
 		temp = readl(port->addr);
 		if (temp == ~(u32)0) {
-			xhci_hc_died(xhci);
+			xhci_hc_died_mtk(xhci);
 			retval = -ENODEV;
 			break;
 		}
@@ -1588,11 +1588,11 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 
 				set_bit(wIndex, &bus_state->resuming_ports);
 				usb_hcd_start_port_resume(&hcd->self, wIndex);
-				xhci_set_link_state(xhci, port, XDEV_RESUME);
+				xhci_set_link_state_mtk(xhci, port, XDEV_RESUME);
 				spin_unlock_irqrestore(&xhci->lock, flags);
 				msleep(USB_RESUME_TIMEOUT);
 				spin_lock_irqsave(&xhci->lock, flags);
-				xhci_set_link_state(xhci, port, XDEV_U0);
+				xhci_set_link_state_mtk(xhci, port, XDEV_U0);
 				clear_bit(wIndex, &bus_state->resuming_ports);
 				usb_hcd_end_port_resume(&hcd->self, wIndex);
 			}
@@ -1604,7 +1604,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				xhci_dbg(xhci, "slot_id is zero\n");
 				goto error;
 			}
-			xhci_ring_device(xhci, slot_id);
+			xhci_ring_device_mtk(xhci, slot_id);
 			break;
 		case USB_PORT_FEAT_C_SUSPEND:
 			bus_state->port_c_suspend &= ~(1 << wIndex);
@@ -1650,7 +1650,7 @@ EXPORT_SYMBOL_GPL(xhci_hub_control_);
  * Note that the status change bits will be cleared as soon as a port status
  * change event is generated, so we use the saved status from that event.
  */
-int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
+int xhci_hub_status_data_mtk(struct usb_hcd *hcd, char *buf)
 {
 	unsigned long flags;
 	u32 temp, status;
@@ -1663,7 +1663,7 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	struct xhci_hub *rhub;
 	struct xhci_port **ports;
 
-	rhub = xhci_get_rhub(hcd);
+	rhub = xhci_get_rhub_mtk(hcd);
 	ports = rhub->ports;
 	max_ports = rhub->num_ports;
 	bus_state = &rhub->bus_state;
@@ -1697,11 +1697,11 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	for (i = 0; i < max_ports; i++) {
 		temp = readl(ports[i]->addr);
 		if (temp == ~(u32)0) {
-			xhci_hc_died(xhci);
+			xhci_hc_died_mtk(xhci);
 			retval = -ENODEV;
 			break;
 		}
-		trace_xhci_hub_status_data(i, temp);
+		trace_xhci_hub_status_data_mtk(i, temp);
 
 		if ((temp & mask) != 0 ||
 			(bus_state->port_c_suspend & 1 << i) ||
@@ -1737,7 +1737,7 @@ int xhci_bus_suspend_(struct usb_hcd *hcd)
 	u32 portsc_buf[USB_MAXCHILDREN];
 	bool wake_enabled;
 
-	rhub = xhci_get_rhub(hcd);
+	rhub = xhci_get_rhub_mtk(hcd);
 	ports = rhub->ports;
 	max_ports = rhub->num_ports;
 	bus_state = &rhub->bus_state;
@@ -1841,7 +1841,7 @@ retry:
 							    port_index + 1);
 			if (slot_id) {
 				spin_unlock_irqrestore(&xhci->lock, flags);
-				xhci_stop_device(xhci, slot_id, 1);
+				xhci_stop_device_mtk(xhci, slot_id, 1);
 				spin_lock_irqsave(&xhci->lock, flags);
 			}
 		}
@@ -1899,7 +1899,7 @@ int xhci_bus_resume_(struct usb_hcd *hcd)
 	struct xhci_hub *rhub;
 	struct xhci_port **ports;
 
-	rhub = xhci_get_rhub(hcd);
+	rhub = xhci_get_rhub_mtk(hcd);
 	ports = rhub->ports;
 	max_ports = rhub->num_ports;
 	bus_state = &rhub->bus_state;
@@ -1969,25 +1969,25 @@ int xhci_bus_resume_(struct usb_hcd *hcd)
 		for_each_set_bit(port_index, &bus_state->bus_suspended,
 				 BITS_PER_LONG) {
 			/* Clear PLC to poll it later for U0 transition */
-			xhci_test_and_clear_bit(xhci, ports[port_index],
+			xhci_test_and_clear_bit_mtk(xhci, ports[port_index],
 						PORT_PLC);
-			xhci_set_link_state(xhci, ports[port_index], XDEV_U0);
+			xhci_set_link_state_mtk(xhci, ports[port_index], XDEV_U0);
 		}
 	}
 
 	/* poll for U0 link state complete, both USB2 and USB3 */
 	for_each_set_bit(port_index, &bus_state->bus_suspended, BITS_PER_LONG) {
-		sret = xhci_handshake(ports[port_index]->addr, PORT_PLC,
+		sret = xhci_handshake_mtk(ports[port_index]->addr, PORT_PLC,
 				      PORT_PLC, 10 * 1000);
 		if (sret) {
 			xhci_warn(xhci, "port %d-%d resume PLC timeout\n",
 				  hcd->self.busnum, port_index + 1);
 			continue;
 		}
-		xhci_test_and_clear_bit(xhci, ports[port_index], PORT_PLC);
+		xhci_test_and_clear_bit_mtk(xhci, ports[port_index], PORT_PLC);
 		slot_id = xhci_find_slot_id_by_port_(hcd, xhci, port_index + 1);
 		if (slot_id)
-			xhci_ring_device(xhci, slot_id);
+			xhci_ring_device_mtk(xhci, slot_id);
 	}
 	(void) readl(&xhci->op_regs->command);
 
@@ -2003,9 +2003,9 @@ int xhci_bus_resume_(struct usb_hcd *hcd)
 }
 EXPORT_SYMBOL_GPL(xhci_bus_resume_);
 
-unsigned long xhci_get_resuming_ports(struct usb_hcd *hcd)
+unsigned long xhci_get_resuming_ports_mtk(struct usb_hcd *hcd)
 {
-	struct xhci_hub *rhub = xhci_get_rhub(hcd);
+	struct xhci_hub *rhub = xhci_get_rhub_mtk(hcd);
 
 	/* USB3 port wakeups are reported via usb_wakeup_notification() */
 	return rhub->bus_state.resuming_ports;	/* USB2 ports only */

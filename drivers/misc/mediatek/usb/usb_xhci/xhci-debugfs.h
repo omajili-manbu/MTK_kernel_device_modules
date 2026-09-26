@@ -105,38 +105,38 @@ struct xhci_slot_priv {
 };
 
 #ifdef CONFIG_DEBUG_FS
-void xhci_debugfs_init(struct xhci_hcd *xhci);
-void xhci_debugfs_exit(struct xhci_hcd *xhci);
-void __init xhci_debugfs_create_root(void);
-void __exit xhci_debugfs_remove_root(void);
-void xhci_debugfs_create_slot(struct xhci_hcd *xhci, int slot_id);
-void xhci_debugfs_remove_slot(struct xhci_hcd *xhci, int slot_id);
-void xhci_debugfs_create_endpoint(struct xhci_hcd *xhci,
+void xhci_debugfs_init_mtk(struct xhci_hcd *xhci);
+void xhci_debugfs_exit_mtk(struct xhci_hcd *xhci);
+void __init xhci_debugfs_create_root_mtk(void);
+void __exit xhci_debugfs_remove_root_mtk(void);
+void xhci_debugfs_create_slot_mtk(struct xhci_hcd *xhci, int slot_id);
+void xhci_debugfs_remove_slot_mtk(struct xhci_hcd *xhci, int slot_id);
+void xhci_debugfs_create_endpoint_mtk(struct xhci_hcd *xhci,
 				  struct xhci_virt_device *virt_dev,
 				  int ep_index);
-void xhci_debugfs_remove_endpoint(struct xhci_hcd *xhci,
+void xhci_debugfs_remove_endpoint_mtk(struct xhci_hcd *xhci,
 				  struct xhci_virt_device *virt_dev,
 				  int ep_index);
-void xhci_debugfs_create_stream_files(struct xhci_hcd *xhci,
+void xhci_debugfs_create_stream_files_mtk(struct xhci_hcd *xhci,
 				      struct xhci_virt_device *virt_dev,
 				      int ep_index);
 #else
-static inline void xhci_debugfs_init(struct xhci_hcd *xhci) { }
-static inline void xhci_debugfs_exit(struct xhci_hcd *xhci) { }
-static inline void __init xhci_debugfs_create_root(void) { }
-static inline void __exit xhci_debugfs_remove_root(void) { }
-static inline void xhci_debugfs_create_slot(struct xhci_hcd *x, int s) { }
-static inline void xhci_debugfs_remove_slot(struct xhci_hcd *x, int s) { }
+static inline void xhci_debugfs_init_mtk(struct xhci_hcd *xhci) { }
+static inline void xhci_debugfs_exit_mtk(struct xhci_hcd *xhci) { }
+static inline void __init xhci_debugfs_create_root_mtk(void) { }
+static inline void __exit xhci_debugfs_remove_root_mtk(void) { }
+static inline void xhci_debugfs_create_slot_mtk(struct xhci_hcd *x, int s) { }
+static inline void xhci_debugfs_remove_slot_mtk(struct xhci_hcd *x, int s) { }
 static inline void
-xhci_debugfs_create_endpoint(struct xhci_hcd *xhci,
+xhci_debugfs_create_endpoint_mtk(struct xhci_hcd *xhci,
 			     struct xhci_virt_device *virt_dev,
 			     int ep_index) { }
 static inline void
-xhci_debugfs_remove_endpoint(struct xhci_hcd *xhci,
+xhci_debugfs_remove_endpoint_mtk(struct xhci_hcd *xhci,
 			     struct xhci_virt_device *virt_dev,
 			     int ep_index) { }
 static inline void
-xhci_debugfs_create_stream_files(struct xhci_hcd *xhci,
+xhci_debugfs_create_stream_files_mtk(struct xhci_hcd *xhci,
 				 struct xhci_virt_device *virt_dev,
 				 int ep_index) { }
 #endif /* CONFIG_DEBUG_FS */

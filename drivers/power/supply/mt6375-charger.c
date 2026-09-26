@@ -1475,12 +1475,12 @@ out:
 	}
 }
 
-static enum power_supply_usb_type mt6375_chg_psy_usb_types[] = {
-	POWER_SUPPLY_USB_TYPE_UNKNOWN,
-	POWER_SUPPLY_USB_TYPE_SDP,
-	POWER_SUPPLY_USB_TYPE_CDP,
-	POWER_SUPPLY_USB_TYPE_DCP,
-};
+/* rodin stage2: 6.18 power_supply_desc.usb_types is a BIT() bitmap */
+static const u32 mt6375_chg_psy_usb_types =
+	BIT(POWER_SUPPLY_USB_TYPE_UNKNOWN) |
+	BIT(POWER_SUPPLY_USB_TYPE_SDP) |
+	BIT(POWER_SUPPLY_USB_TYPE_CDP) |
+	BIT(POWER_SUPPLY_USB_TYPE_DCP);
 
 static enum power_supply_property mt6375_chg_psy_properties[] = {
 	POWER_SUPPLY_PROP_MANUFACTURER,
@@ -1695,7 +1695,6 @@ static char *mt6375_psy_supplied_to[] = {
 static const struct power_supply_desc mt6375_psy_desc = {
 	.type = POWER_SUPPLY_TYPE_USB,
 	.usb_types = mt6375_chg_psy_usb_types,
-	.num_usb_types = ARRAY_SIZE(mt6375_chg_psy_usb_types),
 	.properties = mt6375_chg_psy_properties,
 	.num_properties = ARRAY_SIZE(mt6375_chg_psy_properties),
 	.property_is_writeable = mt6375_chg_property_is_writeable,
@@ -3553,7 +3552,7 @@ out:
 	return ret;
 }
 
-static int mt6375_chg_remove(struct platform_device *pdev)
+static void mt6375_chg_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .remove is void */
 {
 	struct mt6375_chg_data *ddata = platform_get_drvdata(pdev);
 
@@ -3569,8 +3568,6 @@ static int mt6375_chg_remove(struct platform_device *pdev)
 		mutex_destroy(&ddata->pe_lock);
 		mutex_destroy(&ddata->attach_lock);
 	}
-
-	return 0;
 }
 
 static const struct of_device_id __maybe_unused mt6375_chg_of_match[] = {
