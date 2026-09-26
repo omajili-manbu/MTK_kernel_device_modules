@@ -1560,7 +1560,7 @@ static int mtk_pcie_peri_reset(struct mtk_pcie_port *port, bool enable)
 	return res.a0;
 }
 
-static int match_any(struct device *dev, void *unused)
+static int match_any(struct device *dev, const void *unused) /* rodin b2: 6.18 device_match_t takes const */
 {
 	return 1;
 }
@@ -1734,14 +1734,17 @@ static int __maybe_unused avoid_kmemleak_false_alarm(struct pci_dev *dev,
 
 static void mtk_pcie_avoid_kmemleak_false_alarm(struct pci_host_bridge *host)
 {
-	struct pci_bus_resource *bus_res;
+	struct resource *res;
+	unsigned int i;
 
 	kmemleak_not_leak(host);
 	kmemleak_not_leak(&host->dev);
 	kmemleak_not_leak(host->bus);
 
-	list_for_each_entry(bus_res, &host->bus->resources, list)
-		kmemleak_not_leak(bus_res);
+	/* rodin b2: 6.18 removed struct pci_bus_resource/bus->resources list;
+	 * iterate the resource array via pci_bus_for_each_resource instead */
+	pci_bus_for_each_resource(host->bus, res, i)
+		kmemleak_not_leak(res);
 
 	pci_walk_bus(host->bus, avoid_kmemleak_false_alarm, NULL);
 }
@@ -1805,7 +1808,7 @@ err_probe:
 	return err;
 }
 
-static int mtk_pcie_remove(struct platform_device *pdev)
+static void mtk_pcie_remove(struct platform_device *pdev) /* rodin b2: 6.18 remove void */
 {
 	struct mtk_pcie_port *port = platform_get_drvdata(pdev);
 	struct pci_host_bridge *host = pci_host_bridge_from_priv(port);
@@ -1846,8 +1849,7 @@ static int mtk_pcie_remove(struct platform_device *pdev)
 
 	if (port->pcidev)
 		pci_dev_put(port->pcidev);
-
-	return err;
+	/* rodin b2: void remove, err consumed by dev_info above */
 }
 
 static struct platform_device *mtk_pcie_find_pdev_by_port(int port)
