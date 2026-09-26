@@ -69,7 +69,9 @@ void mtk_btag_ufs_transfer_req_compl(struct mtk_blocktag *btag, __u16 tid,
 				     __u16 qid);
 #endif
 
-#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_MTK_PRO)
+/* rodin: declarations follow the provider (blocktag-mmc.o, gated by MTK_BLOCK_IO_TRACER);
+   MMC_MTK_PRO stays =n until the mtk-mmc stage flips it */
+#if IS_ENABLED(CONFIG_MTK_BLOCK_IO_TRACER)
 int mmc_mtk_biolog_init(struct mmc_host *mmc);
 int mmc_mtk_biolog_exit(void);
 void mmc_mtk_biolog_send_command(__u16 task_id, struct mmc_request *mrq);

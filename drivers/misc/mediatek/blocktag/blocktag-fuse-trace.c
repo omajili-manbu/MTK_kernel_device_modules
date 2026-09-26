@@ -611,8 +611,8 @@ void mtk_btag_fuse_init(struct proc_dir_entry *btag_root)
 		return;
 	}
 
-	hrtimer_init(&pstat_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	pstat_timer.function = pstat_timer_fn;
+	hrtimer_setup(&pstat_timer, pstat_timer_fn,
+		      CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	hrtimer_start(&pstat_timer, ms_to_ktime(PERIODIC_STAT_MS),
 			HRTIMER_MODE_REL);
 

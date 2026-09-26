@@ -36,7 +36,7 @@ struct timesync_control_s {
 
 static struct timesync_control_s timesync_ctrl;
 
-static u64 adsp_ts_tick_read(const struct cyclecounter *cc)
+static u64 adsp_ts_tick_read(struct cyclecounter *cc) /* rodin: 6.18 cyclecounter.read is non-const */
 {
 	return arch_timer_read_counter();
 }
@@ -95,9 +95,8 @@ int adsp_timesync_init(void)
 			 sched_clock());
 
 	/* init refresh hr_timer */
-	hrtimer_init(&timesync_ctrl.timer,
-		     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	timesync_ctrl.timer.function = adsp_timesync_refresh;
+	hrtimer_setup(&timesync_ctrl.timer, adsp_timesync_refresh,
+		      CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	timesync_ctrl.period_ms = TIMESYNC_WRAP_TIME_MS;
 
 	pr_info("%s(), done", __func__);

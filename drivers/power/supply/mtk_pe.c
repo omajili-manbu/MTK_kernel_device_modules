@@ -24,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/poll.h>
 #include <linux/power_supply.h>
+#include "rodin_psy_compat.h" /* rodin: devm_power_supply_get_by_phandle -> _by_reference */
 #include <linux/pm_wakeup.h>
 #include <linux/time.h>
 #include <linux/mutex.h>
@@ -983,9 +984,9 @@ static int mtk_pe_probe(struct platform_device *pdev)
 
 }
 
-static int mtk_pe_remove(struct platform_device *dev)
+static void mtk_pe_remove(struct platform_device *dev)
 {
-	return 0;
+	return;
 }
 
 static void mtk_pe_shutdown(struct platform_device *dev)

@@ -831,7 +831,7 @@ static void __used pt_set_shutdown_condition(void)
 
 	bat_psy = power_supply_get_by_name("mtk-gauge");
 	if (!bat_psy || IS_ERR(bat_psy)) {
-		bat_psy = devm_power_supply_get_by_phandle(lbat_data->dev, "gauge");
+		bat_psy = devm_power_supply_get_by_reference(lbat_data->dev, "gauge") /* rodin: 6.18 renamed */ ;
 		if (!bat_psy || IS_ERR(bat_psy)) {
 			pr_info("%s psy is not rdy\n", __func__);
 			return;
@@ -898,7 +898,7 @@ int pt_psy_event(struct notifier_block *nb, unsigned long event, void *v)
 			mod_timer(&lbat_data->notify_timer, jiffies);
 		} else if (soc < 0 || soc > 1) {
 			if (timer_pending(&lbat_data->notify_timer))
-				del_timer_sync(&lbat_data->notify_timer);
+				timer_delete_sync(&lbat_data->notify_timer);
 		}
 	}
 

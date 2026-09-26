@@ -14,6 +14,7 @@
 #include <linux/socket.h>	/* netlink */
 #include <net/sock.h>		/* netlink */
 #include "mtk_battery.h"
+#include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include "mtk_battery_daemon.h"
 #if IS_ENABLED(CONFIG_PMIC_LBAT_SERVICE)
 #include <pmic_lbat_service.h>

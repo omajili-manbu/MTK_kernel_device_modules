@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/power_supply.h>
+#include "rodin_psy_compat.h" /* rodin: devm_power_supply_get_by_phandle -> _by_reference */
 #include <linux/regmap.h>
 #include <linux/sched/clock.h>
 #include <net/sock.h>
@@ -4180,12 +4181,12 @@ out_irq_chip:
 	return ret;
 }
 
-static int mt6375_gauge_remove(struct platform_device *pdev)
+static void mt6375_gauge_remove(struct platform_device *pdev)
 {
 	struct mt6375_priv *priv = platform_get_drvdata(pdev);
 
 	gauge_del_irq_chip(priv);
-	return 0;
+	return;
 }
 
 static void mt6375_gauge_shutdown(struct platform_device *pdev)

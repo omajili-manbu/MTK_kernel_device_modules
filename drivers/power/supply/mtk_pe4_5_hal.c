@@ -43,6 +43,7 @@
 #include <linux/sched.h>
 #include <linux/poll.h>
 #include <linux/power_supply.h>
+#include "rodin_psy_compat.h" /* rodin: devm_power_supply_get_by_phandle -> _by_reference */
 #include <linux/pm_wakeup.h>
 #include <linux/time.h>
 #include <linux/mutex.h>
@@ -77,7 +78,7 @@ struct pe45_hal {
 	int adapter_type;
 };
 
-int pe4_hal_init_hardware(struct chg_alg_device *alg)
+int pe45_hal_init_hardware(struct chg_alg_device *alg)
 {
 	struct mtk_pe45 *pe4;
 	struct pe45_hal *hal;
@@ -140,7 +141,7 @@ int pe4_hal_init_hardware(struct chg_alg_device *alg)
 	return 0;
 }
 
-int pe4_hal_set_adapter_cap_end(struct chg_alg_device *alg,
+int pe45_hal_set_adapter_cap_end(struct chg_alg_device *alg,
 	int mV, int mA, int exit_mode)
 {
 	struct pe45_hal *hal;
@@ -162,7 +163,7 @@ int pe4_hal_set_adapter_cap_end(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_set_mivr(struct chg_alg_device *alg, enum chg_idx chgidx, int uV)
+int pe45_hal_set_mivr(struct chg_alg_device *alg, enum chg_idx chgidx, int uV)
 {
 	int ret = 0;
 	bool chg2_chip_enabled = false;
@@ -194,7 +195,7 @@ int pe4_hal_set_mivr(struct chg_alg_device *alg, enum chg_idx chgidx, int uV)
 	return ret;
 }
 
-int pe4_hal_enable_vbus_ovp(struct chg_alg_device *alg, bool enable)
+int pe45_hal_enable_vbus_ovp(struct chg_alg_device *alg, bool enable)
 {
 	//wy fix me
 	mtk_chg_enable_vbus_ovp(enable);
@@ -202,7 +203,7 @@ int pe4_hal_enable_vbus_ovp(struct chg_alg_device *alg, bool enable)
 	return 0;
 }
 
-int pe4_hal_enable_termination(struct chg_alg_device *alg,
+int pe45_hal_enable_termination(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool enable)
 {
 	struct pe45_hal *hal;
@@ -226,7 +227,7 @@ int pe4_hal_enable_termination(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_uisoc(struct chg_alg_device *alg)
+int pe45_hal_get_uisoc(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop = {0};
 	struct power_supply *bat_manager_psy = NULL;
@@ -261,7 +262,7 @@ int pe4_hal_get_uisoc(struct chg_alg_device *alg)
 	return ret;
 }
 
-int pe4_hal_is_adapter_ready(struct chg_alg_device *alg)
+int pe45_hal_is_adapter_ready(struct chg_alg_device *alg)
 {
 	struct mtk_charger *info = NULL;
 	struct power_supply *chg_psy = NULL;
@@ -292,7 +293,7 @@ int pe4_hal_is_adapter_ready(struct chg_alg_device *alg)
 	return ALG_TA_CHECKING;
 }
 
-int pe4_hal_get_battery_temperature(struct chg_alg_device *alg)
+int pe45_hal_get_battery_temperature(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop = {0};
 	struct power_supply *bat_manager_psy = NULL;
@@ -326,7 +327,7 @@ int pe4_hal_get_battery_temperature(struct chg_alg_device *alg)
 	return ret;
 }
 
-int pe4_hal_get_adapter_cap(struct chg_alg_device *alg,
+int pe45_hal_get_adapter_cap(struct chg_alg_device *alg,
 	struct pe4_power_cap *cap)
 {
 	struct pe45_hal *hal;
@@ -359,7 +360,7 @@ int pe4_hal_get_adapter_cap(struct chg_alg_device *alg,
 	return ret;
 }
 
-int pe4_hal_set_input_current(struct chg_alg_device *alg,
+int pe45_hal_set_input_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 ua)
 {
 	struct pe45_hal *hal;
@@ -377,7 +378,7 @@ int pe4_hal_set_input_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_set_charging_current(struct chg_alg_device *alg,
+int pe45_hal_set_charging_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 ua)
 {
 	struct pe45_hal *hal;
@@ -395,7 +396,7 @@ int pe4_hal_set_charging_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_1st_set_adapter_cap(struct chg_alg_device *alg,
+int pe45_hal_1st_set_adapter_cap(struct chg_alg_device *alg,
 	int mV, int mA)
 {
 	struct pe45_hal *hal;
@@ -409,7 +410,7 @@ int pe4_hal_1st_set_adapter_cap(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_set_adapter_cap(struct chg_alg_device *alg,
+int pe45_hal_set_adapter_cap(struct chg_alg_device *alg,
 	int mV, int mA)
 {
 	struct pe45_hal *hal;
@@ -422,7 +423,7 @@ int pe4_hal_set_adapter_cap(struct chg_alg_device *alg,
 	return adapter_dev_set_cap(hal->adapter, MTK_PD_APDO, mV, mA);
 }
 
-int pe4_hal_get_input_current(struct chg_alg_device *alg,
+int pe45_hal_get_input_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *ua)
 {
 	struct pe45_hal *hal;
@@ -443,7 +444,7 @@ int pe4_hal_get_input_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_enable_powerpath(struct chg_alg_device *alg,
+int pe45_hal_enable_powerpath(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool enable)
 {
 	struct pe45_hal *hal;
@@ -460,7 +461,7 @@ int pe4_hal_enable_powerpath(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_force_disable_powerpath(struct chg_alg_device *alg,
+int pe45_hal_force_disable_powerpath(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool disable)
 {
 	struct power_supply *chg_psy = NULL;
@@ -488,7 +489,7 @@ int pe4_hal_force_disable_powerpath(struct chg_alg_device *alg,
 	return ret;
 }
 
-int pe4_hal_get_charger_cnt(struct chg_alg_device *alg)
+int pe45_hal_get_charger_cnt(struct chg_alg_device *alg)
 {
 	struct pe45_hal *hal;
 	int cnt = 0;
@@ -505,7 +506,7 @@ int pe4_hal_get_charger_cnt(struct chg_alg_device *alg)
 	return cnt;
 }
 
-bool pe4_hal_is_chip_enable(struct chg_alg_device *alg, enum chg_idx chgidx)
+bool pe45_hal_is_chip_enable(struct chg_alg_device *alg, enum chg_idx chgidx)
 {
 	struct pe45_hal *hal;
 	bool is_chip_enable = false;
@@ -524,7 +525,7 @@ bool pe4_hal_is_chip_enable(struct chg_alg_device *alg, enum chg_idx chgidx)
 	return is_chip_enable;
 }
 
-int pe4_hal_enable_charger(struct chg_alg_device *alg,
+int pe45_hal_enable_charger(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool en)
 {
 	struct pe45_hal *hal;
@@ -617,7 +618,7 @@ static int get_pmic_vbus(int *vchr)
 	return ret;
 }
 
-int pe4_hal_get_vbus(struct chg_alg_device *alg)
+int pe45_hal_get_vbus(struct chg_alg_device *alg)
 {
 	int ret = 0;
 	int vchr = 0;
@@ -638,7 +639,7 @@ int pe4_hal_get_vbus(struct chg_alg_device *alg)
 	return vchr;
 }
 
-int pe4_hal_get_vbat(struct chg_alg_device *alg)
+int pe45_hal_get_vbat(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop = {0};
 	struct power_supply *bat1_psy = NULL;
@@ -673,7 +674,7 @@ int pe4_hal_get_vbat(struct chg_alg_device *alg)
 	return ret;
 }
 
-int pe4_hal_get_ibus(struct chg_alg_device *alg, int *ibus)
+int pe45_hal_get_ibus(struct chg_alg_device *alg, int *ibus)
 {
 	int ret = 0;
 	struct pe45_hal *hal;
@@ -688,7 +689,7 @@ int pe4_hal_get_ibus(struct chg_alg_device *alg, int *ibus)
 	return ret;
 }
 
-int pe4_hal_dump_registers(struct chg_alg_device *alg)
+int pe45_hal_dump_registers(struct chg_alg_device *alg)
 {
 	struct pe45_hal *hal;
 
@@ -701,7 +702,7 @@ int pe4_hal_dump_registers(struct chg_alg_device *alg)
 	return 0;
 }
 
-int pe4_hal_get_ibat(struct chg_alg_device *alg)
+int pe45_hal_get_ibat(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop = {0};
 	struct power_supply *bat1_psy = NULL;
@@ -737,7 +738,7 @@ int pe4_hal_get_ibat(struct chg_alg_device *alg)
 	return ret / 1000;
 }
 
-int pe4_hal_get_charger_type(struct chg_alg_device *alg)
+int pe45_hal_get_charger_type(struct chg_alg_device *alg)
 {
 	struct mtk_charger *info = NULL;
 	struct power_supply *chg_psy = NULL;
@@ -759,7 +760,7 @@ int pe4_hal_get_charger_type(struct chg_alg_device *alg)
 	return ret;
 }
 
-int pe4_hal_reset_eoc_state(struct chg_alg_device *alg)
+int pe45_hal_reset_eoc_state(struct chg_alg_device *alg)
 {
 	struct pe45_hal *hal;
 	int ret;
@@ -777,7 +778,7 @@ int pe4_hal_reset_eoc_state(struct chg_alg_device *alg)
 	return 0;
 }
 
-int pe4_hal_reset_ta(struct chg_alg_device *alg, enum chg_idx chgidx)
+int pe45_hal_reset_ta(struct chg_alg_device *alg, enum chg_idx chgidx)
 {
 	struct pe45_hal *hal;
 	int ret;
@@ -794,7 +795,7 @@ int pe4_hal_reset_ta(struct chg_alg_device *alg, enum chg_idx chgidx)
 	return 0;
 }
 
-int pe4_hal_enable_cable_drop_comp(struct chg_alg_device *alg,
+int pe45_hal_enable_cable_drop_comp(struct chg_alg_device *alg,
 	bool en)
 {
 	struct pe45_hal *hal;
@@ -806,7 +807,7 @@ int pe4_hal_enable_cable_drop_comp(struct chg_alg_device *alg,
 	return charger_dev_enable_cable_drop_comp(hal->chg1_dev, false);
 }
 
-int pe4_hal_vbat_mon_en(struct chg_alg_device *alg,
+int pe45_hal_vbat_mon_en(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool en)
 {
 
@@ -826,7 +827,7 @@ int pe4_hal_vbat_mon_en(struct chg_alg_device *alg,
 	return ret;
 }
 
-int pe4_hal_set_cv(struct chg_alg_device *alg,
+int pe45_hal_set_cv(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 uv)
 {
 	struct pe45_hal *hal;
@@ -846,7 +847,7 @@ int pe4_hal_set_cv(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_mivr_state(struct chg_alg_device *alg,
+int pe45_hal_get_mivr_state(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool *in_loop)
 {
 	struct pe45_hal *hal;
@@ -864,7 +865,7 @@ int pe4_hal_get_mivr_state(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_mivr(struct chg_alg_device *alg,
+int pe45_hal_get_mivr(struct chg_alg_device *alg,
 	enum chg_idx chgidx, int *mivr1)
 {
 	struct pe45_hal *hal;
@@ -882,7 +883,7 @@ int pe4_hal_get_mivr(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_charger_enable_chip(struct chg_alg_device *alg,
+int pe45_hal_charger_enable_chip(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool enable)
 {
 	struct pe45_hal *hal;
@@ -906,7 +907,7 @@ int pe4_hal_charger_enable_chip(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_is_charger_enable(struct chg_alg_device *alg,
+int pe45_hal_is_charger_enable(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool *en)
 {
 	struct pe45_hal *hal;
@@ -929,7 +930,7 @@ int pe4_hal_is_charger_enable(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_charging_current(struct chg_alg_device *alg,
+int pe45_hal_get_charging_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *ua)
 {
 	struct pe45_hal *hal;
@@ -947,7 +948,7 @@ int pe4_hal_get_charging_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_min_charging_current(struct chg_alg_device *alg,
+int pe45_hal_get_min_charging_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *uA)
 {
 	struct pe45_hal *hal;
@@ -971,7 +972,7 @@ int pe4_hal_get_min_charging_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_set_eoc_current(struct chg_alg_device *alg,
+int pe45_hal_set_eoc_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 uA)
 {
 	struct pe45_hal *hal;
@@ -995,7 +996,7 @@ int pe4_hal_set_eoc_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_min_input_current(struct chg_alg_device *alg,
+int pe45_hal_get_min_input_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *uA)
 {
 	struct pe45_hal *hal;
@@ -1019,7 +1020,7 @@ int pe4_hal_get_min_input_current(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_safety_check(struct chg_alg_device *alg,
+int pe45_hal_safety_check(struct chg_alg_device *alg,
 	int ieoc)
 {
 	struct pe45_hal *hal;
@@ -1033,7 +1034,7 @@ int pe4_hal_safety_check(struct chg_alg_device *alg,
 	return 0;
 }
 
-int pe4_hal_get_log_level(struct chg_alg_device *alg)
+int pe45_hal_get_log_level(struct chg_alg_device *alg)
 {
 	struct mtk_charger *info = NULL;
 	struct power_supply *chg_psy = NULL;

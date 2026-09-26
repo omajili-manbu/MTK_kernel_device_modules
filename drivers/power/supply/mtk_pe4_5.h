@@ -34,24 +34,24 @@
 
 #define PRECISION_ENHANCE	5
 
-extern int pe4_get_debug_level(void);
+extern int pe45_get_debug_level(void);
 #define pe4_err(fmt, args...)					\
 do {								\
-	if (pe4_get_debug_level() >= PE4_ERROR_LEVEL) {	\
+	if (pe45_get_debug_level() >= PE4_ERROR_LEVEL) {	\
 		pr_notice(fmt, ##args);				\
 	}							\
 } while (0)
 
 #define pe4_info(fmt, args...)					\
 do {								\
-	if (pe4_get_debug_level() >= PE4_INFO_LEVEL) { \
+	if (pe45_get_debug_level() >= PE4_INFO_LEVEL) { \
 		pr_notice(fmt, ##args);				\
 	}							\
 } while (0)
 
 #define pe4_dbg(fmt, args...)					\
 do {								\
-	if (pe4_get_debug_level() >= PE4_DEBUG_LEVEL) {	\
+	if (pe45_get_debug_level() >= PE4_DEBUG_LEVEL) {	\
 		pr_notice(fmt, ##args);				\
 	}							\
 } while (0)
@@ -214,71 +214,71 @@ static inline u32 precise_div(u64 dividend, u64 divisor)
 		PRECISION_ENHANCE);
 }
 
-extern int pe4_hal_init_hardware(struct chg_alg_device *alg);
-extern int pe4_hal_enable_vbus_ovp(struct chg_alg_device *alg, bool enable);
-extern int pe4_hal_get_uisoc(struct chg_alg_device *alg);
-extern int pe4_hal_is_adapter_ready(struct chg_alg_device *alg);
-extern int pe4_hal_get_battery_temperature(struct chg_alg_device *alg);
-extern int pe4_hal_set_input_current(struct chg_alg_device *alg,
+extern int pe45_hal_init_hardware(struct chg_alg_device *alg);
+extern int pe45_hal_enable_vbus_ovp(struct chg_alg_device *alg, bool enable);
+extern int pe45_hal_get_uisoc(struct chg_alg_device *alg);
+extern int pe45_hal_is_adapter_ready(struct chg_alg_device *alg);
+extern int pe45_hal_get_battery_temperature(struct chg_alg_device *alg);
+extern int pe45_hal_set_input_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 ua);
-extern int pe4_hal_set_charging_current(struct chg_alg_device *alg,
+extern int pe45_hal_set_charging_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 ua);
-extern int pe4_hal_1st_set_adapter_cap(struct chg_alg_device *alg,
+extern int pe45_hal_1st_set_adapter_cap(struct chg_alg_device *alg,
 	int mV, int mA);
-extern int pe4_hal_set_adapter_cap(struct chg_alg_device *alg,
+extern int pe45_hal_set_adapter_cap(struct chg_alg_device *alg,
 	int mV, int mA);
-extern int pe4_hal_set_adapter_cap_end(struct chg_alg_device *alg,
+extern int pe45_hal_set_adapter_cap_end(struct chg_alg_device *alg,
 	int mV, int mA, int exit_mode);
 extern int pe45_hal_get_adapter_status(struct chg_alg_device *alg,
 	struct pe4_adapter_status *pe4_sta);
-extern int pe4_hal_get_adapter_cap(struct chg_alg_device *alg,
+extern int pe45_hal_get_adapter_cap(struct chg_alg_device *alg,
 	struct pe4_power_cap *cap);
-extern int pe4_hal_get_input_current(struct chg_alg_device *alg,
+extern int pe45_hal_get_input_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *ua);
-extern int pe4_hal_enable_powerpath(struct chg_alg_device *alg,
+extern int pe45_hal_enable_powerpath(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool enable);
-extern int pe4_hal_force_disable_powerpath(struct chg_alg_device *alg,
+extern int pe45_hal_force_disable_powerpath(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool disable);
-extern int pe4_hal_get_charger_cnt(struct chg_alg_device *alg);
-extern bool pe4_hal_is_chip_enable(struct chg_alg_device *alg,
+extern int pe45_hal_get_charger_cnt(struct chg_alg_device *alg);
+extern bool pe45_hal_is_chip_enable(struct chg_alg_device *alg,
 	enum chg_idx chgidx);
-extern int pe4_hal_enable_charger(struct chg_alg_device *alg,
+extern int pe45_hal_enable_charger(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool en);
 extern int pe45_hal_get_adapter_output(struct chg_alg_device *alg,
 	struct pe4_pps_status *pe4_status);
-extern int pe4_hal_get_vbus(struct chg_alg_device *alg);
-extern int pe4_hal_get_vbat(struct chg_alg_device *alg);
-extern int pe4_hal_get_ibus(struct chg_alg_device *alg, int *ibus);
-extern int pe4_hal_get_ibat(struct chg_alg_device *alg);
-extern int pe4_hal_dump_registers(struct chg_alg_device *alg);
-extern int pe4_hal_set_mivr(struct chg_alg_device *alg,
+extern int pe45_hal_get_vbus(struct chg_alg_device *alg);
+extern int pe45_hal_get_vbat(struct chg_alg_device *alg);
+extern int pe45_hal_get_ibus(struct chg_alg_device *alg, int *ibus);
+extern int pe45_hal_get_ibat(struct chg_alg_device *alg);
+extern int pe45_hal_dump_registers(struct chg_alg_device *alg);
+extern int pe45_hal_set_mivr(struct chg_alg_device *alg,
 	enum chg_idx chgidx, int uV);
-extern int pe4_hal_get_mivr(struct chg_alg_device *alg,
+extern int pe45_hal_get_mivr(struct chg_alg_device *alg,
 	enum chg_idx chgidx, int *mivr1);
-extern int pe4_hal_get_mivr_state(struct chg_alg_device *alg,
+extern int pe45_hal_get_mivr_state(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool *in_loop);
-extern int pe4_hal_charger_enable_chip(struct chg_alg_device *alg,
+extern int pe45_hal_charger_enable_chip(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool enable);
-extern int pe4_hal_is_charger_enable(struct chg_alg_device *alg,
+extern int pe45_hal_is_charger_enable(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool *en);
-extern int pe4_hal_get_charging_current(struct chg_alg_device *alg,
+extern int pe45_hal_get_charging_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *ua);
-extern int pe4_hal_get_min_charging_current(struct chg_alg_device *alg,
+extern int pe45_hal_get_min_charging_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *uA);
-extern int pe4_hal_set_eoc_current(struct chg_alg_device *alg,
+extern int pe45_hal_set_eoc_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 uA);
-extern int pe4_hal_get_min_input_current(struct chg_alg_device *alg,
+extern int pe45_hal_get_min_input_current(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 *uA);
-extern int pe4_hal_safety_check(struct chg_alg_device *alg,
+extern int pe45_hal_safety_check(struct chg_alg_device *alg,
 	int ieoc);
-extern int pe4_hal_vbat_mon_en(struct chg_alg_device *alg,
+extern int pe45_hal_vbat_mon_en(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool en);
-extern int pe4_hal_set_cv(struct chg_alg_device *alg,
+extern int pe45_hal_set_cv(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 uv);
-extern int pe4_hal_set_cv(struct chg_alg_device *alg,
+extern int pe45_hal_set_cv(struct chg_alg_device *alg,
 	enum chg_idx chgidx, u32 uv);
-extern int pe4_hal_enable_termination(struct chg_alg_device *alg,
+extern int pe45_hal_enable_termination(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool enable);
-extern int pe4_hal_reset_eoc_state(struct chg_alg_device *alg);
-extern int pe4_hal_get_log_level(struct chg_alg_device *alg);
+extern int pe45_hal_reset_eoc_state(struct chg_alg_device *alg);
+extern int pe45_hal_get_log_level(struct chg_alg_device *alg);
 #endif /* __MTK_PE4_H */

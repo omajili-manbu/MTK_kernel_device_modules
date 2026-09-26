@@ -179,7 +179,7 @@ static int mtk_usb_extcon_psy_init(struct mtk_extcon_info *extcon)
 		goto fail;
 	}
 
-	extcon->usb_psy = devm_power_supply_get_by_phandle(dev, "charger");
+	extcon->usb_psy = devm_power_supply_get_by_reference( /* rodin: 6.18 renamed from _by_phandle */ dev, "charger");
 	if (IS_ERR_OR_NULL(extcon->usb_psy)) {
 		/* try to get by name */
 		extcon->usb_psy = power_supply_get_by_name("primary_chg");
@@ -772,9 +772,9 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_usb_extcon_remove(struct platform_device *pdev)
+static void mtk_usb_extcon_remove(struct platform_device *pdev)
 {
-	return 0;
+	return;
 }
 
 static void mtk_usb_extcon_shutdown(struct platform_device *pdev)
