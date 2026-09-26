@@ -119,3 +119,8 @@ ifneq ($(wildcard $(srctree)/$(src)/cmdq-platform-mt6899.c),)
 obj-$(CONFIG_MTK_CMDQ_MBOX_EXT) += cmdq-platform-mt6899.o
 endif
 endif
+# rodin b3d: this file is an ifeq(MTK_CMDQ_MBOX_EXT,y)/else ladder - the =y
+# branch only honors per-chip configs, the =m branch uses wildcard() which
+# cannot match the ../-relative ext mount path. The mt6899 platform object
+# is therefore unconditional for the rodin device, outside the ladder.
+obj-$(CONFIG_MTK_CMDQ_MBOX_EXT) += cmdq-platform-mt6899.o

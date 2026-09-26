@@ -195,6 +195,46 @@ enum slbc_cb_res {
 	RES_LOW_PRIORITY,
 };
 
+
+/* rodin b3d: renamed with _mt6899 suffix - these are the real
+ * implementations registered via common_ops; the core (slbc.c)
+ * exports same-name dispatchers, and one vmlinux cannot hold both */
+static int slbc_force_cache_mt6899(enum slc_ach_uid uid, unsigned int size);
+static int slbc_force_cache_ratio_mt6899(enum slc_ach_uid uid, unsigned int ratio);
+static int slbc_gid_release_mt6899(enum slc_ach_uid uid, int gid);
+static int slbc_gid_request_mt6899(enum slc_ach_uid uid, int *gid, struct slbc_gid_data *data);
+static int slbc_gid_val_mt6899(enum slc_ach_uid uid);
+static int slbc_invalidate_mt6899(enum slc_ach_uid uid, int gid);
+static int slbc_power_off_mt6899(struct slbc_data *d);
+static int slbc_power_on_mt6899(struct slbc_data *d);
+static int slbc_register_activate_ops_mt6899(struct slbc_ops *ops);
+static int slbc_release_mt6899(struct slbc_data *d);
+static int slbc_request_mt6899(struct slbc_data *d);
+static int slbc_roi_update_mt6899(enum slc_ach_uid uid, int gid, struct slbc_gid_data *data);
+static int slbc_secure_off_mt6899(struct slbc_data *d);
+static int slbc_secure_on_mt6899(struct slbc_data *d);
+static u32 slbc_sram_read_mt6899(u32 offset);
+static void slbc_sram_write_mt6899(u32 offset, u32 val);
+static int slbc_status_mt6899(struct slbc_data *d);
+static void slbc_update_mic_num_mt6899(unsigned int num);
+static void slbc_update_mm_bw_mt6899(unsigned int bw);
+static int slbc_validate_mt6899(enum slc_ach_uid uid, int gid);
+
+
+/* rodin b3d v2: real implementations, renamed to avoid the core
+ * (slbc.c) same-name exports - one vmlinux cannot hold both */
+static int slbc_ceil_mt6899(enum slc_ach_uid uid, unsigned int ceil);
+static int slbc_cg_priority_mt6899(bool gpu_first);
+static int slbc_disable_dcc_mt6899(bool disable);
+static int slbc_disable_slc_mt6899(bool disable);
+static int slbc_get_cache_hit_bw_mt6899(enum slc_ach_uid uid);
+static int slbc_get_cache_hit_rate_mt6899(enum slc_ach_uid uid);
+static int slbc_get_cache_size_mt6899(enum slc_ach_uid uid);
+static int slbc_get_cache_usage_mt6899(int *cpu, int *gpu, int *other);
+static int slbc_read_invalidate_mt6899(enum slc_ach_uid uid, int gid, int enable);
+static int slbc_total_ceil_mt6899(unsigned int ceil);
+static int slbc_window_mt6899(unsigned int window);
+
 #ifdef SLBC_CB_TEST
 int user_activate(struct slbc_data *d)
 {
@@ -218,8 +258,8 @@ void user_cb_register(void)
 	static struct slbc_ops disp_op = {.data = &disp_d,
 			.activate = user_activate, .deactivate = user_deactivate};
 
-	slbc_register_activate_ops(&mml_op);
-	slbc_register_activate_ops(&disp_op);
+	slbc_register_activate_ops_mt6899(&mml_op);
+	slbc_register_activate_ops_mt6899(&disp_op);
 }
 #endif /* SLBC_CB_TEST */
 
@@ -239,7 +279,7 @@ static struct task_struct *slbc_activate_task[ARRAY_SIZE(p_config)];
 static struct task_struct *slbc_deactivate_task[ARRAY_SIZE(p_config)];
 #endif /* SLBC_CB */
 
-u32 slbc_sram_read(u32 offset)
+u32 slbc_sram_read_mt6899(u32 offset)
 {
 	if (!slbc_sram_enable)
 		return 0;
@@ -252,7 +292,7 @@ u32 slbc_sram_read(u32 offset)
 	return readl(slbc->sram_vaddr + offset);
 }
 
-void slbc_sram_write(u32 offset, u32 val)
+void slbc_sram_write_mt6899(u32 offset, u32 val)
 {
 	if (!slbc_sram_enable)
 		return;
@@ -357,9 +397,9 @@ static u32 slbc_read_debug_sram(int sid)
 		return SID_NOT_FOUND;
 
 	if (sid < 8)
-		return slbc_sram_read(SLBC_DEBUG_0 + sid * 4);
+		return slbc_sram_read_mt6899(SLBC_DEBUG_0 + sid * 4);
 	else
-		return slbc_sram_read(SLBC_DEBUG_8 + (sid - 8) * 4);
+		return slbc_sram_read_mt6899(SLBC_DEBUG_8 + (sid - 8) * 4);
 }
 
 static void slbc_dcc_ctrl(u32 dcc_flag)
@@ -380,8 +420,8 @@ static void slbc_dcc_ctrl(u32 dcc_flag)
 	}
 	pr_info("#@# %s(%d) venc_count %d\n",
 		__func__, __LINE__, venc_count);
-	slbc_sram_write(SLBC_DCC_COUNT, venc_count);
-	slbc_sram_write(SLBC_DCC_CTRL, dcc_flag);
+	slbc_sram_write_mt6899(SLBC_DCC_COUNT, venc_count);
+	slbc_sram_write_mt6899(SLBC_DCC_CTRL, dcc_flag);
 	mutex_unlock(&slbc_ref_lock);
 }
 
@@ -391,7 +431,7 @@ void slbc_force_cmd(unsigned int force)
 	slbc_force_scmi_cmd(force);
 }
 
-int slbc_force_cache_ratio(enum slc_ach_uid uid, unsigned int ratio)
+int slbc_force_cache_ratio_mt6899(enum slc_ach_uid uid, unsigned int ratio)
 {
 	unsigned int force_cmd;
 
@@ -404,7 +444,7 @@ int slbc_force_cache_ratio(enum slc_ach_uid uid, unsigned int ratio)
 	return slbc_force_scmi_cmd(force_cmd);
 }
 
-int slbc_force_cache(enum slc_ach_uid uid, unsigned int size)
+int slbc_force_cache_mt6899(enum slc_ach_uid uid, unsigned int size)
 {
 	unsigned int force_cmd;
 
@@ -569,7 +609,7 @@ void slbc_buffer_cb_notify(u32 res, u32 sid, u32 sid_list)
 	}
 }
 
-int slbc_register_activate_ops(struct slbc_ops *ops)
+int slbc_register_activate_ops_mt6899(struct slbc_ops *ops)
 {
 #ifdef SLBC_CB
 	u32 sid;
@@ -767,7 +807,7 @@ static int slbc_request_buffer(struct slbc_data *d)
 		slbc_set_sram_data(d);
 
 #if IS_ENABLED(CONFIG_MTK_SLBC_IPI)
-		buffer_ref = slbc_sram_read(SLBC_BUFFER_REF);
+		buffer_ref = slbc_sram_read_mt6899(SLBC_BUFFER_REF);
 #else
 		buffer_ref++;
 #endif /* CONFIG_MTK_SLBC_IPI */
@@ -776,7 +816,7 @@ static int slbc_request_buffer(struct slbc_data *d)
 	return ret;
 }
 
-int slbc_status(struct slbc_data *d)
+int slbc_status_mt6899(struct slbc_data *d)
 {
 	int ret = 0;
 
@@ -789,7 +829,7 @@ int slbc_status(struct slbc_data *d)
 	return ret;
 }
 
-int slbc_request(struct slbc_data *d)
+int slbc_request_mt6899(struct slbc_data *d)
 {
 	int ret = 0;
 	int sid;
@@ -821,7 +861,7 @@ int slbc_request(struct slbc_data *d)
 
 	if (!ret) {
 #if IS_ENABLED(CONFIG_MTK_SLBC_IPI)
-		slbc_ref = slbc_sram_read(SLBC_REF);
+		slbc_ref = slbc_sram_read_mt6899(SLBC_REF);
 #else
 		slbc_ref++;
 #endif /* CONFIG_MTK_SLBC_IPI */
@@ -852,7 +892,7 @@ static int slbc_release_buffer(struct slbc_data *d)
 		slbc_clr_sram_data(d);
 
 #if IS_ENABLED(CONFIG_MTK_SLBC_IPI)
-		buffer_ref = slbc_sram_read(SLBC_BUFFER_REF);
+		buffer_ref = slbc_sram_read_mt6899(SLBC_BUFFER_REF);
 #else
 		buffer_ref--;
 #endif /* CONFIG_MTK_SLBC_IPI */
@@ -862,7 +902,7 @@ static int slbc_release_buffer(struct slbc_data *d)
 	return ret;
 }
 
-int slbc_release(struct slbc_data *d)
+int slbc_release_mt6899(struct slbc_data *d)
 {
 	int ret = 0;
 	u64 begin, val;
@@ -881,7 +921,7 @@ int slbc_release(struct slbc_data *d)
 
 	if (!ret) {
 #if IS_ENABLED(CONFIG_MTK_SLBC_IPI)
-		slbc_ref = slbc_sram_read(SLBC_REF);
+		slbc_ref = slbc_sram_read_mt6899(SLBC_REF);
 #else
 		slbc_ref--;
 #endif /* CONFIG_MTK_SLBC_IPI */
@@ -899,7 +939,7 @@ int slbc_release(struct slbc_data *d)
 	return ret;
 }
 
-int slbc_power_on(struct slbc_data *d)
+int slbc_power_on_mt6899(struct slbc_data *d)
 {
 	unsigned int uid;
 
@@ -922,7 +962,7 @@ int slbc_power_on(struct slbc_data *d)
 	return 0;
 }
 
-int slbc_power_off(struct slbc_data *d)
+int slbc_power_off_mt6899(struct slbc_data *d)
 {
 	unsigned int uid;
 
@@ -945,7 +985,7 @@ int slbc_power_off(struct slbc_data *d)
 	return 0;
 }
 
-int slbc_secure_on(struct slbc_data *d)
+int slbc_secure_on_mt6899(struct slbc_data *d)
 {
 	unsigned int uid;
 
@@ -967,7 +1007,7 @@ int slbc_secure_on(struct slbc_data *d)
 	return 0;
 }
 
-int slbc_secure_off(struct slbc_data *d)
+int slbc_secure_off_mt6899(struct slbc_data *d)
 {
 	unsigned int uid;
 
@@ -989,12 +1029,12 @@ int slbc_secure_off(struct slbc_data *d)
 	return 0;
 }
 
-void slbc_update_mm_bw(unsigned int bw)
+void slbc_update_mm_bw_mt6899(unsigned int bw)
 {
-	slbc_sram_write(SLBC_MM_EST_BW, bw);
+	slbc_sram_write_mt6899(SLBC_MM_EST_BW, bw);
 }
 
-void slbc_update_mic_num(unsigned int num)
+void slbc_update_mic_num_mt6899(unsigned int num)
 {
 	int i;
 
@@ -1025,7 +1065,7 @@ void slbc_update_outer(unsigned int outer)
 	slbc_outer_cmd(outer);
 }
 
-int slbc_gid_val(enum slc_ach_uid uid)
+int slbc_gid_val_mt6899(enum slc_ach_uid uid)
 {
 	int ret = -EINVAL;
 
@@ -1138,7 +1178,7 @@ static void slbc_get_gid_by_req(enum slc_ach_uid uid, int *gid)
 	}
 }
 
-int slbc_gid_request(enum slc_ach_uid uid, int *gid, struct slbc_gid_data *data)
+int slbc_gid_request_mt6899(enum slc_ach_uid uid, int *gid, struct slbc_gid_data *data)
 {
 	int local_cnt = 0;
 	int ret = 0;
@@ -1182,7 +1222,7 @@ int slbc_gid_request(enum slc_ach_uid uid, int *gid, struct slbc_gid_data *data)
 	return ret;
 }
 
-int slbc_gid_release(enum slc_ach_uid uid, int gid)
+int slbc_gid_release_mt6899(enum slc_ach_uid uid, int gid)
 {
 	int local_cnt = 0;
 	int ret = 0;
@@ -1220,7 +1260,7 @@ int slbc_gid_release(enum slc_ach_uid uid, int gid)
 	return ret;
 }
 
-int slbc_roi_update(enum slc_ach_uid uid, int gid, struct slbc_gid_data *data)
+int slbc_roi_update_mt6899(enum slc_ach_uid uid, int gid, struct slbc_gid_data *data)
 {
 	int ret = 0;
 
@@ -1238,7 +1278,7 @@ int slbc_roi_update(enum slc_ach_uid uid, int gid, struct slbc_gid_data *data)
 	return ret;
 }
 
-int slbc_validate(enum slc_ach_uid uid, int gid)
+int slbc_validate_mt6899(enum slc_ach_uid uid, int gid)
 {
 	int local_cnt = 0;
 	int ret = 0;
@@ -1275,7 +1315,7 @@ int slbc_validate(enum slc_ach_uid uid, int gid)
 	return ret;
 }
 
-int slbc_invalidate(enum slc_ach_uid uid, int gid)
+int slbc_invalidate_mt6899(enum slc_ach_uid uid, int gid)
 {
 	int local_cnt = 0;
 	int ret = 0;
@@ -1312,7 +1352,7 @@ int slbc_invalidate(enum slc_ach_uid uid, int gid)
 	return ret;
 }
 
-int slbc_read_invalidate(enum slc_ach_uid uid, int gid, int enable)
+int slbc_read_invalidate_mt6899(enum slc_ach_uid uid, int gid, int enable)
 {
 	struct slbc_gid_data data;
 	int ret = 0;
@@ -1334,7 +1374,7 @@ int slbc_read_invalidate(enum slc_ach_uid uid, int gid, int enable)
 	return ret;
 }
 
-int slbc_ceil(enum slc_ach_uid uid, unsigned int ceil)
+int slbc_ceil_mt6899(enum slc_ach_uid uid, unsigned int ceil)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1349,7 +1389,7 @@ int slbc_ceil(enum slc_ach_uid uid, unsigned int ceil)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_total_ceil(unsigned int ceil)
+int slbc_total_ceil_mt6899(unsigned int ceil)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1364,7 +1404,7 @@ int slbc_total_ceil(unsigned int ceil)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_window(unsigned int window)
+int slbc_window_mt6899(unsigned int window)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1379,7 +1419,7 @@ int slbc_window(unsigned int window)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_cg_priority(bool gpu_first)
+int slbc_cg_priority_mt6899(bool gpu_first)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1394,7 +1434,7 @@ int slbc_cg_priority(bool gpu_first)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_disable_dcc(bool disable)
+int slbc_disable_dcc_mt6899(bool disable)
 {
 	mutex_lock(&slbc_ref_lock);
 	if (disable) {
@@ -1408,12 +1448,12 @@ int slbc_disable_dcc(bool disable)
 	}
 	pr_info("#@# %s(%d) venc_count %d\n",
 		__func__, __LINE__, venc_count);
-	slbc_sram_write(SLBC_DCC_COUNT, venc_count);
+	slbc_sram_write_mt6899(SLBC_DCC_COUNT, venc_count);
 	mutex_unlock(&slbc_ref_lock);
 	return 0;
 }
 
-int slbc_disable_slc(bool disable)
+int slbc_disable_slc_mt6899(bool disable)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	slc_disable = (int)disable;
@@ -1425,7 +1465,7 @@ int slbc_disable_slc(bool disable)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_size(enum slc_ach_uid uid)
+int slbc_get_cache_size_mt6899(enum slc_ach_uid uid)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1441,7 +1481,7 @@ int slbc_get_cache_size(enum slc_ach_uid uid)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_hit_rate(enum slc_ach_uid uid)
+int slbc_get_cache_hit_rate_mt6899(enum slc_ach_uid uid)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1457,7 +1497,7 @@ int slbc_get_cache_hit_rate(enum slc_ach_uid uid)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_hit_bw(enum slc_ach_uid uid)
+int slbc_get_cache_hit_bw_mt6899(enum slc_ach_uid uid)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1473,7 +1513,7 @@ int slbc_get_cache_hit_bw(enum slc_ach_uid uid)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_usage(int *cpu, int *gpu, int *other)
+int slbc_get_cache_usage_mt6899(int *cpu, int *gpu, int *other)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1533,30 +1573,30 @@ static int dbg_slbc_proc_show(struct seq_file *m, void *v)
 	slbc_sspm_sram_update();
 
 #if IS_ENABLED(CONFIG_MTK_SLBC_IPI)
-	slbc_uid_used = slbc_sram_read(SLBC_UID_USED);
-	slbc_uid_used |= ((unsigned long)slbc_sram_read(SLBC_UID_USED2)) << 32;
-	slbc_sid_mask = slbc_sram_read(SLBC_SID_MASK);
-	slbc_sid_req_q = slbc_sram_read(SLBC_SID_REQ_Q);
-	slbc_sid_rel_q = slbc_sram_read(SLBC_SID_REL_Q);
-	slbc_slot_used = slbc_sram_read(SLBC_SLOT_USED);
-	slbc_force = slbc_sram_read(SLBC_FORCE);
-	buffer_ref = slbc_sram_read(SLBC_BUFFER_REF);
-	slbc_ref = slbc_sram_read(SLBC_REF);
-	slbc_sta = slbc_sram_read(SLBC_STA);
-	slbc_ack_c = slbc_sram_read(SLBC_ACK_C);
-	slbc_ack_g = slbc_sram_read(SLBC_ACK_G);
-	cpuqos_mode = slbc_sram_read(CPUQOS_MODE);
-	slbc_sram_con = slbc_sram_read(SLBC_SRAM_CON);
-	slbc_cache_used = slbc_sram_read(SLBC_CACHE_USED);
-	slbc_pmu_0 = slbc_sram_read(SLBC_PMU_0);
-	slbc_pmu_1 = slbc_sram_read(SLBC_PMU_1);
-	slbc_pmu_2 = slbc_sram_read(SLBC_PMU_2);
-	slbc_pmu_3 = slbc_sram_read(SLBC_PMU_3);
-	slbc_pmu_4 = slbc_sram_read(SLBC_PMU_4);
-	slbc_pmu_5 = slbc_sram_read(SLBC_PMU_5);
-	slbc_pmu_6 = slbc_sram_read(SLBC_PMU_6);
-	slbc_cg_pri = slbc_sram_read(SLBC_CG_PRIORITY);
-	slbc_total_ceil_n = slbc_sram_read(SLBC_TOTAL_CEIL);
+	slbc_uid_used = slbc_sram_read_mt6899(SLBC_UID_USED);
+	slbc_uid_used |= ((unsigned long)slbc_sram_read_mt6899(SLBC_UID_USED2)) << 32;
+	slbc_sid_mask = slbc_sram_read_mt6899(SLBC_SID_MASK);
+	slbc_sid_req_q = slbc_sram_read_mt6899(SLBC_SID_REQ_Q);
+	slbc_sid_rel_q = slbc_sram_read_mt6899(SLBC_SID_REL_Q);
+	slbc_slot_used = slbc_sram_read_mt6899(SLBC_SLOT_USED);
+	slbc_force = slbc_sram_read_mt6899(SLBC_FORCE);
+	buffer_ref = slbc_sram_read_mt6899(SLBC_BUFFER_REF);
+	slbc_ref = slbc_sram_read_mt6899(SLBC_REF);
+	slbc_sta = slbc_sram_read_mt6899(SLBC_STA);
+	slbc_ack_c = slbc_sram_read_mt6899(SLBC_ACK_C);
+	slbc_ack_g = slbc_sram_read_mt6899(SLBC_ACK_G);
+	cpuqos_mode = slbc_sram_read_mt6899(CPUQOS_MODE);
+	slbc_sram_con = slbc_sram_read_mt6899(SLBC_SRAM_CON);
+	slbc_cache_used = slbc_sram_read_mt6899(SLBC_CACHE_USED);
+	slbc_pmu_0 = slbc_sram_read_mt6899(SLBC_PMU_0);
+	slbc_pmu_1 = slbc_sram_read_mt6899(SLBC_PMU_1);
+	slbc_pmu_2 = slbc_sram_read_mt6899(SLBC_PMU_2);
+	slbc_pmu_3 = slbc_sram_read_mt6899(SLBC_PMU_3);
+	slbc_pmu_4 = slbc_sram_read_mt6899(SLBC_PMU_4);
+	slbc_pmu_5 = slbc_sram_read_mt6899(SLBC_PMU_5);
+	slbc_pmu_6 = slbc_sram_read_mt6899(SLBC_PMU_6);
+	slbc_cg_pri = slbc_sram_read_mt6899(SLBC_CG_PRIORITY);
+	slbc_total_ceil_n = slbc_sram_read_mt6899(SLBC_TOTAL_CEIL);
 
 	for (i = 0; i < UID_MAX; i++) {
 		sid = slbc_get_sid_by_uid(i);
@@ -1744,8 +1784,8 @@ static ssize_t dbg_slbc_proc_write(struct file *file,
 			int i;
 
 			slbc_sspm_sram_update();
-			slbc_uid_used = slbc_sram_read(SLBC_UID_USED);
-			slbc_uid_used |= ((unsigned long)slbc_sram_read(SLBC_UID_USED2)) << 32;
+			slbc_uid_used = slbc_sram_read_mt6899(SLBC_UID_USED);
+			slbc_uid_used |= ((unsigned long)slbc_sram_read_mt6899(SLBC_UID_USED2)) << 32;
 
 			mutex_lock(&slbc_ops_lock);
 			for (i = 0; i < ARRAY_SIZE(p_config); i++) {
@@ -1772,20 +1812,20 @@ static ssize_t dbg_slbc_proc_write(struct file *file,
 		slbc_sspm_slc_disable((int)!!val_1);
 	} else if (!strcmp(cmd, "slbc_uid_used")) {
 		slbc_uid_used = val_1;
-		slbc_sram_write(SLBC_UID_USED, slbc_uid_used & 0xffffffff);
-		slbc_sram_write(SLBC_UID_USED, (slbc_uid_used >> 32) & 0xffffffff);
+		slbc_sram_write_mt6899(SLBC_UID_USED, slbc_uid_used & 0xffffffff);
+		slbc_sram_write_mt6899(SLBC_UID_USED, (slbc_uid_used >> 32) & 0xffffffff);
 	} else if (!strcmp(cmd, "slbc_sid_mask")) {
 		slbc_sid_mask = val_1;
-		slbc_sram_write(SLBC_SID_MASK, slbc_sid_mask);
+		slbc_sram_write_mt6899(SLBC_SID_MASK, slbc_sid_mask);
 	} else if (!strcmp(cmd, "slbc_sid_req_q")) {
 		slbc_sid_req_q = val_1;
-		slbc_sram_write(SLBC_SID_REQ_Q, slbc_sid_req_q);
+		slbc_sram_write_mt6899(SLBC_SID_REQ_Q, slbc_sid_req_q);
 	} else if (!strcmp(cmd, "slbc_sid_rel_q")) {
 		slbc_sid_rel_q = val_1;
-		slbc_sram_write(SLBC_SID_REL_Q, slbc_sid_rel_q);
+		slbc_sram_write_mt6899(SLBC_SID_REL_Q, slbc_sid_rel_q);
 	} else if (!strcmp(cmd, "slbc_slot_used")) {
 		slbc_slot_used = val_1;
-		slbc_sram_write(SLBC_SLOT_USED, slbc_slot_used);
+		slbc_sram_write_mt6899(SLBC_SLOT_USED, slbc_slot_used);
 	} else if (!strcmp(cmd, "test_slb_request")) {
 		if (val_1 <= UID_ZERO || val_1 >= UID_MAX) {
 			ret = -EPERM;
@@ -1810,52 +1850,52 @@ static ssize_t dbg_slbc_proc_write(struct file *file,
 		temp = val_2;
 		test_gid_d.dma_size = val_3;
 		test_gid_d.sign = SLC_DATA_MAGIC;
-		slbc_gid_request((enum slc_ach_uid)val_1, &temp, &test_gid_d);
+		slbc_gid_request_mt6899((enum slc_ach_uid)val_1, &temp, &test_gid_d);
 	} else if (!strcmp(cmd, "slbc_gid_release")) {
 		if (val_1 <= ID_PD || val_1 >= ID_MAX ||
 				val_2 >= GID_MAX) {
 			ret = -EPERM;
 			goto out;
 		}
-		slbc_gid_release((enum slc_ach_uid)val_1, val_2);
+		slbc_gid_release_mt6899((enum slc_ach_uid)val_1, val_2);
 	} else if (!strcmp(cmd, "slbc_validate")) {
 		if (val_1 <= ID_PD || val_1 >= ID_MAX ||
 				val_2 >= GID_MAX) {
 			ret = -EPERM;
 			goto out;
 		}
-		slbc_validate((enum slc_ach_uid)val_1, (int)val_2);
+		slbc_validate_mt6899((enum slc_ach_uid)val_1, (int)val_2);
 	} else if (!strcmp(cmd, "slbc_invalidate")) {
 		if (val_1 <= ID_PD || val_1 >= ID_MAX ||
 				val_2 >= GID_MAX) {
 			ret = -EPERM;
 			goto out;
 		}
-		slbc_invalidate((enum slc_ach_uid)val_1, (int)val_2);
+		slbc_invalidate_mt6899((enum slc_ach_uid)val_1, (int)val_2);
 	} else if (!strcmp(cmd, "slbc_read_invalidate")) {
 		if (val_1 <= ID_PD || val_1 >= ID_MAX ||
 				val_2 >= GID_MAX) {
 			ret = -EPERM;
 			goto out;
 		}
-		slbc_read_invalidate((enum slc_ach_uid)val_1, val_2, val_3);
+		slbc_read_invalidate_mt6899((enum slc_ach_uid)val_1, val_2, val_3);
 	} else if (!strcmp(cmd, "slbc_ceil")) {
 		if (val_1 <= ID_PD || val_1 >= ID_MAX) {
 			ret = -EPERM;
 			goto out;
 		}
-		slbc_ceil((enum slc_ach_uid)val_1, val_2);
+		slbc_ceil_mt6899((enum slc_ach_uid)val_1, val_2);
 	} else if (!strcmp(cmd, "slbc_total_ceil")) {
-		slbc_total_ceil(val_1);
+		slbc_total_ceil_mt6899(val_1);
 	} else if (!strcmp(cmd, "slbc_window")) {
-		slbc_window(val_1);
+		slbc_window_mt6899(val_1);
 	} else if (!strcmp(cmd, "slbc_cg_priority")) {
-		slbc_cg_priority(val_1);
+		slbc_cg_priority_mt6899(val_1);
 	} else if (!strcmp(cmd, "slbc_force")) {
 		slbc_force = val_1;
 		slbc_force_cmd(slbc_force);
 	} else if (!strcmp(cmd, "mic_num")) {
-		slbc_update_mic_num(val_1);
+		slbc_update_mic_num_mt6899(val_1);
 	} else if (!strcmp(cmd, "inner")) {
 		slbc_update_inner(val_1);
 	} else if (!strcmp(cmd, "outer")) {
@@ -1863,7 +1903,7 @@ static ssize_t dbg_slbc_proc_write(struct file *file,
 	} else if (!strcmp(cmd, "debug_level")) {
 		debug_level = val_1;
 	} else if (!strcmp(cmd, "slc_cpu_setting")) {
-		slbc_disable_dcc(val_1);
+		slbc_disable_dcc_mt6899(val_1);
 #if IS_ENABLED(CONFIG_MTK_SLBC_IPI)
 	} else if (!strcmp(cmd, "gid_set")) {
 		slbc_table_gid_set(val_1, val_2, val_3);
@@ -2043,39 +2083,39 @@ static int slbc_create_debug_fs(void)
 }
 
 static struct slbc_common_ops common_ops = {
-	.slbc_status = slbc_status,
-	.slbc_request = slbc_request,
-	.slbc_release = slbc_release,
-	.slbc_power_on = slbc_power_on,
-	.slbc_power_off = slbc_power_off,
-	.slbc_secure_on = slbc_secure_on,
-	.slbc_secure_off = slbc_secure_off,
-	.slbc_register_activate_ops = slbc_register_activate_ops,
+	.slbc_status = slbc_status_mt6899,
+	.slbc_request = slbc_request_mt6899,
+	.slbc_release = slbc_release_mt6899,
+	.slbc_power_on = slbc_power_on_mt6899,
+	.slbc_power_off = slbc_power_off_mt6899,
+	.slbc_secure_on = slbc_secure_on_mt6899,
+	.slbc_secure_off = slbc_secure_off_mt6899,
+	.slbc_register_activate_ops = slbc_register_activate_ops_mt6899,
 	.slbc_activate_status = slbc_activate_status,
-	.slbc_sram_read = slbc_sram_read,
-	.slbc_sram_write = slbc_sram_write,
-	.slbc_update_mm_bw = slbc_update_mm_bw,
-	.slbc_update_mic_num = slbc_update_mic_num,
-	.slbc_gid_val = slbc_gid_val,
-	.slbc_gid_request = slbc_gid_request,
-	.slbc_gid_release = slbc_gid_release,
-	.slbc_roi_update = slbc_roi_update,
-	.slbc_validate = slbc_validate,
-	.slbc_invalidate = slbc_invalidate,
-	.slbc_read_invalidate = slbc_read_invalidate,
+	.slbc_sram_read = slbc_sram_read_mt6899,
+	.slbc_sram_write = slbc_sram_write_mt6899,
+	.slbc_update_mm_bw = slbc_update_mm_bw_mt6899,
+	.slbc_update_mic_num = slbc_update_mic_num_mt6899,
+	.slbc_gid_val = slbc_gid_val_mt6899,
+	.slbc_gid_request = slbc_gid_request_mt6899,
+	.slbc_gid_release = slbc_gid_release_mt6899,
+	.slbc_roi_update = slbc_roi_update_mt6899,
+	.slbc_validate = slbc_validate_mt6899,
+	.slbc_invalidate = slbc_invalidate_mt6899,
+	.slbc_read_invalidate = slbc_read_invalidate_mt6899,
 #ifdef SLBC_SUPPORT_SDK
-	.slbc_force_cache = slbc_force_cache,
-	.slbc_force_cache_ratio = slbc_force_cache_ratio,
-	.slbc_ceil = slbc_ceil,
-	.slbc_total_ceil = slbc_total_ceil,
-	.slbc_window = slbc_window,
-	.slbc_cg_priority = slbc_cg_priority,
-	.slbc_disable_dcc = slbc_disable_dcc,
-	.slbc_disable_slc = slbc_disable_slc,
-	.slbc_get_cache_size = slbc_get_cache_size,
-	.slbc_get_cache_hit_rate = slbc_get_cache_hit_rate,
-	.slbc_get_cache_hit_bw = slbc_get_cache_hit_bw,
-	.slbc_get_cache_usage = slbc_get_cache_usage,
+	.slbc_force_cache = slbc_force_cache_mt6899,
+	.slbc_force_cache_ratio = slbc_force_cache_ratio_mt6899,
+	.slbc_ceil = slbc_ceil_mt6899,
+	.slbc_total_ceil = slbc_total_ceil_mt6899,
+	.slbc_window = slbc_window_mt6899,
+	.slbc_cg_priority = slbc_cg_priority_mt6899,
+	.slbc_disable_dcc = slbc_disable_dcc_mt6899,
+	.slbc_disable_slc = slbc_disable_slc_mt6899,
+	.slbc_get_cache_size = slbc_get_cache_size_mt6899,
+	.slbc_get_cache_hit_rate = slbc_get_cache_hit_rate_mt6899,
+	.slbc_get_cache_hit_bw = slbc_get_cache_hit_bw_mt6899,
+	.slbc_get_cache_usage = slbc_get_cache_usage_mt6899,
 #endif
 };
 

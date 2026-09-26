@@ -69,3 +69,7 @@ obj-${CONFIG_MTK_SLBC_IPI} += slbc_ipi.o
 obj-${CONFIG_MTK_SLBC_TRACE} += slbc_trace.o
 obj-${CONFIG_MTK_SLBC_MMSRAM} += mmsram.o
 
+
+# rodin b3d: wildcard() cannot match the ../-relative mounted path; the
+# mt6899 platform object is unconditional for the rodin device
+obj-${CONFIG_MTK_SLBC_MT6899} += slbc_mt6899.o

@@ -102,7 +102,7 @@ int sspm_sysfs_create_file(const struct device_attribute *attr)
 	return device_create_file(sspm_log_device.this_device, attr);
 }
 
-int sspm_sysfs_create_bin_file(const struct bin_attribute *attr)
+int sspm_sysfs_create_bin_file(struct bin_attribute *attr) /* rodin: 6.18 device_create_bin_file takes non-const attr */
 {
 	return device_create_bin_file(sspm_log_device.this_device, attr);
 }

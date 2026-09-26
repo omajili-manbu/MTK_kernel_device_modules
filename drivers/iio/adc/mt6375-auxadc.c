@@ -291,7 +291,7 @@ static int check_gauge_psy(struct mt6375_priv *priv)
 
 	psy = power_supply_get_by_name("mtk-gauge");
 	if (!psy) {
-		psy = power_supply_get_by_phandle(priv->dev->of_node, "gauge");
+		psy = power_supply_get_by_reference(of_fwnode_handle(priv->dev->of_node), "gauge"); /* rodin: 6.18 renamed, fwnode-based */
 		if (IS_ERR_OR_NULL(psy))
 			return -ENODEV;
 	}
@@ -584,7 +584,7 @@ static int auxadc_handle_vbat0(struct mt6375_priv *priv, bool is_vbat0)
 	}
 
 	/* notify gauge & charger */
-	chg_psy = devm_power_supply_get_by_phandle(priv->dev, "charger");
+	chg_psy = devm_power_supply_get_by_reference(priv->dev, "charger"); /* rodin: 6.18 renamed */
 	if (IS_ERR_OR_NULL(chg_psy))
 		return PTR_ERR(chg_psy);
 
@@ -640,12 +640,11 @@ static void auxadc_vbat0_poll_work(struct work_struct *work)
 	__pm_relax(priv->vbat0_ws);
 }
 
-static enum alarmtimer_restart vbat0_alarm_poll_func(struct alarm *alarm, ktime_t now)
+static void vbat0_alarm_poll_func(struct alarm *alarm, ktime_t now) /* rodin: 6.18 alarm callback is void */
 {
 	struct mt6375_priv *priv = container_of(alarm, struct mt6375_priv, vbat0_alarm);
 
 	schedule_work(&priv->vbat0_work);
-	return ALARMTIMER_NORESTART;
 }
 
 static int auxadc_check_vbat_event(struct mt6375_priv *priv, u8 *status_buf)

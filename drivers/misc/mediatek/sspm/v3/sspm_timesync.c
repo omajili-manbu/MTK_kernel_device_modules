@@ -95,7 +95,7 @@ static void sspm_ts_update(int suspended, u64 tick, u64 ts)
 	mb();
 }
 
-static u64 timesync_tick_read(const struct cyclecounter *cc)
+static u64 timesync_tick_read(struct cyclecounter *cc) /* rodin: 6.18 read callback is non-const */
 {
 	return arch_timer_read_counter();
 }
@@ -182,9 +182,8 @@ unsigned int __init sspm_timesync_init(void)
 	 */
 	timecounter_init(&timesync_counter, &timesync_cc, sched_clock());
 
-	hrtimer_init(&timesync_refresh_timer,
+	hrtimer_setup(&timesync_refresh_timer, timesync_refresh, /* rodin: 6.18 hrtimer_init replaced by hrtimer_setup */
 				CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	timesync_refresh_timer.function = timesync_refresh;
 	hrtimer_start(&timesync_refresh_timer,
 		timesync_ctx.wrap_kt, HRTIMER_MODE_REL);
 
