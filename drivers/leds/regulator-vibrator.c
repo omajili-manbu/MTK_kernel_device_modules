@@ -251,14 +251,14 @@ static int __maybe_unused vib_suspend(struct device *dev)
 	return 0;
 }
 
-static int vib_remove(struct platform_device *pdev)
+static void vib_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct reg_vibr *vibr = platform_get_drvdata(pdev);
 
 	cancel_work_sync(&vibr->vibr_work);
 	devm_led_classdev_unregister(&pdev->dev, &vibr->vibr_cdev);
 
-	return 0;
+	
 }
 
 static void vib_shutdown(struct platform_device *pdev)

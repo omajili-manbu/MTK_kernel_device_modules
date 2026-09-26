@@ -1089,7 +1089,7 @@ static int sc858x_register_interrupt(struct sc858x_chip *sc)
     int ret;
 
     if (gpio_is_valid(sc->irq_gpio)) {
-        ret = gpio_request_one(sc->irq_gpio, GPIOF_DIR_IN,"sc858x_irq");
+        ret = gpio_request_one(sc->irq_gpio, GPIOF_IN /* rodin b4: 6.18 renamed GPIOF_DIR_IN->GPIOF_IN (same value) */,"sc858x_irq");
         if (ret) {
             dev_err(sc->dev,"failed to request sc858x_irq\n");
             return -EINVAL;
@@ -1764,7 +1764,7 @@ static void cp_sysfs_init_attrs(void)
 	cp_sysfs_attrs[limit] = NULL; /* Has additional entry for this */
 }
 
-int cp_sysfs_create_group(struct power_supply *psy)
+static int cp_sysfs_create_group(struct power_supply *psy) /* rodin b4: file-local, dup symbol with sibling charger */
 {
 	cp_sysfs_init_attrs();
 

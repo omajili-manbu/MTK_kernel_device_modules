@@ -692,8 +692,7 @@ static int mmdvfs_probe(struct platform_device *pdev)
 		snprintf(prop_name, sizeof(prop_name) - 1,
 			 "mediatek,hopping-%s", hopping_name);
 		num_hopping_rate = 0;
-		of_property_for_each_u32(dev->of_node, prop_name,
-					 hopping_rate_prop, p, hopping_rate) {
+		of_property_for_each_u32(dev->of_node, prop_name, hopping_rate) { /* rodin b4: 6.18 3-arg form (recipe: mtk-smi-dbg.c) */
 			if (num_hopping_rate >= MAX_OPP_NUM) {
 				pr_notice("Too many items in %s\n", prop_name);
 				return -EINVAL;

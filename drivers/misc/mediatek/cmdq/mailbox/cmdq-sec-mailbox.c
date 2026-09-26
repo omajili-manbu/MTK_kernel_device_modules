@@ -14,6 +14,7 @@
 #include <linux/sched/clock.h>
 #include <linux/timer.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h> /* rodin b4: 6.18 header pruning */
 
 #include "cmdq-sec.h"
 #include "cmdq-sec-mailbox.h"
@@ -639,7 +640,7 @@ static bool cmdq_sec_irq_handler(
 			CMDQ_SEC_SHARED_THR_CNT_OFFSET +
 			thread->idx * sizeof(s32));
 		spin_unlock_irqrestore(&thread->chan->lock, flags);
-		del_timer(&thread->timeout);
+		timer_delete(&thread->timeout);
 		return true;
 	}
 
@@ -1635,7 +1636,7 @@ task_err_callback:
 			__raw_writel(0, cmdq->shared_mem->va +
 				CMDQ_SEC_SHARED_THR_CNT_OFFSET +
 				task->thread->idx * sizeof(s32));
-			del_timer(&task->thread->timeout);
+			timer_delete(&task->thread->timeout);
 		}
 
 		/*cmdq_util_aee("CMDQ",
@@ -1689,7 +1690,7 @@ static int cmdq_sec_mbox_send_data(struct mbox_chan *chan, void *data)
 
 static void cmdq_sec_thread_timeout(struct timer_list *t)
 {
-	struct cmdq_sec_thread *thread = from_timer(thread, t, timeout);
+	struct cmdq_sec_thread *thread = timer_container_of(thread, t, timeout);
 	struct cmdq_sec *cmdq =
 		container_of(thread->chan->mbox, struct cmdq_sec, mbox);
 

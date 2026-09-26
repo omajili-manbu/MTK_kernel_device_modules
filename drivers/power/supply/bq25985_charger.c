@@ -2192,7 +2192,7 @@ static void cp_sysfs_init_attrs(void)
 	cp_sysfs_attrs[limit] = NULL; /* Has additional entry for this */
 }
 
-int cp_sysfs_create_group(struct power_supply *psy)
+static int cp_sysfs_create_group(struct power_supply *psy) /* rodin b4: file-local, dup symbol with sibling charger */
 {
 	cp_sysfs_init_attrs();
 

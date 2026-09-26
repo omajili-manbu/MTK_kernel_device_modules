@@ -1418,7 +1418,7 @@ static int mtk_pd_probe(struct platform_device *pdev)
 	mutex_init(&pd->access_lock);
 	mutex_init(&pd->data_lock);
 	mtk_pd_parse_dt(pd, &pdev->dev);
-	pd->bat_psy = devm_power_supply_get_by_phandle(&pdev->dev, "gauge");
+	pd->bat_psy = devm_power_supply_get_by_reference(&pdev->dev, "gauge"); /* rodin b4: 6.18 psy phandle->reference (rodin_psy_compat.h) */
 	if (IS_ERR_OR_NULL(pd->bat_psy))
 		pd_err("%s: devm power fail to get bat_psy\n", __func__);
 
@@ -1427,9 +1427,8 @@ static int mtk_pd_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_pd_remove(struct platform_device *dev)
+static void mtk_pd_remove(struct platform_device *dev) /* rodin b4: 6.18 remove void */
 {
-	return 0;
 }
 
 static void mtk_pd_shutdown(struct platform_device *dev)

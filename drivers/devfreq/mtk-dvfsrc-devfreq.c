@@ -188,14 +188,14 @@ err_free_opp:
 	return ret;
 }
 
-static int dvfsrc_devfreq_remove(struct platform_device *pdev)
+static void dvfsrc_devfreq_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct dvfsrc_devfreq *dvfsrc = platform_get_drvdata(pdev);
 
 	devfreq_remove_device(dvfsrc->devfreq);
 	dev_pm_opp_remove_all_dynamic(&pdev->dev);
 
-	return 0;
+	
 }
 
 static struct platform_driver dvfsrc_devfreq_platdrv = {

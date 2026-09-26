@@ -23,6 +23,7 @@
 #include <linux/regmap.h>
 #include <linux/sort.h>
 #include <linux/suspend.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
 #include "mtk_low_battery_throttling.h"
 #include "mtk_dynamic_loading_throttling.h"
 

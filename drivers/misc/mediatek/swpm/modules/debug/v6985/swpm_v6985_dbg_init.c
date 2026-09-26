@@ -78,7 +78,7 @@ static ssize_t enable_write(char *FromUser, size_t sz, void *priv)
 			mod_timer(&swpm_timer, jiffies +
 				msecs_to_jiffies(swpm_log_interval_ms));
 		else
-			del_timer(&swpm_timer);
+			timer_delete(&swpm_timer);
 		swpm_unlock(&swpm_mutex);
 		ret = sz;
 	}

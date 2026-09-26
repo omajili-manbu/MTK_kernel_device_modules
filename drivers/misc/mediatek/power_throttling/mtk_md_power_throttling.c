@@ -257,9 +257,9 @@ static int mtk_md_power_throttling_probe(struct platform_device *pdev)
 #endif
 	return 0;
 }
-static int mtk_md_power_throttling_remove(struct platform_device *pdev)
+static void mtk_md_power_throttling_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
-	return 0;
+	
 }
 static const struct of_device_id md_power_throttling_of_match[] = {
 	{ .compatible = "mediatek,md-power-throttling", },

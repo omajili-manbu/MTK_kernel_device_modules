@@ -554,9 +554,9 @@ static int speech_usip_dev_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int speech_usip_dev_remove(struct platform_device *pdev)
+static void speech_usip_dev_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
-	return 0;
+	
 }
 
 static struct platform_driver speech_usip_mem = {

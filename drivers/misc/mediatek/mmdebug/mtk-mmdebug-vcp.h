@@ -20,17 +20,7 @@ enum MMDEBUG_FUNC {
 };
 
 /* vcp/.../mmdebug_public.h */
-const char *kernel_warn_type_str[] = {
-	"MMDEBUG-DPSW_CHECK_VMM_OFF",
-	"MMDEBUG-DPSW_CHECK_VLOGIC",
-	"MMDEBUG-DPSW_TIMEOUT",
-	"MMDEBUG-HFLV_CHECK_CLOCK",
-	"MMDEBUG-HFLV_CHECK_SINGLE_CLOCK",
-	"MMDEBUG-HFLV_CHECK_VOLTAGE",
-	"MMDEBUG-HFLV_CHECK_VOLTAGE_BIN",
-	"MMDEBUG-POLL_RC_TIMEOUT",
-	"MMDEBUG-RPOFILE_TIMEOUT",
-};
+extern const char *kernel_warn_type_str[]; /* rodin b4: definition moved to mtk-mmdebug-vcp.c (header-defined array = per-TU duplicate symbol) */
 
 /* vcp/.../mmdebug_private.h */
 struct mmdebug_ipi_data {

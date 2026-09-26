@@ -1500,7 +1500,7 @@ static int mtk_i3c_set_speed(struct mtk_i3c_master *i3c,
 				continue;
 			h_cal_para.best_mul = (parent_clk + clk_div * target_speed - 1) /
 				(clk_div * target_speed);
-			if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_RATE) {
+			if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */) {
 				h_cal_para.exp_duty = I3C_HS_DUTY;
 			} else {
 				h_cal_para.exp_duty = I3C_LS_DUTY;
@@ -1547,7 +1547,7 @@ static int mtk_i3c_set_speed(struct mtk_i3c_master *i3c,
 
 			l_cal_para.best_mul = (parent_clk + clk_div * target_speed - 1) /
 				(clk_div * target_speed);
-			if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_RATE) {
+			if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */) {
 				l_cal_para.exp_duty = I3C_HS_DUTY;
 				l_cal_para.force_h_time = i3c->hs_force_h_time_ns;
 			} else {
@@ -1569,7 +1569,7 @@ static int mtk_i3c_set_speed(struct mtk_i3c_master *i3c,
 			cal_reg->ltiming_reg = ((l_cal_para.l_sample_cnt - 1) << 6) |
 				(l_cal_para.l_step_cnt - 1);
 			cal_reg->ext_conf_reg = (l_ext_time << 8) | (1 << 0);
-			if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_RATE) {
+			if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */) {
 				h_cal_para.max_step = I3C_MAX_HS_STEP_CNT_DIV;
 				h_cal_para.force_h_time = i3c->hs_force_h_time_ns;
 				h_cal_para.src_clk = parent_clk / clk_div;
@@ -1604,7 +1604,7 @@ clk_div_exit:
 		return -EINVAL;
 
 	cal_reg->clock_div_reg = ((clk_div - 1) << 8) | (clk_div - 1);
-	if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_RATE)
+	if (target_speed > I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */)
 		cal_reg->io_config_reg = I3C_IOCFG_PUSH_PULL;
 	else
 		cal_reg->io_config_reg = I3C_IOCFG_OPEN_DRAIN;
@@ -1618,9 +1618,9 @@ static int mtk_i3c_init_speed(struct mtk_i3c_master *i3c, unsigned long parent_c
 	unsigned int parent_clk = (unsigned int)parent_clk_lu;
 
 	if (i3c->base.bus.scl_rate.i2c == 0)
-		i3c->base.bus.scl_rate.i2c = I3C_BUS_I2C_FM_SCL_RATE;
+		i3c->base.bus.scl_rate.i2c = I3C_BUS_I2C_FM_SCL_MAX_RATE /* rodin b4: 6.18 renamed */;
 	if (i3c->base.bus.scl_rate.i3c == 0)
-		i3c->base.bus.scl_rate.i3c = I3C_BUS_I2C_FM_PLUS_SCL_RATE;
+		i3c->base.bus.scl_rate.i3c = I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */;
 
 	i3c->i2c_speed.speed_hz = i3c->base.bus.scl_rate.i2c;
 	ret = mtk_i3c_set_speed(i3c, &(i3c->i2c_speed), parent_clk, false);
@@ -1964,7 +1964,7 @@ static int mtk_i3c_do_transfer(struct mtk_i3c_master *i3c, struct mtk_i3c_xfer *
 		goto err_exit;
 	}
 	if (i3c->fifo_use_pulling && !xfer->dma_en && (xfer->mode == MTK_I3C_SDR_MODE) &&
-		(i3c->base.bus.scl_rate.i3c > I3C_BUS_I2C_FM_PLUS_SCL_RATE))
+		(i3c->base.bus.scl_rate.i3c > I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */))
 		intr_mask_reg = 0;
 	else
 		intr_mask_reg = I3C_INTR_IBI | I3C_INTR_HS_ACKERR | I3C_INTR_ACKERR | I3C_INTR_COMP;
@@ -2552,7 +2552,7 @@ static void mtk_i3c_master_detach_i2c_dev(struct i2c_dev_desc *dev)
 }
 
 static int mtk_i3c_master_i2c_xfers(struct i2c_dev_desc *dev,
-				   const struct i2c_msg *i2c_xfers,
+				   struct i2c_msg *i2c_xfers, /* rodin b4: 6.18 i2c_xfers takes non-const */
 				   int i2c_nxfers)
 {
 	struct i3c_master_controller *m = i2c_dev_get_master(dev);
@@ -2762,7 +2762,7 @@ static int mtk_i3c_parse_dt(struct device_node *np, struct mtk_i3c_master *i3c)
 
 	ret = of_property_read_u32(np, "broadcast-ccc-speed", &i3c->b_ccc_speed_hz);
 	if (ret < 0)
-		i3c->b_ccc_speed_hz = I3C_BUS_I2C_FM_PLUS_SCL_RATE;
+		i3c->b_ccc_speed_hz = I3C_BUS_I2C_FM_PLUS_SCL_MAX_RATE /* rodin b4: 6.18 renamed */;
 
 	ret = of_property_read_u32(np, "ch_offset_i3c", &i3c->ch_offset_i3c);
 	if (ret < 0)
@@ -2876,14 +2876,14 @@ static int mtk_i3c_master_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_i3c_master_remove(struct platform_device *pdev)
+static void mtk_i3c_master_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct mtk_i3c_master *i3c = platform_get_drvdata(pdev);
 
 	list_del(&i3c->s_controller_info.list);
 	i3c_master_unregister(&i3c->base);
 
-	return 0;
+	
 }
 
 static int mtk_i3c_suspend_noirq(struct device *dev)

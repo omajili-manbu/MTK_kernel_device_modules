@@ -1090,7 +1090,7 @@ static int mt6362_leds_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mt6362_leds_remove(struct platform_device *pdev)
+static void mt6362_leds_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 #if IS_ENABLED(CONFIG_MTK_FLASHLIGHT)
 	struct mt6362_leds_data *data = platform_get_drvdata(pdev);
@@ -1102,7 +1102,7 @@ static int mt6362_leds_remove(struct platform_device *pdev)
 	mtcdev = data->flashleds + MT6362_FLASH_LED2;
 	flashlight_dev_unregister_by_device_id(&mtcdev->dev_id);
 #endif
-	return 0;
+	
 }
 
 static const struct of_device_id __maybe_unused mt6362_leds_ofid_tbls[] = {

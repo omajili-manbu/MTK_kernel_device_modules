@@ -1576,7 +1576,7 @@ static int pdm_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int pdm_remove(struct platform_device *pdev)
+static void pdm_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct usbpd_pm *pdpm = platform_get_drvdata(pdev);
 
@@ -1584,7 +1584,7 @@ static int pdm_remove(struct platform_device *pdev)
 	cancel_delayed_work(&pdpm->main_sm_work);
 	cancel_work_sync(&pdpm->psy_change_work);
 
-	return 0;
+	
 }
 
 static struct platform_driver pdm_driver = {

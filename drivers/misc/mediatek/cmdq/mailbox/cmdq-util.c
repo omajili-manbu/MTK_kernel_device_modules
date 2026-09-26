@@ -6,6 +6,7 @@
 #include <linux/mailbox_controller.h>
 #include <linux/kernel.h>
 #include <linux/io.h>
+#include <linux/vmalloc.h> /* rodin b4: 6.18 header pruning */
 #include <linux/debugfs.h>
 #include <linux/proc_fs.h>
 #include <linux/dma-mapping.h>

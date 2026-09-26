@@ -310,7 +310,7 @@ static int rt5133_gpio_get(struct gpio_chip *chip, unsigned int offset)
 	return !!(priv->gpio_output_flag & BIT(offset));
 }
 
-static void rt5133_gpio_set(struct gpio_chip *chip, unsigned int offset,
+static int rt5133_gpio_set(struct gpio_chip *chip, unsigned int offset,
 			    int set_val)
 {
 	struct rt5133_priv *priv = gpiochip_get_data(chip);
@@ -328,10 +328,12 @@ static void rt5133_gpio_set(struct gpio_chip *chip, unsigned int offset,
 	if (ret) {
 		dev_err(priv->dev, "Failed to set gpio [%d] val %d\n", offset,
 			set_val);
-		return;
+		return 0;
 	}
 
 	priv->gpio_output_flag = next_flag;
+
+	return 0; /* rodin b4: 6.18 gpio_chip .set keeps int form */
 }
 
 static irqreturn_t rt5133_intr_handler(int irq_number, void *data)

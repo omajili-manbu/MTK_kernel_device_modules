@@ -14,6 +14,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/of_platform.h> /* rodin b4: 6.18 header pruning */
 
 #include "pmic_lvsys_notify.h"
 

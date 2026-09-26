@@ -11,6 +11,7 @@
 #include <linux/platform_device.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/of_platform.h> /* rodin b4: 6.18 header pruning */
 #include "clkbuf-util.h"
 #include "clkbuf-ctrl.h"
 #include "srclken.h"

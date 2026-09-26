@@ -8,9 +8,9 @@
 #include <linux/list.h>
 #include <linux/list_sort.h>
 #include <linux/interrupt.h>
-#include <linux/mfd/mt6357/registers.h>
-#include <linux/mfd/mt6358/registers.h>
-#include <linux/mfd/mt6359p/registers.h>
+#include "../../../../include/linux/mfd/mt6357/registers.h" /* rodin b4: vendor-first, kernel same-name header shadows vendor AUXADC regs */
+#include "../../../../include/linux/mfd/mt6358/registers.h" /* rodin b4: vendor-first, kernel same-name header shadows vendor AUXADC regs */
+#include "../../../../include/linux/mfd/mt6359p/registers.h" /* rodin b4: vendor-first, kernel same-name header shadows vendor AUXADC regs */
 #include <linux/mfd/mt6377/registers.h>
 #include <linux/mfd/mt6397/core.h>
 #include <linux/module.h>

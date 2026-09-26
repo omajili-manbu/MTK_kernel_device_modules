@@ -13,6 +13,7 @@
 #include <linux/err.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
 #include <mtk-hw-semaphore.h>
 #include <mtk-smi-dbg.h>
 

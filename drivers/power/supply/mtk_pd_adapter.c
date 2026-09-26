@@ -1250,13 +1250,13 @@ out:
 	return ret;
 }
 
-static int mtk_pd_adapter_remove(struct platform_device *pdev)
+static void mtk_pd_adapter_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct mtk_pd_adapter_info *info = platform_get_drvdata(pdev);
 
 	if (info)
 		mtk_pd_adapter_remove_helper(info);
-	return 0;
+	
 }
 
 static const struct of_device_id mtk_pd_adapter_of_match[] = {

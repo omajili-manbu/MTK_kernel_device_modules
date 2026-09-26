@@ -46,7 +46,6 @@ struct mtk_pwm_data {
 };
 
 struct mtk_disp_pwm {
-	struct pwm_chip chip;
 	const struct mtk_pwm_data *data;
 	struct clk *clk_main;
 	struct clk *clk_mm;
@@ -60,7 +59,7 @@ struct mtk_disp_pwm {
 
 static inline struct mtk_disp_pwm *to_mtk_disp_pwm(struct pwm_chip *chip)
 {
-	return container_of(chip, struct mtk_disp_pwm, chip);
+	return pwmchip_get_drvdata(chip); /* rodin b4: 6.18 alloc-API */
 }
 
 static void mtk_disp_pwm_update_bits(struct mtk_disp_pwm *mdp, u32 offset,
@@ -179,20 +178,20 @@ static int mtk_disp_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		if (mdp->data->need_power_on == true) {
 #if 0
 			if(mdp->pwm_src_set != true && !IS_ERR(mdp->clk_source)) {
-				if (get_pwm_src_base(mdp->chip.dev, mdp) >= 0) {
+				if (get_pwm_src_base(pwmchip_parent(chip), mdp) >= 0) {
 					err = clk_prepare_enable(mdp->clk_mm);
 					if (err < 0) {
-						dev_info(mdp->chip.dev, "clk prepare enable failed!\n");
+						dev_info(pwmchip_parent(chip), "clk prepare enable failed!\n");
 						return err;
 					}
 					err = clk_set_parent(mdp->clk_mm, mdp->clk_source);
 					if (err < 0) {
-						dev_info(mdp->chip.dev, "no pwm_src\n");
+						dev_info(pwmchip_parent(chip), "no pwm_src\n");
 						return err;
 					}
 					clk_disable_unprepare(mdp->clk_mm);
 					mdp->pwm_src_set = true;
-					dev_info(mdp->chip.dev, "select clk_mm with pwm_src\n");
+					dev_info(pwmchip_parent(chip), "select clk_mm with pwm_src\n");
 				}
 			}
 #endif
@@ -351,18 +350,19 @@ static int mtk_disp_pwm_get_state(struct pwm_chip *chip,
 static const struct pwm_ops mtk_disp_pwm_ops = {
 	.apply = mtk_disp_pwm_apply,
 	.get_state = mtk_disp_pwm_get_state,
-	.owner = THIS_MODULE,
 };
 
 static int mtk_disp_pwm_probe(struct platform_device *pdev)
 {
+	struct pwm_chip *chip;
 	struct mtk_disp_pwm *mdp;
 	int ret;
 	struct clk *pwm_src;
 
-	mdp = devm_kzalloc(&pdev->dev, sizeof(*mdp), GFP_KERNEL);
-	if (!mdp)
-		return -ENOMEM;
+	chip = devm_pwmchip_alloc(&pdev->dev, 1, sizeof(*mdp)); /* rodin b4: 6.18 alloc-API */
+	if (IS_ERR(chip))
+		return PTR_ERR(chip);
+	mdp = to_mtk_disp_pwm(chip);
 
 	mdp->data = of_device_get_match_data(&pdev->dev);
 
@@ -393,27 +393,25 @@ static int mtk_disp_pwm_probe(struct platform_device *pdev)
 			if (get_pwm_src_base(&pdev->dev, mdp) >= 0) {
 				ret = clk_prepare_enable(mdp->clk_mm);
 				if (ret < 0) {
-					dev_info(mdp->chip.dev, "clk prepare enable failed!\n");
+					dev_info(pwmchip_parent(chip), "clk prepare enable failed!\n");
 					return ret;
 				}
 				ret = clk_set_parent(mdp->clk_mm, mdp->clk_source);
 				if (ret < 0) {
-					dev_info(mdp->chip.dev, "no pwm_src\n");
+					dev_info(pwmchip_parent(chip), "no pwm_src\n");
 					return ret;
 				}
 				clk_disable_unprepare(mdp->clk_mm);
 				// mdp->pwm_src_set = true;
-				dev_info(mdp->chip.dev, "select clk_mm with pwm_src\n");
+				dev_info(pwmchip_parent(chip), "select clk_mm with pwm_src\n");
 			}
 		} else
 			dev_info(&pdev->dev, "get pwm_src failed\n");
 	}
 
-	mdp->chip.dev = &pdev->dev;
-	mdp->chip.ops = &mtk_disp_pwm_ops;
-	mdp->chip.npwm = 1;
+	chip->ops = &mtk_disp_pwm_ops;
 
-	ret = pwmchip_add(&mdp->chip);
+	ret = devm_pwmchip_add(&pdev->dev, chip); /* rodin b4: 6.18 alloc-API */
 	if (ret < 0) {
 		dev_err(&pdev->dev, "pwmchip_add() failed: %pe\n", ERR_PTR(ret));
 		return ret;
@@ -424,13 +422,11 @@ static int mtk_disp_pwm_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mtk_disp_pwm_remove(struct platform_device *pdev)
+static void mtk_disp_pwm_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct mtk_disp_pwm *mdp = platform_get_drvdata(pdev);
 
-	pwmchip_remove(&mdp->chip);
-
-	return 0;
+	/* rodin b4: devm_pwmchip_add 接管 pwmchip_remove */
 }
 
 static const struct mtk_pwm_data mt2701_pwm_data = {

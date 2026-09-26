@@ -17,6 +17,8 @@
 #include <linux/workqueue.h>
 #include <mt-plat/aee.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
+#include <linux/of_platform.h> /* rodin b4: 6.18 header pruning */
 #include "mmsram.h"
 
 #define MMSYSRAM_INTEN0		(0x000)

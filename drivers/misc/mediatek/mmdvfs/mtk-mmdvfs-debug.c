@@ -17,6 +17,7 @@
 #include <linux/sched/clock.h>
 #include <linux/soc/mediatek/mtk_mmdvfs.h>
 #include <linux/workqueue.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
 #include <soc/mediatek/mmdvfs_v3.h>
 #include <mt-plat/mrdump.h>
 
@@ -1246,11 +1247,11 @@ static int mmdvfs_debug_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mmdvfs_debug_remove(struct platform_device *pdev)
+static void mmdvfs_debug_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	devm_regulator_put(g_mmdvfs->reg);
 	kfree(g_mmdvfs);
-	return 0;
+	
 }
 
 static const struct of_device_id of_mmdvfs_debug_match_tbl[] = {

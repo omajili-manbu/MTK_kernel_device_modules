@@ -1488,7 +1488,7 @@ static int sys_comp_init(struct device *dev, struct mml_sys *sys,
 
 	/* Initialize dbg-regs */
 	i = 0;
-	of_property_for_each_u32(node, "dbg-reg-offsets", prop, p, value) {
+	of_property_for_each_u32(node, "dbg-reg-offsets", value) { /* rodin b4: 6.18 3-arg form (B3-ready) */
 		if (i > MML_MAX_SYS_DBG_REGS) {
 			dev_err(dev, "no dbg-reg-offsets or out of size in component %s: %d\n",
 				node->full_name, i);

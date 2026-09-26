@@ -15,6 +15,7 @@
 #include <linux/sched/clock.h>
 #include <linux/timer.h>
 #include <linux/uaccess.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
 
 #include "cmdq-util.h"
 #include "cmdq-sec.h"
@@ -495,10 +496,10 @@ static void cmdq_test_mbox_large_cmd(struct cmdq_test *test, const u32 count)
 
 static void cmdq_test_mbox_sync_token_loop_iter(struct timer_list *t)
 {
-	struct cmdq_test *test = from_timer(test, t, timer);
+	struct cmdq_test *test = timer_container_of(test, t, timer);
 
 	if (!test->tick)
-		del_timer(&test->timer);
+		timer_delete(&test->timer);
 	else {
 		mod_timer(&test->timer, jiffies + msecs_to_jiffies(300));
 		test->iter += 1;
@@ -545,7 +546,7 @@ static void cmdq_test_mbox_loop(struct cmdq_test *test)
 	cmdq_mbox_stop(test->loop);
 	clk_disable_unprepare(test->gce.clk);
 	test->tick = false;
-	del_timer(&test->timer);
+	timer_delete(&test->timer);
 }
 
 static void cmdq_test_mbox_dma_access(struct cmdq_test *test, const bool secure)
@@ -689,7 +690,7 @@ static void cmdq_test_mbox_write_dma_cpr(
 static void cmdq_test_mbox_sync_token_flush(struct timer_list *t)
 {
 	u32	val;
-	struct cmdq_test *test = from_timer(test, t, timer);
+	struct cmdq_test *test = timer_container_of(test, t, timer);
 
 	if (clk_prepare_enable(test->gce.clk)) {
 		cmdq_err("clk fail");
@@ -703,7 +704,7 @@ static void cmdq_test_mbox_sync_token_flush(struct timer_list *t)
 		test->token_user0, (1 << 16), val);
 
 	if (!test->tick)
-		del_timer(&test->timer);
+		timer_delete(&test->timer);
 	else
 		mod_timer(&test->timer, jiffies + msecs_to_jiffies(10));
 
@@ -767,7 +768,7 @@ void cmdq_test_mbox_flush(
 	}
 
 	test->tick = false;
-	del_timer(&test->timer);
+	timer_delete(&test->timer);
 }
 
 static void cmdq_test_mbox_write(

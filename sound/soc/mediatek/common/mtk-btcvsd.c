@@ -13,6 +13,7 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
 
 #include <sound/soc.h>
 
@@ -1614,13 +1615,13 @@ static int mtk_btcvsd_snd_probe(struct platform_device *pdev)
 					       NULL, 0);
 }
 
-static int mtk_btcvsd_snd_remove(struct platform_device *pdev)
+static void mtk_btcvsd_snd_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	struct mtk_btcvsd_snd *btcvsd = dev_get_drvdata(&pdev->dev);
 
 	iounmap(btcvsd->bt_pkv_base);
 	iounmap(btcvsd->bt_sram_bank2_base);
-	return 0;
+	
 }
 
 static const struct of_device_id mtk_btcvsd_snd_dt_match[] = {

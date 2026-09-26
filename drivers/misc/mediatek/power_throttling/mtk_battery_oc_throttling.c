@@ -889,10 +889,10 @@ int bat_oc_set_ppb_mode(unsigned int mode)
 }
 EXPORT_SYMBOL(bat_oc_set_ppb_mode);
 
-static int battery_oc_throtting_remove(struct platform_device *pdev)
+static void battery_oc_throtting_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
 	remove_proc_subtree(MTK_BATOC_DIR_NAME, NULL);
-	return 0;
+	
 }
 
 static int __maybe_unused battery_oc_throttling_suspend(struct device *d)

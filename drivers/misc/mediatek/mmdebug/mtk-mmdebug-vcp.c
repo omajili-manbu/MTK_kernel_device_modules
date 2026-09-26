@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/mod_devicetable.h> /* rodin b4: 6.18 of_device.h pruning */
 #include <linux/workqueue.h>
 #include <soc/mediatek/smi.h>
 
@@ -23,6 +24,18 @@
 #include "vcp_status.h"
 
 #include "mtk-mmdebug-vcp.h"
+
+const char *kernel_warn_type_str[] = {
+	"MMDEBUG-DPSW_CHECK_VMM_OFF",
+	"MMDEBUG-DPSW_CHECK_VLOGIC",
+	"MMDEBUG-DPSW_TIMEOUT",
+	"MMDEBUG-HFLV_CHECK_CLOCK",
+	"MMDEBUG-HFLV_CHECK_SINGLE_CLOCK",
+	"MMDEBUG-HFLV_CHECK_VOLTAGE",
+	"MMDEBUG-HFLV_CHECK_VOLTAGE_BIN",
+	"MMDEBUG-POLL_RC_TIMEOUT",
+	"MMDEBUG-RPOFILE_TIMEOUT",
+};
 
 static int vcp_power;
 static DEFINE_MUTEX(mmdebug_vcp_pwr_mutex);

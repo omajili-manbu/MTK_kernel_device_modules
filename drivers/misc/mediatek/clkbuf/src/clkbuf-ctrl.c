@@ -13,6 +13,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h> /* rodin b4: 6.18 header pruning */
 #include "clkbuf-util.h"
 #include "clkbuf-ctrl.h"
 #include "clkbuf-pmic.h"

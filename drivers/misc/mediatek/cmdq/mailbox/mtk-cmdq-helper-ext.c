@@ -17,6 +17,7 @@
 
 #if !IS_ENABLED(CONFIG_MTK_CMDQ_DEBUG)
 #include <linux/mmdebug.h>
+#include <linux/of.h> /* rodin b4: 6.18 header pruning */
 #endif
 #include <iommu_debug.h>
 #ifdef CMDQ_DCACHE_INVAL
@@ -642,7 +643,7 @@ void cmdq_vcp_enable(bool en)
 	mutex_lock(&vcp.vcp_mutex);
 	if (en) {
 		if (atomic_inc_return(&vcp.vcp_usage) == 1)
-			del_timer(&vcp.vcp_timer);
+			timer_delete(&vcp.vcp_timer);
 		if (atomic_read(&vcp.vcp_power) <= 0) {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_VCP_SUPPORT)
 			dma_addr_t buf_pa = vcp_get_reserve_mem_phys_ex(GCE_MEM_ID);
