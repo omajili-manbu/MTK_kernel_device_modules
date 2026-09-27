@@ -273,20 +273,12 @@ static unsigned int is_skb_gro(struct sk_buff *skb)
 
 static inline unsigned int napi_gro_list_flush(struct ccmni_instance *ccmni)
 {
-	struct napi_struct *napi;
-	unsigned int rx_count;
-
-	napi = ccmni->napi;
-	rx_count = napi->rx_count;
-
-	napi_gro_flush(napi, false);
-	if (napi->rx_count) {
-		netif_receive_skb_list(&napi->rx_list);
-		INIT_LIST_HEAD(&napi->rx_list);
-		napi->rx_count = 0;
-	}
-
-	return rx_count;
+	/* rodin: 6.18 core-managed GRO flush -- napi_gro_flush() was removed
+	 * upstream (chains + normal list now flush inside the poll completion
+	 * path).  Re-arm the poll; ccmni_napi_poll -> napi_complete_done makes
+	 * the core flush everything, so no driver-side gro state is touched. */
+	napi_schedule(ccmni->napi);
+	return 0;
 }
 
 #endif
@@ -1059,6 +1051,8 @@ static const struct net_device_ops ccmni_netdev_ops = {
 static int ccmni_napi_poll(struct napi_struct *napi, int budget)
 {
 #ifdef ENABLE_WQ_GRO
+	/* rodin: 6.18 core-managed GRO flush (see napi_gro_list_flush) */
+	napi_complete_done(napi, 0);
 	return 0;
 #else
 	struct ccmni_instance *ccmni =

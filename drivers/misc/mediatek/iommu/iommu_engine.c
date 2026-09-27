@@ -70,36 +70,10 @@ static void cqdma_access(unsigned long long dma0addr, void *va00,
 /**
  * Translation Fault handler
  */
-static int default_iommu_fault_handler(struct iommu_fault *fault, void *cookie)
-{
-	struct device *dev;
-	int ret = 0;
-
-	if (!fault || !cookie)
-		return -EINVAL;
-
-	dev = cookie;
-
-	dev_info(dev, "[%s] dev:%s, start\n", __func__, dev_name(dev));
-
-	if (fault->type == IOMMU_FAULT_PAGE_REQ) {
-		dev_info(dev,
-			 "[%s][page request fault] type:%d, prm{flags:0x%x, grpid:0x%x, perm:0x%x, addr:0x%llx, pasid:0x%x}\n",
-			 __func__, fault->type, fault->prm.flags,
-			 fault->prm.grpid, fault->prm.perm,
-			 fault->prm.addr, fault->prm.pasid);
-	} else if (fault->type == IOMMU_FAULT_DMA_UNRECOV) {
-		dev_info(dev,
-			 "[%s][unrecoverable fault] type:%d, event{reason:0x%x, flags:0x%x, perm:0x%x, addr:0x%llx, pasid:0x%x}\n",
-			 __func__, fault->type, fault->event.reason,
-			 fault->event.flags, fault->event.perm,
-			 fault->event.addr, fault->event.pasid);
-	}
-
-	dev_info(dev, "[%s] dev:%s, done\n", __func__, dev_name(dev));
-
-	return ret;
-}
+/* rodin: default_iommu_fault_handler removed -- the per-device iommu
+ * fault reporting API (iommu_register_device_fault_handler /
+ * struct iommu_fault::event) was deleted upstream in 6.12-6.13; the
+ * engine's fault printing goes with it (diagnostics only). */
 
 static int cqdma_engine_init(struct platform_device *pdev)
 {
@@ -121,13 +95,11 @@ static int cqdma_engine_init(struct platform_device *pdev)
 	data->engine = DMA_ENGINE_CQDMA;
 	data->pdev = pdev;
 	data->reg_base = cqdma_reg_base;
-	data->iommu_fault_handler = default_iommu_fault_handler;
 
 	dma_engine_datas[DMA_ENGINE_CQDMA] = data;
 
-	/* Register Translation Fault handler */
-	iommu_register_device_fault_handler(&pdev->dev,
-		(iommu_dev_fault_handler_t)data->iommu_fault_handler, &pdev->dev);
+	/* rodin: fault handler registration removed (API deleted upstream,
+	 * see default_iommu_fault_handler comment). */
 
 	pr_info("%s done dev:%s, cqdma_reg_base:%llx\n", __func__,
 		dev_name(&pdev->dev), (unsigned long long)cqdma_reg_base);

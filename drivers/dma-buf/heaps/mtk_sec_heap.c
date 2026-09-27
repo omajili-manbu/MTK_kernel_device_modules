@@ -1465,7 +1465,7 @@ struct page *alloc_pmm_msg_v2(struct sg_table *table,
 free_buffer:
 	list_for_each_entry_safe(pmm_page, tmp_page, pmm_msg_list, lru) {
 		max_order = compound_order(pmm_page);
-		if (max_order <= MAX_ORDER)
+		if (max_order <= MAX_PAGE_ORDER)
 			__free_pages(pmm_page, max_order);
 	}
 	return NULL;
@@ -1597,7 +1597,7 @@ free_pmm_page:
 	list_for_each_entry_safe(pmm_page, tmp_page,
 				  &buffer->ssheap->pmm_msg_list, lru) {
 		max_order = compound_order(pmm_page);
-		if (max_order <= MAX_ORDER)
+		if (max_order <= MAX_PAGE_ORDER)
 			__free_pages(pmm_page, max_order);
 	}
 free_sg_table:
@@ -1605,7 +1605,7 @@ free_sg_table:
 free_pages:
 	list_for_each_entry_safe(page, tmp_page, &pages, lru) {
 		max_order = compound_order(page);
-		if (max_order <= MAX_ORDER)
+		if (max_order <= MAX_PAGE_ORDER)
 			__free_pages(page, max_order);
 	}
 
@@ -2120,8 +2120,6 @@ static struct platform_driver mtk_dma_heap_config_driver = {
 
 static int set_heap_dev_dma(struct device *heap_dev)
 {
-	int err = 0;
-
 	if (!heap_dev)
 		return -EINVAL;
 
@@ -2133,15 +2131,8 @@ static int set_heap_dev_dma(struct device *heap_dev)
 		if (!heap_dev->dma_parms)
 			return -ENOMEM;
 
-		err = dma_set_max_seg_size(heap_dev,
-					   (unsigned int)DMA_BIT_MASK(64));
-		if (err) {
-			devm_kfree(heap_dev, heap_dev->dma_parms);
-			dev_err(heap_dev,
-				"Failed to set DMA segment size, err:%d\n",
-				err);
-			return err;
-		}
+		/* rodin: dma_set_max_seg_size() returns void since 6.16 */
+		dma_set_max_seg_size(heap_dev, (unsigned int)DMA_BIT_MASK(64));
 	}
 
 	return 0;
@@ -2327,5 +2318,5 @@ static void __exit mtk_sec_heap_exit(void)
 MODULE_SOFTDEP("pre: apusys");
 module_init(mtk_sec_heap_init);
 module_exit(mtk_sec_heap_exit);
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

@@ -558,7 +558,7 @@ static void mtk_vdec_lpw_init_timer(struct mtk_vcodec_ctx *ctx)
 
 static void mtk_vdec_lpw_deinit_timer(struct mtk_vcodec_ctx *ctx)
 {
-	del_timer_sync(&ctx->lpw_timer);
+	timer_delete_sync(&ctx->lpw_timer);
 }
 
 static void mtk_vdec_lpw_set_ts(struct mtk_vcodec_ctx *ctx, u64 ts)
@@ -651,7 +651,7 @@ static void mtk_vdec_lpw_stop_timer(struct mtk_vcodec_ctx *ctx, bool need_lock)
 		spin_lock_irqsave(&ctx->lpw_lock, flags);
 
 	if (ctx->lpw_timer_wait) {
-		del_timer(&ctx->lpw_timer);
+		timer_delete(&ctx->lpw_timer);
 		ctx->lpw_timer_wait = false;
 	}
 
@@ -5613,6 +5613,6 @@ int mtk_vcodec_dec_queue_init(void *priv, struct vb2_queue *src_vq,
 	return ret;
 }
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");
 

@@ -64,7 +64,7 @@ enum aw882xx_int_type {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 #define AW_KERNEL_VER_OVER_5_4_0
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+MODULE_IMPORT_NS("ANDROID_GKI_VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver")  /* rodin: 6.18 renamed ns */;
 #endif
 
 

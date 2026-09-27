@@ -60,6 +60,12 @@
 #define MTEE_SESSION_UNLOCK()
 #endif
 
+/* rodin (stage4 batch4-2): the KREE-flavored mtee peer below needs the
+ * gz_tz_system KREE_* services, which land in batch 4-3.  Gate the whole
+ * implementation (session types, pkvm variants, real ops) behind the
+ * GZ_KREE gate; stubs below keep trusted_mem/tmem_ffa buildable =y now.
+ */
+#if IS_ENABLED(CONFIG_MTK_GZ_KREE)
 static const char mem_srv_name[] = "com.mediatek.geniezone.srv.mem";
 
 struct MTEE_SESSION_DATA {
@@ -694,6 +700,65 @@ static int mtee_invoke_command(struct trusted_driver_cmd_params *invoke_params,
 
 	return TMEM_OK;
 }
+
+
+#else /* !CONFIG_MTK_GZ_KREE -- rodin (stage4 batch4-2) stubs */
+/* GZ-KREE peer services (KREE_*) are provided by gz_tz_system, which lands
+ * in stage4 batch4-3.  Stub the mtee peer ops so trusted_mem/tmem_ffa can be
+ * built-in with CONFIG_MTK_GZ_KREE=n; the real implementations above revive
+ * automatically when that gate turns on (IS_ENABLED cross-batch closure
+ * guard, same pattern as the pkvm_mtee_* variants). */
+static int mtee_session_open(void **peer_data, void *dev_desc)
+{
+	UNUSED(peer_data);
+	UNUSED(dev_desc);
+	return TMEM_MTEE_CREATE_SESSION_FAILED;
+}
+
+static int mtee_session_close(void *peer_data, void *dev_desc)
+{
+	UNUSED(peer_data);
+	UNUSED(dev_desc);
+	return TMEM_OK;
+}
+
+static int mtee_alloc(u32 alignment, u32 size, u32 *refcount, u64 *sec_handle,
+		      u8 *owner, u32 id, u32 clean, void *peer_data,
+		      void *dev_desc)
+{
+	UNUSED(alignment); UNUSED(size); UNUSED(refcount); UNUSED(sec_handle);
+	UNUSED(owner); UNUSED(id); UNUSED(clean); UNUSED(peer_data);
+	UNUSED(dev_desc);
+	return TMEM_MTEE_ALLOC_CHUNK_FAILED;
+}
+
+static int mtee_free(u64 sec_handle, u8 *owner, u32 id, void *peer_data,
+		     void *dev_desc)
+{
+	UNUSED(sec_handle); UNUSED(owner); UNUSED(id); UNUSED(peer_data);
+	UNUSED(dev_desc);
+	return TMEM_MTEE_FREE_CHUNK_FAILED;
+}
+
+static int mtee_mem_reg_add(u64 pa, u32 size, void *peer_data, void *dev_desc)
+{
+	UNUSED(pa); UNUSED(size); UNUSED(peer_data); UNUSED(dev_desc);
+	return TMEM_MTEE_APPEND_MEMORY_FAILED;
+}
+
+static int mtee_mem_reg_remove(void *peer_data, void *dev_desc)
+{
+	UNUSED(peer_data); UNUSED(dev_desc);
+	return TMEM_MTEE_RELEASE_MEMORY_FAILED;
+}
+
+static int mtee_invoke_command(struct trusted_driver_cmd_params *invoke_params,
+			       void *peer_data, void *dev_desc)
+{
+	UNUSED(invoke_params); UNUSED(peer_data); UNUSED(dev_desc);
+	return TMEM_MTEE_INVOKE_COMMAND_FAILED;
+}
+#endif /* CONFIG_MTK_GZ_KREE (rodin) */
 
 static struct trusted_driver_operations mtee_peer_ops = {
 	.session_open = mtee_session_open,

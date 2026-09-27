@@ -17,7 +17,15 @@ ccflags-y += -Werror
 # Trusted Memory Subsystem Driver
 #==========================================================================
 # Ensure module is built only when option is enabled
+# rodin (stage4 batch4-2): tmem_ffa (FFA variant) is a superset alternative of
+# trusted_mem -- the device ships only tmem_ffa.ko, and as =y built-ins the two
+# composites would link every shared member twice.  When the FFA variant is
+# on, trusted_mem steps aside; its exports stay live via the tmem_ffa members.
+ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_TMEM_FFA)),)
+obj-n = trusted_mem.o
+else
 obj-$(CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM) = trusted_mem.o
+endif
 trusted_mem-y += dev_mgr.o
 trusted_mem-y += entry.o
 trusted_mem-y += region_mgr.o

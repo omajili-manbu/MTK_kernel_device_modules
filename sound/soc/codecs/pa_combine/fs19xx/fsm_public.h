@@ -116,7 +116,7 @@ void fsm_firmware_deinit(void);
 #if defined(CONFIG_FSM_Q6AFE)
 #include "fsm_q6afe.h"
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+MODULE_IMPORT_NS("ANDROID_GKI_VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver")  /* rodin: 6.18 renamed ns */;
 #endif
 void fsm_afe_init_controls(struct snd_soc_codec *codec);
 #else

@@ -71,7 +71,8 @@ static int mtk_audio_usb_offload_event_handler(unsigned long event, void *ptr)
 	break;
 	case EVENT_AFE_SRAM_ALLOCATE:
 	case EVENT_AFE_SRAM_ALLOCATE_FROM_END:
-#if !IS_ENABLED(CONFIG_NEBULA_SND_PASSTHROUGH)
+#if !IS_ENABLED(CONFIG_NEBULA_SND_PASSTHROUGH) && IS_ENABLED(CONFIG_SND_SOC_MTK_SRAM)
+	/* rodin: SRAM provider (mtk-sram-manager) lands in batch 4-5 */
 	if (g_auo_sram.afe && ptr) {
 		umem = (struct mtk_audio_usb_mem *)ptr;
 
@@ -89,7 +90,8 @@ static int mtk_audio_usb_offload_event_handler(unsigned long event, void *ptr)
 #endif
 	break;
 	case EVENT_AFE_SRAM_FREE:
-#if !IS_ENABLED(CONFIG_NEBULA_SND_PASSTHROUGH)
+#if !IS_ENABLED(CONFIG_NEBULA_SND_PASSTHROUGH) && IS_ENABLED(CONFIG_SND_SOC_MTK_SRAM)
+	/* rodin: SRAM provider (mtk-sram-manager) lands in batch 4-5 */
 	if (g_auo_sram.afe && ptr) {
 		umem = (struct mtk_audio_usb_mem *)ptr;
 

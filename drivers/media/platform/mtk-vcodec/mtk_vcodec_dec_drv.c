@@ -784,7 +784,7 @@ static const struct of_device_id mtk_vcodec_match[] = {
 
 MODULE_DEVICE_TABLE(of, mtk_vcodec_match);
 
-static int mtk_vcodec_dec_remove(struct platform_device *pdev)
+static void mtk_vcodec_dec_remove(struct platform_device *pdev)
 {
 	struct mtk_vcodec_dev *dev = platform_get_drvdata(pdev);
 
@@ -815,7 +815,6 @@ static int mtk_vcodec_dec_remove(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_VCP_SUPPORT)
 	vdec_vcp_remove(dev);
 #endif
-	return 0;
 }
 
 static const struct dev_pm_ops mtk_vcodec_dec_pm_ops = {
@@ -835,6 +834,6 @@ static struct platform_driver mtk_vcodec_dec_driver = {
 
 module_platform_driver(mtk_vcodec_dec_driver);
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Mediatek video codec V4L2 decoder driver");

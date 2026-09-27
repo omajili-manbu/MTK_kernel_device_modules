@@ -40,7 +40,7 @@
 
 #if IS_ENABLED(CONFIG_ALLOC_TMEM_WITH_HIGH_FREQ)
 u32 tmem_high_freq;
-u32 cpu_map;
+static u32 cpu_map;
 #endif
 
 #if IS_ENABLED(CONFIG_TEST_MTK_TRUSTED_MEMORY)
@@ -341,11 +341,13 @@ static int trusted_mem_init(struct platform_device *pdev)
 	return TMEM_OK;
 }
 
-static int trusted_mem_exit(struct platform_device *pdev)
+static void trusted_mem_exit(struct platform_device *pdev)
 {
 #if WITH_SSHEAP_PROC
-	if (strncmp(dev_name(&pdev->dev), "ssheap", 6) == 0)
-		return ssheap_exit(pdev);
+	if (strncmp(dev_name(&pdev->dev), "ssheap", 6) == 0) {
+		ssheap_exit(pdev);
+		return;
+	}
 #endif
 
 #ifdef MTEE_DEVICES_SUPPORT
@@ -362,8 +364,6 @@ static int trusted_mem_exit(struct platform_device *pdev)
 #endif
 
 	trusted_mem_subsys_exit();
-
-	return 0;
 }
 
 static const struct of_device_id tm_of_match_table[] = {

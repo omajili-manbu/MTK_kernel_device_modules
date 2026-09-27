@@ -12,6 +12,18 @@
 #define mem_srv_name	"com.mediatek.geniezone.srv.mem"
 #define m4u_srv_name	"com.mediatek.geniezone.srv.m4u_sec_ha"
 
+/* rodin (stage4 batch4-2): the KREE_* MTEE services are provided by
+ * gz_tz_system, which lands in stage4 batch4-3.  With CONFIG_MTK_GZ_KREE=n
+ * the calls below compile to failure returns so iommu_gz can be built-in
+ * now; the real services revive automatically when the gate turns on. */
+#if !IS_ENABLED(CONFIG_MTK_GZ_KREE)
+#define KREE_RegisterSharedmem(sn, hd, p)	TZ_RESULT_ERROR_GENERIC
+#define KREE_UnregisterSharedmem(sn, hd)	TZ_RESULT_ERROR_GENERIC
+#define KREE_CreateSession(n, sn)		TZ_RESULT_ERROR_GENERIC
+#define KREE_CloseSession(sn)			TZ_RESULT_ERROR_GENERIC
+#define KREE_TeeServiceCall(sn, c, t, p)	TZ_RESULT_ERROR_GENERIC
+#endif
+
 static struct m4u_sec_ty_context m4u_ty_ctx = {
 	.ctx_lock = __MUTEX_INITIALIZER(m4u_ty_ctx.ctx_lock),
 };
@@ -181,9 +193,9 @@ static int m4u_gz_ha_deinit(struct m4u_gz_sec_context *ctx)
 {
 	struct m4u_sec_ty_context *ty_ctx = ctx->imp;
 
-	KREE_CloseSession(ty_ctx->m4u_sn);
+	(void)KREE_CloseSession(ty_ctx->m4u_sn);
 	_unreg_shmem(ty_ctx->mem_sn, ty_ctx->mem_hd);
-	KREE_CloseSession(ty_ctx->mem_sn);
+	(void)KREE_CloseSession(ty_ctx->mem_sn);
 	_release_region();
 	ty_ctx->init = 0;
 

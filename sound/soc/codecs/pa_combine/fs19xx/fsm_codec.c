@@ -373,9 +373,9 @@ static int fsm_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 
 	pr_debug("fmt: %X", fmt);
 	/*switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-		case SND_SOC_DAIFMT_CBS_CFS:
+		case SND_SOC_DAIFMT_CBC_CFC:
 			break;
-		case SND_SOC_DAIFMT_CBM_CFM:
+		case SND_SOC_DAIFMT_CBP_CFP:
 		default:
 			// only supports Slave mode
 			pr_err("invalid DAI master/slave interface");
@@ -605,7 +605,7 @@ static char *fmt_single_name(struct device *dev, int *id)
 	if (dev_name(dev) == NULL)
 		return NULL;
 
-	strlcpy(name, dev_name(dev), NAME_SIZE);
+	strscpy(name, dev_name(dev), NAME_SIZE);
 
 	/* are we a "%s.%d" name (platform and SPI components) */
 	found = strstr(name, dev->driver->name);
@@ -628,7 +628,7 @@ static char *fmt_single_name(struct device *dev, int *id)
 
 			/* sanitize component name for DAI link creation */
 			snprintf(tmp, NAME_SIZE, "%s.%s", dev->driver->name, name);
-			strlcpy(name, tmp, NAME_SIZE);
+			strscpy(name, tmp, NAME_SIZE);
 		} else
 			*id = 0;
 	}

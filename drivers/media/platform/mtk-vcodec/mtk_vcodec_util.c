@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <uapi/linux/sched/types.h>
 
+#include <linux/vmalloc.h>
 #include "mtk_vcodec_fence.h"
 #include "mtk_vcodec_drv.h"
 #include "mtk_vcodec_util.h"
@@ -51,7 +52,7 @@ void mtk_vcodec_check_alive(struct timer_list *t)
 
 	/* Only support vdec check alive now */
 	if (mtk_vcodec_is_vcp(MTK_INST_DECODER)) {
-		params = from_timer(params, t, vdec_active_checker);
+		params = timer_container_of(params, t, vdec_active_checker);
 		dev = container_of(params, struct mtk_vcodec_dev, vdec_dvfs_params);
 		dev->check_alive_work.dev = dev;
 		dev->check_alive_work.ctx = NULL;
@@ -96,7 +97,7 @@ static void mtk_vcodec_alive_checker_deinit(struct mtk_vcodec_ctx *ctx, bool is_
 	/* Only support vdec check alive now */
 	if (mtk_vcodec_is_vcp(MTK_INST_DECODER) && ctx->type == MTK_INST_DECODER) {
 		if (dev->vdec_dvfs_params.has_timer && is_last) {
-			del_timer_sync(&dev->vdec_dvfs_params.vdec_active_checker);
+			timer_delete_sync(&dev->vdec_dvfs_params.vdec_active_checker);
 			flush_workqueue(dev->check_alive_workqueue);
 			dev->vdec_dvfs_params.has_timer = 0;
 			mtk_v4l2_debug(4, "[%d][VDVFS][VDEC] deinit vdec alive checker...",
@@ -1630,5 +1631,5 @@ void mtk_vcodec_get_log(struct mtk_vcodec_ctx *ctx, struct mtk_vcodec_dev *dev,
 }
 EXPORT_SYMBOL_GPL(mtk_vcodec_get_log);
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

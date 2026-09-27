@@ -493,7 +493,6 @@ static const struct file_operations g_fsm_misc_ops = {
 	.read    = fsm_misc_read,
 	.write   = fsm_misc_write,
 	.release = fsm_misc_release,
-	.llseek  = no_llseek,
 	.unlocked_ioctl = fsm_misc_ioctl,
 #if defined(CONFIG_COMPAT)
 	.compat_ioctl = fsm_misc_compat_ioctl,

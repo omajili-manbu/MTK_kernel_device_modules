@@ -31,6 +31,7 @@
 #include <linux/kallsyms.h>
 #include <linux/kmemleak.h>
 #include <asm/cacheflush.h>
+#include <asm/virt.h>  /* rodin: is_protected_kvm_enabled (6.18 static inline) */
 #include "ssmr_internal.h"
 
 #define SSMR_FEATURES_DT_UNAME "memory-ssmr-features"

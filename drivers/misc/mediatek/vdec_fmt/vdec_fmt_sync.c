@@ -183,8 +183,9 @@ static bool timeline_fence_signaled(struct dma_fence *dma_fence)
 {
 	struct sync_timeline *parent = fence_parent(dma_fence);
 
-	return !__dma_fence_is_later(dma_fence->seqno,
-		parent->value, dma_fence->ops);
+	/* rodin: 6.18 __dma_fence_is_later(fence, f1, f2) */
+	return !__dma_fence_is_later(dma_fence, dma_fence->seqno,
+		parent->value);
 }
 
 static bool timeline_fence_enable_signaling(struct dma_fence *dma_fence)
