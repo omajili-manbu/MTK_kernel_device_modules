@@ -15,6 +15,7 @@
 #include <linux/seq_file.h>
 #include <linux/fb.h>
 #include <mt-plat/mtk_gpu_utility.h>
+#include "mtk_disp_notify.h" /* rodin 4-3: 显示 blank 通知（替代 6.18 已删的 fb blank 事件） */
 #if defined(CONFIG_MTK_GPUFREQ_V2)
 #include <ged_gpufreq_v2.h>
 #include <gpufreq_v2.h>
@@ -838,12 +839,37 @@ static KOBJ_ATTR_RW(pre_fence_chk);
 //-----------------------------------------------------------------------------
 
 /* rodin 4-3: 6.18 移除 fb notifier 的 FB_EVENT_BLANK（fbmem 通知链只剩
- * FB_REGISTERED/UNREGISTERED，blank 播报随 fbdev 空白处理一并删除），
- * 原 ged_fb_notifier_callback 已摘除。
- *
- * 降级（可接受，终验清单已登记）：GED 不再随熄屏/亮屏更新 GED_EVENT_LCD 位，
- * 改为 hal 初始化时按"屏幕常亮"置位一次。影响面仅熄屏场景下的 GPU DVFS
- * 策略近似，不涉及功能正确性；日后接 DRM blank 通知时替换该置位即可。 */
+ * FB_REGISTERED/UNREGISTERED）。改用 vendor 自带的显示通知框架
+ * mtk_disp_notifier（提供方 = mediatek-drm v2 的 mtk_disp_notify.c，
+ * 发起方 = mtk_dsi.c 的 blank 切换；cm_mgr/thermal/ppm_v3 等件同款用法），
+ * 事件语义与原 fb notifier 一致：UNBLANK → 置 GED_EVENT_LCD + 探测信号，
+ * POWERDOWN → 清位 + 探测信号。 */
+
+static struct notifier_block ged_disp_notifier;
+
+static int ged_disp_notifier_callback(struct notifier_block *self,
+	unsigned long event, void *data)
+{
+	int *blank = (int *)data;
+
+	if (event != MTK_DISP_EVENT_BLANK)
+		return 0;
+
+	switch (*blank) {
+	case MTK_DISP_BLANK_UNBLANK:
+		g_ui32EventStatus |= GED_EVENT_LCD;
+		ged_dvfs_probe_signal(GED_GAS_SIGNAL_EVENT);
+		break;
+	case MTK_DISP_BLANK_POWERDOWN:
+		g_ui32EventStatus &= ~GED_EVENT_LCD;
+		ged_dvfs_probe_signal(GED_GAS_SIGNAL_EVENT);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
 
 struct ged_event_change_entry_t {
 	ged_event_change_fp callback;
@@ -2260,8 +2286,15 @@ GED_ERROR ged_hal_init(void)
 		goto ERROR;
 	}
 
-	/* rodin 4-3: 见上方注释——6.18 无 blank 事件，按常亮置位一次 */
+	/* rodin 4-3: 显示通知注册（提供方 mediatek-drm v2，已内建）；与 cm_mgr 同款守卫 */
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_DRM_MEDIATEK)
+	ged_disp_notifier.notifier_call = ged_disp_notifier_callback;
+	if (mtk_disp_notifier_register("ged", &ged_disp_notifier))
+		GED_LOGE("Register disp_notifier fail!\n");
+#else
+	/* 本树 DRM 面恒 =y；该分支只保证别的配置下仍可编译（无 blank 源时按常亮起） */
 	g_ui32EventStatus |= GED_EVENT_LCD;
+#endif
 
 	err = ged_sysfs_create_file(hal_kobj, &kobj_attr_eb_dvfs_policy);
 	if (unlikely(err != GED_OK))
