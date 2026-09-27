@@ -472,4 +472,4 @@ int ged_bridge_dmabuf_set_name(
 	out->eError = ged_dmabuf_set_name(in->share_fd, in->name);
 	return 0;
 }
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

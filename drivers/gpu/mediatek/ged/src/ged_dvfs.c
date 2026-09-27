@@ -4275,8 +4275,7 @@ GED_ERROR ged_dvfs_system_init(void)
 	if (g_async_id_threshold != ged_get_min_oppidx_real())
 		g_same_stack_in_opp = true;
 
-	hrtimer_init(&gpu_mewtwo_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	gpu_mewtwo_timer.function = gpu_mewtwo_timer_cb;
+	hrtimer_setup(&gpu_mewtwo_timer, gpu_mewtwo_timer_cb, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	gpu_mewtwo_timer_expire = ms_to_ktime(GPU_MEWTWO_TIMEOUT);
 
 	//MBrain: enable opp log by default

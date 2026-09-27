@@ -1311,8 +1311,7 @@ static int32_t vibrator_init(struct ics_haptic_data *haptic_data)
         return ret;
     }
 #endif
-    hrtimer_init(&haptic_data->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-    haptic_data->timer.function = vibrator_timer_func;
+    hrtimer_setup(&haptic_data->timer, vibrator_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
     INIT_WORK(&haptic_data->vibrator_work, vibrator_work_routine);
     INIT_WORK(&haptic_data->preset_work, preset_work_routine);

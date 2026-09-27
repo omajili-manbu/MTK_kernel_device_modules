@@ -39,8 +39,9 @@ static DEFINE_MUTEX(gpueb_logger_mutex);
 static DEFINE_MUTEX(gpueb_log_enable_mutex);
 static struct log_ctrl_s *gpueb_log_ctl;
 
-unsigned int r_pos_debug;
-unsigned int log_ctl_debug;
+/* rodin 4-3: 与 vcp/rv/vcp_logger.c 同名全局撞名；本文件内自用，static 化 */
+static unsigned int r_pos_debug;
+static unsigned int log_ctl_debug;
 
 static unsigned int gpueb_log_enable_set(unsigned int enable)
 {

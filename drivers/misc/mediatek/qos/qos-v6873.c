@@ -197,9 +197,8 @@ static const struct of_device_id mtk_qos_of_match[] = {
 	},
 };
 
-static int mt6873_qos_remove(struct platform_device *pdev)
-{
-	return 0;
+static void mt6873_qos_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 }
 
 

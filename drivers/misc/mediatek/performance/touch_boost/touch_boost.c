@@ -1028,8 +1028,7 @@ static int __init touch_boost_init(void)
 		return -ENOMEM;
 	}
 
-	hrtimer_init(&hrt1, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	hrt1.function = &mt_touch_timeout;
+	hrtimer_setup(&hrt1, &mt_touch_timeout, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	spin_lock_init(&ktchboost.touch_lock);
 	init_waitqueue_head(&ktchboost.wq);

@@ -6,6 +6,7 @@
 
 
 #include <linux/time.h>
+#include <linux/vmalloc.h> /* rodin 4-3: 6.18 头瘦身, vzalloc/vfree 需显式包含 */
 #include <linux/ktime.h>
 #include <linux/timekeeping.h>
 #include <linux/types.h>
@@ -709,7 +710,7 @@ void mtk_vcodec_alive_checker_suspend(struct mtk_vcodec_dev *dev)
 		if (!mtk_vcodec_ctx_list_empty(dev) && dev->vdec_dvfs_params.has_timer) {
 			mtk_v4l2_debug(0, "[VDVFS][VDEC] suspend vdec alive checker (freq %d)..",
 				dev->vdec_dvfs_params.target_freq);
-			del_timer_sync(&dev->vdec_dvfs_params.vdec_active_checker);
+			timer_delete_sync(&dev->vdec_dvfs_params.vdec_active_checker);
 			flush_workqueue(dev->check_alive_workqueue);
 			dev->vdec_dvfs_params.has_timer = 0;
 		}

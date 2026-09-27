@@ -395,6 +395,6 @@ sih_haptic_t *get_global_haptic_ptr(void);
  * Extern
  *
  *********************************************************/
-extern int CUSTOME_WAVE_ID;
+extern int CUSTOME_WAVE_ID_sih;
 
 #endif

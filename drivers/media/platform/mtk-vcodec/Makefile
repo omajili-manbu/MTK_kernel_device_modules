@@ -43,8 +43,10 @@ ifeq ($(CONFIG_VIDEO_MEDIATEK_VCODEC_V1),y)
 endif
 
 ifeq ($(CONFIG_VIDEO_MEDIATEK_VCODEC_V2),y)
-	obj-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-dec-v2.o \
-	                       mtk-vcodec-enc-v2.o
+	obj-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-dec-v2.o
+# rodin 4-3: enc-v2 的符号闭包含闭源 metis/mi_schedule（sched 簇），拆出独立门；
+# 默认 n，待 perf/sched 批（4-9）决策后随批复活。
+	obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC_ENC_V2) += mtk-vcodec-enc-v2.o
 
 	mtk-vcodec-dec-v2-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += \
 			v2/mtk_vcodec_dec_pm_plat.o \

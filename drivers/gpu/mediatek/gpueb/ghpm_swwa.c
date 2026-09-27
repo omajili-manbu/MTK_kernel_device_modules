@@ -79,8 +79,8 @@ static unsigned long g_pwr_irq_flags;
 static raw_spinlock_t ghpm_lock;
 static bool first_on_after_bootup;
 
-unsigned int g_ghpm_ready;
-EXPORT_SYMBOL(g_ghpm_ready);
+/* rodin 4-3: g_ghpm_ready 由 ghpm.c 定义并导出（ghpm_wrapper.h 声明），
+ * 本文件与其同链撞名——删除本地定义，改用共享 extern（语义=同一就绪标志）。 */
 
 static struct ghpm_platform_fp platform_ghpmswwa_fp = {
 	.ghpm_ctrl = __ghpm_swwa_ctrl,

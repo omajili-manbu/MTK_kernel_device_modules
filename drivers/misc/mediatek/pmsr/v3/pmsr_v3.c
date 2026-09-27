@@ -722,8 +722,8 @@ static int pmsr_procfs_init(void)
 
 static enum hrtimer_restart pmsr_timer_handle(struct hrtimer *timer)
 {
-	hrtimer_forward(timer, timer->base->get_time(),
-			ns_to_ktime(timer_window_len * NSEC_PER_USEC));
+	/* rodin 4-3: 6.18 删 hrtimer_clock_base::get_time，用 hrtimer_forward_now 等价改写 */
+	hrtimer_forward_now(timer, ns_to_ktime(timer_window_len * NSEC_PER_USEC));
 
 	queue_delayed_work(pmsr_tool_forcereq, &pmsr_tool_forcereq_work, 0);
 
@@ -773,8 +773,7 @@ static int __init pmsr_init(void)
 	/* register ipi for AP2SSPM communication */
 	pmsr_ipi_init();
 
-	hrtimer_init(&pmsr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	pmsr_timer.function = pmsr_timer_handle;
+	hrtimer_setup(&pmsr_timer, pmsr_timer_handle, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	if (!pmsr_tool_forcereq) {
 		pmsr_tool_forcereq = alloc_workqueue("pmsr_tool_forcereq", WQ_HIGHPRI, 0);

@@ -718,7 +718,7 @@ static void defer_timer_init(void)
 static void defer_timer_deinit(void)
 {
 	// Remove the deferrable timer
-	del_timer(&g_defer_timer);
+	timer_delete(&g_defer_timer);
 }
 
 
@@ -753,8 +753,7 @@ static enum hrtimer_restart hr_timer_callback(struct hrtimer *timer)
 static void hr_timer_init(void)
 {
 	// Initialize and set up hr_timer
-	hrtimer_init(&g_hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	g_hr_timer.function = hr_timer_callback;
+	hrtimer_setup(&g_hr_timer, hr_timer_callback, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hr_timer_interval_ns = ktime_set(0, 1000 * 1000); // 1 ms
 }
 
@@ -1577,8 +1576,8 @@ static int cgppt_driver_probe(struct platform_device *pdev)
 	return 0; // Return 0 means success, negative values indicate failure
 }
 
-static int cgppt_driver_remove(struct platform_device *pdev)
-{
+static void cgppt_driver_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 	pr_info("[CG PPT] %s()\n", __func__);
 
 	//delete sysfs device
@@ -1599,7 +1598,6 @@ static int cgppt_driver_remove(struct platform_device *pdev)
 	//cgppt work
 	trace_work_deinit();
 
-	return 0;
 }
 
 

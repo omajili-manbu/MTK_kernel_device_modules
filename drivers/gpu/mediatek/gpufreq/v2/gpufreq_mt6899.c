@@ -50,7 +50,7 @@ static unsigned int __gpufreq_get_pll_fstack(void);
 /* init function */
 static int __gpufreq_init_platform_info(struct platform_device *pdev);
 static int __gpufreq_pdrv_probe(struct platform_device *pdev);
-static int __gpufreq_pdrv_remove(struct platform_device *pdev);
+static void __gpufreq_pdrv_remove(struct platform_device *pdev); /* rodin 4-3: 6.18 .remove=void */
 
 /**
  * ===============================================
@@ -1004,9 +1004,8 @@ done:
 }
 
 /* API: gpufreq driver remove */
-static int __gpufreq_pdrv_remove(struct platform_device *pdev)
-{
-	return GPUFREQ_SUCCESS;
+static void __gpufreq_pdrv_remove(struct platform_device *pdev)
+{ /* rodin 4-3: 6.18 .remove=void */
 }
 
 /* API: register gpufreq platform driver */

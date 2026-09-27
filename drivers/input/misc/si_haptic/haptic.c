@@ -49,11 +49,11 @@
  * variable
  *
  *****************************************************/
-char awinic_ram_name[][SIH_RTP_NAME_MAX] = {
+char awinic_ram_name_sih[][SIH_RTP_NAME_MAX] = {
 	{"aw8697_haptic.bin"},
 };
 
-char awinic_rtp_name[][SIH_RTP_NAME_MAX] = {
+char awinic_rtp_name_sih[][SIH_RTP_NAME_MAX] = {
 	{"aw8697_rtp_1.bin"}, /*8*/
 	{"aw8697_rtp_1.bin"},
 	{"aw8697_rtp_1.bin"},
@@ -244,8 +244,8 @@ char awinic_rtp_name[][SIH_RTP_NAME_MAX] = {
 	{"keyboard_linear_down_rtp.bin"},
 	{"keyboard_linear_up_rtp.bin"}, /*196*/
 };
-int CUSTOME_WAVE_ID;
-int awinic_rtp_name_len = sizeof(awinic_rtp_name) / SIH_RTP_NAME_MAX;
+int CUSTOME_WAVE_ID_sih;
+int awinic_rtp_name_len_sih = sizeof(awinic_rtp_name_sih) / SIH_RTP_NAME_MAX;
 static sih_haptic_ptr_t g_haptic_t;
 /*****************************************************
  *
@@ -303,7 +303,7 @@ static int sih_parse_lra_dts(struct device *dev, sih_haptic_t *sih_haptic,
 		hp_err("%s:lra name acquire failed\n", __func__);
 		return -EIO;
 	}
-	strlcpy(sih_haptic->chip_attr.lra_name, str, SIH_LRA_NAME_LEN);
+	strscpy(sih_haptic->chip_attr.lra_name, str, SIH_LRA_NAME_LEN);
 	hp_info("%s:lra_name = %s\n", __func__, sih_haptic->chip_attr.lra_name);
 
 	val = of_property_read_u32(np, "vib_f0_pre",
@@ -372,7 +372,7 @@ static int sih_acquire_prepare_res(struct device *dev,
 
 	if (gpio_is_valid(sih_haptic->chip_attr.irq_gpio)) {
 		ret = devm_gpio_request_one(dev, sih_haptic->chip_attr.irq_gpio,
-			GPIOF_DIR_IN, "sih_haptic_irq");
+			GPIOF_IN, "sih_haptic_irq");
 		if (ret) {
 			hp_err("%s:irq gpio request failed\n", __func__);
 			return ret;
@@ -464,7 +464,7 @@ static bool sih_irq_rtp_local_file_handle(sih_haptic_t *sih_haptic,
 			return false;
 		}
 	} else if (sih_haptic->chip_ipara.is_custom_wave == 1) {
-		buf_len = read_rb(rtp_cont->data, inject_data_cnt);
+		buf_len = read_rb_sih(rtp_cont->data, inject_data_cnt);
 		if(buf_len >0){
 			ret = sih_haptic->hp_func->write_rtp_data(sih_haptic,
 				rtp_cont->data, buf_len);
@@ -625,7 +625,7 @@ static void sih_rtp_play_func(sih_haptic_t *sih_haptic, uint8_t mode)
 				break;
 			}
 		} else {
-			buf_len = read_rb(rtp_cont->data, period_size);
+			buf_len = read_rb_sih(rtp_cont->data, period_size);
 			sih_haptic->hp_func->write_rtp_data(sih_haptic,
 				rtp_cont->data, buf_len);
 			if (buf_len < period_size) {
@@ -689,10 +689,10 @@ static void sih_rtp_local_work(sih_haptic_t *sih_haptic, uint8_t mode)
 	sih_haptic->rtp.rtp_init = false;
 	sih_vfree_container(sih_haptic, sih_haptic->rtp.rtp_cont);
 
-	ret = request_firmware(&rtp_file, awinic_rtp_name[rtp_file_index],
+	ret = request_firmware(&rtp_file, awinic_rtp_name_sih[rtp_file_index],
 		sih_haptic->dev);
 	if (ret < 0) {
-		hp_err("%s:fail to read %s\n", __func__, awinic_rtp_name[rtp_file_index]);
+		hp_err("%s:fail to read %s\n", __func__, awinic_rtp_name_sih[rtp_file_index]);
 		sih_chip_state_recovery(sih_haptic);
 		mutex_unlock(&sih_haptic->rtp.rtp_lock);
 		return;
@@ -804,13 +804,13 @@ static void sih_ram_load(const struct firmware *cont, void *context)
 
 	if (!cont) {
 		hp_err("%s:failed to read %s\n", __func__,
-			awinic_ram_name[sih_haptic->ram.lib_index]);
+			awinic_ram_name_sih[sih_haptic->ram.lib_index]);
 		release_firmware(cont);
 		return;
 	}
 
 	hp_info("%s:loaded %s - size: %zu\n", __func__,
-		awinic_ram_name[sih_haptic->ram.lib_index], cont ? cont->size : 0);
+		awinic_ram_name_sih[sih_haptic->ram.lib_index], cont ? cont->size : 0);
 
 	/* check sum */
 	for (i = 2; i < cont->size; i++)
@@ -1015,7 +1015,7 @@ int sih_upload_effect(struct input_dev *dev,
 			/*millisecond data*/
 			data[2] = 0;
 		}
-		if (sih_haptic->chip_ipara.effect_id == CUSTOME_WAVE_ID) {
+		if (sih_haptic->chip_ipara.effect_id == CUSTOME_WAVE_ID_sih) {
 			sih_haptic->ram.action_mode = SIH_RTP_MODE;
 			hp_info("%s: effect_id=%d , play_mode = %d\n",
 				__func__, sih_haptic->chip_ipara.effect_id,
@@ -1025,7 +1025,7 @@ int sih_upload_effect(struct input_dev *dev,
 			/*millisecond data*/
 			data[2] = 0;
 			sih_haptic->chip_ipara.is_custom_wave = 1;
-			rb_init();
+			rb_init_sih();
 		}
 
 		if (copy_to_user(effect->u.periodic.custom_data, data,
@@ -1073,7 +1073,7 @@ int sih_playback(struct input_dev *dev, int effect_id,
 		/*if we are in the play mode, force to exit*/
 		if (val == 0) {
 			atomic_set(&sih_haptic->rtp.exit_in_rtp_loop, 1);
-			rb_force_exit();
+			rb_force_exit_sih();
 			wake_up_interruptible(&sih_haptic->rtp.stop_wait_q);
 			pm_relax(sih_haptic->dev);
 		}
@@ -1416,7 +1416,7 @@ static ssize_t auto_pvdd_store(struct device *dev,
 	if (rc < 0)
 		return rc;
 
-	rc = strtobool(buf, &val);
+	rc = kstrtobool(buf, &val);
 	if (rc < 0)
 		return rc;
 
@@ -1676,7 +1676,7 @@ static ssize_t ram_update_store(struct device *dev,
 		sih_haptic->ram.lib_index = val - 1;
 		sih_haptic->ram.ram_init = false;
 		request_firmware_nowait(THIS_MODULE, FW_ACTION_UEVENT,
-			awinic_ram_name[sih_haptic->ram.lib_index],
+			awinic_ram_name_sih[sih_haptic->ram.lib_index],
 			sih_haptic->dev, GFP_KERNEL, sih_haptic, sih_ram_load);
 	}
 
@@ -2554,7 +2554,7 @@ static ssize_t rtp_file_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	sih_haptic_t *sih_haptic = NULL;
-	uint32_t rtp_num_max = sizeof(awinic_rtp_name) / SIH_RTP_NAME_MAX;
+	uint32_t rtp_num_max = sizeof(awinic_rtp_name_sih) / SIH_RTP_NAME_MAX;
 	char databuf[SIH_RTP_NAME_MAX] = {0};
 	int buf_len = 0;
 	int i = 0;
@@ -2581,7 +2581,7 @@ static ssize_t rtp_file_store(struct device *dev,
 	sih_haptic->hp_func->clear_interrupt_state(sih_haptic);
 
 	for (i = 0; i < rtp_num_max; i++) {
-		if (strncmp(&(awinic_rtp_name[i][0]), databuf, buf_len) == 0) {
+		if (strncmp(&(awinic_rtp_name_sih[i][0]), databuf, buf_len) == 0) {
 			sih_haptic->rtp.rtp_file_num = i;
 			sih_haptic->chip_ipara.state = SIH_ACTIVE_MODE;
 			schedule_work(&sih_haptic->rtp.rtp_work);
@@ -2916,10 +2916,10 @@ static ssize_t custom_wave_show(struct device *dev,
 	len +=
 		snprintf(buf + len, PAGE_SIZE - len,
 		"max_size=%d;free_size=%d;",
-		get_rb_max_size(), get_rb_free_size());
+		get_rb_max_size_sih(), get_rb_free_size_sih());
 	len +=
 		snprintf(buf + len, PAGE_SIZE - len,
-		"custom_wave_id=%d;", CUSTOME_WAVE_ID);
+		"custom_wave_id=%d;", CUSTOME_WAVE_ID_sih);
 	return len;
 }
 
@@ -2942,12 +2942,12 @@ static ssize_t custom_wave_store(struct device *dev,
 	hp_info("%s: write szie %zd, period size %lu", __func__, count,
 		 period_size);
 	if (count % period_size || count < period_size)
-		rb_end();
+		rb_end_sih();
 	atomic_set(&sih_haptic->rtp.is_in_write_loop, 1);
 
 	while (count > 0) {
 		buf_len = MIN(count, period_size);
-		ret = write_rb(buf + offset,  buf_len);
+		ret = write_rb_sih(buf + offset,  buf_len);
 		if (ret < 0)
 			goto exit;
 		count -= buf_len;
@@ -3198,17 +3198,17 @@ static void rtp_work_func(struct work_struct *work)
 	if (sih_haptic->chip_ipara.is_custom_wave == 1 && sih_haptic->chip_ipara.state) {
 		hp_info("%s:buffer size %d, availbe size %d\n",
 		       __func__, sih_haptic->ram.base_addr >> 2,
-		       get_rb_avalible_size());
-		while (get_rb_avalible_size() < sih_haptic->ram.base_addr &&
-		       !rb_shoule_exit()) {
+		       get_rb_avalible_size_sih());
+		while (get_rb_avalible_size_sih() < sih_haptic->ram.base_addr &&
+		       !rb_shoule_exit_sih()) {
 			mutex_unlock(&sih_haptic->lock);
 			ret = wait_event_interruptible(sih_haptic->rtp.stop_wait_q,
-							(get_rb_avalible_size() >= sih_haptic->ram.base_addr) ||
-							rb_shoule_exit());
+							(get_rb_avalible_size_sih() >= sih_haptic->ram.base_addr) ||
+							rb_shoule_exit_sih());
 			hp_info("%s:wakeup\n", __func__);
 			hp_info("%s:after wakeup sbuffer size %d, availbe size %d\n",
 			       __func__, sih_haptic->ram.base_addr >> 2,
-			       get_rb_avalible_size());
+			       get_rb_avalible_size_sih());
 			if (ret == -ERESTARTSYS) {
 				hp_err("%s wake up by signal return erro\n",
 				       __func__);
@@ -3231,13 +3231,13 @@ static void rtp_work_func(struct work_struct *work)
 			       sih_haptic->rtp.rtp_file_num);
 			if (sih_haptic->rtp.rtp_file_num < 0)
 				sih_haptic->rtp.rtp_file_num = 0;
-			if (sih_haptic->rtp.rtp_file_num > (awinic_rtp_name_len - 1))
-				sih_haptic->rtp.rtp_file_num = awinic_rtp_name_len - 1;
+			if (sih_haptic->rtp.rtp_file_num > (awinic_rtp_name_len_sih - 1))
+				sih_haptic->rtp.rtp_file_num = awinic_rtp_name_len_sih - 1;
 			ret = request_firmware(&rtp_file,
-				awinic_rtp_name[sih_haptic->rtp.rtp_file_num],	sih_haptic->dev);
+				awinic_rtp_name_sih[sih_haptic->rtp.rtp_file_num],	sih_haptic->dev);
 			if (ret < 0) {
 				hp_err("%s:failed to read %s\n", __func__,
-					awinic_rtp_name[sih_haptic->rtp.rtp_file_num]);
+					awinic_rtp_name_sih[sih_haptic->rtp.rtp_file_num]);
 				sih_chip_state_recovery(sih_haptic);
 				pm_relax(sih_haptic->dev);
 				mutex_unlock(&sih_haptic->lock);
@@ -3325,8 +3325,7 @@ static int vibrator_chip_init(sih_haptic_t *sih_haptic)
 static void vibrator_init(sih_haptic_t *sih_haptic)
 {
 	/* timer init */
-	hrtimer_init(&sih_haptic->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	sih_haptic->timer.function = haptic_timer_func;
+	hrtimer_setup(&sih_haptic->timer, haptic_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	/* work func init */
 	INIT_WORK(&sih_haptic->ram.ram_work, ram_work_func);
 	INIT_WORK(&sih_haptic->rtp.rtp_work, rtp_work_func);
@@ -3349,7 +3348,7 @@ static int ram_work_init(sih_haptic_t *sih_haptic)
 	sih_haptic->ram.ram_init = false;
 
 	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_UEVENT,
-		awinic_ram_name[sih_haptic->ram.lib_index], sih_haptic->dev,
+		awinic_ram_name_sih[sih_haptic->ram.lib_index], sih_haptic->dev,
 		GFP_KERNEL, sih_haptic, sih_ram_load);
 
 	return ret;
@@ -3410,7 +3409,7 @@ static int sih_i2c_probe(struct i2c_client *i2c)
 	if (ret)
 		goto err_irq;
 
-	CUSTOME_WAVE_ID = sih_haptic->chip_ipara.effect_max;
+	CUSTOME_WAVE_ID_sih = sih_haptic->chip_ipara.effect_max;
 	/* input device config */
 	input_set_drvdata(input_dev, sih_haptic);
 	sih_haptic->soft_frame.vib_dev = *input_dev;
@@ -3443,7 +3442,7 @@ static int sih_i2c_probe(struct i2c_client *i2c)
 		goto err_destroy_ff;
 	}
 
-	ret = create_rb();
+	ret = create_rb_sih();
 	if (ret < 0) {
 		hp_info("%s: error creating ringbuffer\n", __func__);
 		goto err_rb;

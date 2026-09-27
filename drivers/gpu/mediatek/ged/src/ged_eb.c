@@ -1601,8 +1601,7 @@ void fdvfs_init(void)
 
 	mtk_register_gpu_power_change("fdvfs", gpu_power_change_notify_fdvfs);
 
-	hrtimer_init(&g_HT_fdvfs_debug, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	g_HT_fdvfs_debug.function = ged_fdvfs_debug_cb;
+	hrtimer_setup(&g_HT_fdvfs_debug, ged_fdvfs_debug_cb, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	if (g_is_fulltrace_enable == 1)
 		hrtimer_start(&g_HT_fdvfs_debug,

@@ -153,8 +153,8 @@ static int wifi_cooling_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int wifi_cooling_remove(struct platform_device *pdev)
-{
+static void wifi_cooling_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 	struct wifi_cooling_device *wifi_cdev;
 
 	wifi_cdev = (struct wifi_cooling_device *)platform_get_drvdata(pdev);
@@ -162,7 +162,6 @@ static int wifi_cooling_remove(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, NULL);
 
-	return 0;
 }
 
 static struct platform_driver wifi_cooling_driver = {

@@ -929,7 +929,7 @@ static int mtk_jpeg_qbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 	}
 
 	vq = v4l2_m2m_get_vq(fh->m2m_ctx, buf->type);
-	if (buf->index >= vq->num_buffers) {
+	if (buf->index >= vb2_get_num_buffers(vq)) {
 		pr_info("%s %d buf num is over %d\n", __func__, __LINE__, buf->index);
 		return -EINVAL;
 	}
@@ -1836,7 +1836,7 @@ static int mtk_jpeg_open(struct file *file)
 
 	v4l2_fh_init(&ctx->fh, vfd);
 	file->private_data = &ctx->fh;
-	v4l2_fh_add(&ctx->fh);
+	v4l2_fh_add(&ctx->fh, file);
 
 	ctx->jpeg = jpeg;
 	ctx->fh.m2m_ctx = v4l2_m2m_ctx_init(jpeg->m2m_dev, ctx,
@@ -1860,7 +1860,7 @@ static int mtk_jpeg_open(struct file *file)
 	return 0;
 
 error:
-	v4l2_fh_del(&ctx->fh);
+	v4l2_fh_del(&ctx->fh, file);
 	v4l2_fh_exit(&ctx->fh);
 	mutex_unlock(&jpeg->lock);
 free:
@@ -1887,7 +1887,7 @@ static int mtk_jpeg_release(struct file *file)
 	mutex_lock(&jpeg->lock);
 	v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
 	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
-	v4l2_fh_del(&ctx->fh);
+	v4l2_fh_del(&ctx->fh, file);
 	v4l2_fh_exit(&ctx->fh);
 	kfree(ctx);
 	mutex_unlock(&jpeg->lock);
@@ -2219,8 +2219,8 @@ err_req_irq:
 	return ret;
 }
 
-static int mtk_jpeg_remove(struct platform_device *pdev)
-{
+static void mtk_jpeg_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 	struct mtk_jpeg_dev *jpeg = platform_get_drvdata(pdev);
 
 	pm_runtime_disable(&pdev->dev);
@@ -2230,7 +2230,6 @@ static int mtk_jpeg_remove(struct platform_device *pdev)
 	v4l2_device_unregister(&jpeg->v4l2_dev);
 	mtk_jpeg_clk_release(jpeg);
 
-	return 0;
 }
 
 static __maybe_unused int mtk_jpeg_pm_suspend(struct device *dev)
@@ -2398,4 +2397,4 @@ module_platform_driver(mtk_jpeg_driver);
 
 MODULE_DESCRIPTION("MediaTek JPEG codec driver");
 MODULE_LICENSE("GPL v2");
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");

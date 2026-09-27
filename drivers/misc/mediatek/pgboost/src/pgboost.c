@@ -124,7 +124,7 @@ static int dump_list_rank_layout(int mt, char *buffer)
 
 	spin_lock_irqsave(&zone->lock, flags);
 
-	for (order = MAX_ORDER - 1; order >= 0; order--) {
+	for (order = MAX_PAGE_ORDER - 1; order >= 0; order--) {
 
 		ret = sprintf(output + result, "[order-%2d]:", order);
 		if (ret < 0)
@@ -258,7 +258,7 @@ static void change_migrate_type(int mt, bool favor_rank1)
 	unsigned long flags;
 	struct page *page, *tmp;
 	unsigned long pfn;
-	int order = MAX_ORDER - 1;
+	int order = MAX_PAGE_ORDER - 1;
 	int tried = 0, changed = 0, slot = 0;
 	bool positive_seq = false; /* works on <= HPAGE_PMD_ORDER */
 	LIST_HEAD(list);
@@ -421,7 +421,7 @@ static void do_pgboost_list_reordering(bool pick_small, bool favor_rank1)
 	unsigned long flags;
 	struct page *page, *tmp;
 	unsigned long pfn;
-	int order = MAX_ORDER - 1;
+	int order = MAX_PAGE_ORDER - 1;
 	int end_order = pick_small ? 0 : HPAGE_PMD_ORDER;
 
 #ifdef PGBOOST_STRATEGY_HOLD_SPG
@@ -653,7 +653,7 @@ static enum pgboost_action next_pgboost_action(bool force)
 	unsigned long flags;
 	struct page *page;
 	int mt;
-	int order = MAX_ORDER - 1;
+	int order = MAX_PAGE_ORDER - 1;
 	int end_order = HPAGE_PMD_ORDER;
 	unsigned long stride = MAX_ORDER_NR_PAGES;
 

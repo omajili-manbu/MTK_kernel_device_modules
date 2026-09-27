@@ -18,6 +18,7 @@
 #if defined(CONFIG_MTK_GPUFREQ_V2)
 #include <ged_gpufreq_v2.h>
 #include <gpufreq_v2.h>
+#include <linux/vmalloc.h> /* rodin 4-3: 6.18 头瘦身, vzalloc/vfree 需显式包含 */
 #endif
 #include "ged_base.h"
 #include "ged_hal.h"
@@ -836,35 +837,13 @@ static KOBJ_ATTR_RW(pre_fence_chk);
 
 //-----------------------------------------------------------------------------
 
-static struct notifier_block ged_fb_notifier;
-
-static int ged_fb_notifier_callback(struct notifier_block *self,
-	unsigned long event, void *data)
-{
-	struct fb_event *evdata = data;
-	int blank;
-
-	/* If we aren't interested in this event, skip it immediately ... */
-	if (event != FB_EVENT_BLANK)
-		return 0;
-
-	blank = *(int *)evdata->data;
-
-	switch (blank) {
-	case FB_BLANK_UNBLANK:
-		g_ui32EventStatus |= GED_EVENT_LCD;
-		ged_dvfs_probe_signal(GED_GAS_SIGNAL_EVENT);
-		break;
-	case FB_BLANK_POWERDOWN:
-		g_ui32EventStatus &= ~GED_EVENT_LCD;
-		ged_dvfs_probe_signal(GED_GAS_SIGNAL_EVENT);
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
+/* rodin 4-3: 6.18 移除 fb notifier 的 FB_EVENT_BLANK（fbmem 通知链只剩
+ * FB_REGISTERED/UNREGISTERED，blank 播报随 fbdev 空白处理一并删除），
+ * 原 ged_fb_notifier_callback 已摘除。
+ *
+ * 降级（可接受，终验清单已登记）：GED 不再随熄屏/亮屏更新 GED_EVENT_LCD 位，
+ * 改为 hal 初始化时按"屏幕常亮"置位一次。影响面仅熄屏场景下的 GPU DVFS
+ * 策略近似，不涉及功能正确性；日后接 DRM blank 通知时替换该置位即可。 */
 
 struct ged_event_change_entry_t {
 	ged_event_change_fp callback;
@@ -2281,9 +2260,8 @@ GED_ERROR ged_hal_init(void)
 		goto ERROR;
 	}
 
-	ged_fb_notifier.notifier_call = ged_fb_notifier_callback;
-	if (fb_register_client(&ged_fb_notifier))
-		GED_LOGE("Register fb_notifier fail!\n");
+	/* rodin 4-3: 见上方注释——6.18 无 blank 事件，按常亮置位一次 */
+	g_ui32EventStatus |= GED_EVENT_LCD;
 
 	err = ged_sysfs_create_file(hal_kobj, &kobj_attr_eb_dvfs_policy);
 	if (unlikely(err != GED_OK))

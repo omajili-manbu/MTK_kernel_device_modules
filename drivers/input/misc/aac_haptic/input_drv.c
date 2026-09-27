@@ -841,8 +841,7 @@ int32_t ics_input_dev_register(struct ics_haptic_data *haptic_data)
     }
 
     ics_info("%s: start register input dev\n", __func__);
-    hrtimer_init(&haptic_data->input_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-    haptic_data->input_timer.function = input_vibrator_timer_func;
+    hrtimer_setup(&haptic_data->input_timer, input_vibrator_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     mutex_init(&haptic_data->input_lock);
     init_waitqueue_head(&haptic_data->wait_q);
     init_waitqueue_head(&haptic_data->stop_wait_q);

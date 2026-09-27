@@ -42,7 +42,8 @@ static unsigned int g_adjust_dcs_fr_cnt;   // store frame cnt
 static unsigned int g_adjust_dcs_non_dcs_th; // none dcs threshold (ex: 20(20%))
 
 
-struct gpufreq_core_mask_info *g_core_mask_table;
+/* rodin 4-3: 与 gpufreq/v2/gpufreq_mt6899.c 同名全局撞名；本文件内自用，static 化 */
+static struct gpufreq_core_mask_info *g_core_mask_table;
 struct gpufreq_core_mask_info *g_avail_mask_table;
 
 /* Function Pointer hooked by DDK to scale cores */

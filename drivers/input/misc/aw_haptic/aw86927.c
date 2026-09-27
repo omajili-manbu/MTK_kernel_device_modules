@@ -1253,11 +1253,8 @@ static void aw86927_haptic_misc_para_init(struct aw86927 *aw86927)
 	aw86927->f0_cali_status = true;
 	aw86927->rtp_routine_on = 0;
 	aw86927->rtp_num_max = awinic_rtp_name_len;
-	hrtimer_init(&aw86927->stop_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	aw86927->stop_timer.function = qti_hap_stop_timer;
-	hrtimer_init(&aw86927->hap_disable_timer, CLOCK_MONOTONIC,
-		     HRTIMER_MODE_REL);
-	aw86927->hap_disable_timer.function = qti_hap_disable_timer;
+	hrtimer_setup(&aw86927->stop_timer, qti_hap_stop_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hrtimer_setup(&aw86927->hap_disable_timer, qti_hap_disable_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	/* Unlock register */
 	aw86927_i2c_write(aw86927, AW86927_REG_TMCFG,
 			  AW86927_BIT_TMCFG_TM_UNLOCK);
@@ -3841,9 +3838,7 @@ static void aw86927_haptic_audio_init(struct aw86927 *aw86927)
 
 	aw86927->haptic_audio.delay_val = 1;
 	aw86927->haptic_audio.timer_val = 21318;
-	hrtimer_init(&aw86927->haptic_audio.timer, CLOCK_MONOTONIC,
-		     HRTIMER_MODE_REL);
-	aw86927->haptic_audio.timer.function = aw86927_haptic_audio_timer_func;
+	hrtimer_setup(&aw86927->haptic_audio.timer, aw86927_haptic_audio_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	INIT_WORK(&aw86927->haptic_audio.work,
 		  aw86927_haptic_audio_work_routine);
 	mutex_init(&aw86927->haptic_audio.lock);
@@ -4438,8 +4433,7 @@ int aw86927_vibrator_init(struct aw86927 *aw86927)
 		return ret;
 	}
 
-	hrtimer_init(&aw86927->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	aw86927->timer.function = aw86927_vibrator_timer_func;
+	hrtimer_setup(&aw86927->timer, aw86927_vibrator_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	INIT_WORK(&aw86927->vibrator_work, aw86927_vibrator_work_routine);
 	INIT_WORK(&aw86927->rtp_work, aw86927_rtp_work_routine);
 	mutex_init(&aw86927->lock);

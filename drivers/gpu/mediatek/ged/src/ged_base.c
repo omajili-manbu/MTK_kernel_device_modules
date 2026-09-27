@@ -13,6 +13,7 @@
 #include <linux/interrupt.h>
 
 #include <linux/uaccess.h>
+#include <linux/pid.h> /* rodin 4-3: task_tgid_nr 在此 */
 
 unsigned long ged_copy_to_user(void __user *pvTo, const void *pvFrom,
 	unsigned long ulBytes)

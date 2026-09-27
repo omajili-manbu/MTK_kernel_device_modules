@@ -46,7 +46,8 @@ mtk_game-objs += $(MTK_GAME_SRC)
 #Generic subdir build
 obj-$(CONFIG_MTK_FPSGO_V3) += fpsgo_v3/
 obj-$(CONFIG_MTK_FRS) += frs/
-obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += powerhal_cpu_ctrl/
+# rodin 4-3: powerhal_cpu_ctrl 闭包含闭源 metis/mi_schedule（sched 簇）；拆门默认 n
+obj-$(CONFIG_MTK_POWERHAL_CPU_CTRL) += powerhal_cpu_ctrl/
 obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += touch_boost/
 
 obj-$(CONFIG_MTK_LOAD_TRACKER) += load_track/

@@ -1024,7 +1024,7 @@ int dmabuf_trace_mark_write(char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &args;
 #ifdef CONFIG_ARM64
-	trace_tracing_mark_write(&vaf);
+	trace_tracing_mark_write_dmabuf(&vaf);
 #elif CONFIG_ARM
 	trace_tracing_mark_write_dma32(&vaf);
 #endif

@@ -125,7 +125,7 @@ static struct sync_timeline *sync_timeline_create(const char *name)
 
 	kref_init(&obj->kref);
 	obj->context = dma_fence_context_alloc(1);
-	strlcpy(obj->name, name, sizeof(obj->name));
+	strscpy(obj->name, name, sizeof(obj->name));
 
 	obj->pt_tree = RB_ROOT;
 	INIT_LIST_HEAD(&obj->pt_list);
@@ -185,7 +185,8 @@ static bool timeline_fence_signaled(struct dma_fence *fence)
 {
 	struct sync_timeline *parent = fence_parent(fence);
 
-	return !__dma_fence_is_later(fence->seqno, parent->value, fence->ops);
+	/* rodin 4-3: 6.18 __dma_fence_is_later(fence, f1, f2) 新签名（旧形态是 (f1,f2,ops)） */
+	return !__dma_fence_is_later(fence, fence->seqno, parent->value);
 }
 
 static bool timeline_fence_enable_signaling(struct dma_fence *fence)

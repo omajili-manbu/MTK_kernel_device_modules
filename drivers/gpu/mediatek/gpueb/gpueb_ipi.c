@@ -29,6 +29,7 @@
 // MTK common IPI/MBOX
 #include <linux/soc/mediatek/mtk_tinysys_ipi.h>
 #include <linux/soc/mediatek/mtk-mbox.h>
+#include <linux/vmalloc.h> /* rodin 4-3: 6.18 头瘦身, vzalloc/vfree 需显式包含 */
 
 struct mtk_mbox_device   gpueb_mboxdev;
 struct mtk_ipi_device    gpueb_ipidev;

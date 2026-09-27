@@ -9,6 +9,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/power_supply.h>
+#include "../../../power/supply/rodin_psy_compat.h" /* rodin 4-3: devm_power_supply_get_by_phandle -> _by_reference */
 #include <linux/io.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
@@ -928,7 +929,7 @@ static void bat_handler(struct work_struct *work)
 	if (temp != last_temp || soc != last_soc || uisoc != last_uisoc || pb.combo0_uisoc != last_combo0_uisoc
 		|| aging_stage != last_aging_stage) {
 		if (timer_pending(&ppb_dbg_timer)) {
-			del_timer_sync(&ppb_dbg_timer);
+			timer_delete_sync(&ppb_dbg_timer);
 			ppb_print_dbg_log(NULL);
 		}
 
@@ -2225,9 +2226,8 @@ static int peak_power_budget_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int peak_power_budget_remove(struct platform_device *pdev)
-{
-	return 0;
+static void peak_power_budget_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 }
 
 static const struct of_device_id peak_power_budget_of_match[] = {

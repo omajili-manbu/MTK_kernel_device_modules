@@ -29,6 +29,7 @@
 
 #if ENC_EMI_BW
 //#include <linux/interconnect-provider.h>
+#include <linux/vmalloc.h> /* rodin 4-3: 6.18 头瘦身, vzalloc/vfree 需显式包含 */
 #include "mtk-interconnect.h"
 #include "vcodec_bw.h"
 #include "mtk-smi-dbg.h"

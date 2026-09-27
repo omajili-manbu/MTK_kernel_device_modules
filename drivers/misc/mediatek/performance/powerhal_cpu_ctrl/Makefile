@@ -17,4 +17,5 @@ ccflags-y += \
 
 CFLAGS_powerhal_cpu_ctrl.o := -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/performance/powerhal_cpu_ctrl
 
-obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += powerhal_cpu_ctrl.o
+# rodin 4-3: 同上层拆门（该目录的唯一物件）
+obj-$(CONFIG_MTK_POWERHAL_CPU_CTRL) += powerhal_cpu_ctrl.o

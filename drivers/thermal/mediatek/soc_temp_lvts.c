@@ -1752,9 +1752,8 @@ static int lvts_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int lvts_remove(struct platform_device *pdev)
-{
-	return 0;
+static void lvts_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 }
 
 static void lvts_shutdown(struct platform_device *pdev)

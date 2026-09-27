@@ -75,11 +75,21 @@ long _map_user_pages(struct MTIOMMU_PIN_RANGE_T *pinRange, unsigned long uaddr,
 
 			while (res < nr_pages
 			       && uaddr + PAGE_SIZE <= vma->vm_end) {
-				j = follow_pfn(vma, uaddr, &pfns[res]);
+				/* rodin 4-3: 6.18 删 follow_pfn()，改 follow_pfnmap_start/end。
+				 * 语义等价：同一 mmap_read_lock 下解析 vma 内 uaddr 的 pfn；
+				 * pfns 复用 pages 指针（pinRange->isPage=0 的非页路径）。 */
+				struct follow_pfnmap_args args = {
+					.vma = vma,
+					.address = uaddr,
+				};
+
+				j = follow_pfnmap_start(&args);
 				if (j) { /* error */
 					res = j;
 					goto out;
 				}
+				pfns[res] = args.pfn;
+				follow_pfnmap_end(&args);
 				uaddr += PAGE_SIZE;
 				res++;
 			}

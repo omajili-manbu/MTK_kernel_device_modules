@@ -1588,8 +1588,7 @@ GED_ERROR ged_notify_sw_vsync_system_init(void)
 	mutex_init(&gsVsyncStampLock);
 	mutex_init(&gsVsyncModeLock);
 
-	hrtimer_init(&g_HT_hwvsync_emu, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	g_HT_hwvsync_emu.function = ged_sw_vsync_check_cb;
+	hrtimer_setup(&g_HT_hwvsync_emu, ged_sw_vsync_check_cb, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 #if IS_ENABLED(CONFIG_MTK_GPU_APO_SUPPORT)
 	ged_gpu_apo_init_nolock();

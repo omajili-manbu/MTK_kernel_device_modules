@@ -119,7 +119,7 @@ void gpueb_timesync_update(void)
 }
 EXPORT_SYMBOL(gpueb_timesync_update);
 
-static u64 timesync_tick_read(const struct cyclecounter *cc)
+static u64 timesync_tick_read(struct cyclecounter *cc) /* rodin 4-3: 6.18 read 回调非 const */
 {
 	return arch_timer_read_counter();
 }
@@ -236,9 +236,7 @@ unsigned int gpueb_timesync_init(void)
 	 */
 	timecounter_init(&timesync_counter, &timesync_cc, sched_clock());
 
-	hrtimer_init(&timesync_refresh_timer,
-				CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	timesync_refresh_timer.function = timesync_refresh;
+	hrtimer_setup(&timesync_refresh_timer, timesync_refresh, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hrtimer_start(&timesync_refresh_timer, timesync_ctx.wrap_kt, HRTIMER_MODE_REL);
 
 	gpueb_log_i(GPUEB_TAG, "%s ts: cycle_last %lld, time_base:%lld, wrap:%lld",

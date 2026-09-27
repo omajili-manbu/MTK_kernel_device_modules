@@ -5,6 +5,7 @@
  */
 
 #include <linux/of_address.h>
+#include <linux/vmalloc.h> /* rodin 4-3: 6.18 头瘦身, vzalloc/vfree 需显式包含 */
 #include <linux/of_platform.h>
 #include <soc/mediatek/smi.h>
 #include <linux/slab.h>

@@ -304,8 +304,8 @@ static int charger_cooling_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int charger_cooling_remove(struct platform_device *pdev)
-{
+static void charger_cooling_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 	struct charger_cooling_device *charger_cdev;
 
 	charger_cdev = (struct charger_cooling_device *)platform_get_drvdata(pdev);
@@ -313,7 +313,6 @@ static int charger_cooling_remove(struct platform_device *pdev)
 	thermal_cooling_device_unregister(charger_cdev->cdev);
 	platform_set_drvdata(pdev, NULL);
 
-	return 0;
 }
 
 static struct platform_driver charger_cooling_driver = {

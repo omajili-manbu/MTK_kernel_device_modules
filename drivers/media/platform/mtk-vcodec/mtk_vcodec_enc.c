@@ -1995,9 +1995,9 @@ static int vidioc_venc_qbuf(struct file *file, void *priv,
 		mtk_v4l2_err("fail to get vq");
 		return -EINVAL;
 	}
-	if (buf->index >= vq->num_buffers) {
+	if (buf->index >= vb2_get_num_buffers(vq)) {
 		mtk_v4l2_err("[%d] buffer index %d out of range %d",
-			ctx->id, buf->index, vq->num_buffers);
+			ctx->id, buf->index, vb2_get_num_buffers(vq));
 		return -EINVAL;
 	}
 	if (IS_ERR_OR_NULL(buf->m.planes) || buf->length == 0) {
@@ -2256,9 +2256,9 @@ static int vidioc_venc_dqbuf(struct file *file, void *priv,
 			mtk_v4l2_debug(1, "vq is NULL");
 			return -EINVAL;
 		}
-		if (buf->index >= vq->num_buffers) {
+		if (buf->index >= vb2_get_num_buffers(vq)) {
 			mtk_v4l2_err("[%d] buffer index %d out of range %d",
-				ctx->id, buf->index, vq->num_buffers);
+				ctx->id, buf->index, vb2_get_num_buffers(vq));
 			return -EINVAL;
 		}
 		vb = vq->bufs[buf->index];
@@ -2962,7 +2962,7 @@ static int vb2ops_venc_start_streaming(struct vb2_queue *q, unsigned int count)
 	return 0;
 
 err_set_param:
-	for (i = 0; i < q->num_buffers; ++i) {
+	for (i = 0; i < vb2_get_num_buffers(q); ++i) {
 		if (q->bufs[i]->state == VB2_BUF_STATE_ACTIVE) {
 			mtk_v4l2_debug(0, "[%d] id=%d, type=%d, %d -> VB2_BUF_STATE_QUEUED",
 					ctx->id, i, q->type,
@@ -3013,7 +3013,7 @@ static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
 				dstq = &ctx->m2m_ctx->cap_q_ctx.q;
 				srcq = &ctx->m2m_ctx->out_q_ctx.q;
 				mutex_lock(&ctx->buf_lock);
-				for (i = 0; i < dstq->num_buffers; i++) {
+				for (i = 0; i < vb2_get_num_buffers(dstq); i++) {
 					dst_vb2_v4l2 = container_of(
 						dstq->bufs[i], struct vb2_v4l2_buffer, vb2_buf);
 					dstbuf = container_of(
@@ -3022,7 +3022,7 @@ static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
 						v4l2_m2m_buf_done(&dstbuf->vb, VB2_BUF_STATE_ERROR);
 				}
 
-				for (i = 0; i < srcq->num_buffers; i++) {
+				for (i = 0; i < vb2_get_num_buffers(srcq); i++) {
 					src_vb2_v4l2 = container_of(
 						srcq->bufs[i], struct vb2_v4l2_buffer, vb2_buf);
 					srcbuf = container_of(
@@ -3475,7 +3475,7 @@ void mtk_venc_check_queue_cnt(struct mtk_vcodec_ctx *ctx, struct vb2_queue *vq)
 	mtk_v4l2_debug(0,
 		"[%d] type %d queued_cnt %d done_cnt %d rdy_q_cnt %d tatal %d",
 		ctx->id, vq->type, vq->queued_count,
-		done_list_cnt, rdy_q_cnt, vq->num_buffers);
+		done_list_cnt, rdy_q_cnt, vb2_get_num_buffers(vq));
 }
 
 /*

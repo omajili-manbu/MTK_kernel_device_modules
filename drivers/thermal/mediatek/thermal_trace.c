@@ -106,9 +106,11 @@ static void get_tx_bytes(struct thermal_info *data)
 	for_each_tput_instance(i)
 		data->stats[i].cur_tx_bytes = 0;
 
-	read_lock(&dev_base_lock);
+	/* rodin 4-3: 6.18 删 dev_base_lock；网络设备遍历改 RCU 版
+	 * （for_each_netdev_rcu），锁语义与原先的读锁一致：不睡眠。 */
+	rcu_read_lock();
 	for_each_net(net) {
-		for_each_netdev(net, dev) {
+		for_each_netdev_rcu(net, dev) {
 			struct rtnl_link_stats64 temp;
 			struct rtnl_link_stats64 *stats;
 			struct tput_stats *tput_stat;
@@ -134,7 +136,7 @@ static void get_tx_bytes(struct thermal_info *data)
 			}
 		}
 	}
-	read_unlock(&dev_base_lock);
+	rcu_read_unlock();
 }
 
 static void thermal_trace_timer_cancel(void)
@@ -531,8 +533,7 @@ static int __init thermal_trace_init(void)
 	mutex_init(&thermal_trace_data.lock);
 	mutex_init(&thermal_info_data.lock);
 	INIT_DELAYED_WORK(&thermal_info_data.poll_queue, thermal_info_work);
-	hrtimer_init(&thermal_trace_data.trace_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	thermal_trace_data.trace_timer.function = thermal_trace_work;
+	hrtimer_setup(&thermal_trace_data.trace_timer, thermal_trace_work, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	thermal_trace_data.hr_period = 1000000; /* 1ms */
 
 	ret = sysfs_create_group(kernel_kobj, &thermal_trace_attr_group);

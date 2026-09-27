@@ -11,7 +11,8 @@
 #include "mtk_bp_thl.h"
 #include "../../../gpu/mediatek/gpufreq/v2/include/gpufreq_v2.h"
 
-#define CREATE_TRACE_POINTS
+/* rodin 4-3: 该 trace 头的 tracepoint 已由 mtk_low_battery_throttling.c（更早批内建）
+ * 定义；本文件只引用，不再 CREATE_TRACE_POINTS（否则同链重复定义）。 */
 #include "mtk_low_battery_throttling_trace.h"
 
 #define GPU_LIMIT_FREQ 981000

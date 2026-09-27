@@ -788,7 +788,7 @@ int richtap_file_mmap(struct file *filp, struct vm_area_struct *vma)
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4,7,0)
 	//only accept PROT_READ, PROT_WRITE and MAP_SHARED from the API of mmap
-	vm_flags_t vm_flags = calc_vm_prot_bits(PROT_READ|PROT_WRITE, 0) | calc_vm_flag_bits(MAP_SHARED);
+	vm_flags_t vm_flags = calc_vm_prot_bits(PROT_READ|PROT_WRITE, 0) | calc_vm_flag_bits(filp, MAP_SHARED);
 	vm_flags |= current->mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC| VM_SHARED | VM_MAYSHARE;
 	if(vma && (pgprot_val(vma->vm_page_prot) != pgprot_val(vm_get_page_prot(vm_flags))))
 	    return -EPERM;
@@ -956,7 +956,7 @@ static int awinic_i2c_probe(struct i2c_client *i2c)
 
 	if (gpio_is_valid(awinic->irq_gpio)) {
 		ret = devm_gpio_request_one(&i2c->dev, awinic->irq_gpio,
-					    GPIOF_DIR_IN, "awinic_int");
+					    GPIOF_IN, "awinic_int");
 		if (ret) {
 			aw_err("%s: int request failed\n", __func__);
 			goto err_irq_gpio_request;

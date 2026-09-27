@@ -2621,8 +2621,8 @@ static int therm_intf_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int therm_intf_remove(struct platform_device *pdev)
-{
+static void therm_intf_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 	therm_intf_debugfs_exit();
 	sysfs_remove_group(kernel_kobj, &thermal_attr_group);
 
@@ -2630,7 +2630,6 @@ static int therm_intf_remove(struct platform_device *pdev)
 		mtk_leds_unregister_notifier(&leds_init_notifier);
 #endif
 
-	return 0;
 }
 
 static struct platform_driver therm_intf_driver = {

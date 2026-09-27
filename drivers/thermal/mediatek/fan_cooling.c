@@ -194,8 +194,8 @@ static int fan_cooling_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int fan_cooling_remove(struct platform_device *pdev)
-{
+static void fan_cooling_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove 原型为 void */{
+
 	struct fan_cooling_device *fan_cdev;
 
 	fan_cdev = (struct fan_cooling_device *)platform_get_drvdata(pdev);
@@ -203,7 +203,6 @@ static int fan_cooling_remove(struct platform_device *pdev)
 	thermal_cooling_device_unregister(fan_cdev->cdev);
 	platform_set_drvdata(pdev, NULL);
 
-	return 0;
 }
 static unsigned long saved_cooling_state;
 

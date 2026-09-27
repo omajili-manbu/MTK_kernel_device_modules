@@ -416,20 +416,18 @@ static int apusys_sapu_probe(struct platform_device *pdev)
 
 	return ret;
 }
-static int apusys_sapu_remove(struct platform_device *pdev)
+static void apusys_sapu_remove(struct platform_device *pdev) /* rodin 4-3: 6.18 .remove=void */
 {
 	struct device *dev = &pdev->dev;
 
 	if (!sapu) {
 		pr_info("%s: sapu is NULL\n", __func__);
-		return -ENODEV;
+		return;   /* rodin 4-3: 原 return -ENODEV，void 形态下语义等价（仅日志） */
 	}
 
 	mutex_destroy(&sapu->dmabuf_lock);
 	misc_deregister(&sapu->mdev);
 	devm_kfree(dev, sapu);
-
-	return 0;
 }
 
 static int sapu_lock_rpmsg_probe(struct rpmsg_device *rpdev)

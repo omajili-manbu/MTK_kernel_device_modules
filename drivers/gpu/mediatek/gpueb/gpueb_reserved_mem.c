@@ -22,6 +22,7 @@
 #include <linux/pm_runtime.h>
 #include <mboot_params.h>
 #include <linux/of_reserved_mem.h>
+#include <linux/vmalloc.h> /* rodin 4-3: 6.18 头瘦身, vzalloc/vfree 需显式包含 */
 
 #include "gpueb_helper.h"
 #include "gpueb_reserved_mem.h"

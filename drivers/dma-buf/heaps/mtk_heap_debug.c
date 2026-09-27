@@ -399,7 +399,7 @@ struct dma_buf *get_dmabuf_from_file(struct file *file)
 	 */
 	if (!get_kernel_nofault(tmp_file, file) &&
 	    is_dma_buf_file(file) &&
-	    get_file_rcu(file))
+	    get_file_rcu(&file)) /* rodin 4-3: 6.18 get_file_rcu(struct file __rcu **) */
 		return (struct dma_buf *)file->private_data;
 
 	return ERR_PTR(-EINVAL);

@@ -110,7 +110,7 @@ static int fops_vcodec_open(struct file *file)
 	ctx->id = dev->id_counter;
 	v4l2_fh_init(&ctx->fh, video_devdata(file));
 	file->private_data = &ctx->fh;
-	v4l2_fh_add(&ctx->fh);
+	v4l2_fh_add(&ctx->fh, file);
 	INIT_LIST_HEAD(&ctx->list);
 	ctx->dev = dev;
 	ctx->dev_ctx = &dev->dev_ctx;
@@ -201,7 +201,7 @@ err_load_fw:
 err_m2m_ctx_init:
 	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
 err_ctrls_setup:
-	v4l2_fh_del(&ctx->fh);
+	v4l2_fh_del(&ctx->fh, file);
 	v4l2_fh_exit(&ctx->fh);
 	kfree(ctx->enc_flush_buf);
 	kfree(ctx);
@@ -233,7 +233,7 @@ static int fops_vcodec_release(struct file *file)
 	v4l2_m2m_ctx_release(ctx->m2m_ctx);
 	mutex_unlock(&ctx->worker_lock);
 	mtk_vcodec_enc_release(ctx);
-	v4l2_fh_del(&ctx->fh);
+	v4l2_fh_del(&ctx->fh, file);
 	v4l2_fh_exit(&ctx->fh);
 	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
 
@@ -623,9 +623,8 @@ static int mtk_vcodec_enc_probe(struct platform_device *pdev)
 			devm_kzalloc(dev->smmu_dev, sizeof(*pdev->dev.dma_parms), GFP_KERNEL);
 	}
 	if (pdev->dev.dma_parms) {
-		ret = dma_set_max_seg_size(dev->smmu_dev, (unsigned int)DMA_BIT_MASK(34));
-		if (ret)
-			dev_info(&pdev->dev, "Failed to set DMA segment size\n");
+		/* rodin 4-3: 6.18 dma_set_max_seg_size 返回 void */
+		dma_set_max_seg_size(dev->smmu_dev, (unsigned int)DMA_BIT_MASK(34));
 	}
 #endif
 	mtk_v4l2_debug(0, "encoder registered as /dev/video%d",

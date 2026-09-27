@@ -24,15 +24,15 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 
-int write_rb(const char *data, int32_t size);
-int read_rb(char *data, int32_t size) ;
-int get_rb_free_size(void);
-int get_rb_max_size(void);
-void rb_force_exit(void);
-void rb_end(void);
-int rb_shoule_exit(void);
-int create_rb(void) ;
-void rb_init(void);
-int release_rb(void);
-int get_rb_avalible_size(void);
+int write_rb_sih(const char *data, int32_t size);
+int read_rb_sih(char *data, int32_t size) ;
+int get_rb_free_size_sih(void);
+int get_rb_max_size_sih(void);
+void rb_force_exit_sih(void);
+void rb_end_sih(void);
+int rb_shoule_exit_sih(void);
+int create_rb_sih(void) ;
+void rb_init_sih(void);
+int release_rb_sih(void);
+int get_rb_avalible_size_sih(void);
 #endif

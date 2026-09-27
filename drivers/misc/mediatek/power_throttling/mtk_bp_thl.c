@@ -10,6 +10,7 @@
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/platform_device.h> /* rodin 4-3: 6.18 of_device.h 瘦身, struct platform_device/driver 需完整类型 */
 #include <linux/power_supply.h>
 #include "mtk_bp_thl.h"
 #define BAT_PERCENT_LIMIT 15

@@ -26,7 +26,10 @@ DEFINE_EVENT(dmabuf_trace_template, name,	\
 	TP_ARGS(vaf))
 
 #ifdef CONFIG_ARM64
-DEFINE_DMABUF_EVENT(tracing_mark_write);
+/* rodin 4-3: 与 ged_tracepoint.h 的同名 TRACE_EVENT 同链撞名，heaps 侧加 _dmabuf
+ * 后缀（ged 侧 86 个调用点保持原 atrace 名）。代价=dmabuf 监视的 atrace 标记
+ * 事件名变为 .../tracing_mark_write_dmabuf（调试面近似，已登记）。 */
+DEFINE_DMABUF_EVENT(tracing_mark_write_dmabuf);
 #elif CONFIG_ARM
 DEFINE_DMABUF_EVENT(tracing_mark_write_dma32);
 #endif
