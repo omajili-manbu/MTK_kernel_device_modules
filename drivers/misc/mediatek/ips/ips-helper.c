@@ -10,6 +10,8 @@
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of.h> /* rodin batch4-4: 6.18 的 of_device.h 已瘦身，
+                       of_device_get_match_data/of_device_id 都要 of.h */
 #include <linux/platform_device.h>
 #include "ips-helper.h"
 #include <linux/soc/mediatek/mtk_sip_svc.h>
@@ -539,12 +541,11 @@ static int mtkips_helper_probe(struct platform_device *pdev)
 }
 
 
-static int mtkips_helper_remove(struct platform_device *pdev)
+static void mtkips_helper_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
 	ips_unregister_sysfs(dev);
-	return 0;
 }
 
 static int mtkips_pm_suspend(struct device *dev)

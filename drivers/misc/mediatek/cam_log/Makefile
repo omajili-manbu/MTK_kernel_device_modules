@@ -11,4 +11,4 @@
 # GNU General Public License for more details.
 #
 
-obj-m += cam_log.o
+obj-$(CONFIG_MI_CAMLOG) += cam_log.o
