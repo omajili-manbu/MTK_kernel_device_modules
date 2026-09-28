@@ -122,7 +122,7 @@ struct mtk_vcm_data {
 	struct VCM_Hall_data *p_vcm_data;
 };
 
-struct VcmDriverList g_vcmconfig;
+static struct VcmDriverList g_vcmconfig; /* rodin: 批4-5 static 化（5 vcm 模块同名单镜像撞名） */
 
 /* Control commnad */
 #define VIDIOC_MTK_S_LENS_INFO _IOWR('V', BASE_VIDIOC_PRIVATE + 3, struct mtk_vcm_info)

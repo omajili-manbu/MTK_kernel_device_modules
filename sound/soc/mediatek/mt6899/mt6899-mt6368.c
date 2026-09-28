@@ -10,6 +10,7 @@
 #include <linux/pm_runtime.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#include <linux/of_platform.h> /* rodin: 6.18 of_find_device_by_node */
 
 #include "mtk-afe-platform-driver.h"
 #include "mtk-afe-external.h"
@@ -241,7 +242,7 @@ static int mt6899_mt6368_i2s_hw_params(struct snd_pcm_substream *substream,
 	unsigned int rate = params_rate(params);
 	unsigned int mclk_fs_ratio = 128;
 	unsigned int mclk_fs = rate * mclk_fs_ratio;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 
 	return snd_soc_dai_set_sysclk(cpu_dai,
 				      0, mclk_fs, SND_SOC_CLOCK_OUT);
@@ -1125,7 +1126,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback0),
 	},
 	{
@@ -1134,7 +1135,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback1),
 	},
 	{
@@ -1143,7 +1144,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback2),
 	},
 	{
@@ -1152,7 +1153,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback3),
 	},
 	{
@@ -1161,7 +1162,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback4),
 	},
 	{
@@ -1170,7 +1171,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback5),
 	},
 	{
@@ -1179,7 +1180,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback6),
 	},
 	{
@@ -1188,7 +1189,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback7),
 	},
 	{
@@ -1197,7 +1198,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback8),
 	},
 	{
@@ -1206,7 +1207,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback23),
 	},
 	{
@@ -1215,7 +1216,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback24),
 	},
 	{
@@ -1224,7 +1225,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback25),
 	},
 	{
@@ -1233,7 +1234,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback_24ch),
 	},
 	{
@@ -1242,7 +1243,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture9),
 	},
 	{
@@ -1251,7 +1252,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture1),
 	},
 	{
@@ -1260,7 +1261,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture0),
 	},
 	{
@@ -1269,7 +1270,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture3),
 	},
 	{
@@ -1278,7 +1279,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture7),
 	},
 	{
@@ -1287,7 +1288,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture4),
 	},
 	{
@@ -1296,7 +1297,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture2),
 	},
 	{
@@ -1305,7 +1306,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture5),
 	},
 	{
@@ -1314,7 +1315,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_cm0),
 	},
 	{
@@ -1323,7 +1324,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_cm1),
 	},
 	{
@@ -1332,7 +1333,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture10),
 	},
 	{
@@ -1341,7 +1342,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture6),
 	},
 	{
@@ -1350,7 +1351,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture25),
 	},
 	{
@@ -1359,7 +1360,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture8),
 	},
 	{
@@ -1368,7 +1369,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture24),
 	},
 	{
@@ -1377,7 +1378,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_etdm_in0),
 	},
 	{
@@ -1386,7 +1387,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_etdm_in1),
 	},
 	{
@@ -1395,7 +1396,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_etdm_in2),
 	},
 	{
@@ -1404,7 +1405,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_etdm_in4),
 	},
 	{
@@ -1413,7 +1414,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(capture_etdm_in6),
 	},
 	{
@@ -1422,7 +1423,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		SND_SOC_DAILINK_REG(playback_hdmi),
 	},
 	{
@@ -1431,8 +1432,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_lpbk),
 	},
@@ -1442,8 +1441,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_fm),
 	},
@@ -1453,8 +1450,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_speech),
 	},
@@ -1464,8 +1459,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_bt),
 	},
@@ -1475,8 +1468,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_sph_echo_ref),
 	},
@@ -1486,8 +1477,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_spk_init),
 	},
@@ -1497,7 +1486,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_adda_dl_i2s_out),
 	},
@@ -1507,8 +1496,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_src0),
 	},
@@ -1518,8 +1505,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_src2),
 	},
@@ -1529,8 +1514,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_src_0_out),
 	},
@@ -1540,8 +1523,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_src_0_in),
 	},
@@ -1551,8 +1532,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_src_1_out),
 	},
@@ -1562,8 +1541,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_src_1_in),
 	},
@@ -1573,8 +1550,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_src_2_out),
 	},
@@ -1584,8 +1559,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_src_2_in),
 	},
@@ -1595,8 +1568,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_src_bargein),
 	},
@@ -1604,8 +1575,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	{
 		.name = "Primary Codec",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		.init = mt6899_mt6368_init,
 		SND_SOC_DAILINK_REG(adda),
@@ -1613,32 +1582,30 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	{
 		.name = "Primary Codec CH34",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(adda_ch34),
 	},
 	{
 		.name = "AP_DMIC",
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(ap_dmic),
 	},
 	{
 		.name = "AP_DMIC_CH34",
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(ap_dmic_ch34),
 	},
 	{
 		.name = "I2SIN0",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
@@ -1646,33 +1613,33 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	},
 	{
 		.name = "I2SIN1",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(i2sin1),
 	},
 	{
 		.name = "I2SIN2",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(i2sin2),
 	},
 	{
 		.name = "I2SIN4",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
@@ -1680,22 +1647,22 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	},
 	{
 		.name = "I2SIN6",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(i2sin6),
 	},
 	{
 		.name = "I2SOUT0",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
@@ -1703,33 +1670,33 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	},
 	{
 		.name = "I2SOUT1",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(i2sout1),
 	},
 	{
 		.name = "I2SOUT2",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(i2sout2),
 	},
 	{
 		.name = "I2SOUT4",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
@@ -1737,22 +1704,22 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	},
 	{
 		.name = "I2SOUT6",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(i2sout6),
 	},
 	{
 		.name = "FMI2S_MASTER",
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */
 			| SND_SOC_DAIFMT_GATED,
 		.ops = &mt6899_mt6368_i2s_ops,
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6899_i2s_hw_params_fixup,
 		SND_SOC_DAILINK_REG(fmi2s_master),
@@ -1760,101 +1727,81 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	{
 		.name = "HW Gain 0",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_gain0),
 	},
 	{
 		.name = "HW Gain 1",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_gain1),
 	},
 	{
 		.name = "HW Gain 2",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_gain2),
 	},
 	{
 		.name = "HW Gain 3",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_gain3),
 	},
 	{
 		.name = "HW_SRC_0",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_src0),
 	},
 	{
 		.name = "HW_SRC_1",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_src1),
 	},
 	{
 		.name = "HW_SRC_2",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_src2),
 	},
 	{
 		.name = "HW_SRC_3",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hw_src3),
 	},
 	{
 		.name = "CONNSYS_I2S",
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(connsys_i2s),
 	},
 	{
 		.name = "PCM 0",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(pcm0),
 	},
 	{
 		.name = "PCM 1",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(pcm1),
 	},
 	{
 		.name = "TDM",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(tdm),
 	},
 	{
 		.name = "TDM_DPTX",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(tdm_dptx),
 	},
@@ -1862,36 +1809,34 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 	{
 		.name = "Hostless_UL1",
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_ul2),
 	},
 	{
 		.name = "Hostless_UL2",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_ul1),
 	},
 	{
 		.name = "Hostless_UL3",
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_ul3),
 	},
 	{
 		.name = "Hostless_UL4",
 		.no_pcm = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_ul4),
 	},
 	{
 		.name = "Hostless_DSP_DL",
 		.no_pcm = 1,
-		.dpcm_playback = 1,
+		.playback_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_dsp_dl),
 	},
@@ -1901,7 +1846,7 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_capture = 1,
+		.capture_only = 1, /* rodin: 6.18 dpcm */
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_hw_gain_aaudio),
 	},
@@ -1911,8 +1856,6 @@ static struct snd_soc_dai_link mt6899_mt6368_dai_links[] = {
 		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
 			    SND_SOC_DPCM_TRIGGER_PRE},
 		.dynamic = 1,
-		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(hostless_src_aaudio),
 	},

@@ -30,14 +30,14 @@ int ultra_set_dsp_afe(struct mtk_base_afe *afe)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ultra_set_dsp_afe);
-struct mtk_base_afe *get_afe_base(void)
+struct mtk_base_afe *scp_ultra_get_afe_base(void) /* rodin: 批4-5 改名（audio_dsp 侧同名导出让位） */
 {
 	if (!local_scp_ultra_afe)
 		pr_err("%s(), local_scp_ultra_afe is NULL", __func__);
 
 	return local_scp_ultra_afe;
 }
-void set_ipi_recv_private(void *priv)
+void scp_ultra_set_ipi_recv_private(void *priv) /* rodin: 批4-5 改名（同上） */
 {
 	pr_debug("%s\n", __func__);
 
@@ -67,7 +67,7 @@ void ultra_set_ipi_recv_private(void *priv)
 
 void set_afe_dl_irq_target(int scp_enable)
 {
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	struct mtk_base_scp_ultra *scp_ultra = get_scp_ultra_base();
 	struct mtk_base_afe_memif *memif =
 		&afe->memif[scp_ultra->ultra_mem.ultra_dl_memif_id];
@@ -105,7 +105,7 @@ void set_afe_dl_irq_target(int scp_enable)
 }
 void set_afe_ul_irq_target(int scp_enable)
 {
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	struct mtk_base_scp_ultra *scp_ultra = get_scp_ultra_base();
 	struct mtk_base_afe_memif *memif =
 		&afe->memif[scp_ultra->ultra_mem.ultra_ul_memif_id];

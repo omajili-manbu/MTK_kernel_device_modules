@@ -6,8 +6,8 @@
 #ifndef __SWPM_PERF_ARM_PMU_H__
 #define __SWPM_PERF_ARM_PMU_H__
 
-unsigned int legacy_core_pmu_num = 3;
-unsigned int legacy_dsu_pmu_num = 1;
+extern unsigned int legacy_core_pmu_num; /* rodin: 批4-5 头内定义改 extern（debug 模块同包含双定义） */
+extern unsigned int legacy_dsu_pmu_num; /* rodin: 批4-5 同上 */
 
 enum swpm_perf_evt_id {
 	L3DC_EVT,

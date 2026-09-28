@@ -125,7 +125,7 @@ static void mddp_f_del_router_tuple_w_unlock(struct router_tuple *t,
 
 static void mddp_f_timeout_router_tuple(struct timer_list *timer)
 {
-	struct router_tuple *t = from_timer(t, timer, timeout_used);
+	struct router_tuple *t = timer_container_of(t, timer, timeout_used) /* rodin: 6.18 */;
 	unsigned long flag;
 
 	if (unlikely(atomic_read(&mddp_filter_quit))) {

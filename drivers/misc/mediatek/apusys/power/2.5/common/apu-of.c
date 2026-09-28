@@ -6,6 +6,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_platform.h> /* rodin: 6.18 of_find_device_by_node */
+#include <linux/of_platform.h> /* rodin: 6.18 of_find_device_by_node */
 #include <linux/slab.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>

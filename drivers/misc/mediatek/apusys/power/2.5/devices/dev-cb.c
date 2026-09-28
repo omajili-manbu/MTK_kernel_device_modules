@@ -146,14 +146,12 @@ free_ad:
 }
 
 
-static int apu_cb_remove(struct platform_device *pdev)
-{
+static void apu_cb_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct apu_dev *ad = platform_get_drvdata(pdev);
 
 	dev_info(&pdev->dev, "%s\n", __func__);
 	/* remove apu_device from list */
 	apu_del_devfreq(ad);
-	return 0;
 }
 
 static const struct apu_plat_data apusys_cb_data = {

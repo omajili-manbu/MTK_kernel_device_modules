@@ -18,10 +18,10 @@
 	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE | \
 	 SNDRV_PCM_FMTBIT_S32_LE)
 
-static int mtk_dai_stub_compress_new(struct snd_soc_pcm_runtime *rtd, int num)
+static int mtk_dai_stub_compress_new(struct snd_soc_pcm_runtime *rtd) /* rodin: 6.18 compress_new 单参 */
 {
 #if IS_ENABLED(CONFIG_SND_SOC_COMPRESS)
-	snd_soc_new_compress(rtd, num);
+	snd_soc_new_compress(rtd);
 #endif
 	return 0;
 }

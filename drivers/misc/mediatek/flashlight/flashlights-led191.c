@@ -404,8 +404,7 @@ static int led191_probe(struct platform_device *pdev)
 	INIT_WORK(&led191_work, led191_work_disable);
 
 	/* init timer */
-	hrtimer_init(&led191_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	led191_timer.function = led191_timer_func;
+	hrtimer_setup(&led191_timer, led191_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	led191_timeout_ms = 100;
 
 	/* init chip hw */
@@ -437,8 +436,7 @@ err:
 	return err;
 }
 
-static int led191_remove(struct platform_device *pdev)
-{
+static void led191_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct led191_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -459,7 +457,6 @@ static int led191_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

@@ -455,8 +455,7 @@ err_node_put:
 	return -EINVAL;
 }
 
-static int lm3642_i2c_probe(
-		struct i2c_client *client, const struct i2c_device_id *id)
+static int lm3642_i2c_probe(struct i2c_client *client) /* rodin: 6.18 i2c probe 单参 */
 {
 	struct lm3642_chip_data *chip;
 	int err;
@@ -495,8 +494,7 @@ err_out:
 	return err;
 }
 
-static int lm3642_i2c_remove(struct i2c_client *client)
-{
+static void lm3642_i2c_remove(struct i2c_client *client) /* rodin: 6.18 remove void */{
 	struct lm3642_chip_data *chip = i2c_get_clientdata(client);
 
 	pr_debug("Remove start.\n");
@@ -508,7 +506,6 @@ static int lm3642_i2c_remove(struct i2c_client *client)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 static const struct i2c_device_id lm3642_i2c_id[] = {
@@ -571,8 +568,7 @@ static int lm3642_probe(struct platform_device *pdev)
 	INIT_WORK(&lm3642_work, lm3642_work_disable);
 
 	/* init timer */
-	hrtimer_init(&lm3642_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	lm3642_timer.function = lm3642_timer_func;
+	hrtimer_setup(&lm3642_timer, lm3642_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	lm3642_timeout_ms = 800;
 
 	/* clear usage count */
@@ -604,8 +600,7 @@ err_free:
 	return err;
 }
 
-static int lm3642_remove(struct platform_device *pdev)
-{
+static void lm3642_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct lm3642_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -628,7 +623,6 @@ static int lm3642_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

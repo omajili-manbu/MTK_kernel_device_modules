@@ -412,8 +412,7 @@ err_node_put:
 	return -EINVAL;
 }
 
-static int rt4505_i2c_probe(
-		struct i2c_client *client, const struct i2c_device_id *id)
+static int rt4505_i2c_probe(struct i2c_client *client) /* rodin: 6.18 i2c probe 单参 */
 {
 	struct rt4505_platform_data *pdata = dev_get_platdata(&client->dev);
 	struct rt4505_chip_data *chip;
@@ -460,8 +459,7 @@ static int rt4505_i2c_probe(
 	INIT_WORK(&rt4505_work, rt4505_work_disable);
 
 	/* init timer */
-	hrtimer_init(&rt4505_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	rt4505_timer.function = rt4505_timer_func;
+	hrtimer_setup(&rt4505_timer, rt4505_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	rt4505_timeout_ms = 400;
 
 	/* init chip hw */
@@ -497,8 +495,7 @@ err_out:
 	return err;
 }
 
-static int rt4505_i2c_remove(struct i2c_client *client)
-{
+static void rt4505_i2c_remove(struct i2c_client *client) /* rodin: 6.18 remove void */{
 	struct rt4505_platform_data *pdata = dev_get_platdata(&client->dev);
 	struct rt4505_chip_data *chip = i2c_get_clientdata(client);
 	int i;
@@ -523,7 +520,6 @@ static int rt4505_i2c_remove(struct i2c_client *client)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 static const struct i2c_device_id rt4505_i2c_id[] = {

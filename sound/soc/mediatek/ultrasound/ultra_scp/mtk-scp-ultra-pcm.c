@@ -83,7 +83,7 @@ static int scp_ultra_pcm_dev_probe(struct platform_device *pdev)
 		goto err_platform;
 	}
 
-	set_ipi_recv_private((void *)scp_ultra);
+	scp_ultra_set_ipi_recv_private((void *)scp_ultra); /* rodin: 批4-5 改名 */
 	set_scp_ultra_base((void *)scp_ultra);
 
 	return 0;
@@ -94,9 +94,8 @@ err_platform:
 	return ret;
 }
 
-static int scp_ultra_pcm_dev_remove(struct platform_device *pdev)
+static void scp_ultra_pcm_dev_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */
 {
-	return 0;
 }
 
 static const struct of_device_id scp_ultra_pcm_dt_match[] = {

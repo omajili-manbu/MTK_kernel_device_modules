@@ -549,7 +549,7 @@ static void rndis_command_complete(struct usb_ep *ep, struct usb_request *req)
 			rndis->port.multi_pkt_xfer = 1;
 			rndis->port.dl_max_transfer_len = buf->MaxTransferSize;
 			spin_unlock(&rndis_lock);
-			gether_update_dl_max_xfer_size(&rndis->port,
+			mtk_gether_update_dl_max_xfer_size(&rndis->port,
 					rndis->port.dl_max_transfer_len);
 			spin_lock(&rndis_lock);
 		} else
@@ -716,7 +716,7 @@ static int rndis_set_alt(struct usb_function *f,
 		 *
 		 * REVISIT the RNDIS gadget code has done this wrong for a
 		 * very long time.  We need another call to the link layer
-		 * code -- gether_updown(...bool) maybe -- to do it right.
+		 * code -- mtk_gether_updown(...bool) maybe -- to do it right.
 		 */
 		rndis->port.cdc_filter = 0;
 

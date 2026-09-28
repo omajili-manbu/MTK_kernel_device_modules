@@ -430,8 +430,7 @@ err_node_put:
 	return -EINVAL;
 }
 
-static int dummy_i2c_probe(
-		struct i2c_client *client, const struct i2c_device_id *id)
+static int dummy_i2c_probe(struct i2c_client *client) /* rodin: 6.18 i2c probe 单参 */
 {
 	struct dummy_chip_data *chip;
 	int err;
@@ -470,8 +469,7 @@ err_out:
 	return err;
 }
 
-static int dummy_i2c_remove(struct i2c_client *client)
-{
+static void dummy_i2c_remove(struct i2c_client *client) /* rodin: 6.18 remove void */{
 	struct dummy_chip_data *chip = i2c_get_clientdata(client);
 
 	pr_debug("Remove start.\n");
@@ -483,7 +481,6 @@ static int dummy_i2c_remove(struct i2c_client *client)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 static const struct i2c_device_id dummy_i2c_id[] = {
@@ -546,8 +543,7 @@ static int dummy_probe(struct platform_device *pdev)
 	INIT_WORK(&dummy_work, dummy_work_disable);
 
 	/* init timer */
-	hrtimer_init(&dummy_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	dummy_timer.function = dummy_timer_func;
+	hrtimer_setup(&dummy_timer, dummy_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	dummy_timeout_ms = 100;
 
 	/* clear usage count */
@@ -579,8 +575,7 @@ err_free:
 	return err;
 }
 
-static int dummy_remove(struct platform_device *pdev)
-{
+static void dummy_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct dummy_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -603,7 +598,6 @@ static int dummy_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

@@ -36,7 +36,7 @@
 
 
 #define aud_wake_lock_init(dev, name) wakeup_source_register(dev, name)
-#define aud_wake_lock_destroy(ws) wakeup_source_destroy(ws)
+#define aud_wake_lock_destroy(ws) wakeup_source_unregister(ws) /* rodin: 6.18 收缩，register/unregister 配对 */
 #define aud_wake_lock(ws) __pm_stay_awake(ws)
 #define aud_wake_unlock(ws) __pm_relax(ws)
 
@@ -89,11 +89,9 @@ struct snd_pcm_substream;
 struct mtk_base_scp_ultra_dump;
 
 int ultra_set_dsp_afe(struct mtk_base_afe *afe);
-struct mtk_base_afe *get_afe_base(void);
 int set_scp_ultra_base(struct mtk_base_scp_ultra *scp_ultra);
 void *get_scp_ultra_base(void);
 void *get_ipi_recv_private(void);
-void set_ipi_recv_private(void *priv);
 void mtk_scp_ultra_dump_msg(struct mtk_base_scp_ultra_dump *ultra_dump);
 void mtk_scp_ultra_ipi_send(uint8_t data_type, /*audio_ipi_msg_data_t*/
 			    uint8_t ack_type, /*audio_ipi_msg_ack_t*/
@@ -113,4 +111,5 @@ int ultra_irq_set_disable_hw_sema(struct mtk_base_afe *afe,
 				  int afe_id);
 int ultra_irq_set_target_hw_sema(int scp_enable);
 #endif
-
+struct mtk_base_afe *scp_ultra_get_afe_base(void); /* rodin: 批4-5 改名 */
+void scp_ultra_set_ipi_recv_private(void *priv); /* rodin: 批4-5 改名 */

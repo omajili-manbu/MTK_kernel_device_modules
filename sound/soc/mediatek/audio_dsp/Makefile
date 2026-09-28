@@ -12,6 +12,8 @@
 #
 
 # MTK Platform Support
+# rodin: 批4-5 按目录直连挂载，父级 subdir-ccflags 不生效，自补 slbc_ops.h 的 -I
+ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/slbc
 
 # adsp include path
 subdir-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/audio_ipi/include

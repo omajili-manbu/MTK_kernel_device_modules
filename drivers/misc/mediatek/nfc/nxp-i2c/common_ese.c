@@ -24,7 +24,7 @@
 
 static void cold_reset_gaurd_timer_callback(struct timer_list *t)
 {
-	struct cold_reset *cold_reset = from_timer(cold_reset, t, timer);
+	struct cold_reset *cold_reset = timer_container_of(cold_reset, t, timer) /* rodin: 6.18 */;
 
 	pr_debug("%s: entry\n", __func__);
 	cold_reset->in_progress = false;
@@ -37,7 +37,7 @@ static long start_cold_reset_guard_timer(struct cold_reset *cold_reset)
 	if (timer_pending(&cold_reset->timer) == 1) {
 		pr_debug("%s: delete pending timer\n", __func__);
 		/* delete timer if already pending */
-		del_timer(&cold_reset->timer);
+		timer_delete(&cold_reset->timer); /* rodin: 6.18 */
 	}
 	cold_reset->in_progress = true;
 	timer_setup(&cold_reset->timer, cold_reset_gaurd_timer_callback, 0);
@@ -347,7 +347,7 @@ void ese_cold_reset_release(struct nfc_dev *nfc_dev)
 	cold_reset->rsp_pending = false;
 	cold_reset->in_progress = false;
 	if (timer_pending(&cold_reset->timer) == 1)
-		del_timer(&cold_reset->timer);
+		timer_delete(&cold_reset->timer); /* rodin: 6.18 */
 }
 
 void common_ese_init(struct nfc_dev *nfc_dev)

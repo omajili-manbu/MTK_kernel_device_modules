@@ -809,8 +809,7 @@ static int aw3644_chip_init(struct aw3644_chip_data *chip)
 	return 0;
 }
 
-static int aw3644_i2c_probe(struct i2c_client *client,
-	const struct i2c_device_id *id)
+static int aw3644_i2c_probe(struct i2c_client *client) /* rodin: 6.18 i2c probe 单参 */
 {
 	struct aw3644_chip_data *chip;
 	struct aw3644_platform_data *pdata = client->dev.platform_data;
@@ -849,10 +848,8 @@ static int aw3644_i2c_probe(struct i2c_client *client,
 	INIT_WORK(&aw3644_work_ch2, aw3644_work_disable_ch2);
 
 	/* init timer */
-	hrtimer_init(&aw3644_timer_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	aw3644_timer_ch1.function = aw3644_timer_func_ch1;
-	hrtimer_init(&aw3644_timer_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	aw3644_timer_ch2.function = aw3644_timer_func_ch2;
+	hrtimer_setup(&aw3644_timer_ch1, aw3644_timer_func_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
+	hrtimer_setup(&aw3644_timer_ch2, aw3644_timer_func_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	aw3644_timeout_ms[AW3644_CHANNEL_CH1] = 100;
 	aw3644_timeout_ms[AW3644_CHANNEL_CH2] = 100;
 	/* init chip hw */
@@ -877,8 +874,7 @@ err_out:
 	return err;
 }
 
-static int aw3644_i2c_remove(struct i2c_client *client)
-{
+static void aw3644_i2c_remove(struct i2c_client *client) /* rodin: 6.18 remove void */{
 	struct aw3644_chip_data *chip = i2c_get_clientdata(client);
 
 	pr_info("Remove start.\n");
@@ -896,7 +892,6 @@ static int aw3644_i2c_remove(struct i2c_client *client)
 
 	pr_info("Remove done.\n");
 
-	return 0;
 }
 
 static const struct i2c_device_id aw3644_i2c_id[] = {

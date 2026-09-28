@@ -5,6 +5,8 @@ ifeq ($(CONFIG_MTK_ACAO_SUPPORT),y)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/base/power/mcdi/include/
 endif
 
+# rodin: 批4-5 按目录直连挂载，父级 subdir-ccflags 不生效，自补 slbc_ops.h 的 -I（mtk-base-dsp.h）
+ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/slbc
 # adsp include path
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/audio_ipi/include
 ccflags-y += -I$(DEVICE_MODULES_PATH)/sound/soc/mediatek/audio_dsp

@@ -797,10 +797,8 @@ static int mt6360_probe(struct platform_device *pdev)
 	INIT_WORK(&mt6360_work_ch2, mt6360_work_disable_ch2);
 
 	/* init timer */
-	hrtimer_init(&mt6360_timer_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	mt6360_timer_ch1.function = mt6360_timer_func_ch1;
-	hrtimer_init(&mt6360_timer_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	mt6360_timer_ch2.function = mt6360_timer_func_ch2;
+	hrtimer_setup(&mt6360_timer_ch1, mt6360_timer_func_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
+	hrtimer_setup(&mt6360_timer_ch2, mt6360_timer_func_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	mt6360_timeout_ms[MT6360_CHANNEL_CH1] = 600;
 	mt6360_timeout_ms[MT6360_CHANNEL_CH2] = 600;
 
@@ -843,8 +841,7 @@ static int mt6360_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mt6360_remove(struct platform_device *pdev)
-{
+static void mt6360_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct mt6360_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -870,7 +867,6 @@ static int mt6360_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

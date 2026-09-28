@@ -14,6 +14,9 @@
 
 #include <swpm_perf_arm_pmu.h>
 
+unsigned int legacy_core_pmu_num = 3; /* rodin: 批4-5 定义收口 */
+unsigned int legacy_dsu_pmu_num = 1;
+
 #define PMU_AI_EN 1
 
 static unsigned int swpm_arm_pmu_status;

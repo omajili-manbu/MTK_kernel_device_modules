@@ -8,7 +8,7 @@ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_V3),y)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/sspm/v3
 endif
 
-ifeq ($(CONFIG_MTK_QOS_FRAMEWORK),m)
+ifneq ($(CONFIG_MTK_QOS_FRAMEWORK),) # rodin: 批4-5 =y 也需 qos 头（mtk_qos_ipi.h）
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/qos
 endif
 

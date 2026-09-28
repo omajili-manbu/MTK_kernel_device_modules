@@ -758,8 +758,7 @@ err_out:
 	return err;
 }
 
-static int lm3643_i2c_remove(struct i2c_client *client)
-{
+static void lm3643_i2c_remove(struct i2c_client *client) /* rodin: 6.18 remove void */{
 	struct lm3643_chip_data *chip = i2c_get_clientdata(client);
 
 	pr_debug("Remove start.\n");
@@ -771,7 +770,6 @@ static int lm3643_i2c_remove(struct i2c_client *client)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 static const struct i2c_device_id lm3643_i2c_id[] = {
@@ -840,10 +838,8 @@ static int lm3643_probe(struct platform_device *pdev)
 	INIT_WORK(&lm3643_work_ch2, lm3643_work_disable_ch2);
 
 	/* init timer */
-	hrtimer_init(&lm3643_timer_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	lm3643_timer_ch1.function = lm3643_timer_func_ch1;
-	hrtimer_init(&lm3643_timer_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	lm3643_timer_ch2.function = lm3643_timer_func_ch2;
+	hrtimer_setup(&lm3643_timer_ch1, lm3643_timer_func_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
+	hrtimer_setup(&lm3643_timer_ch2, lm3643_timer_func_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	lm3643_timeout_ms[LM3643_CHANNEL_CH1] = 100;
 	lm3643_timeout_ms[LM3643_CHANNEL_CH2] = 100;
 
@@ -876,8 +872,7 @@ err_free:
 	return err;
 }
 
-static int lm3643_remove(struct platform_device *pdev)
-{
+static void lm3643_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct lm3643_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -899,7 +894,6 @@ static int lm3643_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

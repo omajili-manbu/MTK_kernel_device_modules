@@ -655,7 +655,7 @@ static int p61_probe(struct spi_device *spi)
 	struct p61_spi_platform_data platform_data1;
 	struct p61_dev *p61_dev = NULL;
 	struct device_node *np = spi->dev.of_node;
-	pr_info("%s chip select : %d , bus number = %d \n", __FUNCTION__, spi->chip_select, spi->master->bus_num);
+	pr_info("%s chip select : %d , bus number = %d \n", __FUNCTION__, spi->chip_select, spi->controller->bus_num /* rodin: 6.18 spi_controller */);
 
 	ret = p61_parse_dt(&spi->dev, &platform_data1);
 	if (ret) {

@@ -148,7 +148,7 @@ static void mddp_f_del_nat_tuple_w_unlock(struct nat_tuple *t, unsigned long fla
 
 static void mddp_f_timeout_nat_tuple(struct timer_list *timer)
 {
-	struct nat_tuple *t = from_timer(t, timer, timeout_used);
+	struct nat_tuple *t = timer_container_of(t, timer, timeout_used) /* rodin: 6.18 */;
 	unsigned long flag;
 
 	if (unlikely(atomic_read(&mddp_filter_quit))) {

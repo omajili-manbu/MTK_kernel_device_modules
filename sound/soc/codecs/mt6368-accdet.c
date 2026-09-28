@@ -1093,7 +1093,7 @@ static void send_status_event(u32 cable_type, u32 status)
 		 * it check AB=00(because keep to press key) then disable
 		 * micbias, it will cause key no response
 		 */
-		del_timer_sync(&micbias_timer);
+		timer_delete_sync(&micbias_timer); /* rodin: 6.18 */
 		break;
 	case LINE_OUT_DEVICE:
 		if (status)
@@ -1840,7 +1840,7 @@ static void eint_work_callback(struct work_struct *work)
 		accdet->thing_in_flag = false;
 		mutex_unlock(&accdet->res_lock);
 		if (accdet_dts.moisture_detect_mode != 0x5)
-			del_timer_sync(&micbias_timer);
+			timer_delete_sync(&micbias_timer); /* rodin: 6.18 */
 
 		/* disable accdet_sw_en=0
 		 */
@@ -3098,7 +3098,7 @@ void mt6368_accdet_late_init(unsigned long data)
 {
 	pr_info("%s()  now init accdet!\n", __func__);
 	if (atomic_cmpxchg(&accdet_first, 1, 0)) {
-		del_timer_sync(&accdet_init_timer);
+		timer_delete_sync(&accdet_init_timer); /* rodin: 6.18 */
 		accdet_init();
 		accdet_init_debounce();
 		accdet_init_once();
@@ -3467,7 +3467,7 @@ err_chrdevregion:
 	return ret;
 }
 
-static int accdet_remove(struct platform_device *pdev)
+static void accdet_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */
 {
 	destroy_workqueue(accdet->eint_workqueue);
 	destroy_workqueue(accdet->dis_micbias_workqueue);
@@ -3476,7 +3476,6 @@ static int accdet_remove(struct platform_device *pdev)
 	class_destroy(accdet->accdet_class);
 	unregister_chrdev_region(accdet->accdet_devno, 1);
 	devm_kfree(&pdev->dev, accdet);
-	return 0;
 }
 
 static long mt_accdet_unlocked_ioctl(struct file *file, unsigned int cmd,

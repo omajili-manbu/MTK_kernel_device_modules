@@ -13,6 +13,7 @@
 #include <sound/soc.h>
 #include <linux/pm_runtime.h>
 #include "mtk-afe-external.h"
+#include "mtk-scp-ultra-common.h" /* rodin: 批4-5 改名后的声明 */
 
 #include "audio_ultra_msg_id.h"
 #include "mtk-scp-ultra-mem-control.h"
@@ -98,7 +99,7 @@ static int usnd_scp_recover_event(struct notifier_block *this,
 {
 	struct mtk_base_scp_ultra *scp_ultra = get_scp_ultra_base();
 	struct mtk_base_scp_ultra_mem *ultra_mem = &scp_ultra->ultra_mem;
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	struct mtk_base_afe_memif *memif =
 		&afe->memif[scp_ultra->scp_ultra_dl_memif_id];
 	struct mtk_base_afe_memif *memiful =
@@ -156,7 +157,7 @@ static struct notifier_block usnd_scp_recover_notifier = {
 static int ultra_stop_memif_and_irq(struct mtk_base_scp_ultra *scp_ultra)
 {
 	struct mtk_base_scp_ultra_mem *ultra_mem = &scp_ultra->ultra_mem;
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	struct mtk_base_afe_memif *memif =
 		&afe->memif[ultra_mem->ultra_dl_memif_id];
 	struct mtk_base_afe_memif *memiful =
@@ -312,7 +313,7 @@ static int mtk_scp_ultra_dump_set(struct snd_kcontrol *kcontrol,
 			snd_soc_component_get_drvdata(cmpnt);
 	struct mtk_base_scp_ultra_dump *ultra_dump = &scp_ultra->ultra_dump;
 	//struct mtk_base_scp_ultra_mem *ultra_mem = &scp_ultra->ultra_mem;
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 
 	int timeout = 0;
 	int payload[3];
@@ -484,7 +485,7 @@ static int mtk_scp_ultra_engine_state_set(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	struct mtk_base_scp_ultra *scp_ultra = get_scp_ultra_base();
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	struct mtk_base_scp_ultra_mem *ultra_mem = &scp_ultra->ultra_mem;
 	int scp_ultra_memif_dl_id = scp_ultra->scp_ultra_dl_memif_id;
 	int scp_ultra_memif_ul_id = scp_ultra->scp_ultra_ul_memif_id;
@@ -663,7 +664,7 @@ static int mtk_scp_ultra_pcm_open(struct snd_soc_component *component,
 	struct mtk_base_scp_ultra *scp_ultra =
 		snd_soc_component_get_drvdata(component);
 	struct mtk_base_scp_ultra_mem *ultra_mem = &scp_ultra->ultra_mem;
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	int scp_ultra_memif_dl_id =
 		scp_ultra->scp_ultra_dl_memif_id;
 	int scp_ultra_memif_ul_id =
@@ -704,7 +705,7 @@ static int mtk_scp_ultra_pcm_start(struct snd_soc_component *component,
 	struct mtk_base_scp_ultra *scp_ultra =
 		snd_soc_component_get_drvdata(component);
 	struct mtk_base_scp_ultra_mem *ultra_mem = &scp_ultra->ultra_mem;
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	struct mtk_base_afe_memif *memif =
 		&afe->memif[ultra_mem->ultra_dl_memif_id];
 	struct mtk_base_afe_memif *memiful =
@@ -794,7 +795,7 @@ static int mtk_scp_ultra_pcm_stop(struct snd_soc_component *component,
 static int mtk_scp_ultra_pcm_close(struct snd_soc_component *component,
 				   struct snd_pcm_substream *substream)
 {
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 	if (pcm_dump_on) {
 		/* scp ultra dump buffer use dram */
 		if (afe->release_dram_resource)
@@ -855,7 +856,7 @@ static int mtk_scp_ultra_pcm_new(struct snd_soc_component *component)
 	int ret = 0;
 	struct mtk_base_scp_ultra *scp_ultra =
 			snd_soc_component_get_drvdata(component);
-	struct mtk_base_afe *afe = get_afe_base();
+	struct mtk_base_afe *afe = scp_ultra_get_afe_base();
 
 	dev_info(scp_ultra->dev, "%s()\n", __func__);
 

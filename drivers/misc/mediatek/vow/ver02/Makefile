@@ -15,6 +15,7 @@ ifneq ($(CONFIG_MTK_TINYSYS_SCP_SUPPORT),)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/scp/include
 endif
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/vow
+ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/vow/ver02 # rodin: 批4-5 vow_assert.h → vow.h
 
 mtk-vow-objs := \
 	vow.o \

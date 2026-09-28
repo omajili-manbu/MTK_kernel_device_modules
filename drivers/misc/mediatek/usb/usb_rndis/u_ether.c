@@ -1478,7 +1478,7 @@ int mtk_gether_get_ifname(struct net_device *net, char *name, int len)
 }
 EXPORT_SYMBOL_GPL(mtk_gether_get_ifname);
 
-void gether_update_dl_max_xfer_size(struct gether *link, uint32_t s)
+void mtk_gether_update_dl_max_xfer_size(struct gether *link, uint32_t s)
 {
 	struct eth_dev		*dev = link->ioport;
 	unsigned long flags;
@@ -1487,13 +1487,13 @@ void gether_update_dl_max_xfer_size(struct gether *link, uint32_t s)
 	dev->dl_max_xfer_size = s;
 	spin_unlock_irqrestore(&dev->lock, flags);
 }
-EXPORT_SYMBOL_GPL(gether_update_dl_max_xfer_size);
+EXPORT_SYMBOL_GPL(mtk_gether_update_dl_max_xfer_size);
 
 /**
  * mtk_gether_cleanup - remove Ethernet-over-USB device
  * Context: may sleep
  *
- * This is called to free all resources allocated by @gether_setup().
+ * This is called to free all resources allocated by @mtk_gether_setup().
  */
 void mtk_gether_cleanup(struct eth_dev *dev)
 {
@@ -1698,7 +1698,7 @@ void mtk_gether_disconnect(struct gether *link)
 }
 EXPORT_SYMBOL_GPL(mtk_gether_disconnect);
 
-static int __init gether_init(void)
+static int __init mtk_gether_init(void)
 {
 	uether_wq  = create_singlethread_workqueue("uether");
 	if (!uether_wq) {
@@ -1716,15 +1716,15 @@ static int __init gether_init(void)
 		pr_info("%s: create workqueue fail: uether_rps\n", __func__);
 	return 0;
 }
-module_init(gether_init);
+module_init(mtk_gether_init);
 
-static void __exit gether_exit(void)
+static void __exit mtk_gether_exit(void)
 {
 	destroy_workqueue(uether_wq);
 	destroy_workqueue(uether_wq1);
 	destroy_workqueue(uether_rps_wq);
 }
-module_exit(gether_exit);
+module_exit(mtk_gether_exit);
 MODULE_AUTHOR("David Brownell");
 MODULE_DESCRIPTION("ethernet over USB driver");
 MODULE_LICENSE("GPL v2");

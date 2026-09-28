@@ -666,10 +666,8 @@ static int rt5081_probe(struct platform_device *pdev)
 	INIT_WORK(&rt5081_work_ch2, rt5081_work_disable_ch2);
 
 	/* init timer */
-	hrtimer_init(&rt5081_timer_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	rt5081_timer_ch1.function = rt5081_timer_func_ch1;
-	hrtimer_init(&rt5081_timer_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	rt5081_timer_ch2.function = rt5081_timer_func_ch2;
+	hrtimer_setup(&rt5081_timer_ch1, rt5081_timer_func_ch1, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
+	hrtimer_setup(&rt5081_timer_ch2, rt5081_timer_func_ch2, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	rt5081_timeout_ms[RT5081_CHANNEL_CH1] = 600;
 	rt5081_timeout_ms[RT5081_CHANNEL_CH2] = 600;
 
@@ -718,8 +716,7 @@ static int rt5081_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int rt5081_remove(struct platform_device *pdev)
-{
+static void rt5081_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct rt5081_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -745,7 +742,6 @@ static int rt5081_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

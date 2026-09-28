@@ -342,14 +342,12 @@ exit:
 	return ret;
 }
 
-static int u_logger_remove(struct platform_device *pdev)
-{
+static void u_logger_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct u_logger *logger = dev_get_drvdata(&pdev->dev);
 
 	u_logger_procfs_exit(logger);
 	if (logger->class)
 		class_destroy(logger->class);
-	return 0;
 }
 
 static const struct of_device_id u_logger_ids[] = {

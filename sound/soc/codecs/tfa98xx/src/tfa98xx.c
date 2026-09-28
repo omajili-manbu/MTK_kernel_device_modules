@@ -2472,7 +2472,7 @@ static int tfa98xx_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
 		if ((fmt & SND_SOC_DAIFMT_MASTER_MASK)
-				!= SND_SOC_DAIFMT_CBS_CFS) {
+				!= SND_SOC_DAIFMT_CBC_CFC /* rodin: 6.18 改名 */) {
 			dev_err(codec->dev, "Invalid Codec master mode\n");
 			pr_err("Invalid Codec master mode\n");
 			return -EINVAL;
@@ -3118,7 +3118,7 @@ int tfa98xx_i2c_probe(struct i2c_client *i2c)
 		PAGE_SIZE, /* Structure size, we should fit in single page */
 		0, /* Structure alignment */
 		(SLAB_HWCACHE_ALIGN | SLAB_RECLAIM_ACCOUNT |
-		SLAB_MEM_SPREAD), /* Cache property */
+		0), /* rodin: 6.18 删 SLAB_MEM_SPREAD 标志（语义 no-op） */
 		NULL);/* Object constructor */
 
 	pr_info("tfa create cache.......%p\n", tfa98xx_cache);

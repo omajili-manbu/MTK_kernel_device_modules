@@ -14,9 +14,10 @@
 #include <linux/kprobes.h>
 #include <asm/traps.h>
 
-#define AUD_LOG_W(format, args...) snd_printk(format, ##args)
+/* rodin: 6.18 删除 snd_printk，改 pr_warn/pr_info（批4-5） */
+#define AUD_LOG_W(format, args...) pr_warn(format, ##args)
 #ifdef CONFIG_SND_VERBOSE_PRINTK
-#define AUD_LOG_D(format, args...) snd_printk(format, ##args)
+#define AUD_LOG_D(format, args...) pr_info(format, ##args)
 #else
 #define AUD_LOG_D(format, args...)
 #endif

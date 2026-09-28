@@ -7,6 +7,8 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of_platform.h>
+#include <linux/of.h> /* rodin: 6.18 of_device_get_match_data */
+#include <linux/of.h> /* rodin: 6.18 of_device_get_match_data */
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
@@ -132,17 +134,15 @@ static int apu_top_probe(struct platform_device *pdev)
 	return pwr_data->plat_aputop_pb(pdev);
 }
 
-static int apu_top_remove(struct platform_device *pdev)
-{
+static void apu_top_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	if (check_pwr_data())
-		return -ENODEV;
+		return;
 
 	dev_info(&pdev->dev, "%s %s\n", __func__, pwr_data->plat_name);
 	pwr_data->plat_aputop_rm(pdev);
 	pm_runtime_disable(&pdev->dev);
 	apu_pwr_wake_exit();
 
-	return 0;
 }
 
 #if IS_ENABLED(CONFIG_PM_SLEEP)

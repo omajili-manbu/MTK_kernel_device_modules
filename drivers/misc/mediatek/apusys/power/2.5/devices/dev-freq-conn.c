@@ -286,8 +286,7 @@ out:
 }
 
 
-static int con_devfreq_remove(struct platform_device *pdev)
-{
+static void con_devfreq_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct apu_dev *ad = platform_get_drvdata(pdev);
 
 	dev_info(&pdev->dev, "%s\n", __func__);
@@ -301,7 +300,6 @@ static int con_devfreq_remove(struct platform_device *pdev)
 	apu_del_devfreq(ad);
 	ad->plat_ops->uninit_devfreq(ad);
 	wakeup_source_unregister(ws);
-	return 0;
 }
 
 static const struct apu_plat_data mt6873_conn_data = {

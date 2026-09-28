@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h> /* rodin: 6.18 of_find_device_by_node */
 #include <linux/io.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
@@ -3216,8 +3217,7 @@ INIT_SHAREMEM_FAIL:
 	return ret;
 }
 
-static int usb_offload_remove(struct platform_device *pdev)
-{
+static void usb_offload_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	int ret;
 
 	USB_OFFLOAD_INFO("\n");
@@ -3234,7 +3234,6 @@ static int usb_offload_remove(struct platform_device *pdev)
 	kfree(buf_seg);
 	buf_seg = NULL;
 
-	return 0;
 }
 
 static int usb_offload_smc_ctrl(int smc_req)

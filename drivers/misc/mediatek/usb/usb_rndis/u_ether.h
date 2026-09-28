@@ -98,7 +98,7 @@ struct eth_dev {
 struct gether {
 	struct usb_function		func;
 
-	/* updated by gether_{connect,disconnect} */
+	/* updated by mtk_gether_{connect,disconnect} */
 	struct eth_dev			*ioport;
 
 	/* endpoints handle full and/or high speeds */
@@ -137,13 +137,13 @@ struct gether {
 			|USB_CDC_PACKET_TYPE_PROMISCUOUS \
 			|USB_CDC_PACKET_TYPE_DIRECTED)
 
-/* variant of gether_setup that allows customizing network device name */
+/* variant of mtk_gether_setup that allows customizing network device name */
 struct eth_dev *mtk_gether_setup_name(struct usb_gadget *g,
 		const char *dev_addr, const char *host_addr,
 		u8 ethaddr[ETH_ALEN], unsigned int qmult, const char *netname);
 
 /* netdev setup/teardown as directed by the gadget driver */
-/* gether_setup - initialize one ethernet-over-usb link
+/* mtk_gether_setup - initialize one ethernet-over-usb link
  * @g: gadget to associated with these links
  * @ethaddr: NULL, or a buffer in which the ethernet address of the
  *	host side of the link is recorded
@@ -155,7 +155,7 @@ struct eth_dev *mtk_gether_setup_name(struct usb_gadget *g,
  *
  * Returns a eth_dev pointer on success, or an ERR_PTR on failure
  */
-static inline struct eth_dev *gether_setup(struct usb_gadget *g,
+static inline struct eth_dev *mtk_gether_setup(struct usb_gadget *g,
 		const char *dev_addr, const char *host_addr,
 		u8 ethaddr[ETH_ALEN], unsigned int qmult)
 {
@@ -163,7 +163,7 @@ static inline struct eth_dev *gether_setup(struct usb_gadget *g,
 }
 
 /*
- * variant of gether_setup_default that allows customizing
+ * variant of mtk_gether_setup_default that allows customizing
  * network device name
  */
 struct net_device *mtk_gether_setup_name_default(const char *netname);
@@ -177,7 +177,7 @@ struct net_device *mtk_gether_setup_name_default(const char *netname);
  */
 int mtk_gether_register_netdev(struct net_device *net);
 
-/* gether_setup_default - initialize one ethernet-over-usb link
+/* mtk_gether_setup_default - initialize one ethernet-over-usb link
  * Context: may sleep
  *
  * This sets up the single network link that may be exported by a
@@ -186,7 +186,7 @@ int mtk_gether_register_netdev(struct net_device *net);
  *
  * Returns negative errno, or zero on success
  */
-static inline struct net_device *gether_setup_default(void)
+static inline struct net_device *mtk_gether_setup_default(void)
 {
 	return mtk_gether_setup_name_default("usb");
 }
@@ -300,7 +300,7 @@ void mtk_gether_cleanup(struct eth_dev *dev);
 /* connect/disconnect is handled by individual functions */
 struct net_device *mtk_gether_connect(struct gether *geth);
 void mtk_gether_disconnect(struct gether *geth);
-void gether_update_dl_max_xfer_size(struct gether *link, uint32_t s);
+void mtk_gether_update_dl_max_xfer_size(struct gether *link, uint32_t s);
 
 /* Some controllers can't support CDC Ethernet (ECM) ... */
 static inline bool can_support_ecm(struct usb_gadget *gadget)

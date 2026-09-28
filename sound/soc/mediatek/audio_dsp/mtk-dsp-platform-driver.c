@@ -3,6 +3,7 @@
 // Copyright (c) 2018 MediaTek Inc.
 
 #include <linux/dma-mapping.h>
+#include <linux/vmalloc.h> /* rodin: 6.18 头瘦身 */
 #include <linux/module.h>
 #include <linux/string.h>
 #include <sound/soc.h>
@@ -736,7 +737,7 @@ static snd_pcm_uframes_t mtk_dsphw_pcm_pointer_ul
 {
 
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct snd_soc_component *component =
 		snd_soc_rtdcom_lookup(rtd, AFE_DSP_NAME);
@@ -778,7 +779,7 @@ static snd_pcm_uframes_t mtk_dsphw_pcm_pointer_dl
 {
 
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct snd_soc_component *component =
 			snd_soc_rtdcom_lookup(rtd, AFE_DSP_NAME);
@@ -1192,7 +1193,7 @@ static int mtk_dsp_pcm_open(struct snd_soc_component *component,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct mtk_base_dsp *dsp = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 
 	int id = cpu_dai->id;
 	int dsp_feature_id = get_featureid_by_dsp_daiid(id);
@@ -1253,7 +1254,7 @@ static int mtk_dsp_pcm_close(struct snd_soc_component *component,
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_base_dsp *dsp = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	int dsp_feature_id = get_featureid_by_dsp_daiid(id);
 	const char *task_name = get_str_by_dsp_dai_id(id);
@@ -1322,7 +1323,7 @@ static int mtk_dsp_pcm_hw_params(struct snd_soc_component *component,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_base_dsp *dsp = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct mtk_base_dsp_mem *dsp_mem = &dsp->dsp_mem[id];
 	int ret = 0;
@@ -1411,7 +1412,7 @@ static int mtk_dsp_pcm_hw_free(struct snd_soc_component *component,
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_base_dsp *dsp = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct mtk_base_dsp_mem *dsp_mem = &dsp->dsp_mem[id];
 
@@ -1443,7 +1444,7 @@ static int mtk_dsp_pcm_hw_prepare(struct snd_soc_component *component,
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_base_dsp *dsp = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct mtk_base_dsp_mem *dsp_mem = &dsp->dsp_mem[id];
 	struct audio_hw_buffer *adsp_buf = &dsp_mem->adsp_buf;
@@ -1492,7 +1493,7 @@ static int mtk_dsp_start(struct snd_pcm_substream *substream,
 {
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct mtk_base_dsp_mem *dsp_mem = &dsp->dsp_mem[id];
 	const char *task_name = get_str_by_dsp_dai_id(id);
@@ -1516,7 +1517,7 @@ static int mtk_dsp_stop(struct snd_pcm_substream *substream,
 {
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 
 	trace_mtk_dsp_stop(id);
@@ -1557,7 +1558,7 @@ static int mtk_dsp_pcm_copy_dl(struct snd_pcm_substream *substream,
 	int ack_type;
 	void *ipi_audio_buf; /* dsp <-> audio data struct */
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct RingBuf *ringbuf = &dsp_mem->ring_buf;
 	struct ringbuf_bridge *buf_bridge =
@@ -1645,7 +1646,7 @@ static int mtk_dsp_pcm_copy_ul(struct snd_pcm_substream *substream,
 	int ret = 0, availsize = 0;
 	void *ipi_audio_buf; /* dsp <-> audio data struct */
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct RingBuf *ringbuf = &(dsp_mem->ring_buf);
 	unsigned long flags = 0;
@@ -1703,7 +1704,7 @@ static int mtk_dsp_pcm_copy(struct snd_soc_component *component,
 		unsigned long bytes)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	int id = cpu_dai->id;
 	struct mtk_base_dsp *dsp = snd_soc_component_get_drvdata(component);
 	struct mtk_base_dsp_mem *dsp_mem = &dsp->dsp_mem[id];

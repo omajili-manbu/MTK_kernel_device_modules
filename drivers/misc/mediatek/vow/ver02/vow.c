@@ -3865,10 +3865,8 @@ static int VowDrv_probe(struct platform_device *dev)
 	return 0;
 }
 
-static int VowDrv_remove(struct platform_device *dev)
-{
+static void VowDrv_remove(struct platform_device *dev) /* rodin: 6.18 remove void */{
 	VOWDRV_DEBUG("%s()\n", __func__);
-	return 0;
 }
 
 static void VowDrv_shutdown(struct platform_device *dev)

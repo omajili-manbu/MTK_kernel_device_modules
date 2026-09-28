@@ -241,8 +241,7 @@ out:
 }
 
 
-static int iommu_devfreq_remove(struct platform_device *pdev)
-{
+static void iommu_devfreq_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct apu_dev *ad = platform_get_drvdata(pdev);
 
 	dev_info(&pdev->dev, "%s\n", __func__);
@@ -255,7 +254,6 @@ static int iommu_devfreq_remove(struct platform_device *pdev)
 	/* remove apu_device from list */
 	apu_del_devfreq(ad);
 	ad->plat_ops->uninit_devfreq(ad);
-	return 0;
 }
 
 static const struct apu_plat_data mt688x_iommu_data = {

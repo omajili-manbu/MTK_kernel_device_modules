@@ -404,8 +404,7 @@ static int dummy_probe(struct platform_device *pdev)
 	INIT_WORK(&dummy_work, dummy_work_disable);
 
 	/* init timer */
-	hrtimer_init(&dummy_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	dummy_timer.function = dummy_timer_func;
+	hrtimer_setup(&dummy_timer, dummy_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 	dummy_timeout_ms = 100;
 
 	/* init chip hw */
@@ -437,8 +436,7 @@ err:
 	return err;
 }
 
-static int dummy_remove(struct platform_device *pdev)
-{
+static void dummy_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
 	struct dummy_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int i;
 
@@ -459,7 +457,6 @@ static int dummy_remove(struct platform_device *pdev)
 
 	pr_debug("Remove done.\n");
 
-	return 0;
 }
 
 #ifdef CONFIG_OF

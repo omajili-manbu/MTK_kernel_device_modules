@@ -6,6 +6,8 @@ endif
 DSP_VERSION := hifi3_v2
 
 # adsp include path
+# rodin: 批4-5 自补 slbc_ops.h -I（mtk-dsp-mem-control.h 链）
+ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/slbc
 subdir-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/audio_ipi/include
 subdir-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/adsp/include
 subdir-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/scp/include

@@ -695,7 +695,7 @@ static void rawbulk_destroy_function(struct rawbulk_function *fn)
 
 	if (!fn)
 		return;
-	wakeup_source_remove(fn->keep_awake);
+	wakeup_source_unregister(fn->keep_awake); /* rodin: 6.18 收缩 */
 	rawbulk_remove_files(fn);
 	device_destroy(rawbulk_class, fn->dev->devt);
 	kfree(fn);
