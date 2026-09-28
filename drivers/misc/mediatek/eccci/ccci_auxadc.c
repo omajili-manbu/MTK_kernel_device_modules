@@ -22,7 +22,10 @@ static int adc_num;
 static int adc_val;
 static int adc_mV;
 
-#ifdef CCCI_KMODULE_ENABLE
+/* rodin 批4-3b: ccci_debug_enable 在 =m 构建下每个模块各留一份（MODULE 有定义，
+ * 与设备出货一致）；=y 单镜像下 MODULE 未定义，只保留 ccci_core.c 的无守卫那一份，
+ * 否则 5 份全局定义会在 vmlink(vmlinux.o) 阶段 duplicate symbol。 */
+#if defined(CCCI_KMODULE_ENABLE) && defined(MODULE)
 /*
  * for debug log:
  * 0 to disable; 1 for print to ram; 2 for print to uart

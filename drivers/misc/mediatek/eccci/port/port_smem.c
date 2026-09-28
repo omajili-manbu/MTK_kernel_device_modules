@@ -183,9 +183,12 @@ static void collect_ccb_info(struct ccci_smem_port *smem_port)
 			smem_port->wakeup = 0;
 			smem_port->type = TYPE_CCB;
 			init_waitqueue_head(&smem_port->rx_wq);
-			hrtimer_init(&smem_port->notify_timer,
-			CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-			smem_port->notify_timer.function = smem_tx_timer_func;
+			/* rodin 批4-3b: 6.18 用 hrtimer_setup() 一次完成
+			 * hrtimer_init + 回调赋值（等价，同为完整实现）。
+			 */
+			hrtimer_setup(&smem_port->notify_timer,
+			smem_tx_timer_func, CLOCK_MONOTONIC,
+			HRTIMER_MODE_REL);
 			break;
 		}
 	}

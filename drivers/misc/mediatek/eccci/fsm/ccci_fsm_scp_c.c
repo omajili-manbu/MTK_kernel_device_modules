@@ -41,7 +41,10 @@ static void ccci_scp_md_state_sync(enum MD_STATE old_state,
  * 0 to disable; 1 for print to ram; 2 for print to uart
  * other value to desiable all log
  */
-#ifdef CCCI_KMODULE_ENABLE
+/* rodin 批4-3b: ccci_debug_enable 在 =m 构建下每个模块各留一份（MODULE 有定义，
+ * 与设备出货一致）；=y 单镜像下 MODULE 未定义，只保留 ccci_core.c 的无守卫那一份，
+ * 否则 5 份全局定义会在 vmlink(vmlinux.o) 阶段 duplicate symbol。 */
+#if defined(CCCI_KMODULE_ENABLE) && defined(MODULE)
 #ifndef CCCI_LOG_LEVEL /* for platform override */
 #define CCCI_LOG_LEVEL CCCI_LOG_CRITICAL_UART
 #endif

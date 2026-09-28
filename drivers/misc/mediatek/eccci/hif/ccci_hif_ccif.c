@@ -143,7 +143,10 @@ static int tx_exp_buffer_size[QUEUE_NUM] = { 12 * 1024, 32 * 1024,
 	8 * 1024, 0 * 1024, 0 * 1024, 0 * 1024, 8 * 1024, 0 * 1024,
 };
 
-#ifdef CCCI_KMODULE_ENABLE
+/* rodin 批4-3b: ccci_debug_enable 在 =m 构建下每个模块各留一份（MODULE 有定义，
+ * 与设备出货一致）；=y 单镜像下 MODULE 未定义，只保留 ccci_core.c 的无守卫那一份，
+ * 否则 5 份全局定义会在 vmlink(vmlinux.o) 阶段 duplicate symbol。 */
+#if defined(CCCI_KMODULE_ENABLE) && defined(MODULE)
 /*
  * for debug log:
  * 0 to disable; 1 for print to ram; 2 for print to uart
@@ -436,7 +439,7 @@ err_exit1:
 
 static void md_ccif_traffic_monitor_func(struct timer_list *t)
 {
-	struct md_ccif_ctrl *ccif_ctrl = from_timer(ccif_ctrl, t, traffic_monitor);
+	struct md_ccif_ctrl *ccif_ctrl = timer_container_of(ccif_ctrl, t, traffic_monitor);
 
 	schedule_work(&ccif_ctrl->traffic_info.traffic_work_struct);
 }
@@ -964,7 +967,7 @@ static void md_ccif_reset_queue(unsigned char hif_id, unsigned char for_start)
 		mod_timer(&ccif_ctrl->traffic_monitor,
 			jiffies + CCIF_TRAFFIC_MONITOR_INTERVAL * HZ);
 	else
-		del_timer(&ccif_ctrl->traffic_monitor);
+		timer_delete(&ccif_ctrl->traffic_monitor);
 }
 
 static int md_ccif_send_data(unsigned char hif_id, int channel_id)

@@ -61,13 +61,26 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/scp/mt6873
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/
 
 
-# hif objects
-obj-$(CONFIG_MTK_ECCCI_DRIVER) := ccci_hif_all.o
-ccci_hif_all-y := ccci_hif.o \
-		ccci_cldma_plat.o \
-		ccci_hif_cldma.o
+# rodin 批4-3b: =y 复用 =m 的模块切分（ccci_ccif.o / ccci_dpmaif.o）。
+# cldma 不编：设备三分区无任何 cldma blob，且 ccci_cldma_plat.c/ccci_hif_cldma.c 的
+# 函数面在 6 个设备 blob 中零命中；ccci_hif.o 归 ccci_md_all（见 eccci/Makefile）。
+# 增补 -I eccci/port/：=m 独有而 dpmaif 需要（ccci_dpmaif_debug.c → ccci_port.h）。
+ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/eccci/port/
+ccflags-y += -DCCCI_KMODULE_ENABLE
 
-ccci_hif_all-y += ccci_ringbuf.o ccci_hif_ccif.o
+ccci_ccif-y := ccci_ringbuf.o ccci_hif_ccif.o
+obj-$(CONFIG_MTK_ECCCI_DRIVER) += ccci_ccif.o
+
+ccci_dpmaif-y := net_pool.o md_spd_dvfs_fn.o md_spd_dvfs_method.o net_speed.o \
+	ccci_dpmaif_com.o ccci_dpmaif_bat.o ccci_dpmaif_debug.o ccci_dpmaif_resv_mem.o \
+	ccci_dpmaif_drv_com.o ccci_dpmaif_drv_v1.o ccci_dpmaif_drv_v2.o ccci_dpmaif_drv_v3.o
+
+ifeq ($(CONFIG_PAGE_POOL), y)
+ccflags-y += -DRX_PAGE_POOL
+ccci_dpmaif-y += ccci_dpmaif_page_pool.o
+endif
+
+obj-$(CONFIG_MTK_ECCCI_DRIVER) += ccci_dpmaif.o
 
 endif
 

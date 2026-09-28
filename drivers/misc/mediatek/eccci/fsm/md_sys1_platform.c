@@ -2175,10 +2175,11 @@ unsigned int ccci_get_ap_plat(void)
 	return ap_plat_info;
 }
 
-static int ccci_modem_remove(struct platform_device *dev)
+/* rodin 批4-3b: 6.18 的 platform_driver.remove 是 void (*)(struct platform_device *);
+ * 原实现只做资源释放后 return 0，返回值为 void 后语义不变（平台核心不消费返回值）。 */
+static void ccci_modem_remove(struct platform_device *dev)
 {
 	ccci_remove_spm_resource();
-	return 0;
 }
 
 static void ccci_modem_shutdown(struct platform_device *dev)

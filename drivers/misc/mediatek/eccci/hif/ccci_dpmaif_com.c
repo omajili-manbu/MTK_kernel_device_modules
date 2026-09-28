@@ -56,7 +56,10 @@
 #define UIDMASK 0x80000000
 #define TAG "dpmf"
 
-#ifdef CCCI_KMODULE_ENABLE
+/* rodin 批4-3b: ccci_debug_enable 在 =m 构建下每个模块各留一份（MODULE 有定义，
+ * 与设备出货一致）；=y 单镜像下 MODULE 未定义，只保留 ccci_core.c 的无守卫那一份，
+ * 否则 5 份全局定义会在 vmlink(vmlinux.o) 阶段 duplicate symbol。 */
+#if defined(CCCI_KMODULE_ENABLE) && defined(MODULE)
 /*
  * for debug log:
  * 0 to disable; 1 for print to ram; 2 for print to uart
@@ -1636,8 +1639,8 @@ static int dpmaif_txq_sw_init(struct dpmaif_tx_queue *txq)
 
 	init_waitqueue_head(&txq->txq_done_wait);
 	atomic_set(&txq->txq_done, 0);
-	hrtimer_init(&txq->txq_done_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	txq->txq_done_timer.function = txq_done_timer_action;
+	hrtimer_setup(&txq->txq_done_timer, txq_done_timer_action,
+		CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	txq->txq_done_thread = NULL;
 
 	spin_lock_init(&txq->txq_lock);
@@ -2844,7 +2847,7 @@ static int dpmaif_stop(unsigned char hif_id)
 
 #if DPMAIF_TRAFFIC_MONITOR_INTERVAL
 	/* stop debug mechnism */
-	del_timer(&dpmaif_ctl->traffic_monitor);
+	timer_delete(&dpmaif_ctl->traffic_monitor);
 #endif
 
 	dpmaif_disable_all_irq();
@@ -3368,9 +3371,7 @@ static int dpmaif_init_com(struct device *dev)
 			CCCI_ERROR_LOG(0, TAG, "[%s] warning: devm_kzalloc() fail.\n", __func__);
 	}
 	if (dev->dma_parms) {
-		if (dma_set_max_seg_size(dev, UINT_MAX))
-			CCCI_ERROR_LOG(0, TAG,
-				"[%s] warning: dma_set_max_seg_size() fail.\n", __func__);
+		dma_set_max_seg_size(dev, UINT_MAX);
 	}
 
 	/* hook up to device */

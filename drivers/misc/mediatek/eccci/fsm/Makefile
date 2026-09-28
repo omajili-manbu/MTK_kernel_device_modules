@@ -45,27 +45,11 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/pbm/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/mdpm/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/memory-amms/
 
-# fsm objects
-obj-$(CONFIG_MTK_ECCCI_DRIVER) := ccci_fsm_all.o
-
-ccci_fsm_all-y := ap_md_mem.o \
-			ap_md_reg_dump.o \
-			ap_md_reg_dump_gen93.o \
-			ap_md_reg_dump_gen95.o \
-			ap_md_reg_dump_gen97.o \
-			ccci_fsm.o \
-			ccci_fsm_ioctl.o \
-			ccci_fsm_monitor.o \
-			ccci_fsm_poller.o \
-			ccci_fsm_scp_c.o \
-			ccci_fsm_ee.o \
-			ccci_fsm_sys.o \
-			md_sys1_platform.o \
-			modem_sys1.o \
-			mdee_dumper_v1.o \
-			mdee_dumper_v2.o \
-			mdee_dumper_v3.o \
-			mdee_dumper_v5.o \
-			mdee_dumper_v6.o
+# rodin 批4-3b: =y 复用 =m 的模块切分——fsm/ 只出 ccci_fsm_scp.o
+# (ccci_fsm_scp_c.o)；其余 18 个 fsm 对象由 eccci/Makefile 显式并入 ccci_md_all.o
+# （对象集合与原 =y 聚合 ccci_fsm_all.o 逐一对齐）。
+ccflags-y += -DCCCI_KMODULE_ENABLE
+ccci_fsm_scp-y := ccci_fsm_scp_c.o
+obj-$(CONFIG_MTK_ECCCI_DRIVER) += ccci_fsm_scp.o
 
 endif
