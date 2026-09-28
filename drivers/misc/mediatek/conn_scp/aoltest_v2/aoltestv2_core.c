@@ -349,7 +349,7 @@ static void aoltest_msg_notify(uint32_t module_id, uint32_t msg_id,
 		}
 		memcpy(&(data_buf->buf[0]), buf, size);
 	}
-	ret = msg_thread_send_4(&ctx->msg_ctx, AOLTEST_OPID_RECV_MSG,
+	ret = conap_msg_thread_send_4(&ctx->msg_ctx, AOLTEST_OPID_RECV_MSG,
 							module_id, msg_id, (size_t)data_buf, size);
 
 	if (ret)
@@ -410,7 +410,7 @@ static void aoltestv2_common_state_change(uint32_t module_id, int state)
 				return;
 			}
 			memcpy(&(data_buf->buf[0]), test_info->test_data, test_info->test_data_sz);
-			ret = msg_thread_send_4(&ctx->msg_ctx, AOLTEST_OPID_SEND_MSG,
+			ret = conap_msg_thread_send_4(&ctx->msg_ctx, AOLTEST_OPID_SEND_MSG,
 						module_id, test_info->start_test_id,
 						(size_t)data_buf, test_info->test_data_sz);
 
@@ -426,7 +426,7 @@ static void aoltestv2_common_state_change(uint32_t module_id, int state)
 				memcpy(&(data_buf->buf[0]), &(test_info->data_trans),
 									sizeof(uint32_t));
 
-				ret = msg_thread_send_4(&ctx->msg_ctx, AOLTEST_OPID_SEND_MSG,
+				ret = conap_msg_thread_send_4(&ctx->msg_ctx, AOLTEST_OPID_SEND_MSG,
 							module_id, test_info->start_data_trans_id,
 							(size_t)data_buf, sizeof(uint32_t));
 
@@ -498,7 +498,7 @@ static int aoltestv2_core_bind(uint32_t port, uint32_t module_id)
 		return -1;
 	}
 
-	ret = msg_thread_send_2(&ctx->msg_ctx, AOLTEST_OPID_MODULE_BIND, module_id, port);
+	ret = conap_msg_thread_send_2(&ctx->msg_ctx, AOLTEST_OPID_MODULE_BIND, module_id, port);
 
 	if (ret)
 		pr_info("[%s] Send to msg thread fail, ret=[%d]\n", __func__, ret);
@@ -518,7 +518,7 @@ static int aoltestv2_core_unbind(uint32_t module_id)
 		return -1;
 	}
 
-	ret = msg_thread_send_1(&ctx->msg_ctx, AOLTEST_OPID_MODULE_UNBIND, module_id);
+	ret = conap_msg_thread_send_1(&ctx->msg_ctx, AOLTEST_OPID_MODULE_UNBIND, module_id);
 
 	if (ret)
 		pr_info("[%s] Send to msg thread fail, ret=[%d]\n", __func__, ret);
@@ -622,7 +622,7 @@ int aoltestv2_core_init(void)
 	memset(&g_aoltestv2_ctx, 0, sizeof(struct aoltest_core_ctx));
 
 	/* Create EM test thread */
-	ret = msg_thread_init(&ctx->msg_ctx, "em_test_v2_thrd",
+	ret = conap_msg_thread_init(&ctx->msg_ctx, "em_test_v2_thrd",
 					aoltest_core_opfunc, AOLTEST_OPID_MAX);
 
 	if (ret) {

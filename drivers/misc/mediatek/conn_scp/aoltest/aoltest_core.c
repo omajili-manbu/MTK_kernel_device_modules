@@ -391,7 +391,7 @@ void aoltest_core_msg_notify(unsigned int msg_id, unsigned int *buf, unsigned in
 
 	aoltest_push_message(&g_rb, msg_id, buf);
 
-	ret = msg_thread_send_1(&ctx->msg_ctx, AOLTEST_OPID_RECV_MSG, msg_id);
+	ret = conap_msg_thread_send_1(&ctx->msg_ctx, AOLTEST_OPID_RECV_MSG, msg_id);
 
 	if (ret)
 		pr_info("[%s] Notify recv msg fail, ret=[%d]\n", __func__, ret);
@@ -416,10 +416,10 @@ void aoltest_core_state_change(int state)
 
 		if (g_is_test_started) {
 			// Re-send start test with test info
-			ret = msg_thread_send_1(&ctx->msg_ctx,
+			ret = conap_msg_thread_send_1(&ctx->msg_ctx,
 						AOLTEST_OPID_SEND_MSG, AOLTEST_CMD_START_TEST);
 			if (g_is_data_trans) {
-				ret = msg_thread_send_1(&ctx->msg_ctx,
+				ret = conap_msg_thread_send_1(&ctx->msg_ctx,
 					AOLTEST_OPID_SEND_MSG, AOLTEST_CMD_START_DATA_TRANS);
 				if (ret)
 					pr_notice("[%s] send msg fail ret=[%d]", __func__, ret);
@@ -445,7 +445,7 @@ static int aoltest_core_handler(int cmd, void *data)
 	if (cmd == AOLTEST_CMD_START_TEST)
 		g_test_info = *((struct test_info *)data);
 
-	ret = msg_thread_send_1(&ctx->msg_ctx, AOLTEST_OPID_SEND_MSG, cmd);
+	ret = conap_msg_thread_send_1(&ctx->msg_ctx, AOLTEST_OPID_SEND_MSG, cmd);
 
 	if (ret)
 		pr_info("[%s] Send to msg thread fail, ret=[%d]\n", __func__, ret);
@@ -458,7 +458,7 @@ static int aoltest_core_bind(void)
 	int ret = 0;
 	struct aoltest_core_ctx *ctx = &g_aoltest_ctx;
 
-	ret = msg_thread_send(&ctx->msg_ctx, AOLTEST_OPID_SCP_REGISTER);
+	ret = conap_msg_thread_send(&ctx->msg_ctx, AOLTEST_OPID_SCP_REGISTER);
 	if (ret)
 		pr_info("[%s] Send to msg thread fail, ret=[%d]\n", __func__, ret);
 
@@ -478,7 +478,7 @@ int aoltest_core_send_dbg_msg(uint32_t param0, uint32_t param1)
 	int ret;
 	struct aoltest_core_ctx *ctx = &g_aoltest_ctx;
 
-	ret = msg_thread_send_wait_2(&ctx->msg_ctx, AOLTEST_OPID_SEND_DBG_MSG,
+	ret = conap_msg_thread_send_wait_2(&ctx->msg_ctx, AOLTEST_OPID_SEND_DBG_MSG,
 					MSG_OP_TIMEOUT, param0, param1);
 	if (ret)
 		pr_notice("[%s] send msg fail ret=[%d]", __func__, ret);
@@ -490,7 +490,7 @@ int aoltest_core_send_dbg_data(uint8_t *buf, uint32_t size)
 	int ret;
 	struct aoltest_core_ctx *ctx = &g_aoltest_ctx;
 
-	ret = msg_thread_send_wait_2(&ctx->msg_ctx, AOLTEST_OPID_SEND_DBG_DATA,
+	ret = conap_msg_thread_send_wait_2(&ctx->msg_ctx, AOLTEST_OPID_SEND_DBG_DATA,
 					MSG_OP_TIMEOUT, (size_t)buf, size);
 	if (ret)
 		pr_notice("[%s] send msg fail ret=[%d]", __func__, ret);
@@ -507,7 +507,7 @@ int aoltest_core_init(void)
 	memset(&g_aoltest_ctx, 0, sizeof(struct aoltest_core_ctx));
 
 	/* Create EM test thread */
-	ret = msg_thread_init(&ctx->msg_ctx, "em_test_thread",
+	ret = conap_msg_thread_init(&ctx->msg_ctx, "em_test_thread",
 					aoltest_core_opfunc, AOLTEST_OPID_MAX);
 	if (ret) {
 		pr_info("EM test thread init fail, ret=[%d]\n", ret);

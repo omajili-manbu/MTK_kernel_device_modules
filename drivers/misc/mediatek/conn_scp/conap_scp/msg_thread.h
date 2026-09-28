@@ -59,21 +59,21 @@ struct msg_thread_ctx {
 
 #define MSG_OP_TIMEOUT 20000
 
-int msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
+int conap_msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
 					const msg_opid_func *func, int op_size);
-int msg_thread_deinit(struct msg_thread_ctx *ctx);
+int conap_msg_thread_deinit(struct msg_thread_ctx *ctx);
 
 /* timeout:
  *    0: default value (by MSG_OP_TIMEOUT define)
  *    >0: cutom timeout (ms)
  */
-int msg_thread_send(struct msg_thread_ctx *ctx, int opid);
-int msg_thread_send_1(struct msg_thread_ctx *ctx, int opid, size_t param1);
-int msg_thread_send_2(struct msg_thread_ctx *ctx, int opid, size_t param1,
+int conap_msg_thread_send(struct msg_thread_ctx *ctx, int opid);
+int conap_msg_thread_send_1(struct msg_thread_ctx *ctx, int opid, size_t param1);
+int conap_msg_thread_send_2(struct msg_thread_ctx *ctx, int opid, size_t param1,
 					size_t param2);
-int msg_thread_send_3(struct msg_thread_ctx *ctx, int opid, size_t param1,
+int conap_msg_thread_send_3(struct msg_thread_ctx *ctx, int opid, size_t param1,
 					size_t param2, size_t param3);
-int msg_thread_send_4(struct msg_thread_ctx *ctx, int opid, size_t param1,
+int conap_msg_thread_send_4(struct msg_thread_ctx *ctx, int opid, size_t param1,
 							size_t param2, size_t param3,
 							size_t param4);
 
@@ -81,14 +81,14 @@ int msg_thread_send_5(struct msg_thread_ctx *ctx, int opid, size_t param1,
 							size_t param2, size_t param3,
 							size_t param4, size_t param5);
 
-int msg_thread_send_wait(struct msg_thread_ctx *ctx, int opid, int timeout);
-int msg_thread_send_wait_1(struct msg_thread_ctx *ctx, int opid, int timeout, size_t param1);
-int msg_thread_send_wait_2(struct msg_thread_ctx *ctx, int opid, int timeout,
+int conap_msg_thread_send_wait(struct msg_thread_ctx *ctx, int opid, int timeout);
+int conap_msg_thread_send_wait_1(struct msg_thread_ctx *ctx, int opid, int timeout, size_t param1);
+int conap_msg_thread_send_wait_2(struct msg_thread_ctx *ctx, int opid, int timeout,
 								size_t param1, size_t param2);
-int msg_thread_send_wait_3(struct msg_thread_ctx *ctx, int opid, int timeout,
+int conap_msg_thread_send_wait_3(struct msg_thread_ctx *ctx, int opid, int timeout,
 							size_t param1, size_t param2,
 							size_t param3);
-int msg_thread_send_wait_4(struct msg_thread_ctx *ctx, int opid, int timeout,
+int conap_msg_thread_send_wait_4(struct msg_thread_ctx *ctx, int opid, int timeout,
 							size_t param1, size_t param2,
 							size_t param3, size_t param4);
 

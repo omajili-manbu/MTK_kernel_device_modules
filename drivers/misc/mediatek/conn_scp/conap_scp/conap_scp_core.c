@@ -11,6 +11,8 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
+/* rodin(4-6): 6.18 头瘦身，vmalloc/vfree 显式声明 */
+#include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 
 #include "conap_scp.h"
@@ -61,7 +63,7 @@ const struct of_device_id conn_scp_of_ids[] = {
 
 
 static int conn_scp_probe(struct platform_device *pdev);
-static int conn_scp_remove(struct platform_device *pdev);
+static void conn_scp_remove(struct platform_device *pdev);
 
 static struct platform_driver g_connscp_dev_drv = {
 	.probe = conn_scp_probe,
@@ -486,7 +488,7 @@ static void conap_scp_msg_notify(uint16_t drv_type, uint16_t msg_id,
 		} else if (msg_id == CONAP_SCP_CORE_DRV_QRY) {
 			struct msg_data_2 *drv_rdy = (struct msg_data_2 *)data;
 
-			ret = msg_thread_send_1(&g_core_ctx.tx_msg_thread
+			ret = conap_msg_thread_send_1(&g_core_ctx.tx_msg_thread
 						, CONAP_SCP_OPID_DRV_READY_ACK
 						, (size_t)drv_rdy->param0);
 			if (ret)
@@ -507,7 +509,7 @@ static void conap_scp_msg_notify(uint16_t drv_type, uint16_t msg_id,
 		} else if (msg_id == CONAP_SCP_CORE_REQ_TX) {
 			struct msg_data_2 *msg = (struct msg_data_2 *)data;
 
-			ret = msg_thread_send_2(&g_core_ctx.tx_msg_thread
+			ret = conap_msg_thread_send_2(&g_core_ctx.tx_msg_thread
 						, CONAP_SCP_OPID_RECV_MSG
 						, (size_t)msg->param0, (size_t)msg->param1);
 			if (ret)
@@ -520,7 +522,7 @@ static void conap_scp_msg_notify(uint16_t drv_type, uint16_t msg_id,
 		} else if (msg_id == CONAP_SCP_CORE_TX_SHM) {
 			struct msg_data_4 *msg = (struct msg_data_4 *)data;
 
-			ret = msg_thread_send_4(&g_core_ctx.tx_msg_thread
+			ret = conap_msg_thread_send_4(&g_core_ctx.tx_msg_thread
 						, CONAP_SCP_OPID_RECV_SHM_MSG
 						, (size_t)msg->param0, (size_t)msg->param1
 						, (size_t)msg->param2, (size_t)msg->param3);
@@ -565,7 +567,7 @@ static void conap_scp_ipi_ctrl_notify(unsigned int state)
 
 	pr_info("[%s] state=[%d]->[%d]", __func__, g_core_ctx.state, state);
 
-	ret = msg_thread_send_2(&g_core_ctx.tx_msg_thread,
+	ret = conap_msg_thread_send_2(&g_core_ctx.tx_msg_thread,
 			CONAP_SCP_OPID_STATE_CHANGE, STATE_CHG_DRV_SCP, (size_t)state);
 	if (ret)
 		pr_warn("[%s] msg_send fail [%d]", __func__, ret);
@@ -641,7 +643,7 @@ int conap_scp_send_message(enum conap_scp_drv_type type,
 	if (_conap_scp_is_scp_ready() != 1)
 		return CONN_NOT_READY;
 
-	ret = msg_thread_send_wait_4(&g_core_ctx.tx_msg_thread,
+	ret = conap_msg_thread_send_wait_4(&g_core_ctx.tx_msg_thread,
 					CONAP_SCP_OPID_SEND_MSG, MSG_OP_TIMEOUT,
 					(size_t)type, msg_id, (size_t)buf, size);
 	if (ret)
@@ -668,7 +670,7 @@ int conap_scp_is_drv_ready(enum conap_scp_drv_type type)
 	reinit_completion(&user->is_rdy_comp);
 
 	/* send msg */
-	ret = msg_thread_send_1(&g_core_ctx.tx_msg_thread, CONAP_SCP_OPID_DRV_READY, (size_t)type);
+	ret = conap_msg_thread_send_1(&g_core_ctx.tx_msg_thread, CONAP_SCP_OPID_DRV_READY, (size_t)type);
 	if (ret) {
 		pr_warn("[%s] send msg fail [%d]", __func__, ret);
 		return ret;
@@ -807,9 +809,9 @@ int conn_scp_probe(struct platform_device *pdev)
 	return 0;
 }
 
-int conn_scp_remove(struct platform_device *pdev)
+void conn_scp_remove(struct platform_device *pdev)
 {
-	return 0;
+	return;
 }
 
 
@@ -833,7 +835,7 @@ int conap_scp_init(void)
 	}
 
 	/* tx msg thread */
-	ret = msg_thread_init(&g_core_ctx.tx_msg_thread, "conap_scp_core",
+	ret = conap_msg_thread_init(&g_core_ctx.tx_msg_thread, "conap_scp_core",
 					conap_scp_core_opfunc, CONAP_SCP_OPID_MAX);
 	if (ret) {
 		pr_warn("msg thread init fail [%d]", ret);
@@ -884,7 +886,7 @@ int conap_scp_deinit(void)
 	connectivity_unregister_dfd_handler();
 	connectivity_unregister_state_notifier(&g_conn_state_notifier);
 	conap_scp_ipi_deinit();
-	msg_thread_deinit(&g_core_ctx.tx_msg_thread);
+	conap_msg_thread_deinit(&g_core_ctx.tx_msg_thread);
 	mutex_destroy(&g_core_ctx.lock);
 
 	platform_driver_unregister(&g_connscp_dev_drv);

@@ -8,6 +8,8 @@
 /*******************************************************************************/
 #include <linux/cdev.h>
 #include <linux/device.h>
+/* rodin(4-6): 6.18 头瘦身，vmalloc/vfree 显式声明 */
+#include <linux/vmalloc.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/mm.h>

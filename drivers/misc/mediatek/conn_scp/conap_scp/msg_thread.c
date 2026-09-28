@@ -55,7 +55,7 @@ do { \
 /*
  * Utility functions
  */
-static int msg_evt_put_op_to_q(struct msg_op_q *op_q, struct msg_op *op)
+static int conap_msg_evt_put_op_to_q(struct msg_op_q *op_q, struct msg_op *op)
 {
 	int ret = 0;
 	unsigned long flags;
@@ -83,7 +83,7 @@ static int msg_evt_put_op_to_q(struct msg_op_q *op_q, struct msg_op *op)
 /*
  * Utility functions
  */
-static struct msg_op *msg_evt_get_op_from_q(struct msg_op_q *op_q)
+static struct msg_op *conap_msg_evt_get_op_from_q(struct msg_op_q *op_q)
 {
 	unsigned long flags;
 	struct msg_op *op;
@@ -107,22 +107,22 @@ static struct msg_op *msg_evt_get_op_from_q(struct msg_op_q *op_q)
 }
 
 /*
- *  msg_evt_thread API
+ *  conap_msg_evt_thread API
  */
 
-int msg_evt_put_op_to_free_queue(struct msg_thread_ctx *ctx, struct msg_op *op)
+int conap_msg_evt_put_op_to_free_queue(struct msg_thread_ctx *ctx, struct msg_op *op)
 {
-	if (msg_evt_put_op_to_q(&ctx->free_op_q, op))
+	if (conap_msg_evt_put_op_to_q(&ctx->free_op_q, op))
 		return -1;
 	return 0;
 }
 
 
-struct msg_op *msg_evt_get_free_op(struct msg_thread_ctx *ctx)
+struct msg_op *conap_msg_evt_get_free_op(struct msg_thread_ctx *ctx)
 {
 	struct msg_op *op = NULL;
 
-	op = msg_evt_get_op_from_q(&ctx->free_op_q);
+	op = conap_msg_evt_get_op_from_q(&ctx->free_op_q);
 	if (op) {
 		memset(&(op->op), 0, sizeof(struct msg_op_data));
 		op->result = 0;
@@ -132,7 +132,7 @@ struct msg_op *msg_evt_get_free_op(struct msg_thread_ctx *ctx)
 	return op;
 }
 
-int msg_evt_put_op_to_active(struct msg_thread_ctx *ctx, struct msg_op *op)
+int conap_msg_evt_put_op_to_active(struct msg_thread_ctx *ctx, struct msg_op *op)
 {
 	struct msg_op_signal *signal = NULL;
 	int wait_ret = -1;
@@ -164,7 +164,7 @@ int msg_evt_put_op_to_active(struct msg_thread_ctx *ctx, struct msg_op *op)
 		atomic_inc(&op->ref_count);
 
 		/* put to active Q */
-		ret = msg_evt_put_op_to_q(&ctx->active_op_q, op);
+		ret = conap_msg_evt_put_op_to_q(&ctx->active_op_q, op);
 
 		if (ret) {
 			pr_warn("put to active queue fail\n");
@@ -206,37 +206,37 @@ int msg_evt_put_op_to_active(struct msg_thread_ctx *ctx, struct msg_op *op)
 	if (op != NULL && signal != NULL &&
 		atomic_dec_and_test(&op->ref_count)) {
 		/* put Op back to freeQ */
-		msg_evt_put_op_to_free_queue(ctx, op);
+		conap_msg_evt_put_op_to_free_queue(ctx, op);
 	}
 
 	return ret;
 }
 
 
-int msg_thread_send(struct msg_thread_ctx *ctx, int opid)
+int conap_msg_thread_send(struct msg_thread_ctx *ctx, int opid)
 {
-	return msg_thread_send_2(ctx, opid, 0, 0);
+	return conap_msg_thread_send_2(ctx, opid, 0, 0);
 }
 
-int msg_thread_send_1(struct msg_thread_ctx *ctx, int opid, size_t param1)
+int conap_msg_thread_send_1(struct msg_thread_ctx *ctx, int opid, size_t param1)
 {
-	return msg_thread_send_2(ctx, opid, param1, 0);
+	return conap_msg_thread_send_2(ctx, opid, param1, 0);
 }
 
-int msg_thread_send_2(struct msg_thread_ctx *ctx, int opid, size_t param1, size_t param2)
+int conap_msg_thread_send_2(struct msg_thread_ctx *ctx, int opid, size_t param1, size_t param2)
 {
-	return msg_thread_send_3(ctx, opid, param1, param2, 0);
+	return conap_msg_thread_send_3(ctx, opid, param1, param2, 0);
 }
 
 
-int msg_thread_send_3(struct msg_thread_ctx *ctx, int opid, size_t param1,
+int conap_msg_thread_send_3(struct msg_thread_ctx *ctx, int opid, size_t param1,
 					size_t param2, size_t param3)
 {
 	struct msg_op *op = NULL;
 	struct msg_op_signal *signal;
 	int ret;
 
-	op = msg_evt_get_free_op(ctx);
+	op = conap_msg_evt_get_free_op(ctx);
 	if (!op) {
 		pr_err("[%s] can't get free op\n", __func__);
 		return -1;
@@ -249,12 +249,12 @@ int msg_thread_send_3(struct msg_thread_ctx *ctx, int opid, size_t param1,
 	signal = &op->signal;
 	signal->timeoutValue = 0;
 
-	ret = msg_evt_put_op_to_active(ctx, op);
+	ret = conap_msg_evt_put_op_to_active(ctx, op);
 
 	return ret;
 }
 
-int msg_thread_send_4(struct msg_thread_ctx *ctx, int opid, size_t param1,
+int conap_msg_thread_send_4(struct msg_thread_ctx *ctx, int opid, size_t param1,
 							size_t param2, size_t param3,
 							size_t param4)
 {
@@ -269,7 +269,7 @@ int msg_thread_send_5(struct msg_thread_ctx *ctx, int opid, size_t param1,
 	struct msg_op_signal *signal;
 	int ret;
 
-	op = msg_evt_get_free_op(ctx);
+	op = conap_msg_evt_get_free_op(ctx);
 	if (!op) {
 		pr_err("[%s] can't get free op\n", __func__);
 		return -1;
@@ -284,32 +284,32 @@ int msg_thread_send_5(struct msg_thread_ctx *ctx, int opid, size_t param1,
 	signal = &op->signal;
 	signal->timeoutValue = 0;
 
-	ret = msg_evt_put_op_to_active(ctx, op);
+	ret = conap_msg_evt_put_op_to_active(ctx, op);
 
 	return ret;
 
 }
 
-int msg_thread_send_wait(struct msg_thread_ctx *ctx, int opid, int timeout)
+int conap_msg_thread_send_wait(struct msg_thread_ctx *ctx, int opid, int timeout)
 {
-	return msg_thread_send_wait_3(ctx, opid, timeout, 0, 0, 0);
+	return conap_msg_thread_send_wait_3(ctx, opid, timeout, 0, 0, 0);
 }
 
-int msg_thread_send_wait_1(struct msg_thread_ctx *ctx, int opid, int timeout,
+int conap_msg_thread_send_wait_1(struct msg_thread_ctx *ctx, int opid, int timeout,
 							size_t param1)
 {
-	return msg_thread_send_wait_3(ctx, opid, timeout, param1, 0, 0);
+	return conap_msg_thread_send_wait_3(ctx, opid, timeout, param1, 0, 0);
 }
 
 
-int msg_thread_send_wait_2(struct msg_thread_ctx *ctx, int opid, int timeout,
+int conap_msg_thread_send_wait_2(struct msg_thread_ctx *ctx, int opid, int timeout,
 							size_t param1,
 							size_t param2)
 {
-	return msg_thread_send_wait_3(ctx, opid, timeout, param1, param2, 0);
+	return conap_msg_thread_send_wait_3(ctx, opid, timeout, param1, param2, 0);
 }
 
-int msg_thread_send_wait_3(struct msg_thread_ctx *ctx,
+int conap_msg_thread_send_wait_3(struct msg_thread_ctx *ctx,
 							int opid, int timeout,
 							size_t param1,
 							size_t param2,
@@ -319,7 +319,7 @@ int msg_thread_send_wait_3(struct msg_thread_ctx *ctx,
 	struct msg_op_signal *signal = NULL;
 	int ret;
 
-	op = msg_evt_get_free_op(ctx);
+	op = conap_msg_evt_get_free_op(ctx);
 	if (!op) {
 		pr_err("[%s] can't get free op\n", __func__);
 		return -1;
@@ -331,20 +331,20 @@ int msg_thread_send_wait_3(struct msg_thread_ctx *ctx,
 
 	signal = &op->signal;
 	signal->timeoutValue = timeout > 0 ? timeout : MSG_OP_TIMEOUT;
-	ret = msg_evt_put_op_to_active(ctx, op);
+	ret = conap_msg_evt_put_op_to_active(ctx, op);
 	return ret;
 
 }
 
 
-int msg_thread_send_wait_4(struct msg_thread_ctx *ctx, int opid, int timeout, size_t param1,
+int conap_msg_thread_send_wait_4(struct msg_thread_ctx *ctx, int opid, int timeout, size_t param1,
 							size_t param2, size_t param3, size_t param4)
 {
 	struct msg_op *op = NULL;
 	struct msg_op_signal *signal = NULL;
 	int ret;
 
-	op = msg_evt_get_free_op(ctx);
+	op = conap_msg_evt_get_free_op(ctx);
 	if (!op) {
 		pr_err("[%s] can't get free op\n", __func__);
 		return -1;
@@ -357,18 +357,18 @@ int msg_thread_send_wait_4(struct msg_thread_ctx *ctx, int opid, int timeout, si
 
 	signal = &op->signal;
 	signal->timeoutValue = timeout > 0 ? timeout : MSG_OP_TIMEOUT;
-	ret = msg_evt_put_op_to_active(ctx, op);
+	ret = conap_msg_evt_put_op_to_active(ctx, op);
 	return ret;
 
 }
 
-int msg_evt_set_current_op(struct msg_thread_ctx *ctx, struct msg_op *op)
+int conap_msg_evt_set_current_op(struct msg_thread_ctx *ctx, struct msg_op *op)
 {
 	ctx->cur_op = op;
 	return 0;
 }
 
-int msg_evt_opid_handler(struct msg_thread_ctx *ctx, struct msg_op_data *op)
+int conap_msg_evt_opid_handler(struct msg_thread_ctx *ctx, struct msg_op_data *op)
 {
 	int opid, ret;
 
@@ -381,7 +381,7 @@ int msg_evt_opid_handler(struct msg_thread_ctx *ctx, struct msg_op_data *op)
 	opid = op->op_id;
 
 	if (opid >= ctx->op_func_size) {
-		pr_err("msg_evt_thread invalid OPID(%d)\n", opid);
+		pr_err("conap_msg_evt_thread invalid OPID(%d)\n", opid);
 		return -3;
 	}
 
@@ -393,7 +393,7 @@ int msg_evt_opid_handler(struct msg_thread_ctx *ctx, struct msg_op_data *op)
 	return ret;
 }
 
-unsigned int msg_evt_wait_event_checker(struct msg_thread_ctx *ctx)
+unsigned int conap_msg_evt_wait_event_checker(struct msg_thread_ctx *ctx)
 {
 	unsigned long flags;
 	int ret = 0;
@@ -407,7 +407,7 @@ unsigned int msg_evt_wait_event_checker(struct msg_thread_ctx *ctx)
 	return 0;
 }
 
-static int msg_evt_thread(void *pvData)
+static int conap_msg_evt_thread(void *pvData)
 {
 	struct msg_thread_ctx *ctx = (struct msg_thread_ctx *)pvData;
 	struct task_struct *p_thread = NULL;
@@ -424,7 +424,7 @@ static int msg_evt_thread(void *pvData)
 		op = NULL;
 
 		wait_event_interruptible(ctx->waitQueue,
-			(kthread_should_stop() || msg_evt_wait_event_checker(ctx)));
+			(kthread_should_stop() || conap_msg_evt_wait_event_checker(ctx)));
 
 		if ((p_thread) && !IS_ERR_OR_NULL(p_thread) && kthread_should_stop()) {
 			pr_info("[%s] thread should stop now...\n", __func__);
@@ -433,7 +433,7 @@ static int msg_evt_thread(void *pvData)
 		}
 
 		/* get Op from activeQ */
-		op = msg_evt_get_op_from_q(&ctx->active_op_q);
+		op = conap_msg_evt_get_op_from_q(&ctx->active_op_q);
 		if (!op) {
 			pr_warn("get op from activeQ fail\n");
 			continue;
@@ -444,9 +444,9 @@ static int msg_evt_thread(void *pvData)
 		state = atomic_inc_return(&op->op_state);
 
 		if (state == 2) {
-			msg_evt_set_current_op(ctx, op);
-			ret = msg_evt_opid_handler(ctx, &op->op);
-			msg_evt_set_current_op(ctx, NULL);
+			conap_msg_evt_set_current_op(ctx, op);
+			ret = conap_msg_evt_opid_handler(ctx, &op->op);
+			conap_msg_evt_set_current_op(ctx, NULL);
 		} else
 			pr_notice("[%s] op not in_use, give up [%d]", __func__, state);
 
@@ -458,7 +458,7 @@ static int msg_evt_thread(void *pvData)
 
 		if (atomic_dec_and_test(&op->ref_count)) {
 			/* msg_evt_free_op(ctx) */
-			msg_evt_put_op_to_free_queue(ctx, op);
+			conap_msg_evt_put_op_to_free_queue(ctx, op);
 		} else if (op->signal.timeoutValue) {
 			op->result = ret;
 			complete(&(op->signal.comp));
@@ -470,7 +470,7 @@ static int msg_evt_thread(void *pvData)
 	return 0;
 }
 
-int msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
+int conap_msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
 					const msg_opid_func *func, int op_size)
 {
 	int r = 0, i;
@@ -482,7 +482,7 @@ int msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
 	ctx->op_func = func;
 	ctx->op_func_size = op_size;
 
-	p_thread = kthread_create(msg_evt_thread,
+	p_thread = kthread_create(conap_msg_evt_thread,
 				ctx, "%s", name == NULL ? "" : name);
 
 	if (IS_ERR(p_thread)) {
@@ -503,7 +503,7 @@ int msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
 	/* Put all to free Q */
 	for (i = 0; i < MSG_THREAD_OP_BUF_SIZE; i++) {
 		init_completion(&(ctx->op_q_inst[i].signal.comp));
-		msg_evt_put_op_to_free_queue(ctx, &(ctx->op_q_inst[i]));
+		conap_msg_evt_put_op_to_free_queue(ctx, &(ctx->op_q_inst[i]));
 	}
 
 	wake_up_process(p_thread);
@@ -512,7 +512,7 @@ int msg_thread_init(struct msg_thread_ctx *ctx, const char *name,
 	return r;
 }
 
-int msg_thread_deinit(struct msg_thread_ctx *ctx)
+int conap_msg_thread_deinit(struct msg_thread_ctx *ctx)
 {
 	int r;
 	unsigned int retry = 0;
