@@ -9,9 +9,14 @@
 #include <linux/iio/iio.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
-#include <linux/mfd/mt6357/registers.h>
-#include <linux/mfd/mt6358/registers.h>
-#include <linux/mfd/mt6359p/registers.h>
+#include "../../../include/linux/mfd/mt6357/registers.h" /* rodin: vendor-first（内核同名头宏集不同） */
+#include "../../../include/linux/mfd/mt6358/registers.h" /* rodin: vendor-first，内核同名头无 MT6358_AUXADC_* 宏（同 guard 截胡） */
+#include "../../../include/linux/mfd/mt6359p/registers.h"
+/* rodin: 6.18 内核枚举无 6359P 变体，按 S3a 先例文件内绑定（chip id 值相同面） */
+#ifndef MT6359P_CHIP_ID
+#define MT6359P_CHIP_ID		MT6359_CHIP_ID
+#endif
+ /* rodin: vendor-first（内核同名头无 MT6359P_AUXADC_* 宏） */
 #include <linux/mfd/mt6397/core.h>
 #include <linux/module.h>
 #include <linux/nvmem-consumer.h>

@@ -12,6 +12,7 @@
 #include <linux/nvmem-consumer.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
@@ -106,7 +107,7 @@ static int __used pmic_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	int val = 0;
 	int ret;
-	struct pmic_temp_tz *pmic_tz = (struct pmic_temp_tz *)tz->devdata;
+	struct pmic_temp_tz *pmic_tz = (struct pmic_temp_tz *)thermal_zone_device_priv(tz);
 	struct pmic_temp_info *temp_info = pmic_tz->pmic_tz_info;
 	struct pmic_tz_data *tz_data = temp_info->efuse_data;
 	struct pmic_tz_cali_data *cali_data = tz_data->cali_data;

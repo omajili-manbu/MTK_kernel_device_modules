@@ -47,6 +47,8 @@
 #include <trace/events/power.h>
 
 #include "mtk_cm_mgr_common.h"
+
+unsigned int cm_dbg_info; /* rodin: 定义收口到 common.c（批4-5），无条件段 */
 #if IS_ENABLED(CONFIG_MTK_CM_IPI)
 #include "mtk_cm_ipi.h"
 #endif /* CONFIG_MTK_CM_IPI */
@@ -54,6 +56,7 @@
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SSPM_V2) && !IS_ENABLED(CONFIG_MTK_CM_IPI)
 #include <sspm_define.h>
 #include <sspm_ipi_id.h>
+
 #endif /* CONFIG_MTK_TINYSYS_SSPM_V2 && !IS_ENABLED(CONFIG_MTK_CM_IPI) */
 
 /*****************************************************************************

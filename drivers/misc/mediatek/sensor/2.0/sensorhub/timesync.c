@@ -211,7 +211,7 @@ void timesync_start(void)
 
 void timesync_stop(void)
 {
-	del_timer_sync(&timesync_timer);
+	timer_delete_sync(&timesync_timer); /* rodin: 6.18 timer API */
 }
 
 void timesync_resume(void)

@@ -519,18 +519,17 @@ err_new_virtqueue:
 }
 
 
-static int trusty_virtio_find_vqs(struct virtio_device *vdev,
+static int trusty_virtio_find_vqs(struct virtio_device *vdev, /* rodin: 6.18 find_vqs 收敛为 5 参 + virtqueue_info[] */
 				  unsigned int nvqs,
 				  struct virtqueue *vqs[],
-				  vq_callback_t *callbacks[],
-				  const char *const names[],
-				  const bool *ctx, struct irq_affinity *desc)
+				  struct virtqueue_info vqs_info[],
+				  struct irq_affinity *desc)
 {
 	uint i;
 	int ret;
 
 	for (i = 0; i < nvqs; i++) {
-		vqs[i] = _find_vq(vdev, i, callbacks[i], names[i]);
+		vqs[i] = _find_vq(vdev, i, vqs_info[i].callback, vqs_info[i].name);
 		if (IS_ERR(vqs[i])) {
 			ret = PTR_ERR(vqs[i]);
 			_del_vqs(vdev);

@@ -5,6 +5,7 @@
 
 #define pr_fmt(fmt) "sap " fmt
 
+#include <linux/vmalloc.h>
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/soc/mediatek/mtk-mbox.h>

@@ -11,6 +11,7 @@
 #include <linux/of_platform.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/platform_device.h>
 #include <linux/thermal.h>
 #include <linux/math64.h>
 
@@ -165,7 +166,7 @@ static unsigned int calculate_r_ntc(unsigned long long v_in,
 
 static int board_ntc_get_temp(struct thermal_zone_device *tz, int *temp)
 {
-	struct board_ntc_info *ntc_info = (struct board_ntc_info *)tz->devdata;
+	struct board_ntc_info *ntc_info = (struct board_ntc_info *)thermal_zone_device_priv(tz);
 	struct pmic_auxadc_data *adc_data = ntc_info->adc_data;
 	struct tia_data *tia_param = ntc_info->adc_data->tia_param;
 	unsigned int val, r_type, r_ntc, dbg_reg, en_reg, count = 0;

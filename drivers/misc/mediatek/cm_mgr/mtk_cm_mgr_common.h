@@ -8,7 +8,7 @@
 
 #include <linux/kernel.h>
 
-unsigned int cm_dbg_info;
+extern unsigned int cm_dbg_info; /* rodin: 头内定义改 extern，=y 单镜像只留一份（批4-5） */
 #define CM_DBG_PRINT(fmt, ...) \
 	do { \
 		if (cm_dbg_info) \

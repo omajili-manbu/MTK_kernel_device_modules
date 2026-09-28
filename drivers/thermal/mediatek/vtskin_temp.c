@@ -11,14 +11,16 @@
 #include <linux/of_platform.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/platform_device.h>
 #include <linux/thermal.h>
+#include "thermal_core.h" /* rodin: 6.18 zone type 字段在内核内部头 */
 #include "vtskin_temp.h"
 #include <linux/math64.h>
 #include <linux/timer.h>
 
 static int vtskin_get_temp(struct thermal_zone_device *tz, int *temp)
 {
-	struct vtskin_temp_tz *skin_tz = (struct vtskin_temp_tz *)tz->devdata;
+	struct vtskin_temp_tz *skin_tz = (struct vtskin_temp_tz *)thermal_zone_device_priv(tz);
 	struct vtskin_data *skin_data = skin_tz->skin_data;
 	struct vtskin_tz_param *skin_param = skin_data->params;
 	struct thermal_zone_device *tzd;
@@ -42,14 +44,14 @@ static int vtskin_get_temp(struct thermal_zone_device *tz, int *temp)
 		}
 
 		tzd = skin_param[skin_tz->id].tzd[i];
-		if (IS_ERR_OR_NULL(tzd) || !tzd->ops || !tzd->ops->get_temp) {
+		if (IS_ERR_OR_NULL(tzd)) { /* rodin: 6.18 ops 不对驱动可见，用 thermal_zone_get_temp */
 			dev_err(skin_data->dev, "get %s temp fail\n", sensor_name);
 			*temp = THERMAL_TEMP_INVALID;
 			return -EINVAL;
 		}
 
 		if (skin_param[skin_tz->id].operation != OP_COEF) {
-			ret = tzd->ops->get_temp(tzd, &tz_temp);
+			ret = thermal_zone_get_temp(tzd, &tz_temp); /* rodin: 6.18 */
 			if (ret < 0) {
 				dev_err(skin_data->dev, "%s get_temp fail %d\n", sensor_name, ret);
 				*temp = THERMAL_TEMP_INVALID;
@@ -72,7 +74,7 @@ static int vtskin_get_temp(struct thermal_zone_device *tz, int *temp)
 				((unsigned long long)ktime_us_delta(now_time, last_time) < 200000) )
 				tz_temp = last_temp;
 			else {
-				ret = tzd->ops->get_temp(tzd, &tz_temp);
+				ret = thermal_zone_get_temp(tzd, &tz_temp); /* rodin: 6.18 */
 				if (ret < 0) {
 					dev_err(skin_data->dev, "%s get_temp fail %d\n", sensor_name, ret);
 					*temp = THERMAL_TEMP_INVALID;
