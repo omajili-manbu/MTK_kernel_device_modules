@@ -95,7 +95,7 @@ static void spm_resource_req_timer_en(u32 enable, u32 timer_ms)
 
 		spm_resource_req_timer_is_enabled = true;
 	} else if (spm_resource_req_timer_is_enabled) {
-		del_timer(&spm_resource_req_timer);
+		timer_delete(&spm_resource_req_timer);
 		spm_resource_req_timer_is_enabled = false;
 	}
 }

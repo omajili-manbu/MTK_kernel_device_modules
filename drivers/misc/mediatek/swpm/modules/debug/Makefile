@@ -35,7 +35,8 @@ endif
 ifeq ($(CONFIG_MTK_SWPM_MT6895),m)
 obj-$(CONFIG_MTK_SWPM_MT6895) += v6895/
 endif
-ifeq ($(CONFIG_MTK_SWPM_MT6899),m)
+# rodin batch4-7: =y 内建（其余平台门未翻保持原样）
+ifneq ($(CONFIG_MTK_SWPM_MT6899),)
 obj-$(CONFIG_MTK_SWPM_MT6899) += v6899/
 endif
 ifeq ($(CONFIG_MTK_SWPM_MT6983),m)

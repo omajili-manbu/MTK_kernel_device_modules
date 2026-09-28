@@ -301,9 +301,8 @@ static int mt_ssc_pdrv_probe(struct platform_device *pdev)
 	}
 	return 0;
 }
-static int mt_ssc_pdrv_remove(struct platform_device *pdev)
+static void mt_ssc_pdrv_remove(struct platform_device *pdev) /* rodin batch4-7: 6.18 driver core 的 .remove 返回 void */
 {
-	return 0;
 }
 static struct platform_driver mt_ssc_pdrv = {
 	.probe = mt_ssc_pdrv_probe,

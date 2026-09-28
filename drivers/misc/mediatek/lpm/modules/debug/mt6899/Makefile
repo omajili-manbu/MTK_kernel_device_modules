@@ -12,7 +12,8 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/lpm/modules/debug/$(
 ccflags-y += -I$(LPM_MODULES_FOLDER)/debug/mt6899/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/mt-plat/
 ccflags-y += -I$(LPM_MODULES_FOLDER)/include/mt6899/
-ifeq ($(CONFIG_MTK_SYS_RES_DBG_SUPPORT),m)
+# rodin batch4-7: =y 内建（ccflags 与 objs 两处同改，设备真值 sys_res=m）
+ifneq ($(CONFIG_MTK_SYS_RES_DBG_SUPPORT),)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/swpm/inc/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/lpm/modules/debug/sys_res/
 endif
@@ -22,6 +23,7 @@ obj-$(CONFIG_MTK_LOW_POWER_MODULE) += ${BUILD_LPM_DBG_MODUDLE_NAME}.o
 
 ${BUILD_LPM_DBG_MODUDLE_NAME}-objs += lpm_logger.o
 
-ifeq ($(CONFIG_MTK_SYS_RES_DBG_SUPPORT),m)
+# rodin batch4-7: =y 内建（ccflags 与 objs 两处同改，设备真值 sys_res=m）
+ifneq ($(CONFIG_MTK_SYS_RES_DBG_SUPPORT),)
 ${BUILD_LPM_DBG_MODUDLE_NAME}-objs += lpm_sys_res_plat.o
 endif

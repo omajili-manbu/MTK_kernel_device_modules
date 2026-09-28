@@ -7,6 +7,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of.h>	/* rodin 4-7: 6.18 的 of_device.h 不再传递 of.h（of_find_compatible_node 等在此） */
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 

@@ -2052,15 +2052,14 @@ static int mt_pwm_probe(struct platform_device *pdev)
 	return RSUCCESS;
 }
 
-static int  mt_pwm_remove(struct platform_device *pdev)
+static void mt_pwm_remove(struct platform_device *pdev) /* rodin batch4-7: 6.18 driver core 的 .remove 返回 void */
 {
 	if (!pdev) {
 		pr_debug(T "The plaform device is not exist\n");
-		return -EBADADDR;
+		/* 6.18: 原 -EBADADDR 被 driver core 忽略 ⇒ return; 等价 */
+		return;
 	}
 	device_remove_file(&pdev->dev, &dev_attr_pwm_debug);
-
-	return RSUCCESS;
 }
 
 static void mt_pwm_shutdown(struct platform_device *pdev)

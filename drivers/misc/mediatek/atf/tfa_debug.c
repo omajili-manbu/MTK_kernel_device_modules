@@ -7,6 +7,8 @@
 #include <linux/atomic.h>
 #include <linux/io.h>
 #include <linux/module.h>
+#include <linux/of.h>	/* rodin 4-7: 6.18 的 of_device.h 不再传递 of.h（of_find_compatible_node 等在此） */
+#include <linux/platform_device.h>	/* rodin 4-7: 6.18 of_platform.h 不再传递 platform_device.h */
 #include <linux/of_device.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
@@ -212,7 +214,7 @@ static const struct proc_ops tfa_debug_raw_fops = {
 	.proc_open = raw_open,
 	.proc_read = raw_read,
 	.proc_release = raw_release,
-	.proc_lseek = no_llseek,
+	.proc_lseek = noop_llseek,	/* rodin 4-7: 6.18 删 no_llseek，官方替代 noop_llseek */
 };
 
 static int runtime_snap_open(struct inode *inode, struct file *file)
@@ -237,7 +239,7 @@ static const struct proc_ops tfa_debug_runtime_snap_fops = {
 	.proc_open = runtime_snap_open,
 	.proc_read = raw_read,
 	.proc_release = raw_release,
-	.proc_lseek = no_llseek,
+	.proc_lseek = noop_llseek,	/* rodin 4-7: 6.18 删 no_llseek，官方替代 noop_llseek */
 };
 
 static int is_runtime_empty_for_read(struct file *file)
@@ -384,7 +386,7 @@ static const struct proc_ops tfa_debug_runtime_fops = {
 	.proc_write = runtime_log_write,
 	.proc_poll = runtime_log_poll,
 	.proc_release = raw_release,
-	.proc_lseek = no_llseek,
+	.proc_lseek = noop_llseek,	/* rodin 4-7: 6.18 删 no_llseek，官方替代 noop_llseek */
 };
 
 static int lookup_reserved_memory(void)
@@ -557,20 +559,21 @@ static int __init tfa_debug_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int tfa_debug_remove(struct platform_device *pdev)
+static void tfa_debug_remove(struct platform_device *pdev) /* rodin batch4-7: 6.18 driver core 的 .remove 返回 void */
 {
 	pr_notice("%s\n", __func__);
+	/* 6.18: 原 -EINVAL/-ENOENT 被 driver core 忽略，语义即“条件不满足则不做清理”，
+	 * 转 void 后以 return; 保留同一控制流 */
 	if (!is_debug_buf_info_valid())
-		return -EINVAL;
+		return;
 	if (info.proc_dir == NULL)
-		return -ENOENT;
+		return;
 	remove_proc_entry(DEBUG_BUF_ATF_LOGGER_SNAPSHOT_PROC_NAME,
 		info.proc_dir);
 	remove_proc_entry(DEBUG_BUF_TOTAL_RAW_PROC_NAME,
 		info.proc_dir);
 	remove_proc_entry(DEBUG_BUF_PROC_FOLDER_NAME, NULL);
 	memunmap(info.vaddr);
-	return 0;
 }
 
 static struct platform_driver tfa_debug_driver_probe = {

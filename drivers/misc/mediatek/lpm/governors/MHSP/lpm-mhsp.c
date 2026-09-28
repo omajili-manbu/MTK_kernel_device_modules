@@ -698,8 +698,7 @@ static int gov_enable_device(struct cpuidle_driver *drv,
 
 	memset(gov, 0, sizeof(struct gov_info));
 
-	hrtimer_init(cpu_histtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	cpu_histtimer->function = histtimer_fn;
+	hrtimer_setup(cpu_histtimer, histtimer_fn, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	if (!traces_registered) {
 		ret = register_trace_ipi_raise(ipi_raise, NULL);

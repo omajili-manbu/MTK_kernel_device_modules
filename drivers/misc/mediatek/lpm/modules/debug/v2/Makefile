@@ -10,7 +10,8 @@ include $(MTK_LPM_MODULES_FOLDER)/debug/v2/cpc/Makefile
 LPM_MODULE_DEBUG_COMMON += $(${BUILD_LPM_DBG_CPC_NAME}_objs:%.o=/cpc/%.o)
 
 #mtk_lpm_sys_res source files
-ifeq ($(CONFIG_MTK_SYS_RES_DBG_SUPPORT),m)
+# rodin batch4-7: 设备真值 sys_res=m（内容须进模块）⇒ =y 时也要走本块
+ifneq ($(CONFIG_MTK_SYS_RES_DBG_SUPPORT),)
 include $(MTK_LPM_MODULES_FOLDER)/debug/sys_res/Makefile
 MTK_LPM_SYS_RES = $(mtk_lpm_sys_res_objs:%.o=../sys_res/%.o)
 LPM_MODULE_DEBUG_COMMON += ${MTK_LPM_SYS_RES}

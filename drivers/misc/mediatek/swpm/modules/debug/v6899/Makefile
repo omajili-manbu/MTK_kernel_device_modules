@@ -13,7 +13,9 @@ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_V3),y)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/sspm/v3
 endif
 
-ifeq ($(CONFIG_MTK_QOS_FRAMEWORK),m)
+# rodin batch4-7: swpm_v6899 系源码 #include <mtk_qos_ipi.h>，MTK_QOS_FRAMEWORK 本树 =y
+#（此前 =m 判定恒假会丢 qos -I ⇒ 编不过）
+ifneq ($(CONFIG_MTK_QOS_FRAMEWORK),)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/qos
 endif
 

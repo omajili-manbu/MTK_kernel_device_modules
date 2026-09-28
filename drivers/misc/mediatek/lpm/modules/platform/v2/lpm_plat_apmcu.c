@@ -188,7 +188,7 @@ static unsigned int cpu_ret_check_interval;
 static void lpm_cpu_ret_check(struct timer_list *t)
 {
 	long en;
-	struct lpm_cpu_ret_timer_data *crtd = from_timer(crtd, t, ret_timer);
+	struct lpm_cpu_ret_timer_data *crtd = timer_container_of(crtd, t, ret_timer);
 	unsigned int cur_cpu = smp_processor_id();
 
 	if (cur_cpu != crtd->cpu) {
@@ -201,7 +201,7 @@ static void lpm_cpu_ret_check(struct timer_list *t)
 					0x6, 0);
 	if (en == 0) {
 		crtd->ret_ready = 1;
-		del_timer(&crtd->ret_timer);
+		timer_delete(&crtd->ret_timer);
 	} else if (!timer_pending(&crtd->ret_timer)) {
 		crtd->ret_timer.expires += ((unsigned long)cpu_ret_check_interval);
 		add_timer_on(&crtd->ret_timer, cur_cpu);
@@ -224,7 +224,7 @@ static int lpm_stop_cpu_ret_timer(unsigned int cpu)
 {
 	if (!lpm_crt[cpu].dts_en || lpm_crt[cpu].ret_ready)
 		return 0;
-	del_timer(&lpm_crt[cpu].ret_timer);
+	timer_delete(&lpm_crt[cpu].ret_timer);
 	return 0;
 }
 
