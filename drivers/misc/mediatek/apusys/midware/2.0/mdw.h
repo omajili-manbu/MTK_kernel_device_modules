@@ -44,6 +44,8 @@
 /* history parameter */
 #define MDW_NUM_HISTORY 2
 #define MDW_NUM_PREDICT_CMD 16
+/* rodin 4-8: 6.18 的 linux/min_heap.h 删除 struct min_heap，改用下面这个宏生成堆类型 */
+DEFINE_MIN_HEAP(uint64_t, mdw_min_heap);
 #define MDW_POWER_GAIN_TH 7680 //us
 #define MDW_PERIOD_TOLERANCE_TH(x) (x*10/100) //ms
 #define MDW_IPTIME_TOLERANCE_TH(x) (x*10/100) //ms
@@ -274,7 +276,7 @@ struct mdw_device {
 	/* cmd history */
 	uint64_t idle_time_ts;
 	uint64_t predict_cmd_ts[MDW_NUM_PREDICT_CMD];
-	struct min_heap heap;
+	struct mdw_min_heap heap;	/* rodin 4-8: was struct min_heap */
 	atomic_t cmd_running;
 	struct mutex h_mtx;
 

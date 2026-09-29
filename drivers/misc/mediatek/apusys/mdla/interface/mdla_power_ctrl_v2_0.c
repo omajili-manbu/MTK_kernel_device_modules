@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include <linux/timer.h>
+#include <linux/device.h>	/* rodin 4-8: 6.18 头瘦身，pm_wakeup.h 需要 _DEVICE_H_ */
 #include <linux/workqueue.h>
 #include <linux/of_device.h>
 #include <linux/pm_wakeup.h>

@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，struct of_device_id */
 #include <linux/of_device.h>
 #include "reviser_cmn.h"
 #include "reviser_plat.h"

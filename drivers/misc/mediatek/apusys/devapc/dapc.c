@@ -602,7 +602,7 @@ err_iomap:
 	return ret;
 }
 
-static int apusys_devapc_remove(struct platform_device *pdev)
+static void apusys_devapc_remove(struct platform_device *pdev)
 {
 	struct dapc_driver *drv = platform_get_drvdata(pdev);
 
@@ -613,7 +613,7 @@ static int apusys_devapc_remove(struct platform_device *pdev)
 	apu_power_callback_device_unregister(DEVAPC);
 	dapc_drv_put();
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static const struct of_device_id apusys_devapc_of_match[] = {

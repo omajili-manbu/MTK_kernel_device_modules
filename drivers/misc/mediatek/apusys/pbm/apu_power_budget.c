@@ -217,7 +217,7 @@ int apu_power_budget(enum pbm_mode mode, int counter)
 				pr_debug("%s mode:%d cancel off_timer\n",
 						__func__, mode);
 #endif
-				del_timer(&apu_pbm_param_arr[mode].off_timer);
+				timer_delete(&apu_pbm_param_arr[mode].off_timer);
 			}
 
 			apu_power_budget_judgement();
@@ -352,7 +352,7 @@ void apu_pbm_drv_exit(void)
 
 	for (mode = 0 ; mode < PBM_MODE_MAX ; mode++) {
 		if (timer_pending(&apu_pbm_param_arr[mode].off_timer))
-			del_timer(&apu_pbm_param_arr[mode].off_timer);
+			timer_delete(&apu_pbm_param_arr[mode].off_timer);
 	}
 
 #if UPDATE_APU_MBOX

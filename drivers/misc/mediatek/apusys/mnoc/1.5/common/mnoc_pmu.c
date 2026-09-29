@@ -208,8 +208,8 @@ void mnoc_pmu_init(void)
 
 	cfg_period = PERIOD_DEFAULT;
 	mnoc_cfg_timer_en = false;
-	hrtimer_init(&hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	hr_timer.function = mnoc_pmu_polling;
+	/* rodin 4-8: 6.18 删 hrtimer_init，改 hrtimer_setup(t, fn, clk, mode)，函数指针并入参数 */
+	hrtimer_setup(&hr_timer, mnoc_pmu_polling, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	LOG_DEBUG("-\n");
 }

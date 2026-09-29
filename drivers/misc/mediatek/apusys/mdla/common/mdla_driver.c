@@ -337,12 +337,12 @@ err:
 	return ret;
 }
 
-static int mdla_remove(struct platform_device *pdev)
+static void mdla_remove(struct platform_device *pdev)
 {
 	int i;
 
 	if (mdla_pwr_apusys_disabled())
-		return 0;
+		return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 
 	dev_info(&pdev->dev, "%s start -\n", __func__);
 
@@ -361,7 +361,7 @@ static int mdla_remove(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "%s done -\n", __func__);
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static int mdla_resume(struct platform_device *pdev)

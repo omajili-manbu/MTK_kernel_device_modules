@@ -3,6 +3,8 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include <linux/kernel.h>
+#include <linux/device.h>	/* rodin 4-8: 6.18 头瘦身，pm_wakeup.h 需要 _DEVICE_H_ */
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，struct device_node pdev->dev.of_node */
 #include <linux/mutex.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
@@ -111,7 +113,7 @@ static void mdla_pwr_off_timer_cancel(u32 core_id)
 	struct mdla_pwr_ctrl *pwr_ctrl = mdla_get_device(core_id)->power;
 
 	if (timer_pending(&pwr_ctrl->power_off_timer))
-		del_timer(&pwr_ctrl->power_off_timer);
+		timer_delete(&pwr_ctrl->power_off_timer);
 }
 
 static void mdla_pwr_set_opp(u32 core_id, int opp)

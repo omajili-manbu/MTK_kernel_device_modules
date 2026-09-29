@@ -12,7 +12,9 @@
 
 #include <linux/tracepoint.h>
 
-TRACE_EVENT(tracing_mark_write,
+/* rodin 4-8: 改名避与 vmlinux 里 GED 的 __tracepoint_tracing_mark_write 撞名
+ * （4-4 先例：camsys/imgsys/imgsensor 同法加后缀）*/
+TRACE_EVENT(tracing_mark_write_apusys,
 	TP_PROTO(char *s),
 	TP_ARGS(s),
 	TP_STRUCT__entry(

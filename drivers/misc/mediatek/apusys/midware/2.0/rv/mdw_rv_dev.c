@@ -86,7 +86,7 @@ int mdw_rv_dev_dtime_handle(struct mdw_rv_dev *mrdev, struct mdw_cmd *c)
 
 	/* if old timer exist then delete */
 	if (timer_pending(&mrdev->power_off_timer))
-		del_timer(&mrdev->power_off_timer);
+		timer_delete(&mrdev->power_off_timer);
 
 	/* timer power off according to power_dtime */
 	timer_setup(&mrdev->power_off_timer, mdw_rv_dev_timer_callback, 0);
@@ -722,7 +722,7 @@ void mdw_rv_dev_deinit(struct mdw_device *mdev)
 	dma_free_coherent(dev, sizeof(struct mdw_stat), mrdev->stat, mrdev->stat_iova);
 	rpmsg_destroy_ept(mrdev->ept);
 	if (timer_pending(&mrdev->power_off_timer))
-		del_timer(&mrdev->power_off_timer);
+		timer_delete(&mrdev->power_off_timer);
 	kfree(mrdev);
 	mdev->dev_specific = NULL;
 }

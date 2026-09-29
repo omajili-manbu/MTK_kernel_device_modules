@@ -3,6 +3,7 @@
  * Copyright (c) 2021 MediaTek Inc.
  */
 #include <linux/mm.h>
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，of_property_read_string */
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/string.h>

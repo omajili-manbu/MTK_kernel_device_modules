@@ -7,6 +7,7 @@
 #ifndef __APUSYS_REVISER_PLAT_H__
 #define __APUSYS_REVISER_PLAT_H__
 
+#include <linux/platform_device.h>	/* rodin 4-8: 6.18 头瘦身，struct platform_device 不完整 */
 struct reviser_plat {
 	int (*init)(struct platform_device *pdev, void *rplat);
 	int (*uninit)(struct platform_device *pdev);

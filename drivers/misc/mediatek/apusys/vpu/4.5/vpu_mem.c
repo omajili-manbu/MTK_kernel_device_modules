@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/of.h>
+#include <linux/vmalloc.h>	/* rodin 4-8: 6.18 头瘦身，vmap/vfree/vzalloc */
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/dma-direction.h>

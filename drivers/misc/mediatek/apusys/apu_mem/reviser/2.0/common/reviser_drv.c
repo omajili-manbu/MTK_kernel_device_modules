@@ -593,7 +593,7 @@ free_node:
 	return ret;
 }
 
-static int reviser_remove(struct platform_device *pdev)
+static void reviser_remove(struct platform_device *pdev)
 {
 	struct reviser_dev_info *rdv = platform_get_drvdata(pdev);
 
@@ -616,7 +616,7 @@ static int reviser_remove(struct platform_device *pdev)
 
 	LOG_INFO("remove done\n");
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 

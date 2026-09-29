@@ -677,10 +677,10 @@ void mdla_prof_init(int mode)
 		mdla_device->prof->id = i;
 		mdla_device->prof->timer_started = 0;
 
-		hrtimer_init(&mdla_device->prof->polling_pmu_timer,
+		/* rodin 4-8: 6.18 删 hrtimer_init，改 hrtimer_setup(t, fn, clk, mode)，函数指针并入参数 */
+		hrtimer_setup(&mdla_device->prof->polling_pmu_timer,
+					mdla_prof_pmu_polling,
 					CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-		mdla_device->prof->polling_pmu_timer.function
-					= mdla_prof_pmu_polling;
 
 		mutex_init(&mdla_device->prof->lock);
 	}

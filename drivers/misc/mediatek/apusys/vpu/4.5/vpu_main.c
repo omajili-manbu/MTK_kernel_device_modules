@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/types.h>
+#include <linux/of_platform.h>	/* rodin 4-8: 6.18 头瘦身，of_find_device_by_node */
 #include <linux/interrupt.h>
 #include <linux/device.h>
 #include <linux/cdev.h>
@@ -917,7 +918,7 @@ out:
 	return ret;
 }
 
-static int vpu_remove(struct platform_device *pdev)
+static void vpu_remove(struct platform_device *pdev)
 {
 	struct vpu_device *vd = platform_get_drvdata(pdev);
 
@@ -936,7 +937,7 @@ static int vpu_remove(struct platform_device *pdev)
 	vpu_dev_del(vd);
 	vpu_free(pdev);
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static int vpu_suspend(struct vpu_device *vd)

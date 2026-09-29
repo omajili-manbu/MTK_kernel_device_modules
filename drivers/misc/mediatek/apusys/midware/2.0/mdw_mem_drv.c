@@ -4,6 +4,8 @@
  */
 
 #include <linux/module.h>
+#include <linux/platform_device.h>	/* rodin 4-8: 6.18 头瘦身，struct platform_device 不完整 */
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，of_property_read_u64/u32 */
 #include <linux/slab.h>
 #include <linux/cdev.h>
 #include <linux/of_device.h>
@@ -52,11 +54,9 @@ static int apumem_probe(struct platform_device *pdev)
 		pdev->dev.dma_parms =
 			devm_kzalloc(dev, sizeof(*pdev->dev.dma_parms), GFP_KERNEL);
 	}
-	if (pdev->dev.dma_parms) {
-		ret = dma_set_max_seg_size(dev, mask);
-		if (ret)
-			dev_info(dev, "Failed to set DMA segment size\n");
-	}
+	if (pdev->dev.dma_parms)
+		/* rodin 4-8: 6.18 起 dma_set_max_seg_size() 返回 void，不再有返回值可判 */
+		dma_set_max_seg_size(dev, mask);
 
 	mdw_mem_rsc_register(&pdev->dev, type);
 
@@ -66,7 +66,7 @@ static int apumem_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int apumem_remove(struct platform_device *pdev)
+static void apumem_remove(struct platform_device *pdev)
 {
 	int type = 0;
 
@@ -74,7 +74,7 @@ static int apumem_remove(struct platform_device *pdev)
 	mdw_mem_rsc_unregister(type);
 
 	pr_info("%s +\n", __func__);
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static const struct of_device_id mem_of_match[] = {

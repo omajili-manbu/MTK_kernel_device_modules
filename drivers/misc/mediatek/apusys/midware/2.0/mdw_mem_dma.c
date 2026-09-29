@@ -4,6 +4,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <linux/vmalloc.h>	/* rodin 4-8: 6.18 头瘦身，vmap/vfree/vzalloc */
 #include <linux/dma-buf.h>
 #include <linux/module.h>
 #include <linux/slab.h>

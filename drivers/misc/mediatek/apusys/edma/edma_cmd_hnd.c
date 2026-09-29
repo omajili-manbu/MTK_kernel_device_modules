@@ -136,7 +136,7 @@ int edma_power_on(struct edma_sub *edma_sub)
 	edma_device = edma_sub->edma_device;
 
 	// fix power off/on sync issue
-	del_timer_sync(&edma_device->power_timer);
+	timer_delete_sync(&edma_device->power_timer);
 	cancel_work_sync(&edma_device->power_off_work);
 
 	mutex_lock(&edma_device->power_mutex);
@@ -219,7 +219,7 @@ int edma_power_off(struct edma_sub *edma_sub, u8 force)
 	}
 
 	// fix multiple power off sync issue
-	del_timer_sync(&edma_device->power_timer);
+	timer_delete_sync(&edma_device->power_timer);
 	cancel_work_sync(&edma_device->power_off_work);
 
 	mutex_lock(&edma_device->power_mutex);

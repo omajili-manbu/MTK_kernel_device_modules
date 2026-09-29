@@ -133,7 +133,7 @@ static int mvpu_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mvpu_remove(struct platform_device *pdev)
+static void mvpu_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
@@ -141,7 +141,7 @@ static int mvpu_remove(struct platform_device *pdev)
 	g_mvpu_platdata->ops->mvpu_ipi_deinit();
 	mvpu_sysfs_exit();
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static struct platform_driver mvpu_driver = {

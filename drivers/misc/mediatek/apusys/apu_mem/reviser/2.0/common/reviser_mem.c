@@ -4,6 +4,7 @@
  */
 
 #include <linux/errno.h>
+#include <linux/kmemleak.h>	/* rodin 4-8: 6.18 头瘦身，kmemleak_no_scan */
 #include <linux/slab.h>
 #include <linux/dma-direction.h>
 #include <linux/scatterlist.h>

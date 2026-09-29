@@ -11,6 +11,7 @@
 
 /* system includes */
 #include <linux/printk.h>
+#include <linux/vmalloc.h>	/* rodin 4-8: 6.18 头瘦身，vmap/vfree/vzalloc */
 #include <linux/seq_file.h>
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
@@ -348,7 +349,7 @@ static int debug_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int debug_remove(struct platform_device *pdev)
+static void debug_remove(struct platform_device *pdev)
 {
 	LOG_DEBUG("+\n");
 
@@ -359,7 +360,7 @@ static int debug_remove(struct platform_device *pdev)
 
 	LOG_DEBUG("-\n");
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static struct platform_driver debug_driver = {
@@ -371,7 +372,7 @@ static struct platform_driver debug_driver = {
 	},
 };
 
-int debug_init(struct apusys_core_info *info)
+int apusys_dbg_init(struct apusys_core_info *info)	/* rodin 4-8: was debug_init (撞 vmlinux) */
 {
 	LOG_DEBUG("debug driver init start\n");
 
@@ -389,7 +390,7 @@ int debug_init(struct apusys_core_info *info)
 	return 0;
 }
 
-void debug_exit(void)
+void apusys_dbg_exit(void)	/* rodin 4-8: was debug_exit (撞 vmlinux) */
 {
 	LOG_DEBUG("+\n");
 	platform_driver_unregister(&debug_driver);

@@ -4,6 +4,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，of_device_get_match_data */
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 

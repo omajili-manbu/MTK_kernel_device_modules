@@ -23,7 +23,7 @@ void trace_tag_customer(const char *fmt, ...)
 		pr_info("%s: vsnprintf error\n", __func__);
 	va_end(args);
 
-	trace_tracing_mark_write(buf);
+	trace_tracing_mark_write_apusys(buf);
 }
 
 void trace_tag_begin(const char *format, ...)
@@ -36,7 +36,7 @@ void trace_tag_begin(const char *format, ...)
 	if (len >= TRACE_LEN)
 		len = TRACE_LEN - 1;
 
-	trace_tracing_mark_write(buf);
+	trace_tracing_mark_write_apusys(buf);
 }
 
 void trace_tag_end(void)
@@ -49,7 +49,7 @@ void trace_tag_end(void)
 	if (len >= TRACE_LEN)
 		len = TRACE_LEN - 1;
 
-	trace_tracing_mark_write(buf);
+	trace_tracing_mark_write_apusys(buf);
 }
 
 void trace_async_tag(bool isBegin, const char *format, ...)
@@ -67,5 +67,5 @@ void trace_async_tag(bool isBegin, const char *format, ...)
 	if (len >= TRACE_LEN)
 		len = TRACE_LEN - 1;
 
-	trace_tracing_mark_write(buf);
+	trace_tracing_mark_write_apusys(buf);
 }

@@ -4,6 +4,8 @@
  */
 
 #include <linux/module.h>
+#include <linux/platform_device.h>	/* rodin 4-8: 6.18 头瘦身，struct platform_device 不完整 */
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，of_property_read_u32 */
 #include <linux/slab.h>
 #include <linux/of_device.h>
 #include <linux/types.h>
@@ -206,7 +208,7 @@ out:
 	return ret;
 }
 
-static int mdw_platform_remove(struct platform_device *pdev)
+static void mdw_platform_remove(struct platform_device *pdev)
 {
 	struct mdw_device *mdev = platform_get_drvdata(pdev);
 
@@ -220,7 +222,7 @@ static int mdw_platform_remove(struct platform_device *pdev)
 	mdw_dev = NULL;
 	pr_info("%s +\n", __func__);
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static const struct of_device_id mdw_of_match[] = {

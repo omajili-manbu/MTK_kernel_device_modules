@@ -1074,7 +1074,7 @@ remove_procfs:
 	return ret;
 }
 
-static int sw_logger_remove(struct platform_device *pdev)
+static void sw_logger_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
@@ -1088,7 +1088,7 @@ static int sw_logger_remove(struct platform_device *pdev)
 			sw_log_buf, handle);
 	}
 
-	return 0;
+	return;	/* rodin 4-8: .remove 返回值已被 driver core 忽略 */
 }
 
 static const struct of_device_id apusys_sw_logger_of_match[] = {

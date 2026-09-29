@@ -393,7 +393,7 @@ static bool mdw_cmd_period_check(uint64_t old_period, uint64_t new_period)
 
 //--------------------------------------------
 
-static void mdw_swap_uint64(void *lhs, void *rhs)
+static void mdw_swap_uint64(void *lhs, void *rhs, void *args)
 {
 	uint64_t temp = *(uint64_t *)lhs;
 
@@ -401,13 +401,14 @@ static void mdw_swap_uint64(void *lhs, void *rhs)
 	*(uint64_t *)rhs = temp;
 }
 
-static bool mdw_less_than(const void *lhs, const void *rhs)
+static bool mdw_less_than(const void *lhs, const void *rhs, void *args)
 {
 	return *(uint64_t *)lhs < *(uint64_t *)rhs;
 }
 
+/* rodin 4-8: 6.18 的 struct min_heap_callbacks 只有 less/swp，且都多一个 args 参数
+ * （elem_size 已移到堆对象里，由宏用 __minheap_obj_size() 取） */
 static const struct min_heap_callbacks mdw_min_heap_funcs = {
-	.elem_size = sizeof(uint64_t),
 	.less = mdw_less_than,
 	.swp = mdw_swap_uint64,
 };
@@ -541,9 +542,10 @@ static int mdw_cmd_record(struct mdw_cmd *c)
 	if (ch_tbl->period_cnt >= MDW_NUM_HISTORY) {
 		predict_start_ts = c->start_ts + ch_tbl->h_period;
 		mdw_cmd_min_heap_sanity_check(c);
-		min_heap_push(&mdev->heap, &predict_start_ts, &mdw_min_heap_funcs);
+		min_heap_push(&mdev->heap, &predict_start_ts,
+				&mdw_min_heap_funcs, NULL);	/* rodin 4-8: 6.18 多一个 args */
 		mdw_cmd_debug("predict_start_ts(%llu) nr(%d)",
-				 mdev->predict_cmd_ts[0], mdev->heap.nr);
+				 mdev->predict_cmd_ts[0], (int)mdev->heap.nr);
 	}
 
 	/* record cmd end_ts */
@@ -580,7 +582,8 @@ static uint64_t mdw_cmd_get_predict(struct mdw_cmd *c)
 		if (c->end_ts >= predict_start_ts) {
 			mdw_flw_debug("predict cmd start_ts(%llu) is invalid\n",
 					predict_start_ts);
-			min_heap_pop(&mdev->heap, &mdw_min_heap_funcs);
+				min_heap_pop(&mdev->heap,
+					&mdw_min_heap_funcs, NULL);	/* rodin 4-8: 6.18 多一个 args */
 			predict_start_ts = 0;
 			continue;
 		} else {

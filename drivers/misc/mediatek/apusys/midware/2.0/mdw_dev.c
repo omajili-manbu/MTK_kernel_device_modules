@@ -5,6 +5,7 @@
 
 #include <linux/slab.h>
 
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，of_device_get_match_data */
 #include "mdw_cmn.h"
 #include "mdw_cmd.h"
 

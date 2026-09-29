@@ -388,5 +388,7 @@ AOV_SRC += aov/plat/v2/aov_mem_service_v2.o
 AOV_SRC += aov/plat/v2/aov_recovery_v2.o
 AOV_SRC += aov/plat/aov_plat.o
 
-obj-$(CONFIG_MTK_APUSYS_SUPPORT) += apu_aov.o
-apu_aov-objs = $(AOV_SRC)
+# rodin 4-8: 停编 apu_aov（设备 vendor_dlkm 无 apu_aov.ko；aov 族设备 blob 只有 kmod 的
+# mtk_aov = 4-7 已内建的另一模块）。AOV_SRC 保留备查，apusys_rv/aov_recovery.o 仍在编。
+#obj-$(CONFIG_MTK_APUSYS_SUPPORT) += apu_aov.o
+#apu_aov-objs = $(AOV_SRC)

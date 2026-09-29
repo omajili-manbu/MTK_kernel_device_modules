@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include <linux/types.h>
+#include <linux/of.h>	/* rodin 4-8: 6.18 头瘦身，of_device_get_match_data/of_property_read_u32 */
 #include <linux/of_device.h>
 #include <linux/dma-mapping.h>
 

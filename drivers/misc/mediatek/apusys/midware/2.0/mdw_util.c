@@ -4,6 +4,7 @@
  */
 
 #include "mdw_ioctl.h"
+#include <linux/vmalloc.h>	/* rodin 4-8: 6.18 头瘦身，vmap/vfree/vzalloc */
 #include "mdw_cmn.h"
 
 static int mdw_util_info(struct mdw_fpriv *mpriv, uint32_t type, uint64_t val)

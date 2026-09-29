@@ -26,8 +26,8 @@ int apu_power_drv_init(struct apusys_core_info *info);
 void apu_power_drv_exit(void);
 int apupwr_init_tags(struct apusys_core_info *info);
 void apupwr_exit_tags(void);
-int debug_init(struct apusys_core_info *info);
-void debug_exit(void);
+int apusys_dbg_init(struct apusys_core_info *info);	/* rodin 4-8: was debug_init (撞 vmlinux) */
+void apusys_dbg_exit(void);	/* rodin 4-8: was debug_exit (撞 vmlinux) */
 int reviser_init(struct apusys_core_info *info);
 void reviser_exit(void);
 int apummu_init(struct apusys_core_info *info);
@@ -69,7 +69,7 @@ static int (*apusys_init_func[])(struct apusys_core_info *) = {
 	vpu_init,
 #endif
 #if IS_ENABLED(CONFIG_MTK_APUSYS_DEBUG)
-	debug_init,
+	apusys_dbg_init,	/* rodin 4-8: was debug_init */
 #endif
 	mvpu_init,
 	apu_smmu_device_init,
@@ -87,7 +87,7 @@ static void (*apusys_exit_func[])(void) = {
 	apu_smmu_device_exit,
 #if IS_ENABLED(CONFIG_MTK_APUSYS_DEBUG)
 	mvpu_exit,
-	debug_exit,
+	apusys_dbg_exit,	/* rodin 4-8: was debug_exit */
 #endif
 #if IS_ENABLED(CONFIG_MTK_APUSYS_VPU)
 	vpu_exit,
