@@ -182,6 +182,11 @@ static void probe_android_rvh_set_module_core_rw_nx(void *ignore,
 bool full_kernel_code_2m;
 #endif
 
+/* rodin b57: krn 面 rodata（含 grant-ticket 槽页 subscribe）保护落地标志。
+ * 必须是普通 .bss 变量——__ro_after_init 落在保护范围 [_etext,__init_begin]
+ * 内，保护生效后再写会触发 GZ fault 路径。=y 内建态以它为 ESS_1 的门。 */
+static bool mkp_krn_protect_done;
+
 #if !IS_ENABLED(CONFIG_KASAN_GENERIC) && !IS_ENABLED(CONFIG_KASAN_SW_TAGS)
 #if !IS_ENABLED(CONFIG_GCOV_KERNEL)
 static void mkp_protect_kernel_work_fn(struct work_struct *work);
@@ -204,6 +209,20 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 	bool kernel_code_perf = false;
 	unsigned long addr_start_2m = 0, addr_end_2m = 0;
 #endif
+
+	/* rodin b57: =y 内建态必须等到 system_state == SYSTEM_RUNNING（内核
+	 * mark_readonly() 之后）才落地 rodata 保护：__ro_after_init 全内核在
+	 * mark_readonly 前持续被写（OEM =m 的保护发生在用户态装载期，远晚于
+	 * mark_readonly，从无此窗口），保护早于它会把 OEM 不存在的
+	 * "保护后写 ro_after_init" 变成 GZ fault/注入（#105 实证）。=m 时
+	 * 本门被 THIS_MODULE 恒假折叠，OEM 时序不变。 */
+	if (!THIS_MODULE && system_state != SYSTEM_RUNNING) {
+		if (--retry_num >= 0)
+			schedule_delayed_work(&mkp_pk_work, HZ);
+		else
+			MKP_ERR("protect krn: give up waiting SYSTEM_RUNNING\n");
+		return;
+	}
 
 	if (policy_ctrl[MKP_POLICY_KERNEL_CODE] &&
 		policy_ctrl[MKP_POLICY_KERNEL_RODATA]) {
@@ -317,8 +336,22 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		else {
 			ret = mkp_set_mapping_ro(policy, handle);
 			pr_info("mkp: protect krn rodata done\n");
+			/* rodin b57: rodata 保护落地（覆盖 grant-ticket 槽页）——
+			 * 服务端 post-grant mapping op 的 ticket 只能由"对槽页的
+			 * 写入 fault"产生（GZ mkp_service produce_ticket 反汇编
+			 * 实证），故此处置位、并作为 =y ESS_1 的门。 */
+			mkp_krn_protect_done = true;
 		}
 	}
+
+	/* rodin b57: =y 的 start granting 在此执行（krn 面 rodata 保护落地
+	 * 之后）：槽 magic 经受保护写 fault→GZ produce 跳过后仍为 magic，
+	 * ESS_1 换牌（ticket_key）后 post-grant ticket 纪律生效；此后内核
+	 * 自身不再写 ro_after_init（mark_readonly 已过），无违规写窗口。
+	 * =m 时本调用被 THIS_MODULE 恒假折叠（OEM 的 grant 在
+	 * protect_mkp_self 内）。 */
+	if (!THIS_MODULE && mkp_krn_protect_done)
+		mkp_start_granting_hvc_call();
 
 protect_krn_fail:
 	p_stext = NULL;
@@ -881,8 +914,25 @@ static int __init protect_mkp_self(void)
 	 * secure 侧判违规并按其设计注入 dabt 打死内核（FAR=0xfedcba9876543210、
 	 * FSC=0x3f；pkvm_mkp/hyp/mkp_handler.c 同款"inject a dabt to EL1"）。
 	 * =y 无自面 handle 不影响本事件；b54 mkp_hvc_svc_lock 已保证单
-	 * secure-op 串行，#104 的并发窗已闭。 */
-	mkp_start_granting_hvc_call();
+	 * secure-op 串行，#104 的并发窗已闭。
+	 * rodin b57: 服务端（GZ mkp_service 反汇编）ESS_1 = 校验槽 magic 并
+	 * 以 per-boot ticket_key 换牌、置 start_granting；其门是"槽=magic"
+	 * 与"rodata 保护已落地"（post-grant ticket 纪律），不是 b56 猜的
+	 * owner 态。=m 维持 OEM 无条件时序；=y 以 mkp_krn_protect_done 为门
+	 * （#106：ESS_1 先于 rodata 保护 => post-grant 首 mapping op 无
+	 * ticket => do_action_panic(189) => GZ 静默死机）。 */
+	if (THIS_MODULE) {
+		/* rodin b57: =m 保持 OEM 时序：三连调后立即 start granting
+		 * （OEM 的 krn 面 work 由模块装载时序保证远晚于内核
+		 * mark_readonly）。 */
+		mkp_start_granting_hvc_call();
+		return 0;
+	}
+	/* rodin b57: =y 的 ESS_1 推迟到 mkp_pk_work 内（SYSTEM_RUNNING 且
+	 * krn 面 rodata 保护落地后）执行——见 mkp_protect_kernel_work_fn。
+	 * 此处不 grant：initcall 期 rodata 保护未落地，grant 后的
+	 * post-grant ticket 纪律无 ticket 可产（#106 机理）；sharebuf 等
+	 * 全部 op 停在 pre-grant 旁路态直到 work 完成 grant。 */
 	return 0;
 }
 
@@ -1124,6 +1174,16 @@ int __init mkp_demo_init(void)
 
 #if !IS_ENABLED(CONFIG_KASAN_GENERIC) && !IS_ENABLED(CONFIG_KASAN_SW_TAGS)
 #if !IS_ENABLED(CONFIG_GCOV_KERNEL)
+	/* rodin b57: krn 面保护与 ESS_1（start granting）都以 mkp_pk_work
+	 * 执行；=y 内建态在 work 内再等 system_state == SYSTEM_RUNNING（内核
+	 * mark_readonly 之后）——__ro_after_init 全内核在 mark_readonly 前持续
+	 * 被写，rodata 保护早于它将制造 OEM 不存在的 fault 窗口（#105 实证：
+	 * g_ro_avc_handle 写被 GZ 判违规注入 dabt）。=m 的 OEM 时序（模块装载
+	 * 期）天然满足该门，不受影响。post-grant mapping op 的 ticket 只能由
+	 * 对受保护槽页的写入 fault 产生（GZ mkp_service produce_ticket 反汇编
+	 * 实证），故 rodata 保护必须先于 ESS_1——#106 即 ESS_1 先行 =>
+	 * 首 post-grant op 无 ticket => do_action_panic(189) => GZ 静默死机
+	 * （0.412s 起双 CPU 困 EL3、零回栈）。 */
 	schedule_delayed_work(&mkp_pk_work, 0);
 #endif
 #endif

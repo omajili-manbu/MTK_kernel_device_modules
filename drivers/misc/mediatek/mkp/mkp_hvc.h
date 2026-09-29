@@ -109,7 +109,7 @@ int mkp_update_sharebuf_hvc_call(uint32_t policy, uint32_t handle, unsigned long
 int __init mkp_setup_essential_hvc_call(unsigned long phys_offset, unsigned long fixaddr_top,
 	unsigned long fixaddr_real_start);
 
-int __init mkp_start_granting_hvc_call(void);
+int mkp_start_granting_hvc_call(void);
 
 /* rodin b54: secure-op 跨 CPU 序列化原语（定义在 mkp_hvc.c）——
  * ticket 协议要求 [cookie 写 + HVC] 原子、且全系统同一时刻至多

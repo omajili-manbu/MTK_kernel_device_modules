@@ -132,6 +132,6 @@ int mkp_update_sharebuf_hvc_call(uint32_t policy, uint32_t handle, unsigned long
 int __init mkp_setup_essential_hvc_call(unsigned long phys_offset, unsigned long fixaddr_top,
 	unsigned long fixaddr_real_start);
 
-int __init mkp_start_granting_hvc_call(void);
+int mkp_start_granting_hvc_call(void);
 
 #endif /* _MKP_HVC_H */

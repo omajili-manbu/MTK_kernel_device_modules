@@ -341,7 +341,7 @@ int __init mkp_setup_essential_hvc_call(unsigned long phys_offset,
 }
 
 /* Tell MKP service it should start granting */
-int __init mkp_start_granting_hvc_call(void)
+int mkp_start_granting_hvc_call(void)
 {
 	struct arm_smccc_res res;
 	int mkp_hvc_fast_call_id;
@@ -350,21 +350,19 @@ int __init mkp_start_granting_hvc_call(void)
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(0, HVC_FUNC_ESS_1);
 
-	/* rodin b56: ESS_1 前 grant-ticket 槽必须处于 OEM 实证态（0=无在途
-	 * ticket）。OEM 6.6 =m 的 do_secure_ops 以立即数 0x6d6b7021 写槽
-	 * （真机 mkp.ko 反汇编实证）且 secure 侧消费后清零，ESS_1 恒在自面
-	 * 三连调之后，槽已被消费清零；内建态自面三连调被裁（b53）、percpu
-	 * 面 -3 早退（厂商死代码）、krn 面首操作 create_handle 不碰槽，ESS_1
-	 * 可成为全 boot 首个协议事件——槽仍是 .rodata 初值 0x6d6b7021
-	 * ("mkp!")，secure 侧视为未消费在途 ticket 并在 ESS_1 内死等其被
-	 * 消费 => EL3 卡死（真机 #106：0.412s 起 cpu1/cpu3 双 hard lockup、
-	 * 零回栈；与 #104 同形态不同因——b54 锁只堵 AP 侧竞争产生的异常槽
-	 * 态，堵不住"消费者被裁"留下的槽态）。持锁清零与 ESS_1 原子，与
-	 * do_secure_ops 的 [ticket 写 + HVC] 同一纪律；=m 时槽恒已为 0，
-	 * 此写零影响。 */
+	/* rodin b57: 服务端语义已由 GZ mkp_service ELF（tee.img/gz.img 容器
+	 * 内 mkp_service 子镜像）反汇编定案：mkp_kick_off_granting 要求
+	 * *slot == 0x6d6b7021("mkp!")，命中则把槽改写为 per-boot ticket_key
+	 * 并置 start_granting；不命中 => do_action_panic(557) => 服务端向
+	 * NULL 写 "mkppanic" magic 自陷 => GZ sync handler 判 unhandled =>
+	 * 静默死机（真机 #107：b56 的槽清零方向反了，0.412s 起 cpu2 困
+	 * EL3）。槽在 ESS_0/ESS_1 之间不被服务端消费——OEM =m 时槽恒为
+	 * magic（自面三连调写入）；=y 由 krn 面的 do_secure_ops 写入/跳过
+	 * 后同为 magic。此处按 do_secure_ops 同一纪律持锁重写 magic 保证
+	 * 状态，再原子发 ESS_1；=m 时此写与槽现值相同，零影响。 */
 	mkp_hvc_lock(&flags);
 	if (grant_ticket)
-		*grant_ticket = 0;
+		*grant_ticket = subscribe;
 	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, 0, 0, 0, 0, 0, 0, 0, &res);
 	mkp_hvc_unlock(flags);
 
