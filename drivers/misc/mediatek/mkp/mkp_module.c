@@ -42,8 +42,14 @@ bool drv_skip(char *module_name)
 static void module_set_memory(const struct module *mod, enum mod_mem_type type,
 			      enum helper_ops ops, uint32_t policy)
 {
-	const struct module_memory *mod_mem = &mod->mem[type];
+	const struct module_memory *mod_mem;
 
+	/* rodin b53: 内建态 THIS_MODULE=NULL 的调用方（protect_mkp_self 族）
+	 * 其代码已属内核镜像、由 krn 面统一覆盖；空 mod 直接跳过防 NULL 解引用。 */
+	if (!mod)
+		return;
+
+	mod_mem = &mod->mem[type];
 	if (mod_mem->size)
 		mkp_set_mapping_xxx_helper((unsigned long)mod_mem->base, mod_mem->size >> PAGE_SHIFT, policy, ops);
 }

@@ -118,7 +118,8 @@ static void set_memory_rw(unsigned long addr, int nr_pages)
 {
 	bool valid_addr = false;
 
-	if ((unsigned long)THIS_MODULE->mem[MOD_INIT_TEXT].base == addr)
+	if (THIS_MODULE &&
+	    (unsigned long)THIS_MODULE->mem[MOD_INIT_TEXT].base == addr)
 		return;
 	valid_addr = !!(is_vmalloc_or_module_addr((void *)addr));
 	if (valid_addr) {
@@ -138,7 +139,8 @@ static void set_memory_nx(unsigned long addr, int nr_pages)
 	uint32_t policy;
 	unsigned long flags;
 
-	if ((unsigned long)THIS_MODULE->mem[MOD_INIT_TEXT].base == addr)
+	if (THIS_MODULE &&
+	    (unsigned long)THIS_MODULE->mem[MOD_INIT_TEXT].base == addr)
 		return;
 
 	valid_addr = !!(is_vmalloc_or_module_addr((void *)addr));
@@ -843,9 +845,15 @@ static void probe_android_vh_check_bpf_syscall(void *ignore,
 
 static int __init protect_mkp_self(void)
 {
-	module_enable_ro(THIS_MODULE, false, MKP_POLICY_MKP);
-	module_enable_nx(THIS_MODULE, MKP_POLICY_MKP);
-	module_enable_x(THIS_MODULE, MKP_POLICY_MKP);
+	/* rodin b53: 内建态 THIS_MODULE 恒为 NULL（6.6 =m 时才指向自身
+	 * module 结构）；内建代码的 text/rodata 属内核镜像，已由
+	 * mkp_protect_kernel_work_fn（protect krn code/rodata）统一覆盖，
+	 * 故仅 =m 形态保留模块面保护。 */
+	if (THIS_MODULE) {
+		module_enable_ro(THIS_MODULE, false, MKP_POLICY_MKP);
+		module_enable_nx(THIS_MODULE, MKP_POLICY_MKP);
+		module_enable_x(THIS_MODULE, MKP_POLICY_MKP);
+	}
 
 	// mkp_start_granting_hvc_call();
 	return 0;
