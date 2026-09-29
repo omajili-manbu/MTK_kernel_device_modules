@@ -90,7 +90,7 @@ static void probe_task_rename(void *data, struct task_struct *task,
 }
 
 static void probe_task_newtask(void *data, struct task_struct *task,
-			       unsigned long clone_flags)
+			       u64 clone_flags)
 {
 	mtk_pidmap_update(task, task->comm);
 }

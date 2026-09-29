@@ -889,7 +889,7 @@ struct tracepoints_table {
 	int policy;
 };
 
-static void mkp_task_newtask(void *ignore, struct task_struct *task, unsigned long clone_flags)
+static void mkp_task_newtask(void *ignore, struct task_struct *task, u64 clone_flags)
 {
 	int ret = -1;
 	struct cred_sbuf_content c;

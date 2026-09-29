@@ -711,7 +711,8 @@ static void mbraink_sched_process_fork(void *data, struct task_struct *self,
 	}
 }
 
-static void mbraink_sched_process_exit(void *data, struct task_struct *t)
+static void mbraink_sched_process_exit(void *data, struct task_struct *t,
+				       bool group_dead)
 {
 	int i = 0;
 	struct timespec64 tv = { 0 };

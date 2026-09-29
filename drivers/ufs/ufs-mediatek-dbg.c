@@ -557,8 +557,9 @@ static void probe_android_vh_ufs_compl_command(void *data, struct ufs_hba *hba,
 	cmd_hist_add_dev_cmd(hba, lrbp, CMD_DEV_COMPLETED);
 }
 
-static void probe_ufshcd_command(void *data, const char *dev_name,
-				 enum ufs_trace_str_t str_t, unsigned int tag,
+static void probe_ufshcd_command(void *data, struct scsi_device *sdev,
+				 struct ufs_hba *hba, enum ufs_trace_str_t str_t,
+				 unsigned int tag,
 				 u32 doorbell, u32 hwq_id, int transfer_len,
 				 u32 intr, u64 lba, u8 opcode, u8 group_id)
 {
@@ -611,7 +612,7 @@ static void probe_ufshcd_command(void *data, const char *dev_name,
 	}
 }
 
-static void probe_ufshcd_uic_command(void *data, const char *dev_name,
+static void probe_ufshcd_uic_command(void *data, struct ufs_hba *hba,
 				     enum ufs_trace_str_t str_t, u32 cmd,
 				     u32 arg1, u32 arg2, u32 arg3)
 {
@@ -1507,7 +1508,7 @@ out:
 EXPORT_SYMBOL_GPL(ufs_mtk_dbg_phy_enable);
 #endif
 
-static void probe_ufshcd_clk_gating(void *data, const char *dev_name,
+static void probe_ufshcd_clk_gating(void *data, struct ufs_hba *ufshba,
 				    int state)
 {
 	int ptr;
@@ -1578,7 +1579,7 @@ static void probe_ufshcd_clk_gating(void *data, const char *dev_name,
 #endif
 }
 
-static void probe_ufshcd_profile_clk_scaling(void *data, const char *dev_name,
+static void probe_ufshcd_profile_clk_scaling(void *data, struct ufs_hba *hba,
 	const char *profile_info, s64 time_us, int err)
 {
 	int ptr;
@@ -1603,7 +1604,7 @@ static void probe_ufshcd_profile_clk_scaling(void *data, const char *dev_name,
 	}
 }
 
-static void probe_ufshcd_pm(void *data, const char *dev_name,
+static void probe_ufshcd_pm(void *data, struct ufs_hba *hba,
 			    int err, s64 time_us,
 			    int pwr_mode, int link_state,
 			    enum ufsdbg_pm_state state)
@@ -1629,35 +1630,35 @@ static void probe_ufshcd_pm(void *data, const char *dev_name,
 	}
 }
 
-static void probe_ufshcd_runtime_suspend(void *data, const char *dev_name,
+static void probe_ufshcd_runtime_suspend(void *data, struct ufs_hba *hba,
 			    int err, s64 time_us,
 			    int pwr_mode, int link_state)
 {
-	probe_ufshcd_pm(data, dev_name, err, time_us, pwr_mode, link_state,
+	probe_ufshcd_pm(data, hba, err, time_us, pwr_mode, link_state,
 			UFSDBG_RUNTIME_SUSPEND);
 }
 
-static void probe_ufshcd_runtime_resume(void *data, const char *dev_name,
+static void probe_ufshcd_runtime_resume(void *data, struct ufs_hba *hba,
 			    int err, s64 time_us,
 			    int pwr_mode, int link_state)
 {
-	probe_ufshcd_pm(data, dev_name, err, time_us, pwr_mode, link_state,
+	probe_ufshcd_pm(data, hba, err, time_us, pwr_mode, link_state,
 			UFSDBG_RUNTIME_RESUME);
 }
 
-static void probe_ufshcd_system_suspend(void *data, const char *dev_name,
+static void probe_ufshcd_system_suspend(void *data, struct ufs_hba *hba,
 			    int err, s64 time_us,
 			    int pwr_mode, int link_state)
 {
-	probe_ufshcd_pm(data, dev_name, err, time_us, pwr_mode, link_state,
+	probe_ufshcd_pm(data, hba, err, time_us, pwr_mode, link_state,
 			UFSDBG_SYSTEM_SUSPEND);
 }
 
-static void probe_ufshcd_system_resume(void *data, const char *dev_name,
+static void probe_ufshcd_system_resume(void *data, struct ufs_hba *hba,
 			    int err, s64 time_us,
 			    int pwr_mode, int link_state)
 {
-	probe_ufshcd_pm(data, dev_name, err, time_us, pwr_mode, link_state,
+	probe_ufshcd_pm(data, hba, err, time_us, pwr_mode, link_state,
 			UFSDBG_SYSTEM_RESUME);
 }
 

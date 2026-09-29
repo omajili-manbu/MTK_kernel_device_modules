@@ -61,7 +61,9 @@ static struct attribute_group attr_group = {
 #endif
 
 #if IS_ENABLED(CONFIG_KALLSYMS)
-#if !IS_ENABLED(CONFIG_KALLSYMS_BASE_RELATIVE)
+#if 0 /* 6.18: kallsyms is always BASE_RELATIVE (the Kconfig key no longer
+       * exists upstream) and kallsyms_addresses is not generated; the
+       * absolute-layout variant below cannot work, use the relative one. */
 static void mrdump_cblock_kallsyms_init(struct mrdump_ksyms_param *kparam)
 {
 	struct mrdump_ksyms_param tmp_kp;
