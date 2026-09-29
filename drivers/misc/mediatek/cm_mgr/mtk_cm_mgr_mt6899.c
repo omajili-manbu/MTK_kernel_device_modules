@@ -27,6 +27,7 @@
 #include <linux/pm_domain.h>
 #include <linux/pm_opp.h>
 #include <linux/pm_qos.h>
+#include <tinysys-scmi.h>
 #include <linux/sched.h>
 #include <linux/sched/rt.h>
 #include <linux/slab.h>
@@ -478,6 +479,13 @@ ERROR:
 static int platform_cm_mgr_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+
+#if IS_ENABLED(CONFIG_MTK_CM_IPI) && IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+	/* rodin b52: built-in probe (subsys_initcall) can outrun the SCMI
+	 * tinysys chain; defer until get_scmi_tinysys_info() is ready. */
+	if (!get_scmi_tinysys_info())
+		return -EPROBE_DEFER;
+#endif
 
 	spin_lock_init(&cm_mgr_lock);
 	ret = cm_mgr_check_dts_setting_mt6899(pdev);

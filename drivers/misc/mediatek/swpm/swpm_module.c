@@ -84,11 +84,15 @@ static int swpm_scmi_init(void)
 
 	/* for AP to SSPM */
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+	/* rodin b52: idempotent - re-run by the ready notifier */
+	if (tinfo)
+		return 0;
+
 	tinfo = get_scmi_tinysys_info();
 
 	if (!tinfo) {
 		pr_info("get scmi info fail\n");
-		return ret;
+		return -1;
 	}
 
 	ret = of_property_read_u32(tinfo->sdev->dev.of_node, "scmi-apmcupm",
@@ -318,6 +322,11 @@ unsigned int swpm_set_cmd_v2(unsigned int uuid, unsigned int act,
 
 	if ((uuid >= APMCU_SCMI_UUID_SWPM_NUM) || (act >= SWPM_SCMI_ACT_NUM))
 		return 1;
+
+	/* rodin b52: scmi not ready - drop the set command instead of
+	 * crashing on a NULL tinfo */
+	if (!tinfo)
+		return ret;
 #endif
 
 	swpm_lock(&swpm_mutex);
@@ -346,6 +355,11 @@ unsigned int swpm_get_cmd_v2(unsigned int uuid, unsigned int act,
 
 	if ((uuid >= APMCU_SCMI_UUID_SWPM_NUM) || (act >= SWPM_SCMI_ACT_NUM))
 		return 1;
+
+	/* rodin b52: scmi not ready - drop the get command instead of
+	 * crashing on a NULL tinfo */
+	if (!tinfo)
+		return ret;
 #endif
 	swpm_lock(&swpm_mutex);
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SSPM_SUPPORT) && IS_ENABLED(CONFIG_MTK_PMSR)
@@ -413,13 +427,32 @@ int swpm_call_event_notifier(unsigned long val, void *v)
 }
 EXPORT_SYMBOL_GPL(swpm_call_event_notifier);
 
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+static int swpm_scmi_ready_cb(struct notifier_block *nb, unsigned long action,
+				      void *data)
+{
+	swpm_scmi_init();
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block swpm_scmi_ready_nb = {
+	.notifier_call = swpm_scmi_ready_cb,
+};
+#endif
+
 static int __init swpm_init(void)
 {
 	int ret = 0;
 
 	swpm_common_wq = create_workqueue("swpm_common_wq");
 
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+	/* rodin b52: run the scmi hookup once the tinysys chain is up */
+	scmi_tinysys_register_ready_notifier(&swpm_scmi_ready_nb);
+#else
 	swpm_scmi_init();
+#endif
 
 	ATOMIC_INIT_NOTIFIER_HEAD(&swpm_notifier_list);
 

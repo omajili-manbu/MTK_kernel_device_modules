@@ -561,9 +561,25 @@ static void pdchk_swcg_init_common(struct pd_check_swcg *swcg)
 
 void pdchk_common_init(const struct pdchk_ops *ops)
 {
+	pdchk_ops = ops;
+
+	atomic_set(&check_enabled, 0);
+
+	set_genpd_notify();
+}
+EXPORT_SYMBOL(pdchk_common_init);
+
+/* rodin b52: in 6.18 the MTK clock providers register as platform devices
+ * (device_initcall), after the pd-chk probe (subsys_initcall). Filling the
+ * SWCG clk pointers in-probe walks the whole DT against an empty provider
+ * table (~330 misses at 10ms pacing = 3.3s of boot time, zero on 6.6).
+ * Fill them once at late_initcall when all providers are up. */
+static int __init pdchk_swcg_late_init(void)
+{
 	int i;
 
-	pdchk_ops = ops;
+	if (!pdchk_ops)
+		return 0;
 
 	for (i = 0; i < MAX_PD_NUM; i++) {
 		struct pd_check_swcg *swcg = get_subsys_cg(i);
@@ -574,11 +590,9 @@ void pdchk_common_init(const struct pdchk_ops *ops)
 		pdchk_swcg_init_common(swcg);
 	}
 
-	atomic_set(&check_enabled, 0);
-
-	set_genpd_notify();
+	return 0;
 }
-EXPORT_SYMBOL(pdchk_common_init);
+late_initcall(pdchk_swcg_late_init);
 
 struct generic_pm_domain **pdchk_get_all_genpd(void)
 {

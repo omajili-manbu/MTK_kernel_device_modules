@@ -84,6 +84,13 @@ int __init sspm_plt_init(void)
 	unsigned int *mark;
 	unsigned char *b;
 
+	/* rodin b52: the probe path defers until the scmi info is ready;
+	 * this guard keeps any stale call path from a NULL tinfo deref. */
+	if (!tinfo || !tinfo->sdev) {
+		pr_err("SSPM: plt scmi info not ready\n");
+		goto error;
+	}
+
 	ret = sspm_sysfs_create_file(&dev_attr_sspm_alive);
 	if (unlikely(ret != 0))
 		goto error;

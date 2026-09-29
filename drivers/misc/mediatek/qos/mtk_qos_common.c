@@ -12,6 +12,7 @@
 #include <linux/of_device.h>
 #include <linux/kthread.h>
 #include <linux/io.h>
+#include <tinysys-scmi.h>
 
 #include "mtk_qos_ipi.h"
 #include "mtk_qos_sram.h"
@@ -137,6 +138,13 @@ int mtk_qos_probe(struct platform_device *pdev,
 	struct mtk_qos *qos;
 	struct device_node *node = pdev->dev.of_node;
 	int ret;
+
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+	/* rodin b52: built-in probe can outrun the SCMI tinysys chain;
+	 * defer until get_scmi_tinysys_info() is ready. */
+	if (!get_scmi_tinysys_info())
+		return -EPROBE_DEFER;
+#endif
 
 	qos = devm_kzalloc(&pdev->dev, sizeof(*qos), GFP_KERNEL);
 	if (!qos)

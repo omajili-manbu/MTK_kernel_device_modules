@@ -402,6 +402,11 @@ static void ise_scmi_init(void)
 	if (_tinfo)
 		return;
 	_tinfo = get_scmi_tinysys_info();
+	if (!_tinfo) {
+		/* rodin b52: scmi not ready yet */
+		pr_notice("get scmi info fail\n");
+		return;
+	}
 	ret = of_property_read_u32(_tinfo->sdev->dev.of_node, "scmi-ise",
 			&ise_scmi_id);
 	if (ret) {

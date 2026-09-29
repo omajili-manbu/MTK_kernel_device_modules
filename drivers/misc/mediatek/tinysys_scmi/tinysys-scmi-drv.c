@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/scmi_protocol.h>
+#include <linux/notifier.h>
 
 #include "tinysys-scmi.h"
 
@@ -21,6 +22,34 @@ struct scmi_tinysys_info_st *get_scmi_tinysys_info(void)
 	return t_info;
 }
 EXPORT_SYMBOL(get_scmi_tinysys_info);
+
+/* rodin b52: built-in drivers may run their initcalls/probes before the
+ * SCMI tinysys chain (mtk-mbox-mailbox -> arm-scmi transport -> protocol
+ * 0x80 device) is up, i.e. before t_info is allocated in
+ * scmi_tinysys_probe(). Let them register a one-shot hook that fires
+ * exactly once t_info is ready; if it is ready already, the hook fires
+ * synchronously so both orderings converge to the same state. */
+static BLOCKING_NOTIFIER_HEAD(scmi_tinysys_ready_chain);
+
+int scmi_tinysys_register_ready_notifier(struct notifier_block *nb)
+{
+	if (!nb || !nb->notifier_call)
+		return -EINVAL;
+
+	if (t_info)
+		return nb->notifier_call(nb, 1, NULL);
+
+	blocking_notifier_chain_register(&scmi_tinysys_ready_chain, nb);
+
+	/* the probe may have completed in between */
+	if (t_info) {
+		blocking_notifier_chain_unregister(&scmi_tinysys_ready_chain, nb);
+		return nb->notifier_call(nb, 1, NULL);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(scmi_tinysys_register_ready_notifier);
 
 int scmi_tinysys_common_set(const struct scmi_protocol_handle *ph, u32 feature_id,
 	u32 p1, u32 p2, u32 p3, u32 p4, u32 p5)
@@ -99,7 +128,13 @@ int scmi_tinysys_event_notify(u32 feature_id, u32 notify_enable)
 
 	int ret = 0;
 	int f_id = feature_id;
-	struct scmi_device *sdev = t_info->sdev;
+	struct scmi_device *sdev;
+
+	/* rodin b52: guard against consumers racing the tinysys probe */
+	if (!t_info || !t_info->sdev)
+		return -ENODEV;
+
+	sdev = t_info->sdev;
 
 	if (notify_enable) {
 		ret = sdev->handle->notify_ops->devm_event_notifier_register(sdev,
@@ -215,6 +250,9 @@ static int scmi_tinysys_probe(struct scmi_device *sdev)
 	t_info->sdev = sdev;
 
 	t_info->ph = ph;
+
+	/* rodin b52: wake built-in consumers that registered early */
+	blocking_notifier_call_chain(&scmi_tinysys_ready_chain, 1, NULL);
 
 #ifdef TINYSYS_SCMI_DEBUG
 	if (device_create_file(dev, &dev_attr_tinysys_scmi_debug))

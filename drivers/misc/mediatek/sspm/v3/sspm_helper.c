@@ -33,6 +33,7 @@
 #include "sspm_sysfs.h"
 #include "sspm_reservedmem.h"
 #include "sspm_timesync.h"
+#include "tinysys-scmi.h"
 
 struct sspm_regs sspmreg;
 struct platform_device *sspm_pdev;
@@ -134,6 +135,18 @@ static int __init sspm_device_probe(struct platform_device *pdev)
 		return 0;
 	}
 
+#if SSPM_PLT_SERV_SUPPORT
+	/* rodin b52: built-in probe can outrun the SCMI tinysys chain
+	 * (mtk-mbox-mailbox -> arm-scmi -> protocol 0x80 device). Defer
+	 * until get_scmi_tinysys_info() is ready; the deferred probe
+	 * queue retries when the chain binds. On the crash log this
+	 * deref was sspm_plt_init+0x90  ldr x8,[x19]  x19=NULL. */
+	if (!get_scmi_tinysys_info()) {
+		atomic_dec(&sspm_dev_inited);
+		return -EPROBE_DEFER;
+	}
+#endif
+
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfgreg");
 	sspmreg.cfg = devm_ioremap_resource(dev, res);
 
@@ -172,7 +185,9 @@ static int __init sspm_device_probe(struct platform_device *pdev)
 
 	pr_info("[SSPM] sspm_pdrv probe Done.\n");
 
-	sspm_module_init();
+	ret = sspm_module_init();
+	if (ret)
+		return ret;
 
 	return 0;
 }

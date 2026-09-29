@@ -22,6 +22,10 @@ typedef struct scmi_tinysys_report_st {
 
 struct scmi_tinysys_info_st *get_scmi_tinysys_info(void);
 
+/* rodin b52: one-shot ready notifier for built-in consumers whose
+ * initcalls can outrun the tinysys scmi chain (see tinysys-scmi-drv.c). */
+int scmi_tinysys_register_ready_notifier(struct notifier_block *nb);
+
 int scmi_tinysys_common_set(const struct scmi_protocol_handle *ph, u32 feature_id,
 	u32 p1, u32 p2, u32 p3, u32 p4, u32 p5);
 

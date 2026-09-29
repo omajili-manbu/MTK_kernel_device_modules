@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
+#include <linux/notifier.h>
 
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 #include <linux/scmi_protocol.h>
@@ -110,11 +111,15 @@ static int pmsr_ipi_init(void)
 
 	/* for AP to SSPM */
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+	/* rodin b52: idempotent - re-run by the ready notifier */
+	if (tinfo)
+		return 0;
+
 	tinfo = get_scmi_tinysys_info();
 
 	if (!tinfo) {
 		pr_info("get scmi info fail\n");
-		return ret;
+		return -1;
 	}
 
 	ret = of_property_read_u32(tinfo->sdev->dev.of_node, "scmi-apmcupm",
@@ -141,6 +146,10 @@ static int pmsr_get_sspm_sram(void)
 
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	struct scmi_tinysys_status pmsr_tool_rvalue;
+
+	/* rodin b52: scmi not ready - nothing to query */
+	if (!tinfo)
+		return -1;
 
 	pmsr_scmi_set_data.user_info =
 			(user_info | APMCU_SET_ACT(PMSR_TOOL_ACT_GET_SRAM));
@@ -181,12 +190,15 @@ static void pmsr_tool_send_forcereq(struct work_struct *work)
 	/* if cfg.test = 1, then scmi has been sent */
 	if ((cfg.pmsr_sample_rate != 0) && (cfg.test != 1)) {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
-		pmsr_scmi_set_data.user_info =
-			(user_info | APMCU_SET_ACT(PMSR_TOOL_ACT_TEST));
-		ret = scmi_tinysys_common_set(tinfo->ph, scmi_apmcupm_id,
-			pmsr_scmi_set_data.user_info, 0, 0, 0, 0);
-		if (ret)
-			cfg.err |= (1 << PMSR_TOOL_ACT_TEST);
+		if (tinfo) {
+			/* rodin b52: skip the scmi send if not ready yet */
+			pmsr_scmi_set_data.user_info =
+				(user_info | APMCU_SET_ACT(PMSR_TOOL_ACT_TEST));
+			ret = scmi_tinysys_common_set(tinfo->ph, scmi_apmcupm_id,
+				pmsr_scmi_set_data.user_info, 0, 0, 0, 0);
+			if (ret)
+				cfg.err |= (1 << PMSR_TOOL_ACT_TEST);
+		}
 #endif
 	}
 
@@ -753,6 +765,20 @@ static int __init pmsr_parsing_nodes(void)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+static int pmsr_scmi_ready_cb(struct notifier_block *nb, unsigned long action,
+				      void *data)
+{
+	pmsr_ipi_init();
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block pmsr_scmi_ready_nb = {
+	.notifier_call = pmsr_scmi_ready_cb,
+};
+#endif
+
 static int __init pmsr_init(void)
 {
 
@@ -770,8 +796,13 @@ static int __init pmsr_init(void)
 	/* create debugfs node */
 	pmsr_procfs_init();
 
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
+	/* rodin b52: run the ipi hookup once the tinysys chain is up */
+	scmi_tinysys_register_ready_notifier(&pmsr_scmi_ready_nb);
+#else
 	/* register ipi for AP2SSPM communication */
 	pmsr_ipi_init();
+#endif
 
 	hrtimer_setup(&pmsr_timer, pmsr_timer_handle, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 

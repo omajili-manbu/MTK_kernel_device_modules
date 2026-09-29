@@ -130,6 +130,13 @@ void qos_ipi_init(struct mtk_qos *qos)
 
 	_tinfo = get_scmi_tinysys_info();
 
+	if (!_tinfo) {
+		/* rodin b52: probe defers until scmi is ready; guard here */
+		pr_info("get scmi info fail\n");
+		qos_sspm_ready = -2;
+		return;
+	}
+
 	ret = of_property_read_u32(_tinfo->sdev->dev.of_node, "scmi-qos",
 			&scmi_qos_id);
 	if (ret) {

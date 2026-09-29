@@ -15,6 +15,7 @@
 #include <linux/atomic.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/notifier.h>
 #include <ssc_module.h>
 #include <mt-plat/ssc.h>
 
@@ -315,15 +316,63 @@ static struct platform_driver mt_ssc_pdrv = {
 
 };
 
+#if IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)
+/* rodin b52: extracted from ssc_init - the built-in initcall can outrun
+ * the SCMI tinysys chain, so the handshake runs via the ready notifier. */
+static int ssc_scmi_init(void)
+{
+	int ret;
+	struct scmi_tinysys_status rvalue;
+	struct scmi_tinysys_info_st *tinfo;
+
+	tinfo = get_scmi_tinysys_info();
+	if (!tinfo) {
+		pr_info("[SSC] get SCMI info fail\n");
+		return -1;
+	}
+
+	ret = of_property_read_u32(tinfo->sdev->dev.of_node, "scmi_ssc", &ssc_scmi_feature_id);
+
+	pr_info("[SSC] ssc scmi id = %d\n", ssc_scmi_feature_id);
+
+	scmi_tinysys_register_event_notifier(ssc_scmi_feature_id,
+			(f_handler_t)ssc_notification_handler);
+
+	ret = scmi_tinysys_event_notify(ssc_scmi_feature_id, 1);
+	if (ret < 0)
+		pr_info("[SSC] SCMI notify register fail\n");
+
+	ret = of_property_read_u32(tinfo->sdev->dev.of_node, "scmi-plt", &plt_scmi_feature_id);
+	ret = scmi_tinysys_common_set(tinfo->ph, plt_scmi_feature_id, PLT_SSC_INIT,
+					0, 0, 0, 0);
+
+	if (ret)
+		ssc_aee_print("[SSC] SCMI common set fail!\n");
+	else
+		pr_info("[SSC] notify done! (r1:%d r2:%d r3:%d)\n",
+				rvalue.r1, rvalue.r2, rvalue.r3);
+
+	return 0;
+}
+
+static int ssc_scmi_ready_cb(struct notifier_block *nb, unsigned long action,
+				     void *data)
+{
+	ssc_scmi_init();
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block ssc_scmi_ready_nb = {
+	.notifier_call = ssc_scmi_ready_cb,
+};
+#endif
+
 static int __init ssc_init(void)
 {
 	struct device_node *ssc_node;
 	int ret;
 	unsigned long flags;
-#if IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)
-	struct scmi_tinysys_status rvalue;
-	struct scmi_tinysys_info_st *tinfo;
-#endif
 
 	pr_info("[SSC] %s\n", __func__);
 
@@ -381,35 +430,10 @@ static int __init ssc_init(void)
 #endif
 	spin_unlock_irqrestore(&ssc_locker, flags);
 
-	/* scmi interface initialization */
-
+	/* scmi interface initialization (rodin b52: via ready notifier -
+	 * the handshake runs once the tinysys scmi chain is up) */
 #if IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)
-	tinfo = get_scmi_tinysys_info();
-	if (!tinfo) {
-		pr_info("[SSC] get SCMI info fail\n");
-		goto SKIP_SCMI;
-	}
-	ret = of_property_read_u32(tinfo->sdev->dev.of_node, "scmi_ssc", &ssc_scmi_feature_id);
-
-	pr_info("[SSC] ssc scmi id = %d\n", ssc_scmi_feature_id);
-
-	scmi_tinysys_register_event_notifier(ssc_scmi_feature_id,
-			(f_handler_t)ssc_notification_handler);
-
-	ret = scmi_tinysys_event_notify(ssc_scmi_feature_id, 1);
-	if (ret < 0)
-		pr_info("[SSC] SCMI notify register fail\n");
-
-	ret = of_property_read_u32(tinfo->sdev->dev.of_node, "scmi-plt", &plt_scmi_feature_id);
-	ret = scmi_tinysys_common_set(tinfo->ph, plt_scmi_feature_id, PLT_SSC_INIT,
-					0, 0, 0, 0);
-
-	if (ret)
-		ssc_aee_print("[SSC] SCMI common set fail!\n");
-	else
-		pr_info("[SSC] notify done! (r1:%d r2:%d r3:%d)\n",
-				rvalue.r1, rvalue.r2, rvalue.r3);
-SKIP_SCMI:
+	scmi_tinysys_register_ready_notifier(&ssc_scmi_ready_nb);
 #endif
 
 	ssc_vlogic_bound_register_notifier(&ssc_vlogic_notifier_func);
