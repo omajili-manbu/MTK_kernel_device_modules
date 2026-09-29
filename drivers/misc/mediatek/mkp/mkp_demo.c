@@ -874,9 +874,13 @@ static int __init protect_mkp_self(void)
 		module_enable_ro(THIS_MODULE, false, MKP_POLICY_MKP);
 		module_enable_nx(THIS_MODULE, MKP_POLICY_MKP);
 		module_enable_x(THIS_MODULE, MKP_POLICY_MKP);
+		/* rodin b54: grant-start（ESS_1）在 6.6 =m 时序中恒在自保护
+		 * 三连调之后执行（此时 MKP 自面 policy handle 已建立）；内建
+		 * 无自面 handle，该事件不存在 ⇒ 随三连调一并 =m-only。#104
+		 * 实证：=y 下 ESS_1 与 krn 面 create_handle 并发/错序即
+		 * secure 侧双 CPU 卡死（0.414s 双 hard lockup）。 */
+		mkp_start_granting_hvc_call();
 	}
-
-	mkp_start_granting_hvc_call();
 	return 0;
 }
 

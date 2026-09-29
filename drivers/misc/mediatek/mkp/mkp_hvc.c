@@ -5,14 +5,48 @@
 
 #include "mkp_hvc.h"
 #include "debug.h"
+#include <linux/spinlock.h>
 
 DEBUG_SET_LEVEL(DEBUG_LEVEL_ERR);
+
+/* rodin b54: MKP service 的 ticket/grant 协议要求全系统同一时刻至多一个
+ * secure op 在途（单一 grant-cookie 槽 + secure 侧非重入）。6.6 =m 时代
+ * 靠用户态装载时序碰巧串行；内建后 initcall 线程与 krn 保护 work 并发
+ * 进入，secure world 卡死 ⇒ 真机 #104 0.414s 双 CPU hard lockup、零回栈
+ * （两 CPU 均困在 HVC 内）。修复 = raw spinlock 序列化：单发 HVC 走
+ * mkp_smccc_hvc（内含锁），do_secure_ops 的 [ticket 写 + HVC] 临界区
+ * 持锁后走 mkp_smccc_hvc_raw。 */
+static DEFINE_RAW_SPINLOCK(mkp_hvc_svc_lock);
+
+void mkp_hvc_lock(unsigned long *flags)
+{
+	raw_spin_lock_irqsave(&mkp_hvc_svc_lock, *flags);
+}
+
+void mkp_hvc_unlock(unsigned long flags)
+{
+	raw_spin_unlock_irqrestore(&mkp_hvc_svc_lock, flags);
+}
 
 static void mkp_smccc_hvc(unsigned long a0, unsigned long a1,
 			  unsigned long a2, unsigned long a3,
 			  unsigned long a4, unsigned long a5,
 			  unsigned long a6, unsigned long a7,
 			  struct arm_smccc_res *res)
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&mkp_hvc_svc_lock, flags);
+	arm_smccc_hvc(a0, a1, a2, a3, a4, a5, a6, a7, res);
+	raw_spin_unlock_irqrestore(&mkp_hvc_svc_lock, flags);
+}
+
+/* rodin b54: 无锁版本，仅供 do_secure_ops 的持锁临界区使用。 */
+static void mkp_smccc_hvc_raw(unsigned long a0, unsigned long a1,
+			      unsigned long a2, unsigned long a3,
+			      unsigned long a4, unsigned long a5,
+			      unsigned long a6, unsigned long a7,
+			      struct arm_smccc_res *res)
 {
 	arm_smccc_hvc(a0, a1, a2, a3, a4, a5, a6, a7, res);
 }
@@ -23,7 +57,7 @@ int mkp_set_mapping_ro_hvc_call(uint32_t policy, uint32_t handle)
 	int mkp_hvc_fast_call_id;
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(policy, HVC_FUNC_SET_MAPPING_RO);
-	mkp_smccc_hvc(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
+	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
 	MKP_DEBUG("%s:%d hvc_id:0x%x, policy:%d res:0x%lx 0x%lx 0x%lx 0x%lx\n", __func__, __LINE__,
 		mkp_hvc_fast_call_id, policy, res.a0, res.a1, res.a2, res.a3);
 
@@ -36,7 +70,7 @@ int mkp_set_mapping_rw_hvc_call(uint32_t policy, uint32_t handle)
 	int mkp_hvc_fast_call_id;
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(policy, HVC_FUNC_SET_MAPPING_RW);
-	mkp_smccc_hvc(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
+	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
 	MKP_DEBUG("%s:%d hvc_id:0x%x, policy:%d res:0x%lx 0x%lx 0x%lx 0x%lx\n", __func__, __LINE__,
 		mkp_hvc_fast_call_id, policy, res.a0, res.a1, res.a2, res.a3);
 
@@ -49,7 +83,7 @@ int mkp_set_mapping_nx_hvc_call(uint32_t policy, uint32_t handle)
 	int mkp_hvc_fast_call_id;
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(policy, HVC_FUNC_SET_MAPPING_NX);
-	mkp_smccc_hvc(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
+	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
 	MKP_DEBUG("%s:%d hvc_id:0x%x, policy:%d res:0x%lx 0x%lx 0x%lx 0x%lx\n", __func__, __LINE__,
 		mkp_hvc_fast_call_id, policy, res.a0, res.a1, res.a2, res.a3);
 
@@ -62,7 +96,7 @@ int mkp_set_mapping_x_hvc_call(uint32_t policy, uint32_t handle)
 	int mkp_hvc_fast_call_id;
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(policy, HVC_FUNC_SET_MAPPING_X);
-	mkp_smccc_hvc(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
+	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
 	MKP_DEBUG("%s:%d hvc_id:0x%x, policy:%d res:0x%lx 0x%lx 0x%lx 0x%lx\n", __func__, __LINE__,
 		mkp_hvc_fast_call_id, policy, res.a0, res.a1, res.a2, res.a3);
 
@@ -75,7 +109,7 @@ int mkp_clear_mapping_hvc_call(uint32_t policy, uint32_t handle)
 	int mkp_hvc_fast_call_id;
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(policy, HVC_FUNC_CLEAR_MAPPING);
-	mkp_smccc_hvc(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
+	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, handle, 0, 0, 0, 0, 0, 0, &res);
 	MKP_DEBUG("%s:%d hvc_id:0x%x, policy:%d res:0x%lx 0x%lx 0x%lx 0x%lx\n", __func__, __LINE__,
 		mkp_hvc_fast_call_id, policy, res.a0, res.a1, res.a2, res.a3);
 

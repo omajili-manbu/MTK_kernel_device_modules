@@ -6,8 +6,23 @@
 
 #include "mkp_hvc.h"
 #include "debug.h"
+#include <linux/spinlock.h>
 
 DEBUG_SET_LEVEL(DEBUG_LEVEL_ERR);
+
+/* rodin b54: 与 mkp 同款 secure-op 跨 CPU 序列化（pKVM EL2 模块调用
+ * 同为非重入服务面）。CONFIG_MTK_PKVM_MKP 未编，未编但补防。 */
+static DEFINE_RAW_SPINLOCK(mkp_hvc_svc_lock);
+
+void mkp_hvc_lock(unsigned long *flags)
+{
+	raw_spin_lock_irqsave(&mkp_hvc_svc_lock, *flags);
+}
+
+void mkp_hvc_unlock(unsigned long flags)
+{
+	raw_spin_unlock_irqrestore(&mkp_hvc_svc_lock, flags);
+}
 
 int mkp_set_mapping_ro_hvc_call(uint32_t policy, uint32_t handle)
 {

@@ -111,4 +111,10 @@ int __init mkp_setup_essential_hvc_call(unsigned long phys_offset, unsigned long
 
 int __init mkp_start_granting_hvc_call(void);
 
+/* rodin b54: secure-op 跨 CPU 序列化原语（定义在 mkp_hvc.c）——
+ * ticket 协议要求 [cookie 写 + HVC] 原子、且全系统同一时刻至多
+ * 一个 secure op 在途。 */
+void mkp_hvc_lock(unsigned long *flags);
+void mkp_hvc_unlock(unsigned long flags);
+
 #endif /* _MKP_HVC_H */

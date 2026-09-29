@@ -44,12 +44,19 @@ extern const uint64_t subscribe;
 extern uint64_t *grant_ticket;
 extern int hvc_number;
 
+/* rodin b54: secure-op 跨 CPU 序列化原语（定义在 mkp_hvc.c）。 */
+void mkp_hvc_lock(unsigned long *flags);
+void mkp_hvc_unlock(unsigned long flags);
+
 #define mkp_el2_mod_call(id, ...)                                       \
 	({                                                              \
 		struct arm_smccc_res res;                               \
+		unsigned long __mkp_flags;                              \
 									\
+		mkp_hvc_lock(&__mkp_flags);                               \
 		arm_smccc_1_1_hvc(KVM_HOST_SMCCC_ID(id),		\
 				##__VA_ARGS__, &res);			\
+		mkp_hvc_unlock(__mkp_flags);                             \
 		WARN_ON(res.a0 != SMCCC_RET_SUCCESS);			\
 									\
 		res;							\

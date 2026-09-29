@@ -54,10 +54,13 @@ static __always_inline int do_secure_ops(uint32_t policy, uint32_t handle,
 	if (!grant_ticket)
 		goto exit;
 
-	local_irq_save(flags);
+	/* rodin b54: ticket 写入必须与 HVC 同一临界区——grant cookie 槽
+	 * 全局唯一、secure 侧消费后清零；写/发分离时另一 CPU 的 HVC 会
+	 * 看到空 cookie。锁内 set_memory_hvc 指向 _raw 版本，不重入锁。 */
+	mkp_hvc_lock(&flags);
 	*grant_ticket = subscribe;
 	ret = set_memory_hvc(policy, handle);
-	local_irq_restore(flags);
+	mkp_hvc_unlock(flags);
 
 exit:
 	return ret;
