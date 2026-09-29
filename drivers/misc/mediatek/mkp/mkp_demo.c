@@ -874,13 +874,15 @@ static int __init protect_mkp_self(void)
 		module_enable_ro(THIS_MODULE, false, MKP_POLICY_MKP);
 		module_enable_nx(THIS_MODULE, MKP_POLICY_MKP);
 		module_enable_x(THIS_MODULE, MKP_POLICY_MKP);
-		/* rodin b54: grant-start（ESS_1）在 6.6 =m 时序中恒在自保护
-		 * 三连调之后执行（此时 MKP 自面 policy handle 已建立）；内建
-		 * 无自面 handle，该事件不存在 ⇒ 随三连调一并 =m-only。#104
-		 * 实证：=y 下 ESS_1 与 krn 面 create_handle 并发/错序即
-		 * secure 侧双 CPU 卡死（0.414s 双 hard lockup）。 */
-		mkp_start_granting_hvc_call();
 	}
+	/* rodin b55: ESS_1（start granting）恢复全形态执行——它是 grant 协议
+	 * 的使能步，OEM 时序恒在 sharebuf 创建之前；b54 随三连调 =m-only 属
+	 * 过度矫正：#105 实证 =y 缺失时首个 AVC sharebuf 的 cookie 写被
+	 * secure 侧判违规并按其设计注入 dabt 打死内核（FAR=0xfedcba9876543210、
+	 * FSC=0x3f；pkvm_mkp/hyp/mkp_handler.c 同款"inject a dabt to EL1"）。
+	 * =y 无自面 handle 不影响本事件；b54 mkp_hvc_svc_lock 已保证单
+	 * secure-op 串行，#104 的并发窗已闭。 */
+	mkp_start_granting_hvc_call();
 	return 0;
 }
 
