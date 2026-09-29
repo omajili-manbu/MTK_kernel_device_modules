@@ -264,6 +264,10 @@ static int emibus_icc_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
+	/* rodin b58: 6.18 起 nodes[] 带 __counted_by(num_nodes)，计数必须先于填充，
+	 * 否则 UBSAN array-index trap（#108 实证）；register 前无并发读者，语义不变。 */
+	data->num_nodes = num_nodes;
+
 	provider = &emibus_icc_p->provider;
 	provider->dev = dev;
 	provider->set = emibus_icc_set;
@@ -291,7 +295,6 @@ static int emibus_icc_probe(struct platform_device *pdev)
 
 		data->nodes[i] = node;
 	}
-	data->num_nodes = num_nodes;
 
 	ret = icc_provider_register(provider);
 	if (ret)
