@@ -346,9 +346,27 @@ int __init mkp_start_granting_hvc_call(void)
 	struct arm_smccc_res res;
 	int mkp_hvc_fast_call_id;
 	int ret = -1;
+	unsigned long flags;
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(0, HVC_FUNC_ESS_1);
-	mkp_smccc_hvc(mkp_hvc_fast_call_id, 0, 0, 0, 0, 0, 0, 0, &res);
+
+	/* rodin b56: ESS_1 前 grant-ticket 槽必须处于 OEM 实证态（0=无在途
+	 * ticket）。OEM 6.6 =m 的 do_secure_ops 以立即数 0x6d6b7021 写槽
+	 * （真机 mkp.ko 反汇编实证）且 secure 侧消费后清零，ESS_1 恒在自面
+	 * 三连调之后，槽已被消费清零；内建态自面三连调被裁（b53）、percpu
+	 * 面 -3 早退（厂商死代码）、krn 面首操作 create_handle 不碰槽，ESS_1
+	 * 可成为全 boot 首个协议事件——槽仍是 .rodata 初值 0x6d6b7021
+	 * ("mkp!")，secure 侧视为未消费在途 ticket 并在 ESS_1 内死等其被
+	 * 消费 => EL3 卡死（真机 #106：0.412s 起 cpu1/cpu3 双 hard lockup、
+	 * 零回栈；与 #104 同形态不同因——b54 锁只堵 AP 侧竞争产生的异常槽
+	 * 态，堵不住"消费者被裁"留下的槽态）。持锁清零与 ESS_1 原子，与
+	 * do_secure_ops 的 [ticket 写 + HVC] 同一纪律；=m 时槽恒已为 0，
+	 * 此写零影响。 */
+	mkp_hvc_lock(&flags);
+	if (grant_ticket)
+		*grant_ticket = 0;
+	mkp_smccc_hvc_raw(mkp_hvc_fast_call_id, 0, 0, 0, 0, 0, 0, 0, &res);
+	mkp_hvc_unlock(flags);
 
 	/* Success */
 	if (res.a0 == 0)

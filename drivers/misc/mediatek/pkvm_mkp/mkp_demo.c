@@ -858,7 +858,9 @@ static int __init protect_mkp_self(void)
 	/* rodin b55: 此处维持 MTK 原生注释态（不随 mkp/b55 恢复 ESS_1）——
 	 * pkvm 代服务端已删除 ESS_1 与整套 ticket 协议（mkp_hvc_handler 无
 	 * 该 case、do_secure_ops cookie 写亦被原厂注释），恢复调用只会打到
-	 * 未处理 func 号。b55 的 =y 恢复仅适用于 ATF 代 drivers/.../mkp。 */
+	 * 未处理 func 号。b55 的 =y 恢复仅适用于 ATF 代 drivers/.../mkp。
+	 * rodin b56: ESS_1 前的 grant-ticket 槽清零同理仅适用于 ATF 代
+	 * （槽协议专属）；pkvm 代无槽概念，无需镜像。 */
 	// mkp_start_granting_hvc_call();
 	return 0;
 }
