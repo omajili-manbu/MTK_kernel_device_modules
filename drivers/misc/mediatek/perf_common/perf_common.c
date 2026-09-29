@@ -26,7 +26,8 @@ static DEFINE_SPINLOCK(check_lock);
 static int perf_common_init;
 static atomic_t perf_in_progress;
 
-void __iomem *csram_base;
+/* rodin 6.9：原名 perf_csram_base 与 mtk_cm_mgr_mt6899 撞名 ⇒ 加前缀（头同步）。 */
+void __iomem *perf_csram_base;
 void __iomem *u_tcm_base;
 void __iomem *stall_tcm_base;
 
@@ -370,8 +371,15 @@ static int __init init_perf_common(void)
 	perf_common_init = 1;
 	atomic_set(&perf_in_progress, 0);
 
-	hrtimer_init(&perf_hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	perf_hrtimer.function = perf_timer_handler;
+	/*
+	 * rodin 6.9：6.14 起 hrtimer_init() 已删除（上游 9779489a31d7），6.18 只剩
+	 * hrtimer_setup(timer, function, clock_id, mode)（include/linux/hrtimer.h:231-232）
+	 * —— 它把原先"init 后紧跟赋 ->function"两步合成一步，故此处合并书写。
+	 * 注意不要改走 lib/compat-6.6-core.c 的 hrtimer_init 兼容符号：那是给预编译
+	 * .ko blob 用的（它塞桩函数、由调用方随后覆盖），内建源码若蹭它会丢掉
+	 * 「必须紧接着赋 ->function」这一隐式契约，漏赋值即静默失效。
+	 */
+	hrtimer_setup(&perf_hrtimer, perf_timer_handler, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	kt_period = ktime_set(0, perf_timer_delay); // 0 second, 4000000 nanoseconds
 
 	perf_tracker_info_exist = is_perf_tracker_info_exist();
@@ -386,7 +394,7 @@ static int __init init_perf_common(void)
 		cdfv_tcm_base_start = get_perf_tracker_info_from_dts("cdfv-tcm-base");
 		if (cdfv_tcm_base_start == 0)
 			goto get_base_failed;
-		csram_base = ioremap(cdfv_tcm_base_start
+		perf_csram_base = ioremap(cdfv_tcm_base_start
 					, get_perf_tracker_info_from_dts("cdfv-tcm-base-len"));
 		u_tcm_base_start = get_perf_tracker_info_from_dts("u-tcm-base");
 		if (u_tcm_base_start != 0) {
@@ -400,7 +408,7 @@ static int __init init_perf_common(void)
 		}
 		is_percore_need_to_check = get_perf_tracker_info_from_dts("is-percore-need-to-check");
 		if (is_percore_need_to_check) {
-			if ((__raw_readl(csram_base + CHECK_PER_CORE)) == IS_PER_CORE) {
+			if ((__raw_readl(perf_csram_base + CHECK_PER_CORE)) == IS_PER_CORE) {
 				U_FREQ_3_CLUSTER = 0x13c4;
 				is_percore = 1;
 			}
@@ -429,8 +437,8 @@ static int __init init_perf_common(void)
 			goto get_base_failed;
 		}
 
-		csram_base = ioremap(csram_res->start, resource_size(csram_res));
-		if (IS_ERR_OR_NULL((void *)csram_base)) {
+		perf_csram_base = ioremap(csram_res->start, resource_size(csram_res));
+		if (IS_ERR_OR_NULL((void *)perf_csram_base)) {
 			ret = -ENOMEM;
 			pr_info("%s: find csram base failed\n", TAG);
 			goto get_base_failed;

@@ -18,6 +18,7 @@
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/of_platform.h>
 #include <linux/pm_opp.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -196,18 +197,13 @@ int check_curve_adj_support(struct device_node *dvfs_node)
 	return 0;
 }
 
-void arch_get_cluster_cpus(struct cpumask *cpus, int cluster_id)
-{
-	unsigned int cpu;
-
-	cpumask_clear(cpus);
-	for_each_possible_cpu(cpu) {
-		int cpu_cluster_id = topology_cluster_id(cpu);
-
-		if (cpu_cluster_id == cluster_id)
-			cpumask_set_cpu(cpu, cpus);
-	}
-}
+/*
+ * rodin 6.9：此处原有一份 arch_get_cluster_cpus() 定义，与 sched/core_ctl/sched_avg.c
+ * 的 EXPORT_SYMBOL 版及 perf_ioctl_magt.c 的同名副本三方撞名（内建同图 duplicate）。
+ * 实测本文件这份**全树零调用者**（vendor 全树 grep + 内核树 grep）⇒ 直接删除；
+ * 全球面仍由 sched_avg.c 的导出提供。删除不是降级：本文件与其它文件都不需要这份副本
+ * （同模块的 nonlinear_opp_cap.c / cpufreq_sugov_main.c 也不调用它）。
+ */
 
 struct em_base_info *mtk_get_em_base_info(void)
 {

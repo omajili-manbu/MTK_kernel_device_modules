@@ -74,11 +74,12 @@ static int platform_fpsgo_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int platform_fpsgo_remove(struct platform_device *pdev)
+/* rodin 6.9：6.18 起 platform_driver::remove 返回 void
+ * （include/linux/platform_device.h:241，上游 0edb555a65d1）。改签名必须同时
+ * 删掉 return 0;，否则 -Wreturn-mismatch。 */
+static void platform_fpsgo_remove(struct platform_device *pdev)
 {
 	icc_put(bw_path);
-
-	return 0;
 }
 
 static const struct of_device_id platform_fpsgo_of_match[] = {

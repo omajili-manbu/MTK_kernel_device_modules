@@ -46,6 +46,8 @@ ifeq ($(CONFIG_VIDEO_MEDIATEK_VCODEC_V2),y)
 	obj-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-dec-v2.o
 # rodin 4-3: enc-v2 的符号闭包含闭源 metis/mi_schedule（sched 簇），拆出独立门；
 # 默认 n，待 perf/sched 批（4-9）决策后随批复活。
+# rodin 4-9: **已复活 =y**。同批把 v2/vcodec_dvfs.o 从 enc-v2 的 objs 里摘掉
+# （该 .o 同时列在 dec-v2 与 enc-v2 的 objs ⇒ 同图 18 个 multiple definition）。
 	obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC_ENC_V2) += mtk-vcodec-enc-v2.o
 
 	mtk-vcodec-dec-v2-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += \
@@ -53,8 +55,13 @@ ifeq ($(CONFIG_VIDEO_MEDIATEK_VCODEC_V2),y)
 			v2/vcodec_dvfs.o
 
 	mtk-vcodec-enc-v2-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += \
-			v2/mtk_vcodec_enc_pm_plat.o \
-			v2/vcodec_dvfs.o
+			v2/mtk_vcodec_enc_pm_plat.o
+# rodin 6.9：v2/vcodec_dvfs.o **不**编进 enc-v2。该 .o 同时列在 dec-v2 与 enc-v2 的
+# objs 里（6.6 时代两者是独立 .ko，各自的 built-in.a 各存一份没冲突）；内建进同一张
+# vmlinux 后就是 18 个 multiple definition（add_inst/get_inst/get_cfg/calc_freq/
+# find_perf/match_avail_freq/mtk_dvfs_check_op_diff/mtk_vcodec_alive_checker_* …）。
+# dec-v2（CONFIG_VIDEO_MEDIATEK_VCODEC_V2=y，已在 vmlinux）提供这些全局符号，
+# enc-v2 的引用在最终链接期由它们解析 ⇒ 摘掉这边的重复副本即可，零功能损失。
 
 	mtk-vcodec-dec-v2-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += $(mtk-vcodec-dec-m) $(mtk-vcodec-dec-y)
 	mtk-vcodec-enc-v2-$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC) += $(mtk-vcodec-enc-m) $(mtk-vcodec-enc-y)

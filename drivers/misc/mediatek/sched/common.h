@@ -5,6 +5,13 @@
 #ifndef _SCHED_COMMON_H
 #define _SCHED_COMMON_H
 
+/* rodin 6.9：vendor 用 arch_scale_cpu_capacity()（替代 6.18 已删的
+ * capacity_orig_of()）与 topology_cluster_id()，而 common.h 被 sched/fair、
+ * sched/eas、sched/sugov、performance/fpsgo_v3、cache-auditor 各簇共同包含
+ * ⇒ 在共同头里一次性引入声明（6.18 头瘦身后这些不再被隐式带入）。 */
+#include <linux/topology.h>
+#include <linux/sched/topology.h>
+
 #define MTK_VENDOR_DATA_SIZE_TEST(mstruct, kstruct)		\
 	BUILD_BUG_ON(sizeof(mstruct) > (sizeof(u64) *		\
 		ARRAY_SIZE(((kstruct *)0)->android_vendor_data1)))
@@ -186,6 +193,19 @@ extern void mtk_map_util_freq(void *data, unsigned long util,
 #define mtk_map_util_freq(data, util, cap, next_freq)
 #endif /* CONFIG_NONLINEAR_FREQ_CTL */
 
+/*
+ * rodin 6.9：6.18 删除了 kernel/sched/sched.h 里的 enum cpu_util_type（把
+ * FREQUENCY_UTIL/ENERGY_UTIL 双模式拆成 effective_cpu_util() 的 min/max 出参 +
+ * sugov_effective_cpu_perf()）。vendor 的 mtk_cpu_util() 是自实现、语义直接依赖
+ * 该枚举 ⇒ 在本地恢复，这是把 6.6 语义完整搬过来，不是降级。
+ * 注：sched/fair.c 里三处调用**内核** effective_cpu_util() 的点位于 `#else`
+ * 分支（外层 IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)），本配置下不参与编译。
+ */
+enum cpu_util_type {
+	FREQUENCY_UTIL,
+	ENERGY_UTIL,
+};
+
 #if IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
 DECLARE_PER_CPU(int, cpufreq_idle_cpu);
 DECLARE_PER_CPU(spinlock_t, cpufreq_idle_cpu_lock);
@@ -208,9 +228,21 @@ static inline int rt_rq_throttled(struct rt_rq *rt_rq)
 	return rt_rq->rt_throttled && !rt_rq->rt_nr_boosted;
 }
 #else /* !CONFIG_RT_GROUP_SCHED */
+/*
+ * rodin 6.9 降级论证（本簇唯一一处跟随上游的语义变化）：
+ * 6.18 把 rt_throttled / rt_time / rt_runtime 整体移入 #ifdef CONFIG_RT_GROUP_SCHED
+ * （kernel/sched/sched.h:854-864，上游 5f6bd380c7bd "sched/rt: Remove default
+ * bandwidth control"），非 group 构建下该字段不存在，原样引用必然编不过。
+ * 上游自身在非 group 构建下同样直接判定"未节流"（kernel/sched/rt.c:946-949 的
+ * #else 支 `return false;`）⇒ 此处与上游语义对齐。
+ * 行为影响：调用点（sched/fair.c、sched/eas/vip.c）用
+ * `!rt_rq_throttled(&rq->rt)` 判断"RT 未被节流才允许 CFS 抢核"；退化后恒为
+ * "未节流" ⇒ CFS 抢占更激进。这不是丢功能，而是 6.18 删掉默认 RT 带宽控制后的
+ * 既定语义（终验已在重载 RT 场景观察功耗/延迟）。
+ */
 static inline int rt_rq_throttled(struct rt_rq *rt_rq)
 {
-	return rt_rq->rt_throttled;
+	return false;
 }
 #endif
 

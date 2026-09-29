@@ -3219,8 +3219,15 @@ int mtk_fstb_init(void)
 
 	fstb_wq = alloc_ordered_workqueue("%s", WQ_MEM_RECLAIM | WQ_HIGHPRI, "mt_fstb");
 
-	hrtimer_init(&fstb_hrt, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	fstb_hrt.function = &mt_fstb;
+	/*
+	 * rodin 6.9：6.14 起 hrtimer_init() 已删除（上游 9779489a31d7），6.18 只剩
+	 * hrtimer_setup(timer, function, clock_id, mode)（include/linux/hrtimer.h:231-232）
+	 * —— 它把原先"init 后紧跟赋 ->function"两步合成一步，故此处合并书写。
+	 * 注意不要改走 lib/compat-6.6-core.c 的 hrtimer_init 兼容符号：那是给预编译
+	 * .ko blob 用的（它塞桩函数、由调用方随后覆盖），内建源码若蹭它会丢掉
+	 * 「必须紧接着赋 ->function」这一隐式契约，漏赋值即静默失效。
+	 */
+	hrtimer_setup(&fstb_hrt, &mt_fstb, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 #if IS_ENABLED(CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT)
 	ged_kpi_output_gfx_info2_fp = gpu_time_update;

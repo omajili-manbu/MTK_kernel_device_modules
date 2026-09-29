@@ -71,7 +71,8 @@ MODULE_LICENSE("GPL");
 /* Runqueue only has SCHED_IDLE tasks enqueued */
 static int sched_idle_rq(struct rq *rq)
 {
-	return unlikely(rq->nr_running == rq->cfs.idle_h_nr_running &&
+		/* rodin 6.9：6.18 删了 cfs_rq::idle_h_nr_running，层级版为 h_nr_idle。 */
+	return unlikely(rq->nr_running == rq->cfs.h_nr_idle &&
 			rq->nr_running);
 }
 
@@ -702,30 +703,12 @@ unsigned int get_uclamp_min_ls(void)
 EXPORT_SYMBOL_GPL(get_uclamp_min_ls);
 
 /*
- * attach_task() -- attach the task detached by detach_task() to its new rq.
+ * rodin 6.9：本文件原是 6.6 kernel/sched/fair.c 的 fork，自带 attach_task()/
+ * attach_one_task() 副本。6.18 把同名 static inline 留在了 kernel/sched/sched.h
+ * （:2897-2914，本文件已 #include <sched/sched.h>）⇒ 重复定义。此处删本地副本
+ * 直接用内核版：语义等价（内核版以 WARN_ON_ONCE 替代 BUG_ON、以 wakeup_preempt
+ * 替代 check_preempt_curr —— 本树 core.c 里二者是同一实现的 6.6 兼容别名）。
  */
-static void attach_task(struct rq *rq, struct task_struct *p)
-{
-	lockdep_assert_rq_held(rq);
-
-	BUG_ON(task_rq(p) != rq);
-	activate_task(rq, p, ENQUEUE_NOCLOCK);
-	check_preempt_curr(rq, p, 0);
-}
-
-/*
- * attach_one_task() -- attaches the task returned from detach_one_task() to
- * its new rq.
- */
-static void attach_one_task(struct rq *rq, struct task_struct *p)
-{
-	struct rq_flags rf;
-
-	rq_lock(rq, &rf);
-	update_rq_clock(rq);
-	attach_task(rq, p);
-	rq_unlock(rq, &rf);
-}
 
 #if IS_ENABLED(CONFIG_MTK_EAS)
 static void __sched_fork_init(struct task_struct *p)
@@ -760,11 +743,8 @@ void init_task_soft_affinity(void)
 		pr_info("register sched_fork_init hooks failed, returned %d\n", ret);
 }
 
-static inline struct task_group *css_tg(struct cgroup_subsys_state *css)
-{
-	return css ? container_of(css, struct task_group, css) : NULL;
-}
-
+/* rodin 6.9：本文件自带的 css_tg() 与 6.18 kernel/sched/sched.h:573-576 的
+ * 同名 static inline **逐字相同** ⇒ 删本地副本用内核版（否则 redefinition）。 */
 void _init_tg_mask(struct cgroup_subsys_state *css)
 {
 	struct task_group *tg = css_tg(css);
@@ -1095,7 +1075,7 @@ void mtk_can_migrate_task(void *data, struct task_struct *p,
 			*can_migrate = 0;
 			return;
 		} else if ((num_vip_src-1 == num_vip_dst) &&
-			(capacity_orig_of(src_cpu) > capacity_orig_of(dst_cpu))) {
+			(arch_scale_cpu_capacity(src_cpu) > arch_scale_cpu_capacity(dst_cpu))) {
 			*can_migrate = 0;
 			return;
 		}
@@ -1669,8 +1649,8 @@ static inline bool task_demand_fits(struct task_struct *p, int dst_cpu)
 	unsigned int margin;
 	bool AM_enabled;
 	unsigned int sugov_margin;
-	unsigned long dst_capacity = capacity_orig_of(dst_cpu);
-	unsigned long src_capacity = capacity_orig_of(src_cpu);
+	unsigned long dst_capacity = arch_scale_cpu_capacity(dst_cpu);
+	unsigned long src_capacity = arch_scale_cpu_capacity(src_cpu);
 
 	if (dst_capacity == SCHED_CAPACITY_SCALE)
 		return true;
@@ -1711,7 +1691,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	unsigned long ceiling, cap_after_ceiling;
 	bool AM_enabled = adaptive_margin_enabled[cpu];
 	unsigned int sugov_margin = AM_enabled ? get_adaptive_margin(cpu) : SCHED_CAPACITY_SCALE;
-	unsigned long capacity_orig_thermal, capacity_orig = capacity_orig_of(cpu);
+	unsigned long capacity_orig_thermal, capacity_orig = arch_scale_cpu_capacity(cpu);
 	int fit, uclamp_max_fits, uclamp_involve;
 
 
@@ -1728,7 +1708,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	if (!updown_migration_enable)
 		ceiling = SCHED_CAPACITY_SCALE;
 	else
-		ceiling = SCHED_CAPACITY_SCALE * capacity_orig_of(cpu) / sched_capacity_up_margin[cpu];
+		ceiling = SCHED_CAPACITY_SCALE * arch_scale_cpu_capacity(cpu) / sched_capacity_up_margin[cpu];
 
 	/* Whether PELT fit after considering up-down migration ? */
 	cap_after_ceiling = min(ceiling, capacity);
@@ -1741,7 +1721,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 
 	/* Change fit status from 1 to -1 only if uclamp min raise util. */
 	uclamp_min = min(uclamp_min, uclamp_max);
-	capacity_orig_thermal = min(cap_after_ceiling, (capacity_orig - arch_scale_thermal_pressure(cpu)));
+	capacity_orig_thermal = min(cap_after_ceiling, (capacity_orig - READ_ONCE(per_cpu(thermal_pressure, cpu))));
 	if (fit && (util < uclamp_min) && (uclamp_min > capacity_orig_thermal))
 		fit = -1;
 
@@ -1755,7 +1735,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 #else
 static inline bool task_demand_fits(struct task_struct *p, int cpu)
 {
-	unsigned long capacity = capacity_orig_of(cpu);
+	unsigned long capacity = arch_scale_cpu_capacity(cpu);
 
 	if (capacity == SCHED_CAPACITY_SCALE)
 		return true;
@@ -1768,7 +1748,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 {
 	bool AM_enabled = adaptive_margin_enabled[cpu];
 	unsigned int sugov_margin = AM_enabled ? get_adaptive_margin(cpu) : SCHED_CAPACITY_SCALE;
-	unsigned long capacity_orig_thermal, capacity_orig = capacity_orig_of(cpu);
+	unsigned long capacity_orig_thermal, capacity_orig = arch_scale_cpu_capacity(cpu);
 	int fit, uclamp_max_fits, uclamp_involve;
 
 	uclamp_min = clamp((uclamp_min * DEFAULT_MARGIN) >> SCHED_FIXEDPOINT_SHIFT,
@@ -1783,7 +1763,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	fit = fits_capacity(util, capacity, sugov_margin);
 
 	/* Change fit status from 0 to 1 only if uclamp max restrict util. */
-	capacity_orig_thermal = (capacity_orig - arch_scale_thermal_pressure(cpu));
+	capacity_orig_thermal = (capacity_orig - READ_ONCE(per_cpu(thermal_pressure, cpu)));
 	uclamp_max_fits = (capacity_orig == SCHED_CAPACITY_SCALE) && (uclamp_max == SCHED_CAPACITY_SCALE);
 	uclamp_max_fits = !uclamp_max_fits && (uclamp_max <= capacity_orig);
 	fit = fit || uclamp_max_fits;
@@ -2067,7 +2047,7 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 				continue;
 
 			if (available_idle_cpu(cpu)) {
-				cpu_cap = capacity_orig_of(cpu);
+				cpu_cap = arch_scale_cpu_capacity(cpu);
 				idle = idle_get_state(cpu_rq(cpu));
 				if (idle && idle->exit_latency > pd_min_exit_lat &&
 						cpu_cap == target_cap)
@@ -2508,7 +2488,7 @@ static struct task_struct *detach_a_hint_task(struct rq *src_rq, int dst_cpu)
 
 	rcu_read_lock();
 	in_many_heavy_tasks = rd->android_vendor_data1;
-	src_capacity = capacity_orig_of(src_rq->cpu);
+	src_capacity = arch_scale_cpu_capacity(src_rq->cpu);
 	dst_capacity = cpu_cap_ceiling(dst_cpu);
 	list_for_each_entry_reverse(p,
 			&src_rq->cfs_tasks, se.group_node) {
@@ -2844,11 +2824,11 @@ out:
 	 * have been enqueued in the meantime. Since we're not going idle,
 	 * pretend we pulled a task.
 	 */
-	if (this_rq->cfs.h_nr_running && !*pulled_task)
+	if (this_rq->cfs.h_nr_queued && !*pulled_task)
 		*pulled_task = 1;
 
 	/* Is there a task of a high priority class? */
-	if (this_rq->nr_running != this_rq->cfs.h_nr_running)
+	if (this_rq->nr_running != this_rq->cfs.h_nr_queued)
 		*pulled_task = -1;
 
 	if (*pulled_task)

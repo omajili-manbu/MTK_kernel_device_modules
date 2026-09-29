@@ -1,4 +1,10 @@
-ifeq ($(CONFIG_MTK_FPSGO_V3),$(filter $(CONFIG_MTK_FPSGO_V3),m))
+# rodin 6.9（零错误陷阱，配方 §82）：原写法
+#   ifeq ($(CONFIG_MTK_FPSGO_V3),$(filter $(CONFIG_MTK_FPSGO_V3),m))
+# 在符号**未定义**时两侧都为空 ⇒ `""==""` 为真，-D 靠"侥幸"被加上；一旦门翻 =y
+# 两侧不再相等 ⇒ -D 消失 ⇒ 5 处门静默编掉且 RC=0（最危险的失效形态）。
+# 改为 filter y m 形式（内建与模块都加 -D；二者经 linux/kconfig.h 实测等价，
+# 且 .config 里的 CONFIG_MTK_FPSGO_V3=y 已由 autoconf.h 提供同一语义）。
+ifneq ($(filter y m,$(CONFIG_MTK_FPSGO_V3)),)
 ccflags-y += -DCONFIG_MTK_FPSGO_V3
 subdir-ccflags-y += -DCONFIG_MTK_FPSGO_V3
 endif

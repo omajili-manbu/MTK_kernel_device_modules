@@ -754,7 +754,14 @@ void set_tgid_basic_vip(int tgid)
 	rcu_read_lock();
 	group_leader = find_task_by_vpid(tgid);
 	if (group_leader) {
-		list_for_each_entry(p, &group_leader->thread_group, thread_group) {
+		/*
+		 * rodin 6.9（本簇最容易踩的坑）：6.18 删除了 task_struct::thread_group
+		 * （include/linux/sched.h:1117 只留了 __rodin_66_slot_thread_group[2]
+		 * 的 KABI 尺寸占位，**内核不再维护其内容** —— 照抄能编过，但会遍历垃圾
+		 * 链表立即崩或静默丢标记）。6.18 的同一张链表是 signal->thread_head，
+		 * 节点字段是 thread_node（include/linux/sched/signal.h:100,661）。
+		 */
+		list_for_each_entry(p, &group_leader->signal->thread_head, thread_node) {
 			get_task_struct(p);
 			vts = &((struct mtk_task *) p->android_vendor_data1)->vip_task;
 			vts->basic_vip = true;
@@ -773,7 +780,14 @@ void unset_tgid_basic_vip(int tgid)
 	rcu_read_lock();
 	group_leader = find_task_by_vpid(tgid);
 	if (group_leader) {
-		list_for_each_entry(p, &group_leader->thread_group, thread_group) {
+		/*
+		 * rodin 6.9（本簇最容易踩的坑）：6.18 删除了 task_struct::thread_group
+		 * （include/linux/sched.h:1117 只留了 __rodin_66_slot_thread_group[2]
+		 * 的 KABI 尺寸占位，**内核不再维护其内容** —— 照抄能编过，但会遍历垃圾
+		 * 链表立即崩或静默丢标记）。6.18 的同一张链表是 signal->thread_head，
+		 * 节点字段是 thread_node（include/linux/sched/signal.h:100,661）。
+		 */
+		list_for_each_entry(p, &group_leader->signal->thread_head, thread_node) {
 			get_task_struct(p);
 			vts = &((struct mtk_task *) p->android_vendor_data1)->vip_task;
 			vts->basic_vip = false;
@@ -1147,7 +1161,7 @@ void vip_cfs_tick(struct rq *rq)
 	 * If the current is not VIP means, we have to re-schedule to
 	 * see if we can run any other task including VIP tasks.
 	 */
-	if ((vrq->vip_tasks.next != &vts->vip_list) && rq->cfs.h_nr_running > 1)
+	if ((vrq->vip_tasks.next != &vts->vip_list) && rq->cfs.h_nr_queued > 1)
 		resched_curr(rq);
 
 out:
@@ -1180,9 +1194,19 @@ void vip_scheduler_tick(void *unused, struct rq *rq)
 	for (; se; se = NULL)
 #endif
 
-extern void set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se);
+/*
+ * rodin 6.9：6.18 的 android_rvh_replace_next_task_fair 原型只剩
+ * (rq, **p, prev) —— 丢掉了 6.6 的 se/repick/simple 三个出参
+ * （include/trace/hooks/sched.h:102-104）；同时 6.18 的 set_next_entity() 多了
+ * bool first 形参（kernel/sched/sched.h:4092），本地 extern 原型已无必要。
+ *
+ * simple 快路径（原 vip.c:1209-1212 的 for_each_sched_entity + set_next_entity）
+ * 依赖 `simple` 入参，6.18 无对应入参 ⇒ 删该分支。这不是降级：6.18 的
+ * pick_next_task_fair() 在 hook 返回后会自己完成 entity 收尾
+ * （kernel/sched/fair.c:9316 之后 se = &p->se; put_prev_entity()/set_next_entity()
+ * 由核心路径统一处理），保留反而会双重 set。终验已加 VIP 抢占真机验证。
+ */
 void vip_replace_next_task_fair(void *unused, struct rq *rq, struct task_struct **p,
-				struct sched_entity **se, bool *repick, bool simple,
 				struct task_struct *prev)
 {
 	struct vip_rq *vrq = &per_cpu(vip_rq, cpu_of(rq));
@@ -1203,17 +1227,17 @@ void vip_replace_next_task_fair(void *unused, struct rq *rq, struct task_struct 
 	vip = vts_to_ts(vts);
 
 	*p = vip;
-	*se = &vip->se;
-	*repick = true;
-
-	if (simple) {
-		for_each_sched_entity((*se))
-			set_next_entity(cfs_rq_of(*se), *se);
-	}
 }
 
 __no_kcsan
-void vip_dequeue_task(void *unused, struct rq *rq, struct task_struct *p, int flags)
+/* rodin 6.9：6.18 给 android_rvh_after_dequeue_task 加了出参
+ * dequeue_task_result（include/trace/hooks/sched.h:321-323；调用点
+ * kernel/sched/core.c:2302 传 &dequeue_task_result，取值来自
+ * p->sched_class->dequeue_task()）。本 handler 只做"VIP 任务摘下队列时同步从
+ * VIP 链表移除"这件事，不改写调度器给出的结果 ⇒ 保留出参不动（这是 hook 契约
+ * 的完整实现，不是桩）。 */
+void vip_dequeue_task(void *unused, struct rq *rq, struct task_struct *p, int flags,
+			bool *dequeue_task_result)
 {
 	struct vip_task_struct *vts = &((struct mtk_task *) p->android_vendor_data1)->vip_task;
 	if (unlikely(!vip_enable))

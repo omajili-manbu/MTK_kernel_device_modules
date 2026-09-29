@@ -5,6 +5,10 @@
 
 #include <linux/io.h>
 #include <linux/module.h>
+/* rodin 6.9：6.18 头瘦身后 of_device.h 只含 device/driver.h（配方 §61），
+ * struct of_device_id / of_match_ptr / of_match_node 必须直补 of.h。
+ * 本文件由「从未设置过」的 CONFIG_MTK_DVFSRC_MB 翻 =y 后首次进入编译（§70）。 */
+#include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include "dvfsrc-mb.h"

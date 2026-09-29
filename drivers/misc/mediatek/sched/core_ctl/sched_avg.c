@@ -118,7 +118,7 @@ unsigned int get_cpu_util_pct(unsigned int cpu, bool orig)
 		util = max_t(unsigned long, util,
 			READ_ONCE(cfs_rq->avg.util_est));
 
-	capacity = (orig == true) ? capacity_orig_of(cpu) : _capacity_of(cpu);
+	capacity = (orig == true) ? arch_scale_cpu_capacity(cpu) : _capacity_of(cpu);
 	util = min_t(unsigned long, util, capacity);
 	util_pct = (unsigned int)div64_ul((util * 100), capacity);
 	return util_pct;
@@ -792,7 +792,7 @@ static int init_thres_table(void)
 		arch_get_cluster_cpus(&cls_cpus, i);
 		cpu = cpumask_first(&cls_cpus);
 		cluster_over_thres_table[i].max_capacity =
-			capacity_orig_of(cpu);
+			arch_scale_cpu_capacity(cpu);
 	}
 
 	for_each_possible_cpu(cpu) {
@@ -852,7 +852,9 @@ int get_over_thres_stats(char *buf, int buf_size)
 
 		len += snprintf(buf+len, buf_size-len,
 			"cpu=%d capacity=%lu dn_thres=%d up_thres=%d\n",
-			cpu, cpu_rq(cpu)->cpu_capacity_orig,
+			/* rodin 6.9：6.18 删了 struct rq::cpu_capacity_orig，
+			 * 改读 arch_scale_cpu_capacity()（sysfs 输出语义不变）。 */
+			cpu, arch_scale_cpu_capacity(cpu),
 			cpu_over_thres->dn_thres,
 			cpu_over_thres->up_thres);
 	}

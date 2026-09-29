@@ -130,12 +130,12 @@ TRACE_EVENT(sched_fits_cap_ceiling,
 		__entry->uclamp_min			= uclamp_min;
 		__entry->uclamp_max			= uclamp_max;
 		__entry->cap				= cap;
-		__entry->thermal_pressure	= arch_scale_thermal_pressure(cpu);
+		__entry->thermal_pressure	= READ_ONCE(per_cpu(thermal_pressure, cpu));
 		__entry->ceiling			= ceiling;
 		__entry->sugov_margin	= sugov_margin;
 		__entry->capacity_dn_margin	= capacity_dn_margin;
 		__entry->capacity_up_margin	= capacity_up_margin;
-		__entry->capacity_orig		= capacity_orig_of(cpu);
+		__entry->capacity_orig		= arch_scale_cpu_capacity(cpu);
 		__entry->AM_enabled			= AM_enabled;
 		__entry->uclamp_involve			= uclamp_involve;
 		),
@@ -316,7 +316,7 @@ TRACE_EVENT(sched_target_max_spare_cpu,
 		),
 
 	TP_fast_assign(
-		__assign_str(type, type);
+		__assign_str(type);
 		__entry->best_cpu        = best_cpu;
 		__entry->new_cpu        = new_cpu;
 		__entry->replace        = replace;
@@ -584,7 +584,7 @@ TRACE_EVENT(sched_max_util,
 		),
 
 	TP_fast_assign(
-		__assign_str(domain_name, domain_name);
+		__assign_str(domain_name);
 		__entry->idx   = idx;
 		__entry->dst_cpu    = dst_cpu;
 		__entry->dst_idx    = dst_idx;
@@ -1012,7 +1012,7 @@ TRACE_EVENT(sched_set_vip,
 	TP_fast_assign(
 		__entry->id       = id;
 		__entry->done       = done;
-		__assign_str(type, type);
+		__assign_str(type);
 		__entry->vip_prio       = vip_prio;
 		__entry->throttle_time  = throttle_time;
 		__entry->slot_id  = slot_id;
@@ -1038,7 +1038,7 @@ TRACE_EVENT(sched_unset_vip,
 	TP_fast_assign(
 		__entry->id       = id;
 		__entry->done       = done;
-		__assign_str(type, type);
+		__assign_str(type);
 		__entry->slot_id       = slot_id;
 	),
 

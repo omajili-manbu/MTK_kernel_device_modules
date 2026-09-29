@@ -35,7 +35,7 @@
 #include "mtk_energy_model/v3/energy_model.h"
 #endif
 #define csram_read(offs)	\
-	(IS_ERR_OR_NULL((void *)csram_base) ? 0 : __raw_readl(csram_base + (offs)))
+	(IS_ERR_OR_NULL((void *)perf_csram_base) ? 0 : __raw_readl(perf_csram_base + (offs)))
 #if IS_ENABLED(CONFIG_MTK_THERMAL_INTERFACE)
 #include <thermal_interface.h>
 #endif
@@ -85,9 +85,9 @@ u64 get_cpu_stall(int cpu, u32 offset)
 	#if IS_ENABLED(CONFIG_MTK_QOS_FRAMEWORK)
 		return qos_sram_read(CM_STALL_RATIO_ID_0 + cpu);
 	#else
-		if (IS_ERR_OR_NULL((void *)csram_base))
+		if (IS_ERR_OR_NULL((void *)perf_csram_base))
 			return count;
-		count = __raw_readl(csram_base + offset + (cpu * 0x4));
+		count = __raw_readl(perf_csram_base + offset + (cpu * 0x4));
 	#endif
 	}
 	return count;
@@ -107,7 +107,7 @@ static unsigned int cpudvfs_get_cur_freq(int cluster_id, bool is_mcupm)
 	u32 offset = 0;
 	struct ppm_data *p = &cluster_ppm_info[cluster_id];
 
-	if (IS_ERR_OR_NULL((void *)csram_base)) {
+	if (IS_ERR_OR_NULL((void *)perf_csram_base)) {
 #if IS_ENABLED(CONFIG_MEDIATEK_CPU_DVFS)
 		return mt_cpufreq_get_cur_freq(cluster_id);
 #endif
@@ -122,10 +122,10 @@ static unsigned int cpudvfs_get_cur_freq(int cluster_id, bool is_mcupm)
 #endif
 
 	if (is_mcupm)
-		val = __raw_readl(csram_base +
+		val = __raw_readl(perf_csram_base +
 				(offset + (cluster_id * 0x4)));
 	else
-		val = __raw_readl(csram_base +
+		val = __raw_readl(perf_csram_base +
 				(OFFS_DVFS_CUR_OPP_S + (cluster_id * 0x120)));
 
 #if IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
@@ -144,16 +144,16 @@ static unsigned int cpudvfs_get_cur_freq_perCore(int core_id, bool is_mcupm)
 	u32 val = 0;
 	u32 offset = 0;
 
-	if (IS_ERR_OR_NULL((void *)csram_base))
+	if (IS_ERR_OR_NULL((void *)perf_csram_base))
 		return 0;
 
 	offset = OFFS_MCUPM_CUR_FREQ_S_PER_CORE;
 
 	if (is_mcupm)
-		val = __raw_readl(csram_base +
+		val = __raw_readl(perf_csram_base +
 				(offset + (core_id * 0x4)));
 	else
-		val = __raw_readl(csram_base +
+		val = __raw_readl(perf_csram_base +
 				(OFFS_DVFS_CUR_OPP_S_PER_CORE + (core_id * 0x4)));
 
 	return val;

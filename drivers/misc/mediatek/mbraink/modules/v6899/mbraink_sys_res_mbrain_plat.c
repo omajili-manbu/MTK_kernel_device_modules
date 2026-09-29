@@ -32,31 +32,32 @@ static int group_release[NR_SPM_GRP] = {
 	MBRAINK_NOT_RELEASE,
 };
 
-struct mbraink_sys_res_mbrain_header header;
+/* rodin 6.9：原全局名 `mbraink_sys_res_hdr` 与 mtk-mmdvfs / scp 撞名且过于通用 ⇒ 加前缀。 */
+struct mbraink_sys_res_mbrain_header mbraink_sys_res_hdr;
 static unsigned int sys_res_sig_num, sys_res_grp_num;
 static uint32_t spm_res_sig_tbl_num;
 static struct mbraink_sys_res_sig_info *spm_res_sig_tbl_ptr;
 
 static void get_sys_res_header(int type)
 {
-	header.data_offset = sizeof(struct mbraink_sys_res_mbrain_header);
-	header.version = MBRAINK_SYS_RES_DATA_VERSION;
+	mbraink_sys_res_hdr.data_offset = sizeof(struct mbraink_sys_res_mbrain_header);
+	mbraink_sys_res_hdr.version = MBRAINK_SYS_RES_DATA_VERSION;
 	switch (type) {
 	case ALL_SCENE:
-		header.module = MBRAINK_SYS_RES_ALL_DATA_MODULE_ID;
-		header.index_data_length = MBRAINK_SCENE_RELEASE_NUM *
+		mbraink_sys_res_hdr.module = MBRAINK_SYS_RES_ALL_DATA_MODULE_ID;
+		mbraink_sys_res_hdr.index_data_length = MBRAINK_SCENE_RELEASE_NUM *
 			(sizeof(struct mbraink_sys_res_scene_info) +
 			sys_res_sig_num * sizeof(struct mbraink_sys_res_sig_info));
 		break;
 	case LAST_SUSPEND_RES:
-		header.module = MBRAINK_SYS_RES_LVL_DATA_MODULE_ID;
-		header.index_data_length = sizeof(struct mbraink_sys_res_scene_info) +
+		mbraink_sys_res_hdr.module = MBRAINK_SYS_RES_LVL_DATA_MODULE_ID;
+		mbraink_sys_res_hdr.index_data_length = sizeof(struct mbraink_sys_res_scene_info) +
 			(sizeof(uint32_t) + sizeof(struct mbraink_sys_res_sig_info)) *
 			sys_res_grp_num;
 		break;
 	case LAST_SUSPEND_STATS:
-		header.module = MBRAINK_SYS_RES_LVL_DATA_MODULE_ID;
-		header.index_data_length = sizeof(struct mbraink_sys_res_scene_info);
+		mbraink_sys_res_hdr.module = MBRAINK_SYS_RES_LVL_DATA_MODULE_ID;
+		mbraink_sys_res_hdr.index_data_length = sizeof(struct mbraink_sys_res_scene_info);
 		break;
 	}
 }
@@ -71,7 +72,7 @@ static void *sys_res_data_copy(void *dest, void *src, uint64_t size)
 static unsigned int mbraink_get_sys_res_length(void)
 {
 	get_sys_res_header(ALL_SCENE);
-	return header.index_data_length;
+	return mbraink_sys_res_hdr.index_data_length;
 }
 
 static int mbraink_get_sys_res_data(void *address, uint32_t size)
@@ -90,8 +91,8 @@ static int mbraink_get_sys_res_data(void *address, uint32_t size)
 	get_sys_res_header(ALL_SCENE);
 
 	if (!address ||
-	    header.index_data_length == 0 ||
-	    size < header.index_data_length + header.data_offset) {
+	    mbraink_sys_res_hdr.index_data_length == 0 ||
+	    size < mbraink_sys_res_hdr.index_data_length + mbraink_sys_res_hdr.data_offset) {
 		pr_info("[Mbraink][SPM] mbrain address/buffer size error\n");
 		ret = -1;
 	}
@@ -108,10 +109,10 @@ static int mbraink_get_sys_res_data(void *address, uint32_t size)
 	if (ret)
 		return ret;
 
-	/* Copy header */
+	/* Copy mbraink_sys_res_hdr */
 	copy_size = sizeof(struct mbraink_sys_res_mbrain_header);
 	if ((addr_idx + copy_size) <= size) {
-		address = sys_res_data_copy(address, &header, copy_size);
+		address = sys_res_data_copy(address, &mbraink_sys_res_hdr, copy_size);
 		addr_idx += copy_size;
 	}
 
@@ -200,8 +201,8 @@ static int mbraink_get_last_suspend_res_data(void *address, uint32_t size)
 	get_sys_res_header(LAST_SUSPEND_RES);
 
 	if (!address ||
-	    header.index_data_length == 0 ||
-	    size < header.index_data_length + header.data_offset) {
+	    mbraink_sys_res_hdr.index_data_length == 0 ||
+	    size < mbraink_sys_res_hdr.index_data_length + mbraink_sys_res_hdr.data_offset) {
 		pr_info("[Mbraink][SPM] mbrain address/buffer size error\n");
 		ret = -1;
 	}
@@ -220,7 +221,7 @@ static int mbraink_get_last_suspend_res_data(void *address, uint32_t size)
 
 	copy_size = sizeof(struct mbraink_sys_res_mbrain_header);
 	if ((addr_idx + copy_size) <= size) {
-		address = sys_res_data_copy(address, &header, copy_size);
+		address = sys_res_data_copy(address, &mbraink_sys_res_hdr, copy_size);
 		addr_idx += copy_size;
 	}
 
@@ -299,8 +300,8 @@ static int mbraink_get_over_threshold_num(void *address, uint32_t size,
 	get_sys_res_header(LAST_SUSPEND_STATS);
 
 	if (!address ||
-	    header.index_data_length == 0 ||
-	    size < header.index_data_length + header.data_offset) {
+	    mbraink_sys_res_hdr.index_data_length == 0 ||
+	    size < mbraink_sys_res_hdr.index_data_length + mbraink_sys_res_hdr.data_offset) {
 		pr_info("[Mbraink][SPM] mbrain address/buffer size error\n");
 		ret = -1;
 	}
@@ -318,7 +319,7 @@ static int mbraink_get_over_threshold_num(void *address, uint32_t size,
 
 	copy_size = sizeof(struct mbraink_sys_res_mbrain_header);
 	if ((addr_idx + copy_size) <= size) {
-		address = sys_res_data_copy(address, &header, copy_size);
+		address = sys_res_data_copy(address, &mbraink_sys_res_hdr, copy_size);
 		addr_idx += copy_size;
 	}
 

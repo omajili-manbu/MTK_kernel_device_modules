@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/sched/cputime.h>
 #include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <sched/sched.h>
 #include <sugov/cpufreq.h>
 #include "common.h"
@@ -1055,10 +1056,26 @@ static inline unsigned long task_util_est(struct task_struct *p)
 
 static inline s64 entity_key(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
-	return (s64)(se->vruntime - cfs_rq->min_vruntime);
+	/* rodin 6.9：6.18 把 cfs_rq::min_vruntime 换成了 zero_vruntime
+	 * （同一语义：zero-lag 点，见 kernel/sched/fair.c:642 的 entity_key()）。
+	 * 6.18 的写法是 vruntime_op(se->vruntime, "-", cfs_rq->zero_vruntime)，
+	 * vruntime_op 是 fair.c 的 static helper；这里保留原减法形式，算术等价。 */
+	return (s64)(se->vruntime - cfs_rq->zero_vruntime);
 }
 
 int _entity_eligible(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	/*
+	 * rodin 6.9：6.18 删掉了 cfs_rq::avg_vruntime / avg_load 这两个增量缓存字段，
+	 * 改用 zero_vruntime + sum_w_vruntime + sum_weight 的新模型（fair.c:730-760）。
+	 * 判据本身没变（"se 的 vruntime 不晚于零滞后点"），6.18 已把它做成非 static 的
+	 * entity_eligible(cfs_rq, se)（kernel/sched/sched.h:3984 有 extern 声明，
+	 * 本文件已 include <sched/sched.h>）⇒ 直接复用 mainline 实现，语义精确等价。 */
+	return entity_eligible(cfs_rq, se);
+}
+
+#if 0   /* rodin 6.9：原 6.6 实现（依赖已删字段），保留作对照 */
+int _entity_eligible_66(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	struct sched_entity *curr = cfs_rq->curr;
 	s64 avg = cfs_rq->avg_vruntime;
@@ -1073,6 +1090,7 @@ int _entity_eligible(struct cfs_rq *cfs_rq, struct sched_entity *se)
 
 	return avg >= entity_key(cfs_rq, se) * load;
 }
+#endif  /* rodin 6.9 对照块结束 */
 
 void mtk_sched_switch(void *data, struct task_struct *prev,
 		struct task_struct *next, struct rq *rq)
@@ -1101,6 +1119,15 @@ void mtk_sched_switch(void *data, struct task_struct *prev,
 #endif
 }
 
+/*
+ * rodin 6.9 降级论证：`rq->misfit_reason` 是 6.6 树里 MTK 私有加进 struct rq 的
+ * **只写诊断字段**（6.6 kernel/sched/sched.h:978 的 enum misfit_reason 只有
+ * MISFIT_PERF 一项、:1199 的 misfit_reason_t misfit_reason）。6.18 无该字段。
+ * 全树实测：**只有本文件这 3 处写入，零读取**（vendor 全树 + 内核树 grep + 596 个
+ * 设备 .ko 二进制扫描均无消费者）⇒ 删除写入不产生任何可观察差异（不是功能降级，
+ * 是清理一个已经没有任何读取方的写操作）。被判定的 misfit 结果本身（
+ * rq->misfit_task_load / trace_sched_mtk_update_misfit_status）全部保留。
+ */
 void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, bool *need_update)
 {
 	unsigned long util, uclamp_min, uclamp_max, capacity, misfit_task_load = 0;
@@ -1110,7 +1137,6 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 
 	if (!p || p->nr_cpus_allowed == 1) {
 		rq->misfit_task_load = 0;
-		rq->misfit_reason = -1;
 		return;
 	}
 
@@ -1121,7 +1147,6 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 	fits = util_fits_capacity(util, uclamp_min, uclamp_max, capacity, cpu_of(rq));
 	if (fits > 0) {
 		rq->misfit_task_load = 0;
-		rq->misfit_reason = -1;
 		goto out;
 	}
 
@@ -1131,7 +1156,6 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 	 */
 	misfit_task_load = task_h_load(p);
 	rq->misfit_task_load = max_t(unsigned long, misfit_task_load, 1);
-	rq->misfit_reason = MISFIT_PERF;
 
 out:
 	if (trace_sched_mtk_update_misfit_status_enabled())

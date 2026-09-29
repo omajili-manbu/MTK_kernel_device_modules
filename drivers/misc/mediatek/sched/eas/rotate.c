@@ -133,9 +133,9 @@ void task_rotate_init(void)
 
 	/* find min_cap cpu */
 	for_each_possible_cpu(i) {
-		if (capacity_orig_of(i) >= min_orig_cap)
+		if (arch_scale_cpu_capacity(i) >= min_orig_cap)
 			continue;
-		min_orig_cap = capacity_orig_of(i);
+		min_orig_cap = arch_scale_cpu_capacity(i);
 		min_cap_orig_cpu = i;
 	}
 
@@ -257,7 +257,7 @@ void task_check_for_rotation(struct rq *src_rq)
 		if (cpu_paused(i))
 			continue;
 
-		if (capacity_orig_of(i) <= capacity_orig_of(src_cpu))
+		if (arch_scale_cpu_capacity(i) <= arch_scale_cpu_capacity(src_cpu))
 			continue;
 
 		if (READ_ONCE(rq->curr->policy) != SCHED_NORMAL)
@@ -384,8 +384,10 @@ void rotat_task_stats(void __always_unused *data,
 	WRITE_ONCE(rts->ktime_ns, ktime_get_raw_ns());
 }
 
+/* rodin 6.9：6.18 的 trace_event task_newtask 用 u64 clone_flags
+ * （include/trace/events/task.h:11），6.6 是 unsigned long。 */
 void rotat_task_newtask(void __always_unused *data,
-				struct task_struct *p, unsigned long clone_flags)
+				struct task_struct *p, u64 clone_flags)
 {
 	struct rot_task_struct *rts = &((struct mtk_task *)p->android_vendor_data1)->rot_task;
 

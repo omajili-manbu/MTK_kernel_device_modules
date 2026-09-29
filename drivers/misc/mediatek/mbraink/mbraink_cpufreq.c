@@ -255,7 +255,12 @@ mbraink_get_cpufreq_notifier_info(unsigned short current_cluster_idx,
 	spin_unlock_irqrestore(&cpufreq_lock, flags);
 }
 
-int insert_freq_qos_hook(void)
+/*
+ * rodin 6.9：这两个帮助函数与 perf_common/perf_freq_tracker.c 的同名全局撞名
+ * （mtk_mbraink 与 mtk_perf_common 在 6.6 是两个独立 .ko，内建同图即 duplicate）
+ * ⇒ 加 mbraink_ 前缀（项目「双内建共存改名范式」）。函数体零改动。
+ */
+int mbraink_insert_freq_qos_hook(void)
 {
 	struct cpufreq_policy *policy;
 	int cpu;
@@ -294,11 +299,11 @@ int insert_freq_qos_hook(void)
 	return ret;
 
 register_failed:
-	remove_freq_qos_hook();
+	mbraink_remove_freq_qos_hook();
 	return ret;
 }
 
-void remove_freq_qos_hook(void)
+void mbraink_remove_freq_qos_hook(void)
 {
 	struct cpufreq_policy *policy;
 	int cpu;
@@ -375,7 +380,7 @@ int mbraink_cpufreq_notify_init(void)
 	hash_init(tbl);
 	is_inited = 1;
 
-	insert_freq_qos_hook();
+	mbraink_insert_freq_qos_hook();
 	return 0;
 }
 
@@ -385,7 +390,7 @@ void mbraink_cpufreq_notify_exit(void)
 	struct h_node *cur = NULL;
 	struct hlist_node *tmp = NULL;
 
-	remove_freq_qos_hook();
+	mbraink_remove_freq_qos_hook();
 	clear_freq_qos_notifier();
 	// Remove hash table
 	hash_for_each_safe(tbl, bkt, tmp, cur, node) {

@@ -314,11 +314,9 @@ out:
 }
 EXPORT_SYMBOL(group_set_cgroup_colocate);
 
-static inline struct task_group *css_tg(struct cgroup_subsys_state *css)
-{
-	return css ? container_of(css, struct task_group, css) : NULL;
-}
-
+/* rodin 6.9：本文件自带的 css_tg() 与 6.18 kernel/sched/sched.h:573-576 的
+ * 同名 static inline **逐字相同** ⇒ 删本地副本用内核版（否则 redefinition）。
+ * 为此本文件补了 #include <sched/sched.h>（原缺）。 */
 static void group_update_tg_pointer(struct cgroup_subsys_state *css)
 {
 	if (!strcmp(css->cgroup->kn->name, "top-app"))

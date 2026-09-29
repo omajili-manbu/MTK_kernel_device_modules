@@ -603,8 +603,15 @@ int fbt_cpu_ctrl_init(void)
 		return -EFAULT;
 
 	/*timer init*/
-	hrtimer_init(&cpu_ctrl_hrt, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	cpu_ctrl_hrt.function = &handle_cpu_loading_timeout;
+	/*
+	 * rodin 6.9：6.14 起 hrtimer_init() 已删除（上游 9779489a31d7），6.18 只剩
+	 * hrtimer_setup(timer, function, clock_id, mode)（include/linux/hrtimer.h:231-232）
+	 * —— 它把原先"init 后紧跟赋 ->function"两步合成一步，故此处合并书写。
+	 * 注意不要改走 lib/compat-6.6-core.c 的 hrtimer_init 兼容符号：那是给预编译
+	 * .ko blob 用的（它塞桩函数、由调用方随后覆盖），内建源码若蹭它会丢掉
+	 * 「必须紧接着赋 ->function」这一隐式契约，漏赋值即静默失效。
+	 */
+	hrtimer_setup(&cpu_ctrl_hrt, &handle_cpu_loading_timeout, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	g_psFbtCpuCtrlWorkQueue =
 		create_singlethread_workqueue("fpt_cpu_ctrl_wq");

@@ -3671,8 +3671,15 @@ static inline void fbt_init_jerk(struct fbt_jerk *jerk, int id)
 {
 	jerk->id = id;
 
-	hrtimer_init(&jerk->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	jerk->timer.function = &fbt_jerk_tfn;
+	/*
+	 * rodin 6.9：6.14 起 hrtimer_init() 已删除（上游 9779489a31d7），6.18 只剩
+	 * hrtimer_setup(timer, function, clock_id, mode)（include/linux/hrtimer.h:231-232）
+	 * —— 它把原先"init 后紧跟赋 ->function"两步合成一步，故此处合并书写。
+	 * 注意不要改走 lib/compat-6.6-core.c 的 hrtimer_init 兼容符号：那是给预编译
+	 * .ko blob 用的（它塞桩函数、由调用方随后覆盖），内建源码若蹭它会丢掉
+	 * 「必须紧接着赋 ->function」这一隐式契约，漏赋值即静默失效。
+	 */
+	hrtimer_setup(&jerk->timer, &fbt_jerk_tfn, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	INIT_WORK(&jerk->work, fbt_do_jerk);
 }
 
@@ -3690,8 +3697,15 @@ static enum hrtimer_restart fbt_sjerk_tfn(struct hrtimer *timer)
 
 static void fbt_init_sjerk(void)
 {
-	hrtimer_init(&sjerk.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	sjerk.timer.function = &fbt_sjerk_tfn;
+	/*
+	 * rodin 6.9：6.14 起 hrtimer_init() 已删除（上游 9779489a31d7），6.18 只剩
+	 * hrtimer_setup(timer, function, clock_id, mode)（include/linux/hrtimer.h:231-232）
+	 * —— 它把原先"init 后紧跟赋 ->function"两步合成一步，故此处合并书写。
+	 * 注意不要改走 lib/compat-6.6-core.c 的 hrtimer_init 兼容符号：那是给预编译
+	 * .ko blob 用的（它塞桩函数、由调用方随后覆盖），内建源码若蹭它会丢掉
+	 * 「必须紧接着赋 ->function」这一隐式契约，漏赋值即静默失效。
+	 */
+	hrtimer_setup(&sjerk.timer, &fbt_sjerk_tfn, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	INIT_WORK(&sjerk.work, fbt_do_sjerk);
 }
 

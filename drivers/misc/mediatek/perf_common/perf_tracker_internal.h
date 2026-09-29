@@ -19,7 +19,8 @@ struct ppm_data {
 	bool init;
 };
 
-extern void __iomem *csram_base;
+/* rodin 6.9：原名 csram_base 与 mtk_cm_mgr_mt6899 撞名（链接期 duplicate）⇒ 加前缀。 */
+extern void __iomem *perf_csram_base;
 extern void __iomem *u_tcm_base;
 extern void __iomem *stall_tcm_base;
 

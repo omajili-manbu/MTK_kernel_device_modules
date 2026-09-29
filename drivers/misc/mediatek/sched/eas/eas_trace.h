@@ -229,7 +229,7 @@ TRACE_EVENT(sched_em_cpu_energy,
 		__entry->wl        = wl;
 		__entry->idx        = idx;
 		__entry->freq       = freq;
-		__assign_str(cost_type, cost_type);
+		__assign_str(cost_type);
 		__entry->cost       = cost;
 		__entry->scale_cpu  = scale_cpu;
 		__entry->dyn_pwr    = dyn_pwr;
@@ -597,10 +597,19 @@ TRACE_EVENT(sched_rq_load,
 	),
 
 	TP_fast_assign(
-		__entry->nr_running = rq->nr_running;
-		__entry->h_nr_running = rq->h_nr_running;
-		__entry->idle_nr_running = rq->idle_nr_running;
-		__entry->idle_h_nr_running = rq->idle_h_nr_running;
+		/*
+		 * rodin 6.9 结构体映射（6.18 cfs_rq 成员改名 + 层级化）：
+		 *   nr_running        -> nr_queued    （精确）
+		 *   h_nr_running      -> h_nr_queued  （精确）
+		 *   idle_h_nr_running -> h_nr_idle    （精确）
+		 *   idle_nr_running   -> h_nr_idle    （近似：6.6 是"本层 SCHED_IDLE
+		 *     计数"，6.18 只保留层级版。__entry 字段名与 TP_printk 标签刻意
+		 *     保持不变，以免 trace-cmd/perfetto 侧按列解析的脚本失效）
+		 */
+		__entry->nr_running = rq->nr_queued;
+		__entry->h_nr_running = rq->h_nr_queued;
+		__entry->idle_nr_running = rq->h_nr_idle;
+		__entry->idle_h_nr_running = rq->h_nr_idle;
 		__entry->last_update_time = rq->avg.last_update_time;
 		__entry->load_sum = rq->avg.load_sum;
 		__entry->runnable_sum = rq->avg.load_sum;
@@ -681,7 +690,7 @@ TRACE_EVENT(sched_cpu_util,
 		__entry->cpu_util	= mtk_sched_cpu_util(cpu);
 		__entry->cpu_max_util	= mtk_sched_max_util(p, cpu, min_cap, max_cap);
 		__entry->capacity	= capacity_of(cpu);
-		__entry->capacity_orig	= capacity_orig_of(cpu);
+		__entry->capacity_orig	= arch_scale_cpu_capacity(cpu);
 		__entry->idle_exit_latency	= mtk_get_idle_exit_latency(cpu, NULL);
 		__entry->online			= cpu_online(cpu);
 		__entry->paused			= cpu_paused(cpu);
@@ -1177,7 +1186,7 @@ TRACE_EVENT(sched_cgrp_to_fltgrp,
 	TP_fast_assign(
 		__entry->cgrp_id	= cgrp_id;
 		__entry->grp_id	= grp_id;
-		__assign_str(caller0, caller0);
+		__assign_str(caller0);
 		),
 
 	TP_printk("cgrp_id[%d] to flt grp[%d] caller =%s",
@@ -2023,7 +2032,7 @@ TRACE_EVENT(sugov_ext_ta_ctrl_caller,
 		),
 
 	TP_fast_assign(
-		__assign_str(caller0, caller0);
+		__assign_str(caller0);
 		),
 
 	TP_printk("caller =%s",

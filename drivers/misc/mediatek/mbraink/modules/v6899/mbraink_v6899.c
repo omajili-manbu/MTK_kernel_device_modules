@@ -94,7 +94,10 @@ static int mbraink_v6899_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int mbraink_v6899_remove(struct platform_device *pdev)
+/* rodin 6.9：6.18 起 platform_driver::remove 返回 void
+ * （include/linux/platform_device.h:241，上游 0edb555a65d1+70140ba0d2b）。
+ * 改签名必须**同时**删掉 return 0;，只改签名会得 -Wreturn-mismatch。 */
+static void mbraink_v6899_remove(struct platform_device *pdev)
 {
 	struct device *mbraink_v6899_device = &pdev->dev;
 
@@ -108,8 +111,6 @@ static int mbraink_v6899_remove(struct platform_device *pdev)
 	mbraink_v6899_gps_deinit();
 	mbraink_v6899_wifi_deinit();
 	mbraink_v6899_camera_deinit();
-
-	return 0;
 }
 
 static const struct of_device_id mtk_mbraink_v6899_of_ids[] = {

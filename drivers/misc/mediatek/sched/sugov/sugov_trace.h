@@ -627,7 +627,8 @@ TRACE_EVENT(sched_update_cpu_capacity,
 	TP_fast_assign(
 		__entry->cpu = cpu;
 		__entry->wl = wl;
-		__entry->cap_orig = rq->cpu_capacity_orig;
+		/* rodin 6.9：6.18 删了 struct rq::cpu_capacity_orig。 */
+		__entry->cap_orig = arch_scale_cpu_capacity(rq->cpu);
 		__entry->cap_of = rq->cpu_capacity;
 		__entry->caller = caller;
 	),

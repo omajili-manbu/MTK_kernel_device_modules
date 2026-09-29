@@ -50,7 +50,9 @@ static int *num_cpus;
 
 unsigned long capacity_curr_of(int cpu)
 {
-	unsigned long max_cap = cpu_rq(cpu)->cpu_capacity_orig;
+	/* rodin 6.9：6.18 删了 struct rq::cpu_capacity_orig（改读
+	 * arch_scale_cpu_capacity()，语义等价）。 */
+	unsigned long max_cap = arch_scale_cpu_capacity(cpu);
 	unsigned long scale_freq = arch_scale_freq_capacity(cpu);
 
 	return cap_scale(max_cap, scale_freq);
@@ -73,7 +75,10 @@ static int arch_get_nr_clusters(void)
 	return __arch_nr_clusters;
 }
 
-void arch_get_cluster_cpus(struct cpumask *cpus, int cluster_id)
+/* rodin 6.9：原名 arch_get_cluster_cpus 与 sched/core_ctl/sched_avg.c 的
+ * EXPORT_SYMBOL 版撞名（6.6 各自是独立 .ko，内建同图即 duplicate）⇒ 加 magt_ 前缀。
+ * 实现与 sched_avg.c 版逐字相同（都用 cpu_topology[].cluster_id）。 */
+void magt_get_cluster_cpus(struct cpumask *cpus, int cluster_id)
 {
 	unsigned int cpu;
 
@@ -144,7 +149,7 @@ int init_num_cpus(void)
 	}
 	num_cpus[0] = 0;
 	for (i = 0; i < cluster_nr; i++) {
-		arch_get_cluster_cpus(&cluster_cpus, i);
+		magt_get_cluster_cpus(&cluster_cpus, i);
 		num_cpus[i + 1] = num_cpus[i] + cpumask_weight(&cluster_cpus);
 		// pr_info("perf_index num_cpus = %d\n", num_cpus[i]);
 	}

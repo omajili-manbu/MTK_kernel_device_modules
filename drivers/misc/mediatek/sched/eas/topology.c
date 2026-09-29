@@ -8,6 +8,7 @@
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/minmax.h>
+#include <linux/platform_device.h>
 #include <linux/sched/cputime.h>
 #include <sched/sched.h>
 #include <sugov/cpufreq.h>
@@ -106,7 +107,7 @@ unsigned long cpu_cap_ceiling(int cpu)
 {
 	unsigned long cap_ceiling;
 
-	cap_ceiling = min_t(unsigned long, capacity_orig_of(cpu),
+	cap_ceiling = min_t(unsigned long, arch_scale_cpu_capacity(cpu),
 		get_cpu_gear_uclamp_max_capacity(cpu));
 	return clamp_t(unsigned long, cap_ceiling,
 		READ_ONCE(per_cpu(min_freq_scale, cpu)), READ_ONCE(per_cpu(max_freq_scale, cpu)));

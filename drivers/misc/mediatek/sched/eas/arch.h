@@ -53,9 +53,11 @@ unsigned long get_cpu_power(unsigned int mtk_em, unsigned int get_lkg,
 	}
 
 	sum_util = data[0];
-	i = em_pd_get_efficient_state(pd->em_table->state, pd->nr_perf_states,
-				      max_util, pd->flags, pd->min_ps,
-				      pd->max_ps);
+	/* rodin 6.9：6.18 的 em_pd_get_efficient_state() 从 6 参收成 3 参，
+	 * min/max 性能态由函数自己从 pd->min_perf_state/max_perf_state 读
+	 * （include/linux/energy_model.h:200-206），struct em_perf_domain 也已无
+	 * min_ps/max_ps 成员 ⇒ 按 mainline 调用形态改写（同头 :267 样例）。 */
+	i = em_pd_get_efficient_state(pd->em_table->state, pd, max_util);
 	ps = &pd->em_table->state[i];
 	return ps->cost * sum_util;
 }

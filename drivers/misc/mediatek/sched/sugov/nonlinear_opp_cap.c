@@ -15,6 +15,7 @@
 #include <linux/sched/clock.h>
 #include <linux/energy_model.h>
 #include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <linux/cpuset.h>
 #include "common.h"
 #include "cpufreq.h"
@@ -468,7 +469,16 @@ static unsigned long mtk_scale_rt_capacity(int cpu)
 
 	used = READ_ONCE(rq->avg_rt.util_avg);
 	used += READ_ONCE(rq->avg_dl.util_avg);
-	used += thermal_load_avg(rq);
+	/*
+	 * rodin 6.9 降级论证：6.6 的 thermal_load_avg(rq) 读 PELT 平均的
+	 * rq->avg_thermal.load_avg；6.18 把热压力模型换成 per-CPU hw_pressure +
+	 * topology_get_hw_pressure()，**没有** PELT 平均版（全树 grep avg_thermal
+	 * 0 命中）。这里改用同一来源的瞬时值 per_cpu(thermal_pressure)（本树
+	 * compat 符号，由 topology_update_hw_pressure() 与 hw_pressure 同步写入）。
+	 * 差别：从"平滑值"变成"瞬时值"，热压力抖动时 rt 容量扣减更敏感 —— 方向与
+	 * 6.18 mainline 的 hw_pressure 用法一致，属跟随上游的取值口径变化。
+	 */
+	used += READ_ONCE(per_cpu(thermal_pressure, cpu));
 
 	if (unlikely(used >= max))
 		return 1;
@@ -484,7 +494,9 @@ void mtk_update_cpu_capacity(int cpu, unsigned long cap_orig, int wl, int caller
 	unsigned long capacity = mtk_scale_rt_capacity(cpu);
 
 	WRITE_ONCE(per_cpu(cpu_scale, cpu), cap_orig);
-	cpu_rq(cpu)->cpu_capacity_orig = arch_scale_cpu_capacity(cpu);
+	/* rodin 6.9：6.18 删了 struct rq::cpu_capacity_orig。本行右值写的就是
+	 * arch_scale_cpu_capacity(cpu)（见上一行），读侧已统一改走该函数
+	 * ⇒ 删掉这个已无载体的缓存副本，不改变任何可观察值。 */
 
 	if (!capacity)
 		capacity = 1;
@@ -500,7 +512,7 @@ void mtk_update_cpu_capacity(int cpu, unsigned long cap_orig, int wl, int caller
 /* hooked from k66 update_cpu_capacity() */
 void hook_update_cpu_capacity(void *data, int cpu, unsigned long *capacity)
 {
-	unsigned long cap_ceiling, capacity_orig = capacity_orig_of(cpu);
+	unsigned long cap_ceiling, capacity_orig = arch_scale_cpu_capacity(cpu);
 
 	cap_ceiling = min_t(unsigned long, *capacity, get_cpu_gear_uclamp_max_capacity(cpu));
 	*capacity = clamp_t(unsigned long, cap_ceiling,
@@ -674,8 +686,8 @@ void init_sys_max_cap_cpu(void)
 	unsigned int cpu, sys_max_cap = 0;
 
 	for_each_possible_cpu(cpu)
-		if (capacity_orig_of(cpu) > sys_max_cap) {
-			sys_max_cap = capacity_orig_of(cpu);
+		if (arch_scale_cpu_capacity(cpu) > sys_max_cap) {
+			sys_max_cap = arch_scale_cpu_capacity(cpu);
 			sys_max_cap_cluster = topology_cluster_id(cpu);
 		}
 }
@@ -734,8 +746,8 @@ void update_curr_collab_state(bool *is_cpu_to_update_thermal)
 
 				mtk_update_cpu_capacity(cpu, cap, wl, CAP_UPDATED_BY_DPT);
 
-				if (capacity_orig_of(cpu) > sys_max_cap) {
-					sys_max_cap = capacity_orig_of(cpu);
+				if (arch_scale_cpu_capacity(cpu) > sys_max_cap) {
+					sys_max_cap = arch_scale_cpu_capacity(cpu);
 					__sys_max_cap_cluster = topology_cluster_id(cpu);
 				}
 			}
@@ -2726,7 +2738,7 @@ unsigned long mtk_cpu_util_next(int cpu, struct task_struct *p, int dst_cpu, int
 		trace_sched_runnable_boost(is_runnable_boost_enable(), boost, cfs_rq->avg.util_avg,
 				cfs_rq->avg.util_est, runnable, util);
 
-	return min(util, capacity_orig_of(cpu) + 1);
+	return min(util, arch_scale_cpu_capacity(cpu) + 1);
 }
 EXPORT_SYMBOL_GPL(mtk_cpu_util_next);
 

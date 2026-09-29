@@ -126,7 +126,7 @@ static inline bool rt_task_fits_capacity(struct task_struct *p, int cpu)
 	min_cap = uclamp_eff_value(p, UCLAMP_MIN);
 	max_cap = uclamp_eff_value(p, UCLAMP_MAX);
 
-	cpu_cap = capacity_orig_of(cpu);
+	cpu_cap = arch_scale_cpu_capacity(cpu);
 
 	return cpu_cap >= min(min_cap, max_cap);
 }
@@ -623,7 +623,15 @@ void mtk_select_task_rq_rt(void *data, struct task_struct *p, int source_cpu,
 
 	rcu_read_lock();
 
-	ret = cpupri_find_fitness(&task_rq(p)->rd->cpupri, p,
+	/*
+	 * rodin 6.9：6.18 的 cpupri_find_fitness() 多了 exec_ctx 形参（5 参）；它决定
+	 * 用谁的 cpus_mask 过滤 lowest_mask（NULL = 不按任何 mask 过滤）。mainline
+	 * 自己在 select_task_rq_rt() 里就是 find_lowest_rq(p, p)
+	 * （kernel/sched/rt.c:1633），且 find_exec_ctx() 在非 sched_proxy_exec 下直接
+	 * 返回 p（kernel/sched/core.c:4193）⇒ 传 p 与 6.6 的四参版本（__cpupri_find
+	 * 用 p->cpus_mask）逐位等价。这是完整实现，不是降级。
+	 */
+	ret = cpupri_find_fitness(&task_rq(p)->rd->cpupri, p, p,
 				lowest_mask, rt_task_fits_cpu);
 
 	cpumask_andnot(lowest_mask, lowest_mask, cpu_pause_mask);
@@ -658,8 +666,10 @@ out:
 	irq_log_store();
 }
 
-void mtk_find_lowest_rq(void *data, struct task_struct *p, struct cpumask *lowest_mask,
-			int ret, int *lowest_cpu)
+/* rodin 6.9：6.18 的 android_rvh_find_lowest_rq 在第 2 参后加了 exec_ctx
+ * （include/trace/hooks/sched.h:57-60；调用点 kernel/sched/rt.c:1892）。 */
+void mtk_find_lowest_rq(void *data, struct task_struct *p, struct task_struct *exec_ctx,
+			struct cpumask *lowest_mask, int ret, int *lowest_cpu)
 {
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
 	struct perf_domain *pd;
@@ -804,9 +814,11 @@ void throttled_rt_tasks_debug(void *unused, int cpu, u64 clock,
 		ktime_t rt_period, u64 rt_runtime, s64 rt_period_timer_expires)
 {
 	printk_deferred("sched: RT throttling activated for cpu %d\n", cpu);
-	printk_deferred("sched: cpu=%d, expires=%lld now=%llu rt_time=%llu runtime=%llu period=%llu\n",
+	/* rodin 6.9：6.18 下 rt_rq::rt_time 只在 CONFIG_RT_GROUP_SCHED 内存在
+	 * （kernel/sched/sched.h:855-857），本配置该门为 n ⇒ 从调试串去掉该项。 */
+	printk_deferred("sched: cpu=%d, expires=%lld now=%llu runtime=%llu period=%llu\n",
 			cpu, rt_period_timer_expires, ktime_get_raw_ns(),
-			task_rq(current)->rt.rt_time, rt_runtime, rt_period);
+			rt_runtime, rt_period);
 #ifdef CONFIG_SCHED_INFO
 	if (sched_info_on())
 		printk_deferred("cpu=%d, current %s (%d) is running for %llu nsec\n",

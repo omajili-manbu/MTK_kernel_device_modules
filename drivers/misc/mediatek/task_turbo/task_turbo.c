@@ -106,7 +106,10 @@ LIST_HEAD(hmp_domains);
 
 DEFINE_PER_CPU(struct hmp_domain *, hmp_cpu_domain);
 #if IS_ENABLED(CONFIG_ARM64)
-DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
+/* rodin 6.9：原名 cpu_scale 与 arm64 kernel/sched 的全局 per-CPU 符号撞名
+ * （arch/arm64/kernel/topology.c 定义、include/linux/topology.h 声明）⇒ 加 tt_ 前缀。
+ * 本文件内该变量零引用（仅此一处定义），改名纯为消链接期 duplicate。 */
+DEFINE_PER_CPU(unsigned long, tt_cpu_scale) = SCHED_CAPACITY_SCALE;
 #endif
 
 static uint32_t latency_turbo = SUB_FEAT_LOCK | SUB_FEAT_BINDER |
@@ -125,7 +128,15 @@ static unsigned int task_turbo_feats;
 static struct task_struct *inherited_rwsem_owners[INHERITED_RWSEM_COUNT] = {NULL};
 
 static bool is_turbo_task(struct task_struct *p);
-static void set_load_weight(struct task_struct *p, bool update_load);
+/* rodin 6.9：tt_idle_cpu() 是 6.6 idle_cpu() 的本地副本，改名后内核头不再提供声明，
+ * 而调用点（select_turbo_cpu 附近）在定义之前 ⇒ 补本地前置声明。 */
+int tt_idle_cpu(int cpu);
+/* rodin 6.9（A6）：本地 set_load_weight 副本已删 —— 6.18 已把它提升为
+ * kernel/sched/sched.h:4058 的 extern（kernel/sched/core.c:1594），且本地副本里的
+ * reweight_task(p, prio) 在 6.18 变成了 sched_class 方法
+ * （sched.h:2528 `(*reweight_task)(this_rq, task, const struct load_weight *lw)`）
+ * ⇒ 原样编译必错。本文件两处调用都是 set_load_weight(p, false)，6.18 版在该分支
+ * 执行 `p->se.load = lw`，与旧副本逐位等价。 */
 static void rwsem_stop_turbo_inherit(struct rw_semaphore *sem);
 static void rwsem_list_add(struct task_struct *task, struct list_head *entry,
 				struct list_head *head);
@@ -136,9 +147,9 @@ void (*binder_start_vip_inherit_hook)(int to_pid, int inherited_vip_prio) = NULL
 EXPORT_SYMBOL(binder_start_vip_inherit_hook);
 void (*binder_stop_vip_inherit_hook)(int pid, int inherited_vip_prio) = NULL;
 EXPORT_SYMBOL(binder_stop_vip_inherit_hook);
-static inline struct task_struct *rwsem_owner(struct rw_semaphore *sem);
+static inline struct task_struct *tt_rwsem_owner(struct rw_semaphore *sem);
 static inline bool rwsem_test_oflags(struct rw_semaphore *sem, long flags);
-static inline bool is_rwsem_reader_owned(struct rw_semaphore *sem);
+static inline bool tt_is_rwsem_reader_owned(struct rw_semaphore *sem);
 static void rwsem_start_turbo_inherit(struct rw_semaphore *sem);
 static bool sub_feat_enable(int type);
 static bool start_turbo_inherit(struct task_struct *task, int type, int cnt);
@@ -1219,7 +1230,7 @@ static void probe_android_rvh_select_task_rq_fair(void *ignore, struct task_stru
 	*target_cpu = select_turbo_cpu(p);
 }
 
-static inline struct task_struct *rwsem_owner(struct rw_semaphore *sem)
+static inline struct task_struct *tt_rwsem_owner(struct rw_semaphore *sem)
 {
 	return (struct task_struct *)
 		(atomic_long_read(&sem->owner) & ~RWSEM_OWNER_FLAGS_MASK);
@@ -1230,7 +1241,7 @@ static inline bool rwsem_test_oflags(struct rw_semaphore *sem, long flags)
 	return atomic_long_read(&sem->owner) & flags;
 }
 
-static inline bool is_rwsem_reader_owned(struct rw_semaphore *sem)
+static inline bool tt_is_rwsem_reader_owned(struct rw_semaphore *sem)
 {
 #if IS_ENABLED(CONFIG_DEBUG_RWSEMS)
 	/*
@@ -1371,7 +1382,9 @@ cpu_util(int cpu, struct task_struct *p, int dst_cpu, int boost)
 		util = max(util, util_est);
 	}
 
-	return min(util, capacity_orig_of(cpu));
+	/* rodin 6.9（A9）：6.18 删了 capacity_orig_of()，等价物是
+	 * arch_scale_cpu_capacity()（语义精确等价，见 4-9 sched 簇报告 A1）。 */
+	return min(util, arch_scale_cpu_capacity(cpu));
 }
 
 static inline unsigned long task_util(struct task_struct *p)
@@ -1409,7 +1422,7 @@ int find_best_turbo_cpu(struct task_struct *p)
 			 * favor tasks that prefer idle cpus
 			 * to improve latency
 			 */
-			if (idle_cpu(iter_cpu)) {
+			if (tt_idle_cpu(iter_cpu)) {
 				new_cpu = iter_cpu;
 				goto out;
 			}
@@ -1445,41 +1458,15 @@ int select_turbo_cpu(struct task_struct *p)
 	return target_cpu;
 }
 
-/* copy from sched/core.c */
-static void set_load_weight(struct task_struct *p, bool update_load)
-{
-	int prio = p->static_prio - MAX_RT_PRIO;
-	struct load_weight *load = &p->se.load;
-
-	/*
-	 * SCHED_IDLE tasks get minimal weight:
-	 */
-	if (task_has_idle_policy(p)) {
-		load->weight = scale_load(WEIGHT_IDLEPRIO);
-		load->inv_weight = WMULT_IDLEPRIO;
-		return;
-	}
-
-	/*
-	 * SCHED_OTHER tasks have to update their load when changing their
-	 * weight
-	 */
-	if (update_load && p->sched_class == &fair_sched_class) {
-		reweight_task(p, prio);
-	} else {
-		load->weight = scale_load(sched_prio_to_weight[prio]);
-		load->inv_weight = sched_prio_to_wmult[prio];
-	}
-}
 
 #if IS_ENABLED(CONFIG_ARM64)
 /**
- * idle_cpu - is a given CPU idle currently?
+ * tt_idle_cpu - is a given CPU idle currently?
  * @cpu: the processor in question.
  *
  * Return: 1 if the CPU is currently idle. 0 otherwise.
  */
-int idle_cpu(int cpu)
+int tt_idle_cpu(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
@@ -1576,12 +1563,12 @@ static void rwsem_start_turbo_inherit(struct rw_semaphore *sem)
 		return;
 
 	spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
-	owner = rwsem_owner(sem);
+	owner = tt_rwsem_owner(sem);
 	should_inherit = should_set_inherit_turbo(current);
 	if (should_inherit) {
 		inherited_owner = get_inherit_task(sem);
 		turbo_data = get_task_turbo_t(current);
-		if (owner && !is_rwsem_reader_owned(sem) &&
+		if (owner && !tt_is_rwsem_reader_owned(sem) &&
 		    !is_turbo_task(owner) &&
 		    !inherited_owner) {
 			for (i = 0; i < INHERITED_RWSEM_COUNT; i++)
@@ -2102,6 +2089,15 @@ static void remove_turbo_list(struct task_struct *p)
 	spin_unlock(&TURBO_SPIN_LOCK);
 }
 
+/* rodin 6.9（D3）：6.18 的 android_vh_cgroup_set_task 是
+ * (int ret, struct cgroup *cgrp, struct task_struct *task, bool threadgroup)
+ * （include/trace/hooks/cgroup.h:14-16，比 6.6 的 (ret, task) 新），
+ * handler 必须补上这两个形参才能注册。本 handler 的判据是"目标任务的 st group id"，
+ * 由 p 直接读出（get_st_group_id(p)），不依赖 cgrp/threadgroup ⇒ 二者仅作 ABI 占位、
+ * 不参与判断，不是降级（信息面没有损失）。 */
+/* rodin 6.9 (D3)：内核侧保留 6.6 两参 ABI（永久闭源 blob metis.ko 按 2 参编译并
+ * 解引用第 2 参），本 handler 随之回到 2 参。cgrp/threadgroup 在原 handler 里从未被
+ * 使用（判据取自 get_st_group_id(p)）⇒ 零功能损失。 */
 static void probe_android_vh_cgroup_set_task(void *ignore, int ret, struct task_struct *p)
 {
 	struct task_turbo_t *turbo_data;
@@ -2268,7 +2264,9 @@ static void sys_set_turbo_task(struct task_struct *p)
 	add_turbo_list(p);
 }
 
-int init_cpu_time(void)
+/* rodin 6.9：原名 init_cpu_time 与 performance/perf_ioctl/perf_ioctl_magt.c 的同名
+ * 全局撞名（两个模块在 6.6 是独立 .ko）⇒ 加 tt_ 前缀（同 tt_idle_cpu/tt_rwsem_owner）。 */
+int tt_init_cpu_time(void)
 {
 	int i;
 
@@ -2488,7 +2486,7 @@ static int __init init_task_turbo(void)
 		goto register_failed;
 	}
 
-	ret = init_cpu_time();
+	ret = tt_init_cpu_time();
 	if (ret) {
 		pr_info("%s: init cpu time failed, returned %d\n", TAG, ret);
 		goto register_failed;

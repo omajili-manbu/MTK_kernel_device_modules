@@ -599,7 +599,14 @@ static void sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
 	 * into the same scale so we can compare.
 	 */
 	boost = (sg_cpu->iowait_boost * max_cap) >> SCHED_CAPACITY_SHIFT;
-	boost = uclamp_rq_util_with(cpu_rq(sg_cpu->cpu), boost, NULL);
+	/*
+	 * rodin 6.9：uclamp_rq_util_with() 在 6.18 已删除（uclamp 折叠进
+	 * effective_cpu_util() 的 min/max 出参，kernel/sched/fair.c:8424-8439）；
+	 * 6.18 sugov 的 iowait 路径也不再对 boost 施加 uclamp
+	 * （kernel/sched/cpufreq_schedutil.c:333-362 直接按 max_cap 折算，随后由
+	 * effective_cpu_util() 统一 clamp）⇒ 删此行。语义等价：6.18 的 boost 在
+	 * effective_cpu_util 之前施加，uclamp 最终仍会把它 clamp 住。
+	 */
 	if (sg_cpu->util < boost)
 		sg_cpu->util = boost;
 }

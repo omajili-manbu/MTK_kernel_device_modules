@@ -309,7 +309,7 @@ extern void task_check_for_rotation(struct rq *src_rq);
 extern void rotat_after_enqueue_task(void *data, struct rq *rq, struct task_struct *p);
 extern void rotat_task_stats(void *data, struct task_struct *p);
 extern void rotat_task_newtask(void __always_unused *data, struct task_struct *p,
-				unsigned long clone_flags);
+				u64 clone_flags);   /* rodin 6.9 A9：6.18 用 u64 */
 #endif
 extern void mtk_hook_after_enqueue_task(void *data, struct rq *rq,
 				struct task_struct *p, int flags);
@@ -317,8 +317,9 @@ extern void mtk_select_task_rq_rt(void *data, struct task_struct *p, int cpu, in
 				int flags, int *target_cpu);
 extern int mtk_sched_asym_cpucapacity;
 
-extern void mtk_find_lowest_rq(void *data, struct task_struct *p, struct cpumask *lowest_mask,
-				int ret, int *lowest_cpu);
+extern void mtk_find_lowest_rq(void *data, struct task_struct *p, struct task_struct *exec_ctx,
+				struct cpumask *lowest_mask, int ret, int *lowest_cpu);
+/* rodin 6.9 A9：6.18 的 android_rvh_find_lowest_rq 在第 2 参后加了 exec_ctx */
 
 extern void throttled_rt_tasks_debug(void *unused, int cpu, u64 clock,
 				ktime_t rt_period, u64 rt_runtime, s64 rt_period_timer_expires);
