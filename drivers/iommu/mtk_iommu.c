@@ -3108,10 +3108,15 @@ skip_smi:
 	if (ret)
 		goto out_link_remove;
 
-	ret = iommu_device_register(&data->iommu, &mtk_iommu_ops, dev);
-	if (ret)
-		goto out_sysfs_remove;
-
+	/*
+	 * rodin b511 #111: 6.18 iommu core 在 iommu_device_register() 内对整条
+	 * bus 上无 fwspec 的无主设备同步代跑 dma_configure（of_xlate ->
+	 * probe_device -> device_group -> default domain attach，见
+	 * iommu_init_device()）。hw_list 与 tlb_lock 必须先于注册可见：
+	 * device_group 的 get_first_data(hw_list) 读 [NULL] 即 Oops（#111
+	 * 实证 pc=mtk_iommu_device_group+0x30），attach 的 tlb flush 会踩
+	 * 未初始化锁。6.6 =m 时消费者 bind 晚于注册+probe 完成，无此窗口。
+	 */
 	spin_lock_init(&data->tlb_lock);
 
 	if (MTK_IOMMU_HAS_FLAG(data->plat_data, SHARE_PGTABLE)) {
@@ -3122,6 +3127,10 @@ skip_smi:
 		list_add_tail(&data->list, data->plat_data->hw_list);
 		data->hw_list = data->plat_data->hw_list;
 	}
+
+	ret = iommu_device_register(&data->iommu, &mtk_iommu_ops, dev);
+	if (ret)
+		goto out_list_del_hw;
 
 	if (data->plat_data->iommu_type == MM_IOMMU &&
 	    !MTK_IOMMU_HAS_FLAG(data->plat_data, SMI_DEV_LINK_SKIP)) {
@@ -3179,6 +3188,8 @@ skip_smi:
 out_list_del:
 	list_del(&data->list);
 	iommu_device_unregister(&data->iommu);
+out_list_del_hw:
+	list_del(&data->list);
 out_sysfs_remove:
 	iommu_device_sysfs_remove(&data->iommu);
 out_link_remove:
