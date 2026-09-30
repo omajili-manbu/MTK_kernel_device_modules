@@ -12,12 +12,38 @@
  * definition），过通用 ⇒ 加模块前缀。 */
 struct battery_drv_data mbraink_bat_drv_data;
 
+/* rodin b515 #115: init 一次性获取发生在 =y probe 早期（1.12s），psy 必未注册
+ * （6.6 .ko 3.57s 才命中 bat1）⇒ 记住 dev 供运行期懒重取（幂等，取到即缓存）。 */
+static struct device *mbraink_v6899_battery_dev;
+
+static void mbraink_v6899_battery_lazy_get(void)
+{
+	if (!mbraink_v6899_battery_dev)
+		return;
+
+	if (mbraink_bat_drv_data.bat1_psy == NULL ||
+	    IS_ERR(mbraink_bat_drv_data.bat1_psy)) {
+		mbraink_bat_drv_data.bat1_psy = devm_power_supply_get_by_reference(
+			mbraink_v6899_battery_dev, "gauge");
+		if (mbraink_bat_drv_data.bat1_psy != NULL &&
+		    !IS_ERR(mbraink_bat_drv_data.bat1_psy))
+			pr_info("[MBK_v6899] %s: bat1_psy ready\n", __func__);
+	}
+	if (mbraink_bat_drv_data.bat2_psy == NULL ||
+	    IS_ERR(mbraink_bat_drv_data.bat2_psy)) {
+		mbraink_bat_drv_data.bat2_psy = devm_power_supply_get_by_reference(
+			mbraink_v6899_battery_dev, "gauge2");
+	}
+}
+
 static void mbraink_v6899_get_battery_info(struct mbraink_battery_data *battery_buffer,
 			      long long timestamp)
 {
 	union power_supply_propval prop;
 
 	memset(&prop, 0x00, sizeof(prop));
+
+	mbraink_v6899_battery_lazy_get(); /* rodin b515 #115: 运行期补齐 init 期拿不到的 psy */
 	if (mbraink_bat_drv_data.bat1_psy != NULL && !IS_ERR(mbraink_bat_drv_data.bat1_psy)) {
 		battery_buffer->timestamp = timestamp;
 
@@ -87,6 +113,8 @@ static struct mbraink_battery_ops mbraink_v6899_battery_ops = {
 int mbraink_v6899_battery_init(struct device *dev)
 {
 	int ret = 0;
+
+	mbraink_v6899_battery_dev = dev; /* rodin b515 #115 */
 
 	if (mbraink_bat_drv_data.bat1_psy == NULL) {
 		pr_info("%s get phandle from bat1_psy\n", __func__);

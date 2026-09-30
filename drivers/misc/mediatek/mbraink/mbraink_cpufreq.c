@@ -4,6 +4,7 @@
  */
 
 #include <linux/pm_qos.h>
+#include <linux/workqueue.h> /* rodin b515 #115 */
 #include <linux/hashtable.h>
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
@@ -25,6 +26,13 @@ static int is_inited;
 static int is_hooked;
 static struct notifier_block *freq_qos_max_notifier, *freq_qos_min_notifier;
 static int cluster_num;
+
+/* rodin b515 #115: cpufreq policy 就绪前不建 freq qos hooks（=y 后本函数在 module_init
+ * 1.12s 执行 ⇒ cluster_num=0 ⇒ kcalloc(0)+hooks 永久漏注册；6.6 靠 .ko 装载序 3.57s
+ * 天然就绪）。200ms×50=10s 有界重试。 */
+static void mbraink_cpufreq_init_retry(struct work_struct *work);
+static DECLARE_DELAYED_WORK(mbraink_cpufreq_init_work, mbraink_cpufreq_init_retry);
+static int mbraink_cpufreq_init_tries;
 
 /*spinlock for mbraink cpufreq notify event*/
 static DEFINE_SPINLOCK(cpufreq_lock);
@@ -369,9 +377,44 @@ static void clear_freq_qos_notifier(void)
 	kfree(freq_qos_min_notifier);
 }
 
+/* rodin b515 #115: 数 policy 集群数；==CPU_CLUSTER_SZ 才算就绪（防半程注册只挂部分簇）。 */
+static int mbraink_cpufreq_policies_ready(void)
+{
+	struct cpufreq_policy *policy;
+	int cpu, n = 0;
+
+	for_each_possible_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (policy) {
+			n++;
+			cpu = cpumask_last(policy->related_cpus);
+			cpufreq_cpu_put(policy);
+		}
+	}
+	return n;
+}
+
+static void mbraink_cpufreq_init_retry(struct work_struct *work)
+{
+	mbraink_cpufreq_notify_init();
+}
+
 int mbraink_cpufreq_notify_init(void)
 {
 	is_hooked = 0;
+
+	/* rodin b515 #115: policy 未齐 ⇒ defer；超限按原行为继续并保留原警告作诊断
+	 * （init_freq_qos_notifier 的 CPU_CLUSTER_SZ not aligned 打印即诊断锚）。 */
+	if (mbraink_cpufreq_policies_ready() != CPU_CLUSTER_SZ) {
+		if (mbraink_cpufreq_init_tries++ < 50) {
+			pr_info("[MBK] %s: cpufreq policy not ready, defer freq qos hooks\n",
+				__func__);
+			schedule_delayed_work(&mbraink_cpufreq_init_work, msecs_to_jiffies(200));
+			return 0;
+		}
+		pr_notice("[MBK] %s: cpufreq policy still not ready after 10s, install with current count\n",
+			  __func__);
+	}
 
 	memset(cpufreq_notify_data, 0, sizeof(struct mbraink_cpufreq_notify_data) * 3);
 
@@ -381,6 +424,7 @@ int mbraink_cpufreq_notify_init(void)
 	is_inited = 1;
 
 	mbraink_insert_freq_qos_hook();
+	pr_info("[MBK] %s: freq qos hooks installed (cluster_num=%d)\n", __func__, cluster_num);
 	return 0;
 }
 
@@ -390,6 +434,7 @@ void mbraink_cpufreq_notify_exit(void)
 	struct h_node *cur = NULL;
 	struct hlist_node *tmp = NULL;
 
+	cancel_delayed_work_sync(&mbraink_cpufreq_init_work); /* rodin b515 #115 */
 	mbraink_remove_freq_qos_hook();
 	clear_freq_qos_notifier();
 	// Remove hash table

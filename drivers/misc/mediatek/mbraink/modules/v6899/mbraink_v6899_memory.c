@@ -9,6 +9,7 @@
 
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/workqueue.h> /* rodin b515 #115 */
 #include <mbraink_modules_ops_def.h>
 #include "mbraink_v6899_memory.h"
 
@@ -16,6 +17,15 @@
 #include <dvfsrc-mb.h>
 
 struct device *mbraink_v6899_device;
+
+/* rodin b515 #115: ufsnotify 注册重试。=y probe(1.12s) 早于 UFS probe（6.6 靠 .ko
+ * 装载序 3.57s >> 1.44s 保证 drvdata 就绪）；ufs_mb_register 返回 -EPROBE_DEFER 时
+ * 200ms×50=10s 有界重试，就绪后完整注册。 */
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
+static void mbraink_v6899_ufs_reg_retry(struct work_struct *work);
+static DECLARE_DELAYED_WORK(mbraink_v6899_ufs_reg_work, mbraink_v6899_ufs_reg_retry);
+static int mbraink_v6899_ufs_reg_tries;
+#endif
 
 static int mbraink_v6899_memory_getDdrInfo(struct mbraink_memory_ddrInfo *pMemoryDdrInfo)
 {
@@ -224,6 +234,38 @@ static struct mbraink_memory_ops mbraink_v6899_memory_ops = {
 	.get_ufs_info = mbraink_v6899_get_ufs_info,
 };
 
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
+static void mbraink_v6899_ufs_reg_retry(struct work_struct *work)
+{
+	struct device_node *phy_node = NULL;
+	struct platform_device *phy_pdev = NULL;
+	int ret = -ENODEV;
+
+	if (mbraink_v6899_device) {
+		phy_node = of_parse_phandle(mbraink_v6899_device->of_node, "ufsnotify", 0);
+		if (phy_node) {
+			phy_pdev = of_find_device_by_node(phy_node);
+			if (phy_pdev) {
+				ret = ufs_mb_register(phy_pdev, ufs2mbrain_event_notify);
+				platform_device_put(phy_pdev);
+			}
+			of_node_put(phy_node);
+		}
+	}
+
+	if (ret == 0) {
+		pr_info("[MBK_v6899] %s: ufsnotify registered\n", __func__);
+		return;
+	}
+	if (mbraink_v6899_ufs_reg_tries++ < 50) {
+		schedule_delayed_work(&mbraink_v6899_ufs_reg_work, msecs_to_jiffies(200));
+		return;
+	}
+	pr_notice("[MBK_v6899] %s: ufsnotify register gave up after 10s (ret=%d)\n",
+		  __func__, ret);
+}
+#endif
+
 int mbraink_v6899_memory_init(struct device *dev)
 {
 	int ret = 0;
@@ -241,8 +283,20 @@ int mbraink_v6899_memory_init(struct device *dev)
 		phy_node = of_parse_phandle(dev->of_node, "ufsnotify", 0);
 		if (phy_node) {
 			phy_pdev = of_find_device_by_node(phy_node);
-			if (phy_pdev)
-				ufs_mb_register(phy_pdev, ufs2mbrain_event_notify);
+			if (phy_pdev) {
+				int ufs_ret = ufs_mb_register(phy_pdev, ufs2mbrain_event_notify);
+
+				/* rodin b515 #115: UFS 未 probe ⇒ defer，交给重试 work；
+				 * 其余错误码保持 6.6 语义（丢弃、不影响 probe 返回值）。 */
+				if (ufs_ret == -EPROBE_DEFER) {
+					pr_info("[MBK_v6899] %s: ufsnotify register deferred, will retry\n",
+						__func__);
+					mbraink_v6899_ufs_reg_tries = 0;
+					schedule_delayed_work(&mbraink_v6899_ufs_reg_work,
+							      msecs_to_jiffies(200));
+				}
+				platform_device_put(phy_pdev);
+			}
 		}
 #endif
 	} else
@@ -259,6 +313,9 @@ int mbraink_v6899_memory_deinit(struct device *dev)
 	struct platform_device *phy_pdev = NULL;
 #endif
 
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
+	cancel_delayed_work_sync(&mbraink_v6899_ufs_reg_work); /* rodin b515 #115: 防去注册与重试竞争 */
+#endif
 	ret = unregister_mbraink_memory_ops();
 
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
