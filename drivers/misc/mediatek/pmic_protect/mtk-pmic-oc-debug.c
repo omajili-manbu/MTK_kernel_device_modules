@@ -10,6 +10,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/kernel.h>
 #include <linux/regulator/consumer.h>
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 #include <aee.h>
@@ -215,6 +216,14 @@ static int register_oc_notifier(struct platform_device *pdev,
 		if (PTR_ERR(reg) == -EPROBE_DEFER)
 			return PTR_ERR(reg);
 		else if (IS_ERR(reg)) {
+			/* rodin b514 #114: 本节点 DT 无 *-supply ⇒ 走 regulator 按名
+			 * 查找；=y 内建后 probe(1.01s) 早于 mt6363/6373 regulator
+			 * 注册（6.6 是两个 .ko，装载序天然在后：2.77s 时按名命中共
+			 * 0 条该告警）。开机阶段按"尚未就绪"延迟重试（内核
+			 * deferred probe 10s 自续重试兜底），系统 running 后仍缺失
+			 * 才按真缺失处理——有界收敛，避免永久 -EPROBE_DEFER。*/
+			if (system_state != SYSTEM_RUNNING)
+				return -EPROBE_DEFER;
 			dev_notice(&pdev->dev, "fail to get regulator %s\n",
 				   oc_debug->name);
 			continue;

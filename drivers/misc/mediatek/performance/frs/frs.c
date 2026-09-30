@@ -275,7 +275,9 @@ int __init eara_thrm_pre_init(void)
 	return 0;
 }
 
-module_init(eara_thrm_pre_init);
+/* rodin b514 #114: /sys/kernel/thermal 由 thermal_interface 的 probe 创建
+ * （level 6 内更晚），原 module_init 会让 sysfs_merge_group 恒 -ENOENT。*/
+late_initcall(eara_thrm_pre_init);
 module_exit(eara_thrm_pre_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek Frame Rate Smoother");

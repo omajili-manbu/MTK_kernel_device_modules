@@ -702,39 +702,50 @@ static void vow_service_Init(void)
 	vowserv.tx_keyword_start = false;
 	/*Initialization*/
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
-	vowserv.voicedata_scp_ptr =
-		(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
-		+ VOW_VOICEDATA_OFFSET;
-	vowserv.voicedata_scp_addr =
-		scp_get_reserve_mem_phys(VOW_MEM_ID)
-		+ VOW_VOICEDATA_OFFSET;
-	/*init L/R ch audio data in DRAM*/
-	/* if open dual ch transfer and "ABF support = no" in scp, we can get R ch sample = 0x101*/
-	memset(vowserv.voicedata_scp_ptr, 1, VOW_VOICEDATA_SIZE * VOW_MAX_MIC_NUM);
-	/*Extra data*/
-	vowserv.extradata_ptr =
-		(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
-		+ VOW_EXTRA_DATA_OFFSET;
-	vowserv.extradata_addr =
-		scp_get_reserve_mem_phys(VOW_MEM_ID)
-		+ VOW_EXTRA_DATA_OFFSET;
-	/* for payload dump feature(data from scp) */
-	/* use VOW_PAYLOADDUMP_OFFSET/VOW_PAYLOADDUMP_R_OFFSET to exchange payload data */
-	vowserv.payloaddump_scp_ptr =
-		(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
-		+ VOW_PAYLOADDUMP_OFFSET;
-	vowserv.payloaddump_scp_addr =
-		scp_get_reserve_mem_phys(VOW_MEM_ID)
-		+ VOW_PAYLOADDUMP_OFFSET;
-	vowserv.payloaddump_r_scp_ptr =
-		(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
-		+ VOW_PAYLOADDUMP_R_OFFSET;
-	vowserv.payloaddump_r_scp_addr =
-		scp_get_reserve_mem_phys(VOW_MEM_ID)
-		+ VOW_PAYLOADDUMP_R_OFFSET;
-	VOWDRV_DEBUG("%s(), [PDR]offset = 0x%lx, r_offset = 0x%lx\n\r",
-		     __func__, VOW_PAYLOADDUMP_OFFSET, VOW_PAYLOADDUMP_R_OFFSET );
-
+	/* rodin b514 #114: SCP 预留内存由 scp_device_probe() → scp_reserve_memory_ioremap()
+	 * （device_initcall_sync=6s）建立；=y 内建后本函数在 VowDrv_mod_init(level 6)
+	 * 里先跑，scp_get_reserve_mem_virt() 返回 0 ⇒ NULL+VOW_VOICEDATA_OFFSET
+	 * 当 memset 目标崩（6.6 是 =m：vow 装载 2.5853s 晚于 ioremap 2.5798s，仅 5.5ms）。
+	 * 判据取"被使用的那个资源"（预留内存），不取 is_scp_ready()——6.6 装载时
+	 * is_scp_ready() 仍为 0 却已安全 memset。未就绪则跳过本段，由既有
+	 * SCP_EVENT_READY 路径的第二次调用补齐（与 6.6 的两次调用语义逐条等价）。*/
+	if (scp_get_reserve_mem_virt(VOW_MEM_ID) &&
+	    scp_get_reserve_mem_size(VOW_MEM_ID)) {
+		vowserv.voicedata_scp_ptr =
+			(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
+			+ VOW_VOICEDATA_OFFSET;
+		vowserv.voicedata_scp_addr =
+			scp_get_reserve_mem_phys(VOW_MEM_ID)
+			+ VOW_VOICEDATA_OFFSET;
+		/*init L/R ch audio data in DRAM*/
+		/* if open dual ch transfer and "ABF support = no" in scp, we can get R ch sample = 0x101*/
+		memset(vowserv.voicedata_scp_ptr, 1, VOW_VOICEDATA_SIZE * VOW_MAX_MIC_NUM);
+		/*Extra data*/
+		vowserv.extradata_ptr =
+			(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
+			+ VOW_EXTRA_DATA_OFFSET;
+		vowserv.extradata_addr =
+			scp_get_reserve_mem_phys(VOW_MEM_ID)
+			+ VOW_EXTRA_DATA_OFFSET;
+		/* for payload dump feature(data from scp) */
+		/* use VOW_PAYLOADDUMP_OFFSET/VOW_PAYLOADDUMP_R_OFFSET to exchange payload data */
+		vowserv.payloaddump_scp_ptr =
+			(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
+			+ VOW_PAYLOADDUMP_OFFSET;
+		vowserv.payloaddump_scp_addr =
+			scp_get_reserve_mem_phys(VOW_MEM_ID)
+			+ VOW_PAYLOADDUMP_OFFSET;
+		vowserv.payloaddump_r_scp_ptr =
+			(char *)(scp_get_reserve_mem_virt(VOW_MEM_ID))
+			+ VOW_PAYLOADDUMP_R_OFFSET;
+		vowserv.payloaddump_r_scp_addr =
+			scp_get_reserve_mem_phys(VOW_MEM_ID)
+			+ VOW_PAYLOADDUMP_R_OFFSET;
+		VOWDRV_DEBUG("%s(), [PDR]offset = 0x%lx, r_offset = 0x%lx\n\r",
+			     __func__, VOW_PAYLOADDUMP_OFFSET, VOW_PAYLOADDUMP_R_OFFSET );
+	} else {
+		VOWDRV_DEBUG("%s(), SCP rsrv mem not ready, skip scp dram init\n", __func__);
+	}
 #else
 	VOWDRV_DEBUG("%s(), vow: SCP no support\n\r", __func__);
 #endif

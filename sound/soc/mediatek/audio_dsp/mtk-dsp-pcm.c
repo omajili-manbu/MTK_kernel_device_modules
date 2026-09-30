@@ -234,6 +234,15 @@ static int dsp_pcm_dev_probe(struct platform_device *pdev)
 			pdev->dev.of_node->name, pdev->dev.of_node->full_name);
 	}
 
+	/* rodin b514 #114: dram init 上移到 register 之前——否则
+	 * -EPROBE_DEFER 重试会二次 snd_soc_register_component()。*/
+	ret = init_mtk_adsp_dram_segment();
+	if (ret) {
+		pr_info("%s(), init_mtk_adsp_dram_segment fail: %d\n",
+			__func__, ret);
+		goto err_platform;
+	}
+
 	ret = snd_soc_register_component(&pdev->dev,
 					 &mtk_dsp_pcm_platform,
 					 dsp->dai_drivers,
@@ -247,12 +256,6 @@ static int dsp_pcm_dev_probe(struct platform_device *pdev)
 	set_dsp_base((void *)dsp);
 	dsp_pcm_taskattr_init(pdev);
 
-	ret = init_mtk_adsp_dram_segment();
-	if (ret) {
-		pr_info("%s(), init_mtk_adsp_dram_segment fail: %d\n",
-			__func__, ret);
-		goto err_platform;
-	}
 
 	ret = mtk_adsp_init_gen_pool(dsp);
 	if (ret) {
@@ -275,6 +278,10 @@ static int dsp_pcm_dev_probe(struct platform_device *pdev)
 	mtk_audio_register_notify();
 
 err_platform:
+	/* rodin b514 #114: 原为无条件 return 0（吞错、不重试）。仅对
+	 * 新引入的 -EPROBE_DEFER 透传，其余错误保持厂商原有("继续")语义。*/
+	if (ret == -EPROBE_DEFER)
+		return ret;
 	return 0;
 }
 

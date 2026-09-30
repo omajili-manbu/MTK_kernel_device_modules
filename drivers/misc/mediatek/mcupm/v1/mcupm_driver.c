@@ -271,8 +271,21 @@ static int mcupm_reserve_memory_init(void)
 	if (NUMS_MCUPM_MEM_ID == 0)
 		return 0;
 
-	if (mcupm_mem_base_phys == 0)
-		return -ENOMEM;
+	if (mcupm_mem_base_phys == 0) {
+		/* rodin b514 #114: 设备真值是 .ko 形态的 mcupm_map_memory_region()
+		 * ——DT 无 mediatek,reserve-memory-mcupm_share 节点时按"无预留内存"
+		 * 正常继续（6.6 实证：no node for reserved memory + Alive
+		 * RES_MEM(0) SKIP_LOG(1) ret(0)）。=y 分支原为硬 -ENOMEM ⇒ alive
+		 * 线程与后续初始化整段被跳过（6.18 实证：无 Alive 行）。逐字对齐
+		 * 同文件 mcupm_map_memory_region() 的 no-node 分支。*/
+		has_reserved_memory = false;
+		skip_logger = true;
+		for (id = 0; id < NUMS_MCUPM_MEM_ID; id++) {
+			mcupm_reserve_mblock[id].start_phys = 0x0;
+			mcupm_reserve_mblock[id].start_virt = 0x0;
+		}
+		return 0;
+	}
 
 	accumlate_memory_size = 0;
 	mcupm_mem_base_virt = (phys_addr_t)(uintptr_t)

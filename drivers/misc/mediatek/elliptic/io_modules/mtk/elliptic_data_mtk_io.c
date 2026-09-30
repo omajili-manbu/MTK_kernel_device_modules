@@ -59,13 +59,22 @@ int32_t elliptic_debug_io_open(void)
 
 	pr_info("[ELUS] %s()", __func__);
 	if (debug_segment.reserved == 0) {
-		debug_segment.phys =
+		phys_addr_t dbg_phys =
 			scp_get_reserve_mem_phys(SCP_ELLIPTIC_DEBUG_MEM);
-		debug_segment.virt =
+		phys_addr_t dbg_virt =
 			scp_get_reserve_mem_virt(SCP_ELLIPTIC_DEBUG_MEM);
-		debug_segment.size =
+		phys_addr_t dbg_size =
 			scp_get_reserve_mem_size(SCP_ELLIPTIC_DEBUG_MEM);
-		debug_segment.reserved = 1;
+
+		/* rodin b514 #114: 预留内存未建立时取到 0，原实现立即置
+		 * reserved=1 ⇒ 0 被永久缓存（IPI 任务随后按 dram_payload
+		 * 解引用）。三值全非零才缓存，否则下次 open 重取。*/
+		if (dbg_phys && dbg_virt && dbg_size) {
+			debug_segment.phys = dbg_phys;
+			debug_segment.virt = dbg_virt;
+			debug_segment.size = dbg_size;
+			debug_segment.reserved = 1;
+		}
 	}
 	return elliptic_data_io_write(ELLIPTIC_INIT_DEBUG_SEGMENT,
 				(const char *)&debug_segment,

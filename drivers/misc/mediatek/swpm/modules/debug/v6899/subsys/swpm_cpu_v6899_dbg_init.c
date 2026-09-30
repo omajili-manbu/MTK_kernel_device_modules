@@ -89,7 +89,12 @@ void __exit swpm_cpu_v6899_dbg_exit(void)
 	swpm_cpu_v6899_exit();
 }
 
-module_init(swpm_cpu_v6899_dbg_init);
+/* rodin b514 #114: sspm_ready=1 在 sspm_module_init（level 6s）末尾设置；
+ * 本 init 原在 level 6 ⇒ sspm_sbuf_get() 被 is_sspm_ready() 门挡回 0，
+ * cpu_swpm_data_ptr 永久 NULL、温度 notifier 不注册（6.6 是 .ko，装载序
+ * 在 sspm ready 之后）。7s > 6s 有静态保证，与同框架既有
+ * swpm_v6899_dbg_late_initcall 的 late_initcall_sync 范式一致。*/
+late_initcall_sync(swpm_cpu_v6899_dbg_init);
 module_exit(swpm_cpu_v6899_dbg_exit);
 
 MODULE_LICENSE("GPL");

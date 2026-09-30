@@ -3231,11 +3231,6 @@ static int scp_device_probe(struct platform_device *pdev)
 			pr_info("[SCP] get '%s' fail\n", scp_ipi_irqs[i].name);
 	}
 
-	ret = mtk_ipi_device_register(&scp_ipidev, pdev, &scp_mboxdev,
-				      SCP_IPI_COUNT);
-	if (ret)
-		pr_notice("[SCP] ipi_dev_register fail, ret %d\n", ret);
-
 	if (!scp_resource_dump_init(pdev))
 		return -ENODEV;
 
@@ -3243,6 +3238,11 @@ static int scp_device_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 #if SCP_RESERVED_MEM && defined(CONFIG_OF)
+	/* rodin b514 #114: 前移到 ipidev 注册之前 —— b513 的 "ipidev 就绪"
+	 * 一次性通知链（mtk_ipi_dev_register_ready_notifier）不蕴含预留内存
+	 * 已建立；顺序反转后不变量 "ipidev ready ⇒ reserved mem ready" 成立。
+	 * memorydump_size_probe 与 ioremap 一起前移（scp_get_secure_dump_size()
+	 * 读 scp_dump.prefix[]，依赖 memorydump 先跑）。*/
 	/* scp memorydump size probe */
 	ret = memorydump_size_probe(pdev);
 	if (ret)
@@ -3256,6 +3256,11 @@ static int scp_device_probe(struct platform_device *pdev)
 		return ret;
 	}
 #endif
+
+	ret = mtk_ipi_device_register(&scp_ipidev, pdev, &scp_mboxdev,
+				      SCP_IPI_COUNT);
+	if (ret)
+		pr_notice("[SCP] ipi_dev_register fail, ret %d\n", ret);
 
 	/* scp feature table probe */
 	ret = scp_feature_table_probe(pdev);

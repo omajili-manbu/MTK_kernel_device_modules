@@ -308,6 +308,17 @@ static int mtk_cpu_power_throttling_probe(struct platform_device *pdev)
 	ret = parse_cpu_limit_table(&pdev->dev);
 	if (ret != 0)
 		return ret;
+	/* rodin b514 #114: =y 内建后本 probe 可早于 cpufreq 提供者（6.6 是 .ko，
+	 * 装载序天然在后）。任一 CPU 无 policy 即整体延迟重试——原实现 continue
+	 * 会让该 CPU 的限频回调永久缺失（且 k 计数错位）。*/
+	for_each_possible_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (!policy) {
+			pr_info("cpu[%d]: cpufreq policy not ready, defer probe\n", cpu);
+			return -EPROBE_DEFER;
+		}
+		cpufreq_cpu_put(policy);
+	}
 	for_each_possible_cpu(cpu) {
 		policy = cpufreq_cpu_get(cpu);
 		if (!policy) {
