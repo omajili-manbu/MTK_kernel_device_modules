@@ -3773,6 +3773,44 @@ static struct platform_driver mtk_vcp_io_acp_codec = {
 };
 
 /*
+ * rodin b59: 6.18 内建化把 vcp_init 落在 device_initcall_sync(.initcall6s)，而
+ * scpsys（arch_initcall probe，mtk-scpsys.c 的 VCP_READY_STA 轮询）与 clk HWV
+ * gate enable（mtk_clk_polling_vcp_ready -> clkchk trigger_bugon=true 的
+ * BUG_ON(1)，#109）在更早的 initcall 阶段执行，等待超时即开机 panic。
+ * OEM 6.6 为 =m 用户态装载时序，该路径不可达；=y 内建必须把 SMC RESET_SET kick
+ * 前移到 arch_initcall_sync（of_platform_default_populate_init 之后、
+ * mtk-scpsys probe 之前）。寄存器映射与 probe 留在 vcp_init（6s，
+ * mtk_iommu register 之后），DMA 面时序不变。
+ */
+static bool vcp_early_kick_done;
+static int __init vcp_early_boot_init(void)
+{
+	struct device_node *np;
+	struct arm_smccc_res res;
+	unsigned int support = 0;
+
+	np = of_find_compatible_node(NULL, NULL, "mediatek,vcp");
+	if (!np)
+		return 0;
+	of_property_read_u32(np, "vcp-support", &support);
+	if (support == 0 || !of_property_read_bool(np, "vcp-ao-feature")) {
+		of_node_put(np);
+		return 0;
+	}
+	of_node_put(np);
+
+	arm_smccc_smc(MTK_SIP_TINYSYS_VCP_CONTROL,
+		MTK_TINYSYS_VCP_KERNEL_OP_RESET_SET,
+		1, 0, 0, 0, 0, 0, &res);
+	vcp_register_feature(RTOS_FEATURE_ID);
+	vcp_early_kick_done = true;
+	pr_notice("[VCP] early boot kick done (rodin b59)\n");
+
+	return 0;
+}
+arch_initcall_sync(vcp_early_boot_init);
+
+/*
  * driver initialization entry point
  */
 static int __init vcp_init(void)
@@ -3940,7 +3978,7 @@ static int __init vcp_init(void)
 	register_devapc_power_callback(&devapc_power_handle);
 #endif
 
-	if (vcp_ao) {
+	if (vcp_ao && !vcp_early_kick_done) {
 		pr_notice("[VCP] %s core0 status: 0x%x\n", __func__, readl(R_CORE0_STATUS));
 		arm_smccc_smc(MTK_SIP_TINYSYS_VCP_CONTROL,
 			MTK_TINYSYS_VCP_KERNEL_OP_RESET_SET,
