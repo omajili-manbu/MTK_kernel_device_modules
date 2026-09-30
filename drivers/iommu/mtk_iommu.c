@@ -2048,7 +2048,18 @@ static void mtk_iommu_release_device(struct device *dev)
 
 	larbid = MTK_M4U_TO_LARB(fwspec->ids[0]);
 	larbdev = data->larb_imu[larbid].dev;
-	device_link_remove(dev, larbdev);
+	/*
+	 * rodin b512 #112: consumer<->larb device_link 本树从不创建
+	 * （probe_device 无 device_link_add，APU 的 LINK_WITH_APU 加的是
+	 * apudev<->m4u 反向链接），此 remove 本就是 no-op；而 6.18 注册期
+	 * 扫描/早于 smi-larb probe(6.6 实证 0.598s) 的任何 release 路径里
+	 * larb_imu[].dev 为 NULL（APU 实例无 mediatek,larbs 恒 NULL），
+	 * device_link_remove 对 NULL supplier 解引用
+	 * supplier->links.consumers 必崩（#112 pc=device_link_remove+0x34
+	 * 读 [0xe0]，注销拆除链实证）。
+	 */
+	if (larbdev)
+		device_link_remove(dev, larbdev);
 }
 
 static struct iommu_group *mtk_iommu_device_group(struct device *dev)
