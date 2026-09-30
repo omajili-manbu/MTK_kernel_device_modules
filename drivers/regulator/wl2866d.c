@@ -665,9 +665,12 @@ static int wl2866d_driver_register(int index, struct regmap *regmap)
 
 	wl2866d_dev.pdevice = device_create(pwl2866d_class, NULL,
 			wl2866d_dev.dev_no, NULL, device_drv_name);
-	if (wl2866d_dev.pdevice == NULL) {
-		wl2866d_debug("[WL2866D] Allocate device_create for kobject failed\n");
-		return -ENOMEM;
+	if (IS_ERR(wl2866d_dev.pdevice)) {
+		/* rodin b513 #113: device_create 失败返回 ERR_PTR(-EEXIST…)，
+		 * 不是 NULL；原判 NULL 后下一句直接 ->driver_data 解引用。 */
+		wl2866d_debug("[WL2866D] device_create failed, err = %ld\n",
+			PTR_ERR(wl2866d_dev.pdevice));
+		return (int)PTR_ERR(wl2866d_dev.pdevice);
 	}
 
 	wl2866d_dev.pdevice->driver_data = regmap;

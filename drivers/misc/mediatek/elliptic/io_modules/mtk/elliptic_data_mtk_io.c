@@ -50,6 +50,10 @@ static elliptic_ipi_scp_to_host_message_t usnd_ipi_receive;
 static struct scp_elliptic_reserved_mem_t debug_segment;
 static struct elliptic_ipi_handler_data_t elliptic_ipi_handler_data;
 
+/* rodin b513 #113: io 资源（fifo/tasklet）是否已建立，供 cleanup 判定 */
+static bool elliptic_io_inited;
+
+
 int32_t elliptic_debug_io_open(void)
 {
 
@@ -278,6 +282,9 @@ int elliptic_data_io_initialize(void)
 
 	tasklet_init(&elliptic_ipi_handler_data.handle_task, elliptic_data_io_ipi_handle_task, 0);
 	elliptic_ipi_handler_data.task_running = 0;
+	/* rodin b513 #113: fifo/tasklet 已建，从此刻起由 cleanup 拆除
+	 * （后续 scp ipi 注册失败同样会走 cleanup，不再泄漏）。 */
+	elliptic_io_inited = true;
 
 	status = mtk_ipi_register(&scp_ipidev, IPI_IN_ELLIPTIC_ULTRA_0,
 		(mbox_pin_cb_t)elliptic_data_io_ipi_handler, NULL,
@@ -354,10 +361,17 @@ int32_t elliptic_data_io_write(uint32_t message_id, const char *data,
 
 int elliptic_data_io_cleanup(void)
 {
-	pr_info("[ELUS] Unimplemented");
-    tasklet_kill(&elliptic_ipi_handler_data.handle_task);
-	spin_unlock(&elliptic_ipi_handler_data.tasklet_fifo_isr_spinlock);
-    kfifo_free(&elliptic_ipi_handler_data.fifo);
+	/* rodin b513 #113: 只在 initialize 建立过资源后才拆 —— 原实现无条件
+	 * tasklet_kill 未 tasklet_init 的对象、kfifo_free 未 alloc 的 fifo。 */
+	if (!elliptic_io_inited)
+		return 0;
+
+	elliptic_io_inited = false;
+	pr_debug("[ELUS] io cleanup");
+	tasklet_kill(&elliptic_ipi_handler_data.handle_task);
+	/* rodin b513 #113: 原 spin_unlock 未配对（本轮 pstore 1.001360 的
+	 * preemption imbalance 就是它），删除；本函数不加锁。 */
+	kfifo_free(&elliptic_ipi_handler_data.fifo);
 	return 0;
 }
 MODULE_AUTHOR("Elliptic Labs");

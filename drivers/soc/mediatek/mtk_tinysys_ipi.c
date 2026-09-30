@@ -19,6 +19,7 @@
 #include <linux/rpmsg/mtk_rpmsg.h>
 #include <linux/soc/mediatek/mtk-mbox.h>
 #include <linux/soc/mediatek/mtk_tinysys_ipi.h>
+#include <linux/notifier.h>
 #include <linux/freezer.h>
 
 #define MS_TO_NS(x) ((x)*1000000)
@@ -142,6 +143,28 @@ void ipi_monitor_dump(struct mtk_ipi_device *ipidev)
 }
 EXPORT_SYMBOL(ipi_monitor_dump);
 
+/*
+ * rodin b513 #113: 内建化的消费者（elliptic 等）在 initcall 期就会调
+ * mtk_ipi_register()，而 ipidev 的注册（ipi_inited=1）发生在提供者的
+ * probe 里（scp_probe -> scp_ipi_table_init -> mtk_ipi_device_register），
+ * 6.18 内建后 SCP 的 device_initcall_sync 晚于消费者的
+ * device_initcall，时序倒挂。提供一次性 "ipidev 已注册" 通知：注册的
+ * nb 在每次 ipidev 注册完成时被调用（data = struct mtk_ipi_device *），
+ * 消费者用 ipidev 指针过滤；“是否已就绪”由消费者自测
+ * ipidev->ipi_inited（公开字段），避免改动 struct 布局（6.6 blob 可能
+ * 内嵌该结构）。同 b52 scmi_tinysys_register_ready_notifier 范式。
+ */
+static BLOCKING_NOTIFIER_HEAD(mtk_ipi_dev_ready_chain);
+
+int mtk_ipi_dev_register_ready_notifier(struct notifier_block *nb)
+{
+	if (!nb || !nb->notifier_call)
+		return -EINVAL;
+
+	return blocking_notifier_chain_register(&mtk_ipi_dev_ready_chain, nb);
+}
+EXPORT_SYMBOL(mtk_ipi_dev_register_ready_notifier);
+
 int mtk_ipi_device_register(struct mtk_ipi_device *ipidev,
 		struct platform_device *pdev, struct mtk_mbox_device *mbox,
 		unsigned int ipi_chan_count)
@@ -217,6 +240,11 @@ int mtk_ipi_device_register(struct mtk_ipi_device *ipidev,
 	ipidev->table = ipi_chan_table;
 	ipidev->mbdev = mbox;
 	ipidev->ipi_inited = 1;
+
+	/* rodin b513 #113: 通知等待该 ipidev 的内建消费者（一次性语义
+	 * 由消费者自己持有的标志保证；回调内不注销，避免 blocking
+	 * notifier 死锁）。 */
+	blocking_notifier_call_chain(&mtk_ipi_dev_ready_chain, 0, ipidev);
 
 	pr_info("%s (with %d IPI) has registered.\n",
 		ipidev->name, ipi_chan_count);

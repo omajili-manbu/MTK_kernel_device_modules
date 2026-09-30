@@ -31,11 +31,14 @@
 #include <linux/kfifo.h>
 #include <linux/poll.h>
 #include <linux/kobject.h>
+#include <linux/notifier.h>
+#include <linux/soc/mediatek/mtk_tinysys_ipi.h>
 
 #include "elliptic_sysfs.h"
 #include "elliptic_device.h"
 #include "elliptic_data_io.h"
 #include "elliptic_mixer_controls.h"
+#include "scp.h"
 
 // #include <hwmsensor.h>
 // #include <SCP_sensorHub.h>
@@ -217,7 +220,10 @@ int elliptic_data_initialize(struct elliptic_data
 
 int elliptic_data_cleanup(struct elliptic_data *elliptic_data)
 {
-	spin_unlock(&elliptic_data->fifo_isr_spinlock);
+	/* rodin b513 #113: 本函数从不加锁，原 spin_unlock 未配对 ——
+	 * 内核以 "initcall ... returned with preemption imbalance"
+	 * 自证（本轮 pstore 1.001360 实证）。kfifo_free 对未分配
+	 * 的 fifo 安全。 */
 	kfifo_free(&elliptic_data->fifo_isr);
 	return 0;
 }
@@ -636,7 +642,9 @@ static void elliptic_driver_cleanup(int devices_to_destroy)
 		kfree(elliptic_devices);
 	}
 
-	if (elliptic_class)
+	/* rodin b513 #113: class_create 失败时 elliptic_class 是 ERR_PTR
+	 * 而不是 NULL，原判非空会把 ERR_PTR 交给 class_destroy。 */
+	if (!IS_ERR_OR_NULL(elliptic_class))
 		class_destroy(elliptic_class);
 
 	unregister_chrdev_region(
@@ -689,12 +697,29 @@ static int32_t elliptic_send_calibration_to_engine(size_t calib_data_size)
 #endif
 
 
-static int __init elliptic_driver_init(void)
+/* rodin b513 #113: 与 6.6 的模块装载语义等价 —— 6.6 上 scp.ko 先
+ * 装载并注册 scp_ipidev（2.5796s），userspace 之后才装载
+ * elliptic-ultrasound.ko（2.9386s）。6.18 内建化后 elliptic 的
+ * device_initcall 早于 SCP 提供者的 device_initcall_sync（scp_init），
+ * mtk_ipi_register() 因 !ipidev->ipi_inited 返回 IPI_DEV_ILLEGAL，
+ * 于是错误路径释放主设备号、留下 /sys/dev/char 悬挂（#113 实证）。
+ * 因此拆两段：SCP 未就绪时先不建任何资源（chrdev/class/device/
+ * sysfs/io 全不建），等一次性就绪通知再一次性建立。
+ * 注意：elliptic_setup() 会在 initmem 释放后执行，严禁 __init 归属。
+ */
+static bool elliptic_ready_done;
+
+static int elliptic_setup(void)
 {
+
 	int err;
 	int i;
 	int devices_to_destroy;
 	dev_t device_number;
+
+	/* 幂等：就绪回调只应生效一次 */
+	if (elliptic_ready_done)
+		return 0;
 
 	err = alloc_chrdev_region(&device_number, 0, ELLIPTIC_NUM_DEVICES,
 		ELLIPTIC_DEVICENAME);
@@ -709,7 +734,9 @@ static int __init elliptic_driver_init(void)
 	elliptic_major = MAJOR(device_number);
 	elliptic_class = class_create("chardev");
 
-	if (elliptic_class == NULL) {
+	/* rodin b513 #113: class_create 失败返回 ERR_PTR，永不 NULL；
+	 * 原判 NULL 会带着 ERR_PTR 继续建设备/class_destroy。 */
+	if (IS_ERR(elliptic_class)) {
 		pr_err("[ELUS] Class creation failed");
 		goto fail;
 	}
@@ -730,27 +757,45 @@ static int __init elliptic_driver_init(void)
 
 
 	for (i = 0; i < ELLIPTIC_NUM_DEVICES; ++i) {
-		if (elliptic_device_initialize(&elliptic_devices[i], i,
-			elliptic_class)) {
+		err = elliptic_device_initialize(&elliptic_devices[i], i,
+			elliptic_class);
+		if (err) {
+			/* rodin b513 #113: 原实现在此不写 err（保持 0），
+			 * module_init 会假装成功。 */
 			devices_to_destroy = i;
 			goto fail;
 		}
 
-		if (elliptic_data_initialize(&elliptic_devices[i].el_data,
-			ELLIPTIC_DATA_FIFO_SIZE, ELLIPTIC_WAKEUP_TIMEOUT, i)) {
+		err = elliptic_data_initialize(&elliptic_devices[i].el_data,
+			ELLIPTIC_DATA_FIFO_SIZE, ELLIPTIC_WAKEUP_TIMEOUT, i);
+		if (err) {
+			/* rodin b513 #113: 该 device 的 device_create 已成功，
+			 * 计数必须含它；否则 unregister_chrdev_region() 之前
+			 * 漏 device_destroy -> /sys/dev/char/<maj>:<min> 悬挂，
+			 * 被下一个 alloc_chrdev_region 的驱动抢到同一主号。 */
+			devices_to_destroy = i + 1;
 			goto fail;
 		}
 	}
 
 	pr_debug("[ELUS] io initialize\n");
-	if (elliptic_data_io_initialize())
+	err = elliptic_data_io_initialize();
+	if (err) {
+		/* rodin b513 #113: 此时全部 device 已建，必须全部销毁
+		 * 之后才允许释放主设备号（原计数 0 ⇒ 一个都不销毁）。 */
+		devices_to_destroy = ELLIPTIC_NUM_DEVICES;
 		goto fail;
+	}
 
 	wake_source = wakeup_source_register(NULL, "elliptic_wake_source");
 
 	if (!wake_source){
 		pr_err("[ELUS] failed to register wake source\n");
-		return -ENOMEM;
+		/* rodin b513 #113: 原为裸 return —— region/class/设备
+		 * 全部泄漏；此时全部 device 已建，走统一清理。 */
+		err = -ENOMEM;
+		devices_to_destroy = ELLIPTIC_NUM_DEVICES;
+		goto fail;
 	}
 
 #ifdef ELLIPTIC_LOAD_CALIBRATION_DATA_FROM_FILESYSTEM
@@ -765,9 +810,50 @@ static int __init elliptic_driver_init(void)
 	return 0;
 
 fail:
+	/* rodin b513 #113: sysfs 也拆（幂等，见 elliptic_sysfs.c）。 */
+	elliptic_cleanup_sysfs();
 	elliptic_driver_cleanup(devices_to_destroy);
 	return err;
 }
+
+/* rodin b513 #113: B1a 就绪回调。blocking notifier 回调内不注销
+ * （会死锁），一次性语义由 elliptic_ready_done 保证；"是否已就绪"
+ * 用公开字段 ipi_inited 自测（不改 struct 布局）。 */
+static int elliptic_ipi_ready_cb(struct notifier_block *nb,
+				 unsigned long event, void *data)
+{
+	if (data != &scp_ipidev)
+		return NOTIFY_DONE;
+	if (elliptic_ready_done)
+		return NOTIFY_DONE;
+	if (elliptic_setup())
+		return NOTIFY_DONE;
+
+	elliptic_ready_done = true;
+	return NOTIFY_OK;
+}
+
+static struct notifier_block elliptic_ipi_ready_nb = {
+	.notifier_call = elliptic_ipi_ready_cb,
+};
+
+static int __init elliptic_driver_init(void)
+{
+	/* rodin b513 #113: SCP ipidev 未就绪就不建任何资源 */
+	if (!scp_ipidev.ipi_inited) {
+		pr_info("[ELUS] scp ipidev not ready, defer init\n");
+		if (mtk_ipi_dev_register_ready_notifier(&elliptic_ipi_ready_nb))
+			pr_err("[ELUS] register ready notifier failed\n");
+		return 0;
+	}
+
+	if (elliptic_setup())
+		return -ENODEV;
+
+	elliptic_ready_done = true;
+	return 0;
+}
+
 
 static void elliptic_driver_exit(void)
 {

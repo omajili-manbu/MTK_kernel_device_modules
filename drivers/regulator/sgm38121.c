@@ -665,9 +665,12 @@ static int sgm38121_driver_register(int index, struct regmap *regmap)
 
 	sgm38121_dev.pdevice = device_create(psgm38121_class, NULL,
 			sgm38121_dev.dev_no, NULL, device_drv_name);
-	if (sgm38121_dev.pdevice == NULL) {
-		sgm38121_debug("[SGM38121] Allocate device_create for kobject failed\n");
-		return -ENOMEM;
+	if (IS_ERR(sgm38121_dev.pdevice)) {
+		/* rodin b513 #113: device_create 失败返回 ERR_PTR(-EEXIST…)，
+		 * 不是 NULL；原判 NULL 后下一句直接 ->driver_data 解引用。 */
+		sgm38121_debug("[SGM38121] device_create failed, err = %ld\n",
+			PTR_ERR(sgm38121_dev.pdevice));
+		return (int)PTR_ERR(sgm38121_dev.pdevice);
 	}
 
 	sgm38121_dev.pdevice->driver_data = regmap;

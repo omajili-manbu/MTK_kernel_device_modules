@@ -2233,8 +2233,15 @@ static int flashlight_probe(struct platform_device *pdev)
 	flashlight_device =
 	    device_create(flashlight_class, NULL, flashlight_devno,
 				NULL, FLASHLIGHT_DEVNAME);
-	if (!flashlight_device) {
-		pr_info("Failed to create device\n");
+	if (IS_ERR(flashlight_device)) {
+		/* rodin b513 #113: device_create 失败返回 ERR_PTR(-EEXIST…)，
+		 * 不是 NULL；原判 NULL 会把 ERR_PTR 当设备继续喂给
+		 * device_create_file() -> sysfs_create_file_ns 读 [x0+0x30]
+		 * 崩（本轮 pstore 1.003017 实证，x0=0xffffffffffffffef）。
+		 * goto err_create_device 会跳过上面全部 device_remove_file
+		 * 标签块（标签顺序决定），故无需清空 flashlight_device。 */
+		pr_info("Failed to create device, err: %ld\n",
+				PTR_ERR(flashlight_device));
 		goto err_create_device;
 	}
 

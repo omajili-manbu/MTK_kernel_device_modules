@@ -3382,10 +3382,16 @@ static int accdet_probe(struct platform_device *pdev)
 	 * device node, when device_create is called
 	 */
 	accdet->accdet_class = class_create(ACCDET_DEVNAME);
-	if (!accdet->accdet_class) {
+	if (IS_ERR(accdet->accdet_class)) {
+		/* rodin b513 #113: class_create 失败返回 ERR_PTR，永不 NULL；
+		 * 原判 NULL 会带着 ERR_PTR 继续建 workqueue/attr，最后在
+		 * err_device_create 把它交给 class_destroy。 */
+		ret = (int)PTR_ERR(accdet->accdet_class);
 		dev_dbg(&pdev->dev,
 			"Error: Create class failed (%d)\n", ret);
-		ret = -1;
+		accdet->accdet_class = NULL;
+		unregister_chrdev_region(accdet->accdet_devno, 1);
+		goto err_chrdevregion;
 	}
 
 	/* setup timer */

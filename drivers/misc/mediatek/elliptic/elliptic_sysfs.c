@@ -683,6 +683,8 @@ int elliptic_initialize_sysfs(void)
 		sysfs_create_group_failed = 1;
 		pr_err("[ELUS] failed to create sysfs group");
 		kobject_put(elliptic_sysfs_kobj);
+		/* rodin b513 #113: 已 put 的 kobj 不能被 cleanup 再 put 一次 */
+		elliptic_sysfs_kobj = NULL;
 		return -ENOMEM;
 	}
 
@@ -691,7 +693,13 @@ int elliptic_initialize_sysfs(void)
 
 void elliptic_cleanup_sysfs(void)
 {
+	/* rodin b513 #113: 幂等 —— 未初始化（NULL）直接返回，拆除后清空，
+	 * 使 fail 路径与 module_exit 可以共存。 */
+	if (!elliptic_sysfs_kobj)
+		return;
+
 	kobject_put(elliptic_sysfs_kobj);
+	elliptic_sysfs_kobj = NULL;
 }
 
 MODULE_AUTHOR("Elliptic Labs");

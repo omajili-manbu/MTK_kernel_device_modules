@@ -147,16 +147,22 @@ static int wv_probe(struct platform_device *pdev)
 	}
 
 	wv_class = class_create(WV_DEVNAME);
-	if (!wv_class) {
-		ret = -1;
-		WV_LOG(0, "class_create error\n");
+	if (IS_ERR(wv_class)) {
+		/* rodin b513 #113: class_create 失败返回 ERR_PTR，永不 NULL；
+		 * ERR_PTR 非空会被判成成功，后续 device_create 拿到坏 class。 */
+		ret = (int)PTR_ERR(wv_class);
+		WV_LOG(0, "class_create error %d\n", ret);
+		wv_class = NULL;
 		goto out;
 	}
 
 	wv_device = device_create(wv_class, NULL, wv_devt, NULL, WV_DEVNAME);
-	if (!wv_device) {
-		ret = -1;
-		WV_LOG(0, "device_create error\n");
+	if (IS_ERR(wv_device)) {
+		/* rodin b513 #113: device_create 失败返回 ERR_PTR(-EEXIST…)，
+		 * 不是 NULL；wv_remove 会拿它去 device_destroy。 */
+		ret = (int)PTR_ERR(wv_device);
+		WV_LOG(0, "device_create error %d\n", ret);
+		wv_device = NULL;
 		goto out;
 	}
 
@@ -168,6 +174,12 @@ out:
 	if (wv_cdev != NULL) {
 		cdev_del(wv_cdev);
 		wv_cdev = NULL;
+	}
+	/* rodin b513 #113: 失败路径补 class 回收（is_ERR_OR_NULL 幂等），
+	 * 否则 probe 失败后 class 与其 sysfs 项永久泄漏。 */
+	if (!IS_ERR_OR_NULL(wv_class)) {
+		class_destroy(wv_class);
+		wv_class = NULL;
 	}
 	unregister_chrdev_region(wv_devt, 1);
 	return ret;

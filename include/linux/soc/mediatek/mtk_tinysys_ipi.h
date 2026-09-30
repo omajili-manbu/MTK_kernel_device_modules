@@ -6,6 +6,7 @@
 #ifndef __MTK_TINYSYS_IPI_H__
 #define __MTK_TINYSYS_IPI_H__
 
+#include <linux/notifier.h>
 #include <linux/platform_device.h>
 #include <linux/soc/mediatek/mtk-mbox.h>
 
@@ -125,6 +126,11 @@ int mtk_ipi_device_register(struct mtk_ipi_device *ipidev,
 		struct platform_device *pdev, struct mtk_mbox_device *mbox,
 		unsigned int ipi_chan_count);
 int mtk_ipi_device_reset(struct mtk_ipi_device *ipidev);
+
+/* rodin b513 #113: one-shot ipidev-ready notifier for built-in consumers
+ * whose initcalls can outrun the provider probe (see mtk_tinysys_ipi.c).
+ * 只注册函数声明；struct mtk_ipi_device 布局不变（6.6 blob 可能内嵌）。 */
+int mtk_ipi_dev_register_ready_notifier(struct notifier_block *nb);
 
 int mtk_ipi_register(struct mtk_ipi_device *ipidev, int ipi_id,
 		mbox_pin_cb_t cb, void *prdata, void *msg);

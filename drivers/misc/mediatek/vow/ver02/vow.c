@@ -3736,6 +3736,31 @@ bool vow_service_GetVowRecoverStatus(void)
  * SCP Recovery Register
  *****************************************************************************/
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
+/* rodin b513 #113: SCP 就绪判定下的 IPI 注册。内建化后本 initcall
+ * （VowDrv_mod_init = module_init/level 6）早于 SCP 提供者的
+ * device_initcall_sync（scp_init），mtk_ipi_register() 因
+ * !scp_ipidev.ipi_inited 返回 IPI_DEV_ILLEGAL；6.6 上 vow.ko 在 scp.ko
+ * 之后装载（6.6 日志 VowDrv_mod_init@2.5853s 晚于 scp_ipidev@2.5796s）
+ * 故无此问题。一次性语义由 vow_ipi_registered 保证；未就绪时留给下面
+ * 的 SCP_EVENT_READY 分支补注册。
+ */
+static bool vow_ipi_registered;
+
+static void vow_ipi_register_when_ready(void)
+{
+	if (vow_ipi_registered)
+		return;
+
+	if (!vow_check_scp_status()) {
+		VOWDRV_DEBUG("SCP is off, defer vow ipi register\n");
+		return;
+	}
+
+	vow_ipi_register(vow_ipi_rx_internal, vow_ipi_rceive_ack);
+	vow_ipi_registered = true;
+	VOWDRV_DEBUG("vow ipi registered\n");
+}
+
 static int vow_scp_recover_event(struct notifier_block *this,
 				 unsigned long event,
 				 void *ptr)
@@ -3757,6 +3782,9 @@ static int vow_scp_recover_event(struct notifier_block *this,
 			VOWDRV_DEBUG("SCP is Off, don't recover VOW\n");
 			return NOTIFY_DONE;
 		}
+		/* rodin b513 #113: SCP 就绪后补注册 vow IPI（initcall 期
+		 * SCP 尚未就绪时注册会静默失败）。 */
+		vow_ipi_register_when_ready();
 		if (vowserv.scp_recovering) {
 			vowserv.vow_recovering = false;
 			VOWDRV_DEBUG("fail: vow recover1\n");
@@ -4009,8 +4037,9 @@ static int __init VowDrv_mod_init(void)
 				 &dev_attr_vow_SetPatternInput);
 	if (unlikely(ret != 0))
 		return ret;
-	/* ipi register */
-	vow_ipi_register(vow_ipi_rx_internal, vow_ipi_rceive_ack);
+	/* ipi register（rodin b513 #113: SCP 未就绪时注册会静默失败，
+	 * 由 vow_ipi_register_when_ready 在就绪后补） */
+	vow_ipi_register_when_ready();
 
 	vow_service_Init();
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
