@@ -8,8 +8,6 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
-#include <linux/mfd/syscon.h> /* rodin b520: audiosys regmap for 26m hold */
-#include <linux/regmap.h> /* rodin b520 */
 
 #include "clk-mtk.h"
 #include "clk-gate.h"
@@ -394,86 +392,6 @@ static int clk_mt6899_adsp_grp_probe(struct platform_device *pdev)
 
 	return r;
 }
-
-/*
- * rodin b520 (#120 回归失败主修): the AUDIO_TOP_CON3 page (audiosys+0xc, ASRC gate
- * block -- the whitelist's afe4 group) is only reachable with the audio 26M clock
- * requested.  Prerequisite proven by the AFE driver's own resume order: it sets
- * AFE_SPM_CONTROL_REQ bit0 ("set audio 26M request") before touching CON0-4, and
- * carries the warning "Can't set AUDIO_TOP_CON3 to be 0x0, it will hang".
- *
- * #131: the AFE probe-time get/put cycle ran its resume with regmap still NULL
- * ("skip regmap"), so the 26M request was never asserted; the suspend then gated
- * CON4 and left the 26M unrequested for the whole boot.  The clk whitelist's first
- * CON3 access (parent-enable of afe_general3_asrc_afe, whitelist node audiosys@8f
- * entry [44]) then wedged T1 on a cold register page at 14.804s -> lastbus -> HWT.
- *
- * Hold the request from late_initcall (level 7, statically before the whitelist's
- * late_initcall_sync) and read it back with an anchor.  Runtime semantics are
- * unchanged: the AFE runtime suspend clears the bit again after boot, exactly as
- * it does after every runtime_resume-set pair.
- */
-#define AUDSYS_AFE_SPM_CONTROL_REQ	0x60
-#define AUDSYS_AFE_SPM_CONTROL_ACK	0x64
-#define AUDSYS_AUDIO_TOP_CON0		0x0
-#define AUDSYS_AUDIO_TOP_CON1		0x4
-#define AUDSYS_AUDIO_TOP_CON2		0x8
-#define AUDSYS_AUDIO_TOP_CON3		0xc
-#define AUDSYS_AUDIO_TOP_CON4		0x10
-
-static int mt6899_audsys_26m_hold_init(void)
-{
-	struct regmap *regmap;
-	unsigned int req = 0, ack = 0;
-	unsigned int con0 = 0, con1 = 0, con2 = 0, con3 = 0, con4 = 0;
-	int ret;
-
-	regmap = syscon_regmap_lookup_by_compatible("mediatek,mt6899-audiosys");
-	if (IS_ERR(regmap)) {
-		pr_notice("audsys-26m-hold: regmap fail %ld\n", PTR_ERR(regmap));
-		return 0;
-	}
-
-	/* raw bank state before any write (evidence for the next comparison) */
-	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON0, &con0);
-	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON1, &con1);
-	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON2, &con2);
-	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON3, &con3);
-	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON4, &con4);
-	pr_notice("audsys-26m-hold: raw CON0 0x%x CON1 0x%x CON2 0x%x CON3 0x%x CON4 0x%x\n",
-		  con0, con1, con2, con3, con4);
-
-	ret = regmap_update_bits(regmap, AUDSYS_AFE_SPM_CONTROL_REQ, BIT(0), BIT(0));
-	regmap_read(regmap, AUDSYS_AFE_SPM_CONTROL_REQ, &req);
-	regmap_read(regmap, AUDSYS_AFE_SPM_CONTROL_ACK, &ack);
-	pr_notice("audsys-26m-hold: set ret %d req 0x%x ack 0x%x\n", ret, req, ack);
-
-	/*
-	 * rodin b521 (#132 终验 FAIL): the 26M request alone did NOT clear the wedge.
-	 * #132 still stopped at audiosys@8f entry [44] (first AUDIO_TOP_CON3 write,
-	 * ASRC gate block at audiosys+0xc) with CON3 read back 0x3e00000 = all five
-	 * ASRC gates closed.
-	 *
-	 * The 6.6 baseline settles the mechanism: the AFE runtime resume writes
-	 * AUDIO_TOP_CON3 = 0x0 ("Add to be on for free run"), and the AFE runtime
-	 * suspend only re-gates CON4 and clears the 26M request -- it never touches
-	 * CON3.  On 6.6 the sequence is 3.0316s resume -> 3.0385s suspend -> 3.5475s
-	 * whitelist, so CON3 was still 0x0 across the whole whitelist window and its
-	 * first CON3 write never met a fully gated ASRC block.
-	 *
-	 * On 6.18 the AFE probe-time resume ran with regmap still NULL ("skip
-	 * regmap") and the sound card -- which would trigger a second, register-
-	 * writing resume -- fails to register (A-28).  CON3 therefore kept its
-	 * hardware default and the whitelist write stalled on the unclocked block.
-	 * Reproduce the AFE free-run write from the register owner.
-	 */
-	ret = regmap_write(regmap, AUDSYS_AUDIO_TOP_CON3, 0x0);
-	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON3, &con3);
-	pr_notice("audsys-26m-hold: CON3 write ret %d readback 0x%x\n", ret, con3);
-
-	return 0;
-}
-late_initcall(mt6899_audsys_26m_hold_init);
 
 static struct platform_driver clk_mt6899_adsp_drv = {
 	.probe = clk_mt6899_adsp_grp_probe,

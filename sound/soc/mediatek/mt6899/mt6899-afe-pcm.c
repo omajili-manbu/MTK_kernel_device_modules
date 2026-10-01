@@ -10261,6 +10261,10 @@ static const dai_register_cb dai_register_cbs[] = {
 	mt6899_dai_memif_register,
 };
 
+/* rodin b521 (#134): AUDIO_TOP_CON3 free-run owner, set at probe end; the
+ * late_initcall at the file tail uses it to reproduce the 6.6 free-run window. */
+static struct mtk_base_afe *mt6899_afe_con3_owner;
+
 static int mt6899_afe_pcm_dev_probe(struct platform_device *pdev)
 {
 	int ret, i;
@@ -10510,6 +10514,7 @@ err_find_pmic:
 #if IS_ENABLED(CONFIG_MTK_ULTRASND_PROXIMITY) && !defined(SKIP_SB_ULTRA)
 	ultra_set_dsp_afe(afe);
 #endif
+	mt6899_afe_con3_owner = afe;
 	return 0;
 
 err_pm_disable:
@@ -10520,6 +10525,8 @@ err_pm_disable:
 static void mt6899_afe_pcm_dev_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */
 {
 	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
+
+	mt6899_afe_con3_owner = NULL;
 
 	pm_runtime_disable(&pdev->dev);
 
@@ -10557,6 +10564,78 @@ static struct platform_driver mt6899_afe_pcm_driver = {
 	.probe = mt6899_afe_pcm_dev_probe,
 	.remove = mt6899_afe_pcm_dev_remove,
 };
+
+/*
+ * rodin b521 (#134, #133 终验 FAIL 修正): any write that clears an AUDIO_TOP_CON3
+ * PDN bit (audiosys+0xc, the five ASRC power-downs, CON3=0x3e00000) while the ASRC
+ * source clocks are dead never completes: the MMIO store stalls, lastbus times out
+ * and the CPU hard-locks.  #132 hit this from the disable-unused walk (audiosys@8f
+ * entry [44], parent-enable of afe_general3_asrc, the first CON3 write of the boot);
+ * #133 hit it again from a direct regmap_write with only the SPM 26M request set --
+ * the request is acked by SPM but CON4 kept CG_AUDIO_HOPPING/F26M/APLL gated
+ * (raw CON4=0x301f), so the ASRC power-up handshake never sees a clock.
+ *
+ * On 6.6 the register-writing runtime_resume establishes AUDIO_TOP_CON3 = 0x0
+ * ("Add to be on for free run") after enable_clock (INTBUS/AUDIO_H/HOPPING/F26M
+ * + SMC DOMAIN_SIDEBANDS), REQ bit0 and CON4 = 0x0; the runtime suspend then only
+ * restores CON4 = 0x3fff / REQ = 0 and the clocks, leaving CON3 free-run for the
+ * whole boot -- which is why the 6.6-era late walk and every late consumer could
+ * touch CON3 safely.  On 6.18 that resume never ran: the probe-time resume skipped
+ * the regmap (as on 6.6) and the second, register-writing resume is gated behind
+ * the sound card probe (A-28, snd-scp-ultra).
+ *
+ * Reproduce the 6.6 free-run window from the register owner at late_initcall
+ * (level 7, statically before the disable_unused walk's late_initcall_sync):
+ * resume prefix (clocks + REQ + CON4/CON0/1/2) -> CON3 = 0x0 -> suspend suffix
+ * (CON4 = 0x3fff, REQ = 0, clocks off).  The end state is the 6.6 post-boot
+ * steady state; the A-28 card fix, once it lands, re-runs the same no-op writes.
+ */
+static int mt6899_afe_con3_freerun_late_init(void)
+{
+	struct mtk_base_afe *afe = mt6899_afe_con3_owner;
+	unsigned int con3 = 0, con4 = 0;
+	int ret;
+
+	if (!afe || !afe->regmap) {
+		pr_notice("audsys-freerun: afe/regmap not ready, skip\n");
+		return 0;
+	}
+
+	regmap_read(afe->regmap, AUDIO_TOP_CON3, &con3);
+	pr_notice("audsys-freerun: pre CON3 0x%x\n", con3);
+	if (con3 == 0) {
+		pr_notice("audsys-freerun: CON3 already free-run\n");
+		return 0;
+	}
+
+	ret = mt6899_afe_enable_clock(afe);
+	pr_notice("audsys-freerun: enable_clock ret %d\n", ret);
+	if (!ret) {
+		regmap_update_bits(afe->regmap, AFE_SPM_CONTROL_REQ, 0x1, 0x1);
+		/* IPM2.0: clear CON4 first so the ASRC sources get their clocks */
+		regmap_write(afe->regmap, AUDIO_TOP_CON4, 0x0);
+		/* "Add to be on for free run" -- same order as runtime_resume */
+		regmap_write(afe->regmap, AUDIO_TOP_CON0, 0x0);
+		regmap_write(afe->regmap, AUDIO_TOP_CON1, 0x0);
+		regmap_write(afe->regmap, AUDIO_TOP_CON2, 0x0);
+#if !defined(IS_FPGA_EARLY_PORTING)
+		/* Can't set AUDIO_TOP_CON3 to be 0x0, it will hang in FPGA env */
+		regmap_write(afe->regmap, AUDIO_TOP_CON3, 0x0);
+#endif
+	}
+
+	/* suspend suffix: restore the 6.6 post-boot steady state */
+	regmap_write(afe->regmap, AUDIO_TOP_CON4, 0x3fff);
+	regmap_update_bits(afe->regmap, AFE_SPM_CONTROL_REQ, 0x1, 0x0);
+	mt6899_afe_disable_clock(afe);
+
+	regmap_read(afe->regmap, AUDIO_TOP_CON3, &con3);
+	regmap_read(afe->regmap, AUDIO_TOP_CON4, &con4);
+	pr_notice("audsys-freerun: post CON3 0x%x CON4 0x%x\n", con3, con4);
+
+	return 0;
+}
+late_initcall(mt6899_afe_con3_freerun_late_init);
 
 module_platform_driver(mt6899_afe_pcm_driver);
 
