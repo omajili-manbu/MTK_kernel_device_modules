@@ -6,6 +6,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/completion.h>
 #include <linux/dma-mapping.h>
 #include <linux/errno.h>
@@ -2943,7 +2944,7 @@ static struct platform_driver mtk_i3c_driver = {
 		.of_match_table = mtk_i3c_of_match,
 	},
 };
-module_platform_driver(mtk_i3c_driver);
+vseq_module_platform_driver(mtk_i3c_driver);
 
 MODULE_AUTHOR("Mingchang Jia <mingchang.jia@mediatek.com>");
 MODULE_DESCRIPTION("MTK I3C master mt69xx driver");

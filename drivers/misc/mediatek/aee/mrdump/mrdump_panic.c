@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/kdebug.h>
@@ -442,7 +443,7 @@ static int __init mrdump_panic_init(void)
 	return 0;
 }
 
-arch_initcall(mrdump_panic_init);
+vseq_arch_initcall(mrdump_panic_init);
 
 #ifdef MODULE
 static void __exit mrdump_panic_exit(void)

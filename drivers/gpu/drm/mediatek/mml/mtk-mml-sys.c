@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/component.h>
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -3031,7 +3032,7 @@ struct platform_driver mml_sys_driver = {
 		.of_match_table = mml_sys_of_ids,
 	},
 };
-//module_platform_driver(mml_sys_driver);
+//vseq_module_platform_driver(mml_sys_driver);
 
 static s32 dbg_case;
 static s32 dbg_set(const char *val, const struct kernel_param *kp)

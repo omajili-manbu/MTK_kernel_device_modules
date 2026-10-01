@@ -5,6 +5,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
@@ -456,7 +457,7 @@ static __exit void irq_dbg_exit(void)
 {
 }
 
-module_init(irq_dbg_init);
+vseq_module_init(irq_dbg_init);
 module_exit(irq_dbg_exit);
 
 

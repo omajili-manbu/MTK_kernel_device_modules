@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/io.h>
@@ -1200,12 +1201,12 @@ static void __exit log_store_exit(void)
 	unregister_reboot_notifier(&logstore_reboot_notify);
 }
 
-module_init(log_store_early_init);
+vseq_module_init(log_store_early_init);
 module_exit(log_store_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek LogStore Driver");
 MODULE_AUTHOR("MediaTek Inc.");
 MODULE_IMPORT_NS("ANDROID_GKI_VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver"); /* rodin r25: 6.18 GKI prefixed the ns */
 #else
-early_initcall(log_store_early_init);
+vseq_early_initcall(log_store_early_init);
 #endif

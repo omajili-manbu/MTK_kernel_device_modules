@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/scmi_protocol.h>
@@ -273,7 +274,7 @@ static struct scmi_driver scmi_tinysys_driver = {
 	.probe = scmi_tinysys_probe,
 	.id_table = scmi_id_table,
 };
-module_scmi_driver(scmi_tinysys_driver);
+vseq_module_scmi_driver(scmi_tinysys_driver);
 
 MODULE_DESCRIPTION("SCMI tinysys driver");
 MODULE_LICENSE("GPL v2");

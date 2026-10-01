@@ -5,6 +5,7 @@
  */
 
 #include <asm/cputype.h>
+#include <linux/vseq.h>
 #include <linux/arm-smccc.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
@@ -686,7 +687,7 @@ static __exit void bus_parity_exit(void)
 	platform_driver_unregister(&bus_parity_drv);
 }
 
-module_init(bus_parity_init);
+vseq_module_init(bus_parity_init);
 module_exit(bus_parity_exit);
 
 MODULE_DESCRIPTION("MediaTek Bus Parity Driver");

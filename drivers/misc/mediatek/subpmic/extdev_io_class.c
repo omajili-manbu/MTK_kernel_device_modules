@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -343,7 +344,7 @@ static void __exit extdev_io_class_exit(void)
 	pr_info("extdev_io class deinit OK\n");
 }
 
-subsys_initcall(extdev_io_class_init);
+vseq_subsys_initcall(extdev_io_class_init);
 module_exit(extdev_io_class_exit);
 
 MODULE_DESCRIPTION("Extdev io class");

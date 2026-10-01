@@ -4,6 +4,7 @@
  * Author: Flora Fu, MediaTek
  */
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/of_platform.h> /* rodin r25: 6.18 header pruning */
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/interrupt.h>
@@ -5336,9 +5337,9 @@ static int __init pwrap_drv_init(void)
 {
 	return platform_driver_register(&pwrap_drv);
 }
-postcore_initcall(pwrap_drv_init);
+vseq_postcore_initcall(pwrap_drv_init);
 #else
-module_platform_driver(pwrap_drv);
+vseq_module_platform_driver(pwrap_drv);
 #endif
 
 MODULE_AUTHOR("Flora Fu, MediaTek");

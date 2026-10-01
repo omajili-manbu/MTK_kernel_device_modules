@@ -5,6 +5,7 @@
  */
 
 #include <asm/cputype.h>
+#include <linux/vseq.h>
 #include <linux/bug.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -441,7 +442,7 @@ static __exit void systracker_watchpoint_exit(void)
 	platform_driver_unregister(&systracker_wp_drv);
 }
 
-module_init(systracker_watchpoint_init);
+vseq_module_init(systracker_watchpoint_init);
 module_exit(systracker_watchpoint_exit);
 
 MODULE_DESCRIPTION("MediaTek Systracker WP Driver");

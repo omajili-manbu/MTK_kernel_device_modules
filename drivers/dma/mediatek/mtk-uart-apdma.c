@@ -7,6 +7,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/clk-provider.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
@@ -1672,7 +1673,7 @@ static struct platform_driver mtk_uart_apdma_driver = {
 	},
 };
 
-module_platform_driver(mtk_uart_apdma_driver);
+vseq_module_platform_driver(mtk_uart_apdma_driver);
 
 MODULE_DESCRIPTION("MediaTek UART APDMA Controller Driver");
 MODULE_AUTHOR("Long Cheng <long.cheng@mediatek.com>");

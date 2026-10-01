@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/power/mtk-charger.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/kthread.h>
@@ -441,7 +442,7 @@ static int __init mtk_ctd_init(void)
 	return platform_driver_register(&mtk_ctd_driver);
 }
 
-late_initcall_sync(mtk_ctd_init);
+vseq_late_initcall_sync(mtk_ctd_init);
 
 
 static void __exit mtk_ctd_exit(void)

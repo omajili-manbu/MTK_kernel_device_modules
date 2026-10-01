@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
@@ -5100,6 +5101,6 @@ static struct platform_driver mt_msdc_driver = {
 	},
 };
 
-module_platform_driver(mt_msdc_driver);
+vseq_module_platform_driver(mt_msdc_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek SD/MMC Card Driver");

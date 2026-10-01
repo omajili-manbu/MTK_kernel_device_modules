@@ -4,6 +4,7 @@
  */
 
 #include <asm/cacheflush.h>
+#include <linux/vseq.h>
 #include <asm/kexec.h>
 #include <asm/memory.h>
 #include <asm/stacktrace.h>
@@ -1351,7 +1352,7 @@ static void wdk_work_callback(struct work_struct *work)
 
 	cpu_hotplug_enable();
 
-	pr_info("[wdk]init_wk done late_initcall cpus_kick_bit=0x%x -----\n",
+	pr_info("[wdk]init_wk done vseq_late_initcall cpus_kick_bit=0x%x -----\n",
 		cpus_kick_bit);
 
 }
@@ -1815,7 +1816,7 @@ static void __exit hangdet_exit(void)
 	timer_list_debug_exit();
 }
 
-module_init(hangdet_init);
+vseq_module_init(hangdet_init);
 module_exit(hangdet_exit);
 
 MODULE_LICENSE("GPL");

@@ -5,6 +5,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
@@ -895,6 +896,6 @@ static void __exit clk_fmeter_exit(void)
 	platform_driver_unregister(&clk_fmeter_mt6899_drv);
 }
 
-subsys_initcall(clk_fmeter_init);
+vseq_subsys_initcall(clk_fmeter_init);
 module_exit(clk_fmeter_exit);
 MODULE_LICENSE("GPL");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/clk-provider.h>
 #include <linux/kernel.h>
@@ -103,5 +104,5 @@ static struct platform_driver bring_up = {
 	},
 };
 
-module_platform_driver(bring_up);
+vseq_module_platform_driver(bring_up);
 MODULE_LICENSE("GPL");

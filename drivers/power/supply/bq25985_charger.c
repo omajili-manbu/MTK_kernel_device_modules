@@ -1,6 +1,7 @@
 #define pr_fmt(fmt)     "[bq25985] %s: " fmt, __func__
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -2316,7 +2317,7 @@ static struct i2c_driver bq25985_driver = {
 	.id_table = bq25985_i2c_ids,
 };
 
-module_i2c_driver(bq25985_driver);
+vseq_module_i2c_driver(bq25985_driver);
 MODULE_AUTHOR("Miao.junguo@ZLingsmart.com");
 MODULE_DESCRIPTION("BQ25985_charger_driver");
 MODULE_LICENSE("GPL");

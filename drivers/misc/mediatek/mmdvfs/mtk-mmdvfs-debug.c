@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/clock/mmdvfs-clk.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -1286,7 +1287,7 @@ static void __exit mmdvfs_debug_exit(void)
 	platform_driver_unregister(&mmdvfs_debug_drv);
 }
 
-module_init(mmdvfs_debug_init);
+vseq_module_init(mmdvfs_debug_init);
 module_exit(mmdvfs_debug_exit);
 MODULE_DESCRIPTION("MMDVFS Debug Driver");
 MODULE_AUTHOR("Anthony Huang<anthony.huang@mediatek.com>");

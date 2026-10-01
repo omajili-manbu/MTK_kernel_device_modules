@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/version.h>
@@ -836,7 +837,7 @@ static void __exit tcpc_class_exit(void)
 	pr_info("TCPC class un-init OK\n");
 }
 
-subsys_initcall(tcpc_class_init);
+vseq_subsys_initcall(tcpc_class_init);
 module_exit(tcpc_class_exit);
 
 void __weak sched_set_fifo(struct task_struct *p)
@@ -1083,7 +1084,7 @@ MODULE_LICENSE("GPL");
  *
  * 2.0.4_MTK
  * (1) add CONFIG_TCPC_NOTIFIER_LATE_SYNC to
- *      move irq_enable to late_initcall_sync stage
+ *      move irq_enable to vseq_late_initcall_sync stage
  *      to prevent from notifier_supply_num setting wrong.
  *
  * 2.0.3_MTK

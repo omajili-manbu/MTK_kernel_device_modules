@@ -4,6 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/io.h>
 #include <linux/export.h>
 #include <linux/module.h>
@@ -631,7 +632,7 @@ static void __exit mt6899_dcm_exit(void)
 {
 }
 MODULE_SOFTDEP("pre:mtk_dcm.ko");
-module_init(mt6899_dcm_init);
+vseq_module_init(mt6899_dcm_init);
 module_exit(mt6899_dcm_exit);
 
 MODULE_LICENSE("GPL");

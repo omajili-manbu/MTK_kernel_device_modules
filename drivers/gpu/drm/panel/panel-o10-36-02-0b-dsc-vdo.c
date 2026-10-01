@@ -11,6 +11,7 @@
  */
 
 #include <linux/backlight.h>
+#include <linux/vseq.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_modes.h>
@@ -2067,7 +2068,7 @@ static struct mipi_dsi_driver lcm_driver = {
 	},
 };
 
-module_mipi_dsi_driver(lcm_driver);
+vseq_module_mipi_dsi_driver(lcm_driver);
 
 module_param_string(oled_wp, oled_wp_cmdline, sizeof(oled_wp_cmdline), 0600);
 MODULE_PARM_DESC(oled_wp, "oled_wp=<white_point_info>");

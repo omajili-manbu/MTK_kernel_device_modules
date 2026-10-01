@@ -5,6 +5,7 @@
  */
 
 #include <asm/cputype.h>
+#include <linux/vseq.h>
 #include <linux/arm-smccc.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
@@ -744,7 +745,7 @@ static __exit void dbg_error_flag_exit(void)
 	platform_driver_unregister(&dbg_error_flag_drv);
 }
 
-module_init(dbg_error_flag_init);
+vseq_module_init(dbg_error_flag_init);
 module_exit(dbg_error_flag_exit);
 
 MODULE_DESCRIPTION("MediaTek Bus Parity Driver");

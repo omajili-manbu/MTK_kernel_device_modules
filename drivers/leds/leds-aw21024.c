@@ -13,6 +13,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/i2c.h>
 #include <linux/delay.h>
@@ -796,7 +797,7 @@ static int __init aw21024_i2c_init(void)
 	return 0;
 }
 
-module_init(aw21024_i2c_init);
+vseq_module_init(aw21024_i2c_init);
 
 static void __exit aw21024_i2c_exit(void)
 {

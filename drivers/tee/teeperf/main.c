@@ -4,6 +4,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -148,7 +149,7 @@ static void __exit teeperf_exit(void)
 	platform_driver_unregister(&teeperf_plat_driver);
 }
 
-module_init(teeperf_init);
+vseq_module_init(teeperf_init);
 module_exit(teeperf_exit);
 
 MODULE_AUTHOR("Jackson Chang <jackson-kt.chang@mediatek.com>");

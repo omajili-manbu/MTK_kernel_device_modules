@@ -3,6 +3,7 @@
 // Copyright (c) 2021 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/mfd/mt6368/registers.h>
 #include <linux/module.h>
@@ -710,7 +711,7 @@ static struct platform_driver mt6368_regulator_driver = {
 	.shutdown = mt6368_regulator_shutdown,
 	.id_table = mt6368_regulator_ids,
 };
-module_platform_driver(mt6368_regulator_driver);
+vseq_module_platform_driver(mt6368_regulator_driver);
 
 MODULE_AUTHOR("Wen Su <wen.su@mediatek.com>");
 MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6368 PMIC");

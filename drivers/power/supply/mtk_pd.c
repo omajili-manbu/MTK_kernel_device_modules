@@ -23,6 +23,7 @@
  *
  */
 #include <linux/init.h>		/* For init/exit macros */
+#include <linux/vseq.h>
 #include <linux/module.h>	/* For MODULE_ marcros  */
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -1462,7 +1463,7 @@ static int __init mtk_pd_init(void)
 {
 	return platform_driver_register(&pd_driver);
 }
-module_init(mtk_pd_init);
+vseq_module_init(mtk_pd_init);
 
 static void __exit mtk_pd_exit(void)
 {

@@ -5,6 +5,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -1449,7 +1450,7 @@ static __init int emicen_init(void)
 	return 0;
 }
 
-module_init(emicen_init);
+vseq_module_init(emicen_init);
 
 MODULE_DESCRIPTION("MediaTek EMI Driver");
 MODULE_LICENSE("GPL v2");

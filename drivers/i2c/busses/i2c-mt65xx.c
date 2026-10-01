@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -2796,7 +2797,7 @@ static struct platform_driver mtk_i2c_driver = {
 	},
 };
 
-module_platform_driver(mtk_i2c_driver);
+vseq_module_platform_driver(mtk_i2c_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek I2C Bus Driver");

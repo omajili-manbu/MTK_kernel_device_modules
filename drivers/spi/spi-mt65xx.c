@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
@@ -2134,7 +2135,7 @@ static struct platform_driver mtk_spi_driver = {
 	.remove = mtk_spi_remove,
 };
 
-module_platform_driver(mtk_spi_driver);
+vseq_module_platform_driver(mtk_spi_driver);
 
 MODULE_DESCRIPTION("MTK SPI Controller driver");
 MODULE_AUTHOR("Leilk Liu <leilk.liu@mediatek.com>");

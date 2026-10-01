@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
@@ -149,9 +150,9 @@ static void __exit mtk_devinfo_exit(void)
 }
 
 #ifdef MODULE
-module_init(mtk_devinfo_init);
+vseq_module_init(mtk_devinfo_init);
 #else
-subsys_initcall(mtk_devinfo_init);
+vseq_subsys_initcall(mtk_devinfo_init);
 #endif
 module_exit(mtk_devinfo_exit);
 

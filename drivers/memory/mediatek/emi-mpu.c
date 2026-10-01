@@ -4,6 +4,7 @@
  */
 
 #include <emi_mpu.h>
+#include <linux/vseq.h>
 #include <linux/arm-smccc.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
@@ -510,7 +511,7 @@ static __init int emimpu_init(void)
 	return 0;
 }
 
-module_init(emimpu_init);
+vseq_module_init(emimpu_init);
 
 MODULE_DESCRIPTION("MediaTek EMI MPU Driver");
 MODULE_LICENSE("GPL v2");

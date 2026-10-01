@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
@@ -2772,7 +2773,7 @@ static void __exit clk_mmdvfs_exit(void)
 	platform_unregister_drivers(mmdvfs_drv, ARRAY_SIZE(mmdvfs_drv));
 }
 
-module_init(clk_mmdvfs_init);
+vseq_module_init(clk_mmdvfs_init);
 module_exit(clk_mmdvfs_exit);
 
 MODULE_LICENSE("GPL");

@@ -14,6 +14,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/param.h>
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
@@ -3713,7 +3714,7 @@ static struct i2c_driver fg_driver = {
 	.shutdown	= fg_shutdown,
 };
 
-module_i2c_driver(fg_driver);
+vseq_module_i2c_driver(fg_driver);
 
 MODULE_DESCRIPTION("TI GAUGE Driver");
 MODULE_LICENSE("GPL v2");

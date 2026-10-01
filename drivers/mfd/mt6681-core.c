@@ -4,6 +4,7 @@
  */
 
 #include <linux/i2c.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mfd/core.h>
@@ -436,7 +437,7 @@ static struct i2c_driver mt6681_pmic_driver = {
 	.remove = mt6681_pmic_remove,
 	.id_table = mt6681_pmic_id,
 };
-module_i2c_driver(mt6681_pmic_driver);
+vseq_module_i2c_driver(mt6681_pmic_driver);
 
 MODULE_AUTHOR("Ting-Fang Hou<ting-fang.hou@mediatek.com>");
 MODULE_DESCRIPTION("MT6681 PMIC I2C Driver");

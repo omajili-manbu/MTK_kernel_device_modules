@@ -4,6 +4,7 @@
  */
 
 #include <linux/platform_device.h>
+#include <linux/vseq.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -147,8 +148,8 @@ EXPORT_SYMBOL(ipi_monitor_dump);
  * rodin b513 #113: 内建化的消费者（elliptic 等）在 initcall 期就会调
  * mtk_ipi_register()，而 ipidev 的注册（ipi_inited=1）发生在提供者的
  * probe 里（scp_probe -> scp_ipi_table_init -> mtk_ipi_device_register），
- * 6.18 内建后 SCP 的 device_initcall_sync 晚于消费者的
- * device_initcall，时序倒挂。提供一次性 "ipidev 已注册" 通知：注册的
+ * 6.18 内建后 SCP 的 vseq_device_initcall_sync 晚于消费者的
+ * vseq_device_initcall，时序倒挂。提供一次性 "ipidev 已注册" 通知：注册的
  * nb 在每次 ipidev 注册完成时被调用（data = struct mtk_ipi_device *），
  * 消费者用 ipidev 指针过滤；“是否已就绪”由消费者自测
  * ipidev->ipi_inited（公开字段），避免改动 struct 布局（6.6 blob 可能

@@ -4,6 +4,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/list.h>
 #include <linux/list_sort.h>
@@ -1277,7 +1278,7 @@ static struct platform_driver pmic_lbat_service_driver = {
 	},
 	.probe	= pmic_lbat_service_probe,
 };
-module_platform_driver(pmic_lbat_service_driver);
+vseq_module_platform_driver(pmic_lbat_service_driver);
 
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");
 MODULE_DESCRIPTION("MTK lbat driver");

@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) "MKP: " fmt
 
 #include <linux/types.h> // for list_head
+#include <linux/vseq.h>
 #include <linux/module.h> // module_layout
 #include <linux/init.h> // rodata_enable support
 #include <linux/mutex.h>
@@ -64,7 +65,7 @@ static int __init mkp_init(void)
 	pr_info("%s:%d done\n", __func__, __LINE__);
 	return ret;
 }
-module_init(mkp_init);
+vseq_module_init(mkp_init);
 
 static void  __exit mkp_exit(void)
 {

@@ -4,6 +4,7 @@
  * Author: Chia-Mao Hung <chia-mao.hung@mediatek.com>
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include "vcp_status.h"
 #include "vcp.h"
 
@@ -167,6 +168,6 @@ EXPORT_SYMBOL_GPL(vcp_get_io_device_ex);
 static void __exit mtk_vcp_status_exit(void)
 {
 }
-module_init(mtk_vcp_status_init);
+vseq_module_init(mtk_vcp_status_init);
 module_exit(mtk_vcp_status_exit);
 MODULE_LICENSE("GPL");

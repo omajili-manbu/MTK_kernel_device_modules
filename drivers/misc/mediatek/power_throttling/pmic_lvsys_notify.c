@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/export.h>
 #include <linux/linear_range.h>
 #include <linux/interrupt.h>
@@ -572,7 +573,7 @@ static struct platform_driver pmic_lvsys_notify_driver = {
 	},
 	.probe	= pmic_lvsys_notify_probe,
 };
-module_platform_driver(pmic_lvsys_notify_driver);
+vseq_module_platform_driver(pmic_lvsys_notify_driver);
 
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");
 MODULE_DESCRIPTION("MTK pmic lvsys notify driver");

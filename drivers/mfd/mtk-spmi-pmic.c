@@ -4,6 +4,7 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/mt6363/core.h>
 #include <linux/mfd/mt6363/registers.h>
@@ -779,7 +780,7 @@ static struct spmi_driver mtk_spmi_pmic_driver = {
 	},
 	.probe = mtk_spmi_pmic_probe,
 };
-module_spmi_driver(mtk_spmi_pmic_driver);
+vseq_module_spmi_driver(mtk_spmi_pmic_driver);
 
 MODULE_DESCRIPTION("Mediatek SPMI PMIC driver");
 MODULE_ALIAS("spmi:spmi-pmic");

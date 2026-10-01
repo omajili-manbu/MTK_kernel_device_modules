@@ -6,6 +6,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/dma-mapping.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
@@ -1748,7 +1749,7 @@ static int __init mtu3_init(void)
 
 	return 0;
 }
-module_init(mtu3_init);
+vseq_module_init(mtu3_init);
 
 static void __exit mtu3_exit(void)
 {

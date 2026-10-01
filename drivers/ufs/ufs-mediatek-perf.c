@@ -7,6 +7,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/bitfield.h>
 #include <linux/bvec.h>
 #include <linux/clk.h>
@@ -3920,4 +3921,4 @@ MODULE_AUTHOR("Peter Wang <peter.wang@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek UFS Host Driver");
 MODULE_LICENSE("GPL v2");
 
-module_platform_driver(ufs_mtk_pltform);
+vseq_module_platform_driver(ufs_mtk_pltform);

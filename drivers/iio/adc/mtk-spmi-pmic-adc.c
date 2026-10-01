@@ -4,6 +4,7 @@
  */
 
 #include <linux/completion.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/iio/iio.h>
@@ -765,7 +766,7 @@ static struct platform_driver pmic_adc_driver = {
 	},
 	.probe	= pmic_adc_probe,
 };
-module_platform_driver(pmic_adc_driver);
+vseq_module_platform_driver(pmic_adc_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");

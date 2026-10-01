@@ -3,6 +3,7 @@
  * Copyright (C) 2019 MediaTek Inc.
  */
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -897,7 +898,7 @@ static void __exit mtk_mmdvfs_exit(void)
 	platform_driver_unregister(&mmdvfs_drv);
 }
 
-module_init(mtk_mmdvfs_init);
+vseq_module_init(mtk_mmdvfs_init);
 module_exit(mtk_mmdvfs_exit);
 MODULE_DESCRIPTION("MTK MMDVFS driver");
 MODULE_AUTHOR("Anthony Huang<anthony.huang@mediatek.com>");

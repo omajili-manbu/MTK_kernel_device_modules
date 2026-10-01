@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mutex.h>
@@ -576,7 +577,7 @@ static void __exit rpmb_exit(void)
 	ida_destroy(&rpmb_ida);
 }
 
-subsys_initcall(rpmb_init);
+vseq_subsys_initcall(rpmb_init);
 module_exit(rpmb_exit);
 
 MODULE_AUTHOR("Intel Corporation");

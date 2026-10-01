@@ -6,6 +6,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include "pinctrl-mtk-mt6899.h"
 #include "pinctrl-paris.h"
@@ -1607,7 +1608,7 @@ static int __init mt6899_pinctrl_init(void)
 {
 	return platform_driver_register(&mt6899_pinctrl_driver);
 }
-arch_initcall(mt6899_pinctrl_init);
+vseq_arch_initcall(mt6899_pinctrl_init);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek MT6899 Pinctrl Driver");

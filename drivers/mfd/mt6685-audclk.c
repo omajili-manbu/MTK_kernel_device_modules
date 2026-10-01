@@ -3,6 +3,7 @@
  * Copyright (c) 2021 MediaTek Inc.
  */
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
@@ -94,7 +95,7 @@ static struct platform_driver mt6685_audclk_driver = {
 		.of_match_table = mt6685_audclk_of_match,
 	},
 };
-module_platform_driver(mt6685_audclk_driver);
+vseq_module_platform_driver(mt6685_audclk_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Ting-Fang Hou <ting-fang.hou@mediatek.com>");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -386,7 +387,7 @@ static int __init mtk_dcm_init(void)
 static void mtk_dcm_exit(void)
 {
 }
-module_init(mtk_dcm_init);
+vseq_module_init(mtk_dcm_init);
 module_exit(mtk_dcm_exit);
 
 MODULE_LICENSE("GPL v2");

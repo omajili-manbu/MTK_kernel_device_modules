@@ -6,6 +6,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
@@ -77,7 +78,7 @@ static struct spmi_driver mt6685_spmi_driver = {
 		.of_match_table = mt6685_id_table,
 	},
 };
-module_spmi_driver(mt6685_spmi_driver);
+vseq_module_spmi_driver(mt6685_spmi_driver);
 
 MODULE_DESCRIPTION("Mediatek SPMI MT6685 Clock IC driver");
 MODULE_AUTHOR("KY Liu <ky.liu@mediatek.com>");

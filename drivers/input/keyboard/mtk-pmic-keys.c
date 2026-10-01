@@ -6,6 +6,7 @@
  */
 
 #include <linux/input.h>
+#include <linux/vseq.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -613,7 +614,7 @@ static struct platform_driver pmic_keys_pdrv = {
 	},
 };
 
-module_platform_driver(pmic_keys_pdrv);
+vseq_module_platform_driver(pmic_keys_pdrv);
 
 int ktf_mtk_pmic_kpd_test(char *str)
 {

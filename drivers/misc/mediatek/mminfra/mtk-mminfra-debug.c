@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -1669,7 +1670,7 @@ static void __exit mtk_mminfra_debug_exit(void)
 	platform_driver_unregister(&mminfra_debug_drv);
 }
 
-module_init(mtk_mminfra_debug_init);
+vseq_module_init(mtk_mminfra_debug_init);
 module_exit(mtk_mminfra_debug_exit);
 MODULE_DESCRIPTION("MTK MMInfra Debug driver");
 MODULE_AUTHOR("Anthony Huang<anthony.huang@mediatek.com>");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
 #include <linux/printk.h>
@@ -651,7 +652,7 @@ static void __exit bootprof_exit(void)
 	pr_info("bootprof module exit.\n");
 }
 
-early_initcall(bootprof_init);
+vseq_early_initcall(bootprof_init);
 module_exit(bootprof_exit);
 MODULE_DESCRIPTION("MEDIATEK BOOT TIME PROFILING");
 MODULE_LICENSE("GPL v2");

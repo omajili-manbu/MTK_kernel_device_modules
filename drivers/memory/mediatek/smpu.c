@@ -4,6 +4,7 @@
  */
 
 #include <soc/mediatek/smpu.h>
+#include <linux/vseq.h>
 #include <linux/arm-smccc.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
@@ -870,7 +871,7 @@ static __init int smpu_init(void)
 	return 0;
 }
 
-module_init(smpu_init);
+vseq_module_init(smpu_init);
 
 MODULE_DESCRIPTION("MediaTek SMPU Driver");
 MODULE_LICENSE("GPL");

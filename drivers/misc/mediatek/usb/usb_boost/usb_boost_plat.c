@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/pm_qos.h>
 #include <linux/topology.h>
 #include <linux/slab.h>
@@ -266,7 +267,7 @@ static int __init usbboost(void)
 
 	return 0;
 }
-module_init(usbboost);
+vseq_module_init(usbboost);
 
 static void __exit clean(void)
 {

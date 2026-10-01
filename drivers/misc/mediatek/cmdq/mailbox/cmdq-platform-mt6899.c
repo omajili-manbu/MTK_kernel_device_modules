@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/gce/mt6899-gce.h>
+#include <linux/vseq.h>
 
 #include "cmdq-util.h"
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_SMMU_V3)
@@ -306,6 +307,6 @@ static int __init cmdq_platform_init(void)
 	cmdq_util_set_fp(&platform_fp);
 	return 0;
 }
-module_init(cmdq_platform_init);
+vseq_module_init(cmdq_platform_init);
 
 MODULE_LICENSE("GPL");

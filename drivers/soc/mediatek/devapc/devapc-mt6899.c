@@ -4,6 +4,7 @@
  */
 
 #include <linux/bug.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -603,7 +604,7 @@ static struct platform_driver mt6899_devapc_driver = {
 	},
 };
 
-module_platform_driver(mt6899_devapc_driver);
+vseq_module_platform_driver(mt6899_devapc_driver);
 
 MODULE_DESCRIPTION("Mediatek MT6899 Device APC Driver");
 MODULE_AUTHOR("kyle-jk.liao <kyle-jk.liao@mediatek.com>");

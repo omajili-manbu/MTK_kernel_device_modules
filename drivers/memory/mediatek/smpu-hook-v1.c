@@ -1,3 +1,4 @@
+#include <linux/vseq.h>
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2022 MediaTek Inc.
@@ -191,7 +192,7 @@ static __init int smpu_hook_init(void)
 	return 0;
 }
 
-module_init(smpu_hook_init);
+vseq_module_init(smpu_hook_init);
 
 MODULE_DESCRIPTION("MediaTek SMPU HOOK Driver");
 MODULE_LICENSE("GPL");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/version.h>
@@ -77,7 +78,7 @@ static int __init tcpc_class_complete_init(void)
 	}
 	return 0;
 }
-late_initcall_sync(tcpc_class_complete_init);
+vseq_late_initcall_sync(tcpc_class_complete_init);
 
 MODULE_DESCRIPTION("Richtek TypeC Port Late Sync Driver");
 MODULE_AUTHOR("Jeff Chang <jeff_chang@richtek.com>");

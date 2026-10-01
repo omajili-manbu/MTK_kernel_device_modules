@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
@@ -1059,9 +1060,9 @@ static int __init dramc_drv_init(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_DRAMC)
-subsys_initcall_sync(dramc_drv_init);
+vseq_subsys_initcall_sync(dramc_drv_init);
 #else
-module_init(dramc_drv_init);
+vseq_module_init(dramc_drv_init);
 #endif
 
 MODULE_AUTHOR("Mediatek Corporation");

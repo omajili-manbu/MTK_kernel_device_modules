@@ -4,6 +4,7 @@
  */
 
 #include "cqhci.h"
+#include <linux/vseq.h>
 #include "mtk-mmc.h"
 #include "mtk-mmc-dbg.h"
 #include "../core/queue.h"
@@ -1335,7 +1336,7 @@ static void __exit mmc_mtk_dbg_exit(void)
 	return;
 }
 
-module_init(mmc_mtk_dbg_init);
+vseq_module_init(mmc_mtk_dbg_init);
 module_exit(mmc_mtk_dbg_exit);
 
 MODULE_LICENSE("GPL v2");

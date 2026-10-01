@@ -16,6 +16,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -252,7 +253,7 @@ static struct platform_driver ti_syscon_reset_driver = {
 		.of_match_table = ti_syscon_reset_of_match,
 	},
 };
-module_platform_driver(ti_syscon_reset_driver);
+vseq_module_platform_driver(ti_syscon_reset_driver);
 
 MODULE_AUTHOR("Andrew F. Davis <afd@ti.com>");
 MODULE_AUTHOR("Suman Anna <s-anna@ti.com>");

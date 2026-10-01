@@ -5,6 +5,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/platform_device.h> /* rodin stage2: 6.18 header pruning */
@@ -1565,7 +1566,7 @@ static struct platform_driver mtk_rtc_driver = {
 	.shutdown = mtk_rtc_shutdown,
 };
 
-module_platform_driver(mtk_rtc_driver);
+vseq_module_platform_driver(mtk_rtc_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Mw Lin <Mw.Lin@mediatek.com>");

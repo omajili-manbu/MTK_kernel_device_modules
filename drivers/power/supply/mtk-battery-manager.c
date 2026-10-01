@@ -6,6 +6,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/iio/consumer.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -2083,7 +2084,7 @@ static struct platform_driver mtk_battery_manager_driver = {
 		.of_match_table = mtk_bm_of_match,
 	},
 };
-module_platform_driver(mtk_battery_manager_driver);
+vseq_module_platform_driver(mtk_battery_manager_driver);
 
 MODULE_AUTHOR("Wy Chuang<Wy.Chuang@mediatek.com>");
 MODULE_DESCRIPTION("MTK Battery Manager");

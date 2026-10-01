@@ -6,6 +6,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/iio/consumer.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -4239,7 +4240,7 @@ static struct platform_driver mt6375_gauge_driver = {
 		.of_match_table = mt6375_gauge_of_match,
 	},
 };
-module_platform_driver(mt6375_gauge_driver);
+vseq_module_platform_driver(mt6375_gauge_driver);
 
 MODULE_AUTHOR("ChiYuan Huang <cy_huang@richtek.com>");
 MODULE_DESCRIPTION("MediaTek MT6375 Fuel Gauge Driver");

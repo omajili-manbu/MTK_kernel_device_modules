@@ -5,6 +5,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/vseq.h>
 #include <linux/dma-mapping.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
@@ -2770,7 +2771,7 @@ struct platform_driver mml_rrot_driver = {
 	},
 };
 
-//module_platform_driver(mml_rrot_driver);
+//vseq_module_platform_driver(mml_rrot_driver);
 
 MODULE_AUTHOR("Dennis-YC Hsieh <dennis-yc.hsieh@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek SoC display MML RROT driver");

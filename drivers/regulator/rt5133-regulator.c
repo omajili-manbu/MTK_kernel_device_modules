@@ -3,6 +3,7 @@
 // Copyright (c) 2021 Mediatek Inc.
 
 #include <linux/crc8.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/gpio/driver.h>
@@ -670,7 +671,7 @@ static struct i2c_driver rt5133_driver = {
 	.probe = rt5133_probe,
 	.remove = rt5133_remove,
 };
-module_i2c_driver(rt5133_driver);
+vseq_module_i2c_driver(rt5133_driver);
 
 MODULE_AUTHOR("Jeff Chang <jeff_chang@richtek.com>");
 MODULE_DESCRIPTION("RT5133 Regulator Driver");

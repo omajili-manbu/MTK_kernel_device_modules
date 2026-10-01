@@ -5,6 +5,7 @@
 #define pr_fmt(fmt)	"[sc858x] %s: " fmt, __func__
 
 #include <linux/gpio.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -1925,7 +1926,7 @@ static struct i2c_driver sc858x_charger_driver = {
     .remove     = sc858x_charger_remove,
 };
 
-module_i2c_driver(sc858x_charger_driver);
+vseq_module_i2c_driver(sc858x_charger_driver);
 
 MODULE_DESCRIPTION("SC SC858X ChargePump Driver");
 MODULE_LICENSE("GPL v2");

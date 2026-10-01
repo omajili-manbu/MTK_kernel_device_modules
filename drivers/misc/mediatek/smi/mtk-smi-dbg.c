@@ -4,6 +4,7 @@
  * Author: Ming-Fan Chen <ming-fan.chen@mediatek.com>
  */
 #include <linux/debugfs.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/limits.h>
@@ -2330,7 +2331,7 @@ module_param_cb(smi_force_dump, &smi_force_skip_dump_ops, NULL, 0644);
 MODULE_PARM_DESC(smi_force_dump, "smi force skip dump ops");
 #endif
 
-module_init(mtk_smi_dbg_init);
+vseq_module_init(mtk_smi_dbg_init);
 MODULE_LICENSE("GPL v2");
 
 /*

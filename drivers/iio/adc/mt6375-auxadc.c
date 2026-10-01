@@ -10,6 +10,7 @@
  */
 
 #include <dt-bindings/iio/adc/mediatek,mt6375_auxadc.h>
+#include <linux/vseq.h>
 #include <dt-bindings/iio/adc/mediatek,mt6379_auxadc.h>
 #include <linux/alarmtimer.h>
 #include <linux/bitfield.h>
@@ -1274,7 +1275,7 @@ static struct platform_driver mt6375_auxadc_driver = {
 		.pm = &mt6375_auxadc_dev_pm_ops,
 	},
 };
-module_platform_driver(mt6375_auxadc_driver);
+vseq_module_platform_driver(mt6375_auxadc_driver);
 
 MODULE_AUTHOR("ChiYuan Huang <cy_huang@richtek.com>");
 MODULE_DESCRIPTION("MT6375_MT6379 AUXADC Driver");

@@ -5,6 +5,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/arm_ffa.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -320,7 +321,7 @@ static struct platform_driver ufs_mtk_phy_driver = {
 		.name = "ufs_mtk_phy",
 	},
 };
-module_platform_driver(ufs_mtk_phy_driver);
+vseq_module_platform_driver(ufs_mtk_phy_driver);
 
 MODULE_DESCRIPTION("Universal Flash Storage (UFS) MediaTek MPHY");
 MODULE_AUTHOR("Stanley Chu <stanley.chu@mediatek.com>");

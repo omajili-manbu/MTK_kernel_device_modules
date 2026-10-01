@@ -9,6 +9,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/delay.h>
@@ -1444,7 +1445,7 @@ static struct platform_driver usb_meta_driver = {
 		.of_match_table = of_match_ptr(usb_meta_of_match),
 	},
 };
-module_platform_driver(usb_meta_driver);
+vseq_module_platform_driver(usb_meta_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek USB Meta Driver");

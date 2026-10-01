@@ -4,6 +4,7 @@
  */
 
 #include <crypto/hash.h>
+#include <linux/vseq.h>
 #include <linux/arm-smccc.h>
 #include <linux/cdev.h>
 #include <linux/delay.h>
@@ -3268,7 +3269,7 @@ error:
 	return 0;
 }
 
-late_initcall(rpmb_init);
+vseq_late_initcall(rpmb_init);
 
 MODULE_DESCRIPTION("RPMB class");
 MODULE_LICENSE("GPL v2");

@@ -10,6 +10,7 @@
  */
 
 #include <dt-bindings/reset/mt2712-resets.h>
+#include <linux/vseq.h>
 #include <dt-bindings/reset/mt8183-resets.h>
 #include <dt-bindings/reset/mt8192-resets.h>
 #include <dt-bindings/reset/mt8195-resets.h>
@@ -472,7 +473,7 @@ static struct platform_driver mtk_wdt_driver = {
 	},
 };
 
-module_platform_driver(mtk_wdt_driver);
+vseq_module_platform_driver(mtk_wdt_driver);
 
 module_param(timeout, uint, 0);
 MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");

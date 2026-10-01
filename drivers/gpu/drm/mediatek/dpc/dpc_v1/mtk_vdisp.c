@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
@@ -442,7 +443,7 @@ static void __exit mtk_vdisp_exit(void)
 	platform_driver_unregister(&mtk_vdisp_driver_v1);
 }
 
-late_initcall(mtk_vdisp_init);
+vseq_late_initcall(mtk_vdisp_init);
 module_exit(mtk_vdisp_exit);
 MODULE_AUTHOR("William Yang <William-tw.Yang@mediatek.com>");
 MODULE_DESCRIPTION("MTK VDISP driver V1.0");

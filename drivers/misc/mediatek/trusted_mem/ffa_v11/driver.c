@@ -24,6 +24,7 @@
 #define pr_fmt(fmt) DRIVER_NAME ": " fmt
 
 #include <linux/acpi.h>
+#include <linux/vseq.h>
 #include <linux/bitfield.h>
 #include <linux/cpuhotplug.h>
 #include <linux/device.h>
@@ -1585,7 +1586,7 @@ ffa_bus_exit:
 	/* ignore all error */
 	return 0;
 }
-subsys_initcall(ffa_init);
+vseq_subsys_initcall(ffa_init);
 
 static void __exit ffa_exit(void)
 {

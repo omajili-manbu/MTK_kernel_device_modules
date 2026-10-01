@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/io.h>
+#include <linux/vseq.h>
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/kernel.h>
@@ -370,7 +371,7 @@ static struct platform_driver usb_dp_selector_driver = {
 	.remove = usb_dp_selector_remove,
 };
 
-module_platform_driver(usb_dp_selector_driver);
+vseq_module_platform_driver(usb_dp_selector_driver);
 
 MODULE_DESCRIPTION("Type-C DP/USB selector");
 MODULE_LICENSE("GPL v2");

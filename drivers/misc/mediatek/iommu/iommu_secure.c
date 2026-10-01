@@ -6,6 +6,7 @@
 #define pr_fmt(fmt)    "mtk_iommu: secure " fmt
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/bits.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -747,6 +748,6 @@ static void __exit mtk_iommu_sec_exit(void)
 		platform_driver_unregister(mtk_iommu_bk_drivers[i]);
 }
 
-module_init(mtk_iommu_sec_init);
+vseq_module_init(mtk_iommu_sec_init);
 module_exit(mtk_iommu_sec_exit);
 MODULE_LICENSE("GPL v2");

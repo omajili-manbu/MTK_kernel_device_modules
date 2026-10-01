@@ -5,6 +5,7 @@
  *	Stanley Chu <stanley.chu@mediatek.com>
  */
 #include <linux/atomic.h>
+#include <linux/vseq.h>
 #include "../../../drivers/ufs/core/ufs_trace_types.h" /* rodin: 6.18 moved ufs_trace_str_t here */
 #include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/delay.h>
@@ -2414,7 +2415,7 @@ static int __init ufs_mtk_dbg_init(void)
 	return 0;
 }
 
-module_init(ufs_mtk_dbg_init)
+vseq_module_init(ufs_mtk_dbg_init)
 module_exit(ufs_mtk_dbg_exit)
 
 MODULE_DESCRIPTION("MediaTek UFS Debugging Facility");

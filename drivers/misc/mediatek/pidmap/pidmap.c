@@ -3,6 +3,7 @@
  * Copyright (C) 2019 MediaTek Inc.
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/seq_file.h>
@@ -353,7 +354,7 @@ static void __exit mtk_pidmap_exit(void)
  * TODO: The timing of loadable module is too late to have full
  * list of kernel threads. Need to find out solution.
  */
-early_initcall(mtk_pidmap_init);
+vseq_early_initcall(mtk_pidmap_init);
 module_exit(mtk_pidmap_exit);
 
 MODULE_AUTHOR("Stanley Chu <stanley.chu@mediatek.com>");

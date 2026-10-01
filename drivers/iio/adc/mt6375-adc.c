@@ -6,6 +6,7 @@
  */
 
 #include <dt-bindings/iio/adc/mediatek,mt6375_adc.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -316,7 +317,7 @@ static struct platform_driver mt6375_adc_driver = {
 		.of_match_table = mt6375_adc_of_match,
 	},
 };
-module_platform_driver(mt6375_adc_driver);
+vseq_module_platform_driver(mt6375_adc_driver);
 
 MODULE_AUTHOR("ChiYuan Huang <cy_huang@richtek.com>");
 MODULE_DESCRIPTION("MT6375 ADC Driver");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/atomic.h>
+#include <linux/vseq.h>
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/file.h>
@@ -1220,7 +1221,7 @@ static int __init mboot_params_proc_init(void)
 	aee_rr_mboot_params_proc_init();
 	return 0;
 }
-arch_initcall(mboot_params_proc_init);
+vseq_arch_initcall(mboot_params_proc_init);
 #endif
 
 MODULE_LICENSE("GPL");

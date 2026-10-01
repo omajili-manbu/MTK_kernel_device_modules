@@ -4,6 +4,7 @@
  */
 
 #include <linux/extcon-provider.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -858,7 +859,7 @@ static int __init mtk_usb_extcon_init(void)
 {
 	return platform_driver_register(&mtk_usb_extcon_driver);
 }
-late_initcall(mtk_usb_extcon_init);
+vseq_late_initcall(mtk_usb_extcon_init);
 
 static void __exit mtk_usb_extcon_exit(void)
 {

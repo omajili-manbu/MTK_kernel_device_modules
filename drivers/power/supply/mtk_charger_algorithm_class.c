@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
@@ -323,9 +324,9 @@ static int __init charger_algorithm_class_init(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_CHARGER)
-subsys_initcall(charger_algorithm_class_init);
+vseq_subsys_initcall(charger_algorithm_class_init);
 #else
-module_init(charger_algorithm_class_init);
+vseq_module_init(charger_algorithm_class_init);
 #endif
 module_exit(charger_algorithm_class_exit);
 

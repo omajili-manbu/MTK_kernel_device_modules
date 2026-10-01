@@ -3,6 +3,7 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -416,7 +417,7 @@ static struct platform_driver mt6681_regulator_driver = {
 	.shutdown = mt6681_regulator_shutdown,
 	.id_table = mt6681_regulator_ids,
 };
-module_platform_driver(mt6681_regulator_driver);
+vseq_module_platform_driver(mt6681_regulator_driver);
 
 MODULE_AUTHOR("Yiwen Chiou <yiwen.chiou@mediatek.com>");
 MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6681 PMIC");

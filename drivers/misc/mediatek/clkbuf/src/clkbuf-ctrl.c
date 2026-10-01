@@ -4,6 +4,7 @@
  * Author: Kuan-Hsin Lee <Kuan-Hsin.Lee@mediatek.com>
  */
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -359,7 +360,7 @@ static struct platform_driver clkbuf_driver = {
 			.pm = &clk_buf_suspend_ops,
 	},
 };
-module_platform_driver(clkbuf_driver);
+vseq_module_platform_driver(clkbuf_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek CLKBUF CTRL Driver");
 MODULE_AUTHOR("Kuan-Hsin Lee <kuan-hsin.lee@mediatek.com>");

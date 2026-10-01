@@ -6,6 +6,7 @@
 #define pr_fmt(fmt)    "mtk_iommu: debug " fmt
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/bits.h>
 #include <linux/iova.h>
 #include "rodin_io_pgtable_arm_66.h"
@@ -3419,8 +3420,8 @@ static int __init mtk_m4u_dbg_init(void)
 {
 	return platform_driver_register(&mtk_m4u_dbg_drv);
 }
-fs_initcall(mtk_m4u_dbg_init);
+vseq_fs_initcall(mtk_m4u_dbg_init);
 #else
-module_platform_driver(mtk_m4u_dbg_drv);
+vseq_module_platform_driver(mtk_m4u_dbg_drv);
 #endif
 MODULE_LICENSE("GPL v2");

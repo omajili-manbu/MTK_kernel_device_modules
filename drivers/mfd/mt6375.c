@@ -6,6 +6,7 @@
  */
 
 #include <dt-bindings/mfd/mt6375.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -483,7 +484,7 @@ static struct i2c_driver mt6375_driver = {
 		.of_match_table = of_match_ptr(mt6375_of_match),
 	},
 };
-module_i2c_driver(mt6375_driver);
+vseq_module_i2c_driver(mt6375_driver);
 
 MODULE_AUTHOR("ShuFan Lee <shufan_lee@richtek.com>");
 MODULE_DESCRIPTION("MT6375 Core I2C Drvier");

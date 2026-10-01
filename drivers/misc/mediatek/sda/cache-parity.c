@@ -5,6 +5,7 @@
  */
 
 #include <asm/cputype.h>
+#include <linux/vseq.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
 #include <linux/delay.h>
@@ -998,7 +999,7 @@ static __exit void cache_parity_exit(void)
 	platform_driver_unregister(&cache_parity_drv);
 }
 
-module_init(cache_parity_init);
+vseq_module_init(cache_parity_init);
 module_exit(cache_parity_exit);
 
 MODULE_DESCRIPTION("MediaTek Cache Parity Driver");

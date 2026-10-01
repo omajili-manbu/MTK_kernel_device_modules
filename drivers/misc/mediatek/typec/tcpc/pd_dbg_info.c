@@ -5,6 +5,7 @@
 
 #if IS_ENABLED(CONFIG_PD_DBG_INFO)
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/mutex.h>
 #include <linux/sched/clock.h>
 #include <linux/slab.h>
@@ -139,7 +140,7 @@ static void __exit pd_dbg_info_exit(void)
 	clean_up_list();
 }
 
-subsys_initcall(pd_dbg_info_init);
+vseq_subsys_initcall(pd_dbg_info_init);
 module_exit(pd_dbg_info_exit);
 
 MODULE_DESCRIPTION("PD Debug Info Module");

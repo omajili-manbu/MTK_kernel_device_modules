@@ -3,6 +3,7 @@
  * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
  */
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
@@ -2922,6 +2923,6 @@ static void __exit scpsys_exit(void)
 	platform_driver_unregister(&scpsys_drv);
 }
 
-arch_initcall(scpsys_init);
+vseq_arch_initcall(scpsys_init);
 module_exit(scpsys_exit);
 MODULE_LICENSE("GPL");

@@ -6,6 +6,7 @@
 #define pr_fmt(fmt)    "mtk_iommu: " fmt
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/bug.h>
 #include <linux/clk.h>
 #include <linux/component.h>
@@ -4324,7 +4325,7 @@ static struct platform_driver mtk_iommu_driver = {
 		.pm = &mtk_iommu_pm_ops,
 	}
 };
-module_platform_driver(mtk_iommu_driver);
+vseq_module_platform_driver(mtk_iommu_driver);
 
 MODULE_DESCRIPTION("IOMMU API for MediaTek M4U implementations");
 MODULE_LICENSE("GPL v2");

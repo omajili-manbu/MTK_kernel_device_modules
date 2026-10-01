@@ -3,6 +3,7 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -439,7 +440,7 @@ static __init int slc_parity_init(void)
 	return 0;
 }
 
-module_init(slc_parity_init);
+vseq_module_init(slc_parity_init);
 
 MODULE_DESCRIPTION("MediaTek EMI SLC PARITY Driver");
 MODULE_LICENSE("GPL");

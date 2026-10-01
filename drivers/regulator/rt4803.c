@@ -4,6 +4,7 @@
 // Author: ChiYuan Huang <cy_huang@richtek.com>
 
 #include <linux/i2c.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
@@ -205,7 +206,7 @@ static struct i2c_driver rt4803_driver = {
 	},
 	.probe = rt4803_probe,
 };
-module_i2c_driver(rt4803_driver);
+vseq_module_i2c_driver(rt4803_driver);
 
 MODULE_DESCRIPTION("Richtek RT4803 voltage regulator driver");
 MODULE_AUTHOR("ChiYuan Huang <cy_huang@richtek.com>");

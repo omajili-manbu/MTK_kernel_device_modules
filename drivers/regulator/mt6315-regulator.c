@@ -3,6 +3,7 @@
 // Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -434,7 +435,7 @@ static struct platform_driver mt6315_regulator_driver = {
 	.shutdown = mt6315_regulator_shutdown,
 };
 
-module_platform_driver(mt6315_regulator_driver);
+vseq_module_platform_driver(mt6315_regulator_driver);
 
 MODULE_AUTHOR("Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>");
 MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6315 PMIC");

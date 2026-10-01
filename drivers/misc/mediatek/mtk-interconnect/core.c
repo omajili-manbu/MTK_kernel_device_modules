@@ -6,6 +6,7 @@
  */
 
 #include <linux/debugfs.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/idr.h>
 #include <linux/init.h>
@@ -983,7 +984,7 @@ static void __exit mtk_icc_exit(void)
 {
 	debugfs_remove_recursive(icc_debugfs_dir);
 }
-module_init(mtk_icc_init);
+vseq_module_init(mtk_icc_init);
 module_exit(mtk_icc_exit);
 
 bool mmqos_icc_systrace_enabled(void)

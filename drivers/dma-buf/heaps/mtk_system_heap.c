@@ -9,6 +9,7 @@
 #define pr_fmt(fmt) "dma_heap: system "fmt
 
 #include <linux/dma-buf.h>
+#include <linux/vseq.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-map-ops.h>
 #include <linux/dma-heap.h>
@@ -1779,7 +1780,7 @@ int dma_buf_get_gid(struct dma_buf *dmabuf)
 }
 EXPORT_SYMBOL_GPL(dma_buf_get_gid);
 
-module_init(mtk_system_heap_create);
+vseq_module_init(mtk_system_heap_create);
 module_exit(mtk_system_heap_exit);
 MODULE_LICENSE("GPL");
 MODULE_IMPORT_NS("DMA_BUF");

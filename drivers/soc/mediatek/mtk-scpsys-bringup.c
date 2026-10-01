@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of.h>
@@ -87,5 +88,5 @@ static struct platform_driver scpsys_bring_up = {
 		.of_match_table = scpsys_bring_up_id_table,
 	},
 };
-module_platform_driver(scpsys_bring_up);
+vseq_module_platform_driver(scpsys_bring_up);
 MODULE_LICENSE("GPL");

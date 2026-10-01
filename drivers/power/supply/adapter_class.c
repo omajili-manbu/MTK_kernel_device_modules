@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
@@ -724,7 +725,7 @@ static int __init adapter_class_init(void)
 	return 0;
 }
 
-module_init(adapter_class_init);
+vseq_module_init(adapter_class_init);
 module_exit(adapter_class_exit);
 
 MODULE_DESCRIPTION("Adapter Class Device");

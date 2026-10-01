@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>		/* For init/exit macros */
+#include <linux/vseq.h>
 #include <linux/module.h>	/* For MODULE_ marcros  */
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -1020,7 +1021,7 @@ static int __init mtk_pe_init(void)
 {
 	return platform_driver_register(&pe_driver);
 }
-module_init(mtk_pe_init);
+vseq_module_init(mtk_pe_init);
 
 static void __exit mtk_pe_exit(void)
 {

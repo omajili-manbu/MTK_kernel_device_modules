@@ -8,6 +8,7 @@
  */
 
 #include <dt-bindings/phy/phy.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/iopoll.h>
@@ -3103,7 +3104,7 @@ static struct platform_driver mtk_xsphy_driver = {
 	},
 };
 
-module_platform_driver(mtk_xsphy_driver);
+vseq_module_platform_driver(mtk_xsphy_driver);
 
 MODULE_AUTHOR("Chunfeng Yun <chunfeng.yun@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek USB XS-PHY driver");

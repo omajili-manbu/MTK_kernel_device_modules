@@ -4,6 +4,7 @@
  */
 
 #include <asm/div64.h>
+#include <linux/vseq.h>
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/printk.h>
@@ -471,11 +472,11 @@ pr_notice("log_much exit.");
 
 }
 
-module_init(mt_printk_ctrl_init);
+vseq_module_init(mt_printk_ctrl_init);
 module_exit(mt_printk_ctrl_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek Printk enhance");
 MODULE_AUTHOR("MediaTek Inc.");
 #else
-device_initcall(mt_printk_ctrl_init);
+vseq_device_initcall(mt_printk_ctrl_init);
 #endif

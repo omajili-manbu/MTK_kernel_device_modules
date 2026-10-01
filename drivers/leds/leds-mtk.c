@@ -5,6 +5,7 @@
  */
 
 #include <linux/ctype.h>
+#include <linux/vseq.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/leds.h>
@@ -753,7 +754,7 @@ static void __exit mtk_leds_exit(void)
  * battary calling bl .shutdown whitch need to call display
  * function and they not yet probe.
  */
-module_init(mtk_leds_init);
+vseq_module_init(mtk_leds_init);
 module_exit(mtk_leds_exit);
 
 MODULE_AUTHOR("Mediatek Corporation");

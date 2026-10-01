@@ -7,6 +7,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 
 #include <dt-bindings/pinctrl/mt65xx.h>
 #include <linux/gpio.h>
@@ -568,7 +569,7 @@ static void __exit pinctrl_mtk_debug_v2_exit(void)
 		remove_proc_subtree("mtk_gpio", NULL);
 }
 
-late_initcall(pinctrl_mtk_debug_v2_init);
+vseq_late_initcall(pinctrl_mtk_debug_v2_init);
 module_exit(pinctrl_mtk_debug_v2_exit);
 
 MODULE_LICENSE("GPL v2");

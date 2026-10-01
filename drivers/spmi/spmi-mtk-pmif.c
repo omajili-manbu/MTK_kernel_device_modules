@@ -3,6 +3,7 @@
 // Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
@@ -576,7 +577,7 @@ static struct platform_driver mtk_spmi_driver = {
 	.probe		= mtk_spmi_probe,
 	.remove		= mtk_spmi_remove,
 };
-module_platform_driver(mtk_spmi_driver);
+vseq_module_platform_driver(mtk_spmi_driver);
 
 MODULE_AUTHOR("Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek SPMI Driver");

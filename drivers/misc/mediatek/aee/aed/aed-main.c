@@ -4,6 +4,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/compat.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -2459,7 +2460,7 @@ static void __exit aed_exit(void)
 
 	mtk_slog_exit();
 }
-module_init(aed_init);
+vseq_module_init(aed_init);
 module_exit(aed_exit);
 
 MODULE_LICENSE("GPL");

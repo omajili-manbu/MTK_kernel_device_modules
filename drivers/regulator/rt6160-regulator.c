@@ -3,6 +3,7 @@
 // Copyright (c) 2021 Mediatek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/kernel.h>
@@ -420,7 +421,7 @@ static struct i2c_driver rt6160_driver = {
 	},
 	.probe = rt6160_probe,
 };
-module_i2c_driver(rt6160_driver);
+vseq_module_i2c_driver(rt6160_driver);
 
 MODULE_AUTHOR("ChiYuan Huang <cy_huang@richtek.com>");
 MODULE_DESCRIPTION("Richtek RT6160 Voltage Regulator Driver");

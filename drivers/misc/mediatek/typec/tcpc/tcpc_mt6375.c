@@ -4,6 +4,7 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -2649,7 +2650,7 @@ static struct platform_driver mt6375_tcpc_driver = {
 		.of_match_table = of_match_ptr(mt6375_tcpc_of_match),
 	},
 };
-module_platform_driver(mt6375_tcpc_driver);
+vseq_module_platform_driver(mt6375_tcpc_driver);
 
 MODULE_AUTHOR("Gene Chen <gene_chen@richtek.com>");
 MODULE_DESCRIPTION("MT6375 USB Type-C Port Controller Interface Driver");

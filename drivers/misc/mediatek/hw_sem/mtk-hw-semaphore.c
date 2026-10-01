@@ -5,6 +5,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <linux/vseq.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
@@ -246,7 +247,7 @@ static void __exit mtk_hw_semaphore_exit(void)
 	platform_driver_unregister(&mtk_hw_semaphore_driver);
 }
 
-module_init(mtk_hw_semaphore_init);
+vseq_module_init(mtk_hw_semaphore_init);
 module_exit(mtk_hw_semaphore_exit);
 
 module_param(log_level, uint, 0644);

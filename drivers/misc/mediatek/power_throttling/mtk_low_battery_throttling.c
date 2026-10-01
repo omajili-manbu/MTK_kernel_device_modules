@@ -4,6 +4,7 @@
  * Author: Samuel Hsieh <samuel.hsieh@mediatek.com>
  */
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/notifier.h>
 #include <linux/of.h>
@@ -1485,7 +1486,7 @@ static struct platform_driver low_battery_throttling_driver = {
 	.probe = low_battery_throttling_probe,
 };
 
-module_platform_driver(low_battery_throttling_driver);
+vseq_module_platform_driver(low_battery_throttling_driver);
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");
 MODULE_DESCRIPTION("MTK low battery throttling driver");
 MODULE_LICENSE("GPL");

@@ -4,6 +4,7 @@
  * Author: Wendy-ST Lin <wendy-st.lin@mediatek.com>
  */
 #include <dt-bindings/interconnect/mtk,mmqos.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <dt-bindings/interconnect/mtk,emi.h>
 #include <dt-bindings/memory/mt6899-larb-port.h>
@@ -693,5 +694,5 @@ static struct platform_driver mtk_mmqos_mt6899_driver = {
 		.of_match_table = mtk_mmqos_mt6899_of_ids,
 	},
 };
-module_platform_driver(mtk_mmqos_mt6899_driver);
+vseq_module_platform_driver(mtk_mmqos_mt6899_driver);
 MODULE_LICENSE("GPL");

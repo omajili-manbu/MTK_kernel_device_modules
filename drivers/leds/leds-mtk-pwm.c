@@ -5,6 +5,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
@@ -197,7 +198,7 @@ static struct platform_driver led_pwm_driver = {
 	.shutdown = led_pwm_shutdown,
 };
 
-module_platform_driver(led_pwm_driver);
+vseq_module_platform_driver(led_pwm_driver);
 
 MODULE_AUTHOR("Mediatek Corporation");
 MODULE_DESCRIPTION("MTK Disp PWM Backlight Driver");

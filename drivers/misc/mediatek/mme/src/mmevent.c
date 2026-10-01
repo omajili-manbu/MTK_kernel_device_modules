@@ -4,6 +4,7 @@
  */
 
 #include <linux/miscdevice.h>
+#include <linux/vseq.h>
 #include <linux/file.h>
 
 #include <linux/atomic.h>
@@ -1135,7 +1136,7 @@ static void __exit mme_exit(void)
 }
 
 /* Driver specific end */
-module_init(mme_init);
+vseq_module_init(mme_init);
 module_exit(mme_exit);
 MODULE_AUTHOR("Zhongchao Xia <zhongchao.xia@mediatek.com>");
 MODULE_DESCRIPTION("MME Driver");

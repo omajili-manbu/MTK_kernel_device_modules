@@ -5,6 +5,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/kthread.h>
@@ -238,7 +239,7 @@ static void __exit mmdebug_vcp_exit(void)
 	platform_driver_unregister(&mmdebug_vcp_drv);
 }
 
-module_init(mmdebug_vcp_init);
+vseq_module_init(mmdebug_vcp_init);
 module_exit(mmdebug_vcp_exit);
 MODULE_DESCRIPTION("MMDEBUG vcp Driver");
 MODULE_AUTHOR("mtk21306 <cindy-hy.chen@mediatek.com>");

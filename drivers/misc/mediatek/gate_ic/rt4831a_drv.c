@@ -4,6 +4,7 @@
  */
 
 #include <linux/gpio/consumer.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -369,7 +370,7 @@ static struct i2c_driver _gate_ic_i2c_driver = {
 		   },
 };
 
-module_i2c_driver(_gate_ic_i2c_driver);
+vseq_module_i2c_driver(_gate_ic_i2c_driver);
 
 MODULE_AUTHOR("Mediatek Corporation");
 MODULE_DESCRIPTION("MTK RT4831 I2C Driver");

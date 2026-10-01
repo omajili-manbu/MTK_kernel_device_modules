@@ -8,6 +8,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/dma-mapping.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
@@ -1281,7 +1282,7 @@ static int __init xhci_mtk_init(void)
 		return ret;
 	return platform_driver_register(&mtk_xhci_driver);
 }
-module_init(xhci_mtk_init);
+vseq_module_init(xhci_mtk_init);
 
 static void __exit xhci_mtk_exit(void)
 {

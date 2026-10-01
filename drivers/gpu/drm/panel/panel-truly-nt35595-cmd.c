@@ -4,6 +4,7 @@
  */
 
 #include <linux/backlight.h>
+#include <linux/vseq.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_modes.h>
@@ -1132,7 +1133,7 @@ static struct mipi_dsi_driver lcm_driver = {
 	},
 };
 
-module_mipi_dsi_driver(lcm_driver);
+vseq_module_mipi_dsi_driver(lcm_driver);
 
 MODULE_DESCRIPTION("truly nt35595 CMD LCD Panel Driver");
 MODULE_LICENSE("GPL v2");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -343,7 +344,7 @@ static __init int emislb_init(void)
 	return 0;
 }
 
-module_init(emislb_init);
+vseq_module_init(emislb_init);
 
 MODULE_DESCRIPTION("MediaTek EMI SLB MPU Driver");
 MODULE_LICENSE("GPL v2");

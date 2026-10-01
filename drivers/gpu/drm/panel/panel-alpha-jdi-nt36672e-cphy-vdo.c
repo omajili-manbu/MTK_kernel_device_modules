@@ -4,6 +4,7 @@
  */
 
 #include <linux/backlight.h>
+#include <linux/vseq.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_modes.h>
@@ -152,7 +153,7 @@ static void __exit _lcm_i2c_exit(void)
 	i2c_del_driver(&_lcm_i2c_driver);
 }
 
-module_init(_lcm_i2c_init);
+vseq_module_init(_lcm_i2c_init);
 module_exit(_lcm_i2c_exit);
 /***********************************/
 #endif
@@ -1469,7 +1470,7 @@ static struct mipi_dsi_driver jdi_driver = {
 	},
 };
 
-module_mipi_dsi_driver(jdi_driver);
+vseq_module_mipi_dsi_driver(jdi_driver);
 
 MODULE_AUTHOR("Elon Hsu <elon.hsu@mediatek.com>");
 MODULE_DESCRIPTION("jdi r66451 CMD AMOLED Panel Driver");

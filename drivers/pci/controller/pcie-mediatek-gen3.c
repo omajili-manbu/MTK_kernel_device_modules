@@ -7,6 +7,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -3303,6 +3304,6 @@ static void __exit mtk_pcie_exit(void)
 	platform_driver_unregister(&mtk_pcie_driver);
 }
 
-module_init(mtk_pcie_init);
+vseq_module_init(mtk_pcie_init);
 module_exit(mtk_pcie_exit);
 MODULE_LICENSE("GPL v2");

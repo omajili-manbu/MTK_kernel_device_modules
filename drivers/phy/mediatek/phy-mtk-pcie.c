@@ -5,6 +5,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/iopoll.h>
@@ -1122,7 +1123,7 @@ static struct platform_driver mtk_pcie_phy_driver = {
 		.of_match_table = mtk_pcie_phy_of_match,
 	},
 };
-module_platform_driver(mtk_pcie_phy_driver);
+vseq_module_platform_driver(mtk_pcie_phy_driver);
 
 MODULE_DESCRIPTION("MediaTek PCIe PHY driver");
 MODULE_AUTHOR("Jianjun Wang <jianjun.wang@mediatek.com>");

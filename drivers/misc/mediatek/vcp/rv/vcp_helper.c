@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>       /* needed by all modules */
+#include <linux/vseq.h>
 
 /* rodin r25: mtk-smi stays a 6.6 blob in this batch, so its debug hook has no
  * vmlinux definition. Stub it here; the guard flips automatically once
@@ -4023,7 +4024,7 @@ static void __exit vcp_exit(void)
 	platform_driver_unregister(&mtk_vcp_device);
 }
 
-device_initcall(vcp_init);
+vseq_device_initcall(vcp_init);
 module_exit(vcp_exit);
 
 MODULE_DESCRIPTION("MEDIATEK Module VCP driver");

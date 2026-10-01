@@ -3,6 +3,7 @@
 // Copyright (c) 2021 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/mfd/mt6363/registers.h>
 #include <linux/module.h>
@@ -1126,7 +1127,7 @@ static struct platform_driver mt6363_regulator_driver = {
 	.probe = mt6363_regulator_probe,
 	.id_table = mt6363_regulator_ids,
 };
-module_platform_driver(mt6363_regulator_driver);
+vseq_module_platform_driver(mt6363_regulator_driver);
 
 MODULE_AUTHOR("Jeter Chen <jeter.chen@mediatek.com>");
 MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6363 PMIC");

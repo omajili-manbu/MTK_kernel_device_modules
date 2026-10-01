@@ -6,6 +6,7 @@
  * Author: Matthias Brugger <matthias.bgg@gmail.com>
  */
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -2977,7 +2978,7 @@ static struct platform_driver mtk8250_platform_driver = {
 	.probe			= mtk8250_probe,
 	.remove			= mtk8250_remove,
 };
-module_platform_driver(mtk8250_platform_driver);
+vseq_module_platform_driver(mtk8250_platform_driver);
 
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 static int __init early_mtk8250_setup(struct earlycon_device *device,

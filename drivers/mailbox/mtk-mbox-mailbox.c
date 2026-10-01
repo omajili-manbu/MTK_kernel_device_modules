@@ -5,6 +5,7 @@
 #define MBOX_TIMESTAMP
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/of_device.h>
 #include <linux/device.h>
@@ -354,6 +355,6 @@ static __init int mtk_tinysys_mbox_driver(void)
 	return 0;
 }
 
-module_init(mtk_tinysys_mbox_driver);
+vseq_module_init(mtk_tinysys_mbox_driver);
 MODULE_LICENSE("GPL v2");
 

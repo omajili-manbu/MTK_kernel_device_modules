@@ -5,6 +5,7 @@
  */
 
 #include <linux/io.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
@@ -1061,6 +1062,6 @@ static void __exit pd_chk_exit(void)
 	platform_driver_unregister(&pd_chk_mt6899_drv);
 }
 
-subsys_initcall(pd_chk_init);
+vseq_subsys_initcall(pd_chk_init);
 module_exit(pd_chk_exit);
 MODULE_LICENSE("GPL");

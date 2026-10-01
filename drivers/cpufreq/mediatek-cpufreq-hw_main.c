@@ -4,6 +4,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/cpufreq.h>
 #include <linux/energy_model.h>
 #include <linux/init.h>
@@ -717,7 +718,7 @@ static struct platform_driver mtk_cpufreq_hw_driver = {
 		.of_match_table = mtk_cpufreq_hw_match,
 	},
 };
-module_platform_driver(mtk_cpufreq_hw_driver);
+vseq_module_platform_driver(mtk_cpufreq_hw_driver);
 
 MODULE_DESCRIPTION("Mediatek cpufreq-hw driver");
 MODULE_LICENSE("GPL");

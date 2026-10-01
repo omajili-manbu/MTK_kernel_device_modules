@@ -3,6 +3,7 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin stage2: 6.18 header pruning */
 #include <linux/iopoll.h>
 #include <linux/interrupt.h>
@@ -2353,7 +2354,7 @@ static struct platform_driver mtk_spmi_driver = {
 	.probe		= mtk_spmi_probe,
 	.remove		= mtk_spmi_remove,
 };
-module_platform_driver(mtk_spmi_driver);
+vseq_module_platform_driver(mtk_spmi_driver);
 
 MODULE_AUTHOR("Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek SPMI Driver");

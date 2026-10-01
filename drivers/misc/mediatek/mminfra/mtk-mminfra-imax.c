@@ -5,6 +5,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/io.h>
 #include <linux/module.h>
@@ -441,7 +442,7 @@ static void __exit mtk_mminfra_imax_exit(void)
 	platform_driver_unregister(&mminfra_imax_drv);
 }
 
-module_init(mtk_mminfra_imax_init);
+vseq_module_init(mtk_mminfra_imax_init);
 module_exit(mtk_mminfra_imax_exit);
 MODULE_DESCRIPTION("MTK MMInfra IMAX driver");
 MODULE_AUTHOR("Anthony Huang<anthony.huang@mediatek.com>");

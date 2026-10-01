@@ -6,6 +6,7 @@
  */
 
 #include <dt-bindings/power/mtk-charger.h>
+#include <linux/vseq.h>
 #include <linux/completion.h>
 #include <linux/iio/consumer.h>
 #include <linux/atomic.h>
@@ -3584,7 +3585,7 @@ static struct platform_driver mt6375_chg_driver = {
 		.of_match_table = of_match_ptr(mt6375_chg_of_match),
 	},
 };
-module_platform_driver(mt6375_chg_driver);
+vseq_module_platform_driver(mt6375_chg_driver);
 
 MODULE_AUTHOR("ShuFan Lee <shufan_lee@richtek.com>");
 MODULE_DESCRIPTION("MT6375 Charger Driver");

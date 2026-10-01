@@ -14,6 +14,7 @@
 #define pr_fmt(fmt) "[blocktag][core]" fmt
 
 #include <linux/memblock.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
@@ -1196,7 +1197,7 @@ static void __exit mtk_btag_exit(void)
 	vfree(mtk_btag_pagelogger);
 }
 
-fs_initcall(mtk_btag_init);
+vseq_fs_initcall(mtk_btag_init);
 module_exit(mtk_btag_exit);
 
 MODULE_AUTHOR("Perry Hsu <perry.hsu@mediatek.com>");

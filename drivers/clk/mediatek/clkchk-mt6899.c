@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/clk-provider.h>
 #include <linux/io.h>
 #include <linux/mfd/syscon.h>
@@ -2729,6 +2730,6 @@ static void __exit clkchk_mt6899_exit(void)
 	platform_driver_unregister(&clk_chk_mt6899_drv);
 }
 
-subsys_initcall(clkchk_mt6899_init);
+vseq_subsys_initcall(clkchk_mt6899_init);
 module_exit(clkchk_mt6899_exit);
 MODULE_LICENSE("GPL");

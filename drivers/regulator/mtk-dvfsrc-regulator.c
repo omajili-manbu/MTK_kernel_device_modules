@@ -4,6 +4,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -586,7 +587,7 @@ static int __init mtk_dvfsrc_regulator_init(void)
 {
 	return platform_driver_register(&mtk_dvfsrc_regulator_driver);
 }
-subsys_initcall(mtk_dvfsrc_regulator_init);
+vseq_subsys_initcall(mtk_dvfsrc_regulator_init);
 
 static void __exit mtk_dvfsrc_regulator_exit(void)
 {

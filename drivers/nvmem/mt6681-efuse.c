@@ -3,6 +3,7 @@
  * Copyright (c) 2021 MediaTek Inc.
  */
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/nvmem-provider.h>
@@ -224,7 +225,7 @@ static struct platform_driver mt6681_efuse_driver = {
 		.of_match_table = mt6681_efuse_of_match,
 	},
 };
-module_platform_driver(mt6681_efuse_driver);
+vseq_module_platform_driver(mt6681_efuse_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Wen Su <Wen.Su@mediatek.com>");

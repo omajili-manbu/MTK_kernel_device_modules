@@ -4,6 +4,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/dma-mapping.h>
@@ -5245,6 +5246,6 @@ void cmdq_set_outpin_event(struct cmdq_client *cl, bool ena)
 }
 EXPORT_SYMBOL(cmdq_set_outpin_event);
 
-module_init(cmdq_drv_init);
+vseq_module_init(cmdq_drv_init);
 
 MODULE_LICENSE("GPL v2");

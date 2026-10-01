@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
@@ -2518,7 +2519,7 @@ static int __init mml_driver_init(void)
 
 	return ret;
 }
-module_init(mml_driver_init);
+vseq_module_init(mml_driver_init);
 
 static void __exit mml_driver_exit(void)
 {

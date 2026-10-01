@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
@@ -3886,6 +3887,6 @@ static struct platform_driver clk_mt6899_drv = {
 	},
 };
 
-module_platform_driver(clk_mt6899_drv);
+vseq_module_platform_driver(clk_mt6899_drv);
 MODULE_LICENSE("GPL");
 

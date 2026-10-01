@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
@@ -40,7 +41,7 @@ static int __init mediatek_socinfo_init(void)
 
 	return 0;
 }
-module_init(mediatek_socinfo_init);
+vseq_module_init(mediatek_socinfo_init);
 
 static void __exit mediatek_socinfo_exit(void)
 {

@@ -4,6 +4,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
@@ -2712,7 +2713,7 @@ struct platform_driver mml_aal_driver = {
 	},
 };
 
-//module_platform_driver(mml_aal_driver);
+//vseq_module_platform_driver(mml_aal_driver);
 
 static s32 dbg_case;
 static s32 dbg_set(const char *val, const struct kernel_param *kp)

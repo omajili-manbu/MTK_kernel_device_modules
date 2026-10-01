@@ -4,6 +4,7 @@
  */
 
 #include <linux/cpu.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -872,7 +873,7 @@ END:
 
 	return 0;
 }
-module_init(swpm_arm_pmu_init);
+vseq_module_init(swpm_arm_pmu_init);
 
 void __exit swpm_arm_pmu_exit(void)
 {

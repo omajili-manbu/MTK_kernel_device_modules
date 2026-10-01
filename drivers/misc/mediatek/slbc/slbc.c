@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/kconfig.h>
 #include <linux/kthread.h>
 #include <linux/kernel.h>
@@ -412,7 +413,7 @@ int __init slbc_common_module_init(void)
 	return 0;
 }
 
-late_initcall(slbc_common_module_init);
+vseq_late_initcall(slbc_common_module_init);
 
 MODULE_DESCRIPTION("SLBC Driver common v0.1");
 MODULE_LICENSE("GPL");

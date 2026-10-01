@@ -3,6 +3,7 @@
  * Copyright (C) 2018 MediaTek Inc.
  */
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/of_platform.h> /* rodin r25: 6.18 header pruning */
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/clk.h>
@@ -2414,9 +2415,9 @@ static int __init mtk_dvfsrc_init(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_DVFSRC)
-module_init(mtk_dvfsrc_init);
+vseq_module_init(mtk_dvfsrc_init);
 #else
-subsys_initcall(mtk_dvfsrc_init);
+vseq_subsys_initcall(mtk_dvfsrc_init);
 #endif
 
 static void __exit mtk_dvfsrc_exit(void)

@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk-provider.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
@@ -129,5 +130,5 @@ static struct platform_driver clk_mt6899_infracfg_ao_drv = {
 	},
 };
 
-module_platform_driver(clk_mt6899_infracfg_ao_drv);
+vseq_module_platform_driver(clk_mt6899_infracfg_ao_drv);
 MODULE_LICENSE("GPL");

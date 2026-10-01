@@ -5,6 +5,7 @@
  */
 
 #include <linux/init.h>		/* For init/exit macros */
+#include <linux/vseq.h>
 #include <linux/module.h>	/* For MODULE_ marcros  */
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -1278,7 +1279,7 @@ static int __init mtk_pd_adapter_init(void)
 {
 	return platform_driver_register(&mtk_pd_adapter_driver);
 }
-device_initcall_sync(mtk_pd_adapter_init);
+vseq_device_initcall_sync(mtk_pd_adapter_init);
 
 static void __exit mtk_pd_adapter_exit(void)
 {
@@ -1286,7 +1287,7 @@ static void __exit mtk_pd_adapter_exit(void)
 }
 module_exit(mtk_pd_adapter_exit);
 #else
-module_platform_driver(mtk_pd_adapter_driver);
+vseq_module_platform_driver(mtk_pd_adapter_driver);
 #endif
 
 MODULE_AUTHOR("wy.chuang <wy.chuang@mediatek.com>");

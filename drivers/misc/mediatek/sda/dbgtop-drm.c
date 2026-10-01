@@ -4,6 +4,7 @@
  */
 
 #include <dbgtop.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/io.h>
@@ -263,7 +264,7 @@ static int __init mtk_dbgtop_drm_init(void)
 	return 0;
 }
 
-module_init(mtk_dbgtop_drm_init);
+vseq_module_init(mtk_dbgtop_drm_init);
 
 MODULE_DESCRIPTION("MediaTek DBGTOP-DRM Driver");
 MODULE_LICENSE("GPL v2");

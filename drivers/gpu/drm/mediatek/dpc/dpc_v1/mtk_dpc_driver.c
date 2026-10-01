@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/component.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -4874,7 +4875,7 @@ static void __exit mtk_dpc_exit_v1(void)
 	DPCFUNC();
 }
 
-module_init(mtk_dpc_init_v1);
+vseq_module_init(mtk_dpc_init_v1);
 module_exit(mtk_dpc_exit_v1);
 
 MODULE_AUTHOR("William Yang <William-tw.Yang@mediatek.com>");

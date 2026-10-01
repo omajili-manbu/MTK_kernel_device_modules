@@ -4,6 +4,7 @@
 // Author: Owen Chen <owen.chen@mediatek.com>
 
 #include <linux/clk-provider.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
@@ -570,10 +571,10 @@ void pdchk_common_init(const struct pdchk_ops *ops)
 EXPORT_SYMBOL(pdchk_common_init);
 
 /* rodin b52: in 6.18 the MTK clock providers register as platform devices
- * (device_initcall), after the pd-chk probe (subsys_initcall). Filling the
+ * (vseq_device_initcall), after the pd-chk probe (vseq_subsys_initcall). Filling the
  * SWCG clk pointers in-probe walks the whole DT against an empty provider
  * table (~330 misses at 10ms pacing = 3.3s of boot time, zero on 6.6).
- * Fill them once at late_initcall when all providers are up. */
+ * Fill them once at vseq_late_initcall when all providers are up. */
 static int __init pdchk_swcg_late_init(void)
 {
 	int i;
@@ -592,7 +593,7 @@ static int __init pdchk_swcg_late_init(void)
 
 	return 0;
 }
-late_initcall(pdchk_swcg_late_init);
+vseq_late_initcall(pdchk_swcg_late_init);
 
 struct generic_pm_domain **pdchk_get_all_genpd(void)
 {

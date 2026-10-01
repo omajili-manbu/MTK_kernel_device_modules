@@ -3,6 +3,7 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/err.h>
 #include <linux/iio/iio.h>
 #include <linux/kernel.h>
@@ -481,7 +482,7 @@ static struct platform_driver mt6681_auxadc_driver = {
 	},
 	.probe = mt6681_auxadc_probe,
 };
-module_platform_driver(mt6681_auxadc_driver);
+vseq_module_platform_driver(mt6681_auxadc_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Wen Su <Wen.Su@mediatek.com>");

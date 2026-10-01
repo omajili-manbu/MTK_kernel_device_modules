@@ -5,6 +5,7 @@
  */
 
 #include <asm/cputype.h>
+#include <linux/vseq.h>
 #include <linux/arm-smccc.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
@@ -572,7 +573,7 @@ static __exit void last_bus_exit(void)
 #endif
 }
 
-module_init(last_bus_init);
+vseq_module_init(last_bus_init);
 module_exit(last_bus_exit);
 
 MODULE_DESCRIPTION("MediaTek Last Bus Driver");

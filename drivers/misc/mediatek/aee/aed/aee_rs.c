@@ -4,6 +4,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/vseq.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/printk.h>
@@ -177,7 +178,7 @@ static void __exit aedrs_exit(void)
 {
 	misc_deregister(&aed_rs_dev);
 }
-module_init(aedrs_init);
+vseq_module_init(aedrs_init);
 module_exit(aedrs_exit);
 
 MODULE_LICENSE("GPL");

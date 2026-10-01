@@ -10,6 +10,7 @@
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
 #include <linux/clockchips.h>
+#include <linux/vseq.h>
 #include <linux/clocksource.h>
 #include <linux/interrupt.h>
 #include <linux/irqreturn.h>
@@ -386,7 +387,7 @@ static struct platform_driver mtk_timer_driver = {
 MODULE_DESCRIPTION("MEDIATEK Module Timer driver");
 MODULE_LICENSE("GPL v2");
 
-module_platform_driver(mtk_timer_driver);
+vseq_module_platform_driver(mtk_timer_driver);
 #else
 TIMER_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_gpt_init);
 TIMER_OF_DECLARE(mtk_mt6765, "mediatek,mt6765-timer", mtk_syst_init);

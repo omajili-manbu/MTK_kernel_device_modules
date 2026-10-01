@@ -6,6 +6,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -517,7 +518,7 @@ static struct platform_driver mtk_disp_pwm_driver = {
 	.probe = mtk_disp_pwm_probe,
 	.remove = mtk_disp_pwm_remove,
 };
-module_platform_driver(mtk_disp_pwm_driver);
+vseq_module_platform_driver(mtk_disp_pwm_driver);
 
 MODULE_AUTHOR("YH Huang <yh.huang@mediatek.com>");
 MODULE_DESCRIPTION("MediaTek SoC display PWM driver");

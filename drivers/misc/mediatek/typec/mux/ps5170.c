@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/kernel.h>
@@ -685,7 +686,7 @@ static struct i2c_driver ps5170_driver = {
 	.remove	= ps5170_remove,
 	.id_table = ps5170_table,
 };
-module_i2c_driver(ps5170_driver);
+vseq_module_i2c_driver(ps5170_driver);
 
 MODULE_DESCRIPTION("ps5170 Type-C Redriver");
 MODULE_LICENSE("GPL v2");

@@ -4,6 +4,7 @@
  * Author: Yong Wu <yong.wu@mediatek.com>
  */
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/component.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -6055,7 +6056,7 @@ static int __init mtk_smi_init(void)
 	smi_mme_init();
 	return platform_register_drivers(smidrivers, ARRAY_SIZE(smidrivers));
 }
-module_init(mtk_smi_init);
+vseq_module_init(mtk_smi_init);
 
 static void __exit mtk_smi_exit(void)
 {

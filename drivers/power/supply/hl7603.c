@@ -19,6 +19,7 @@
 #define pr_fmt(fmt)     "[hl7603] %s: " fmt, __func__
 
 #include <linux/printk.h>
+#include <linux/vseq.h>
 #include <linux/of.h>
 #include <linux/i2c.h>
 #include "hl7603.h"
@@ -120,7 +121,7 @@ static struct i2c_driver hl7603_driver = {
     .remove = hl7603_remove,
     .shutdown = hl7603_shutdown,
 };
-module_i2c_driver(hl7603_driver);
+vseq_module_i2c_driver(hl7603_driver);
 
 MODULE_AUTHOR("jinkai <jinaki1@xiaomi.com>");
 MODULE_DESCRIPTION("hl7603 boot_bypass driver");

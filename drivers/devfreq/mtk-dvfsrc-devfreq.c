@@ -3,6 +3,7 @@
  * Copyright (C) 2020 MediaTek Inc.
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
@@ -205,7 +206,7 @@ static struct platform_driver dvfsrc_devfreq_platdrv = {
 		.name	= "mtk-dvfsrc-devfreq",
 	},
 };
-module_platform_driver(dvfsrc_devfreq_platdrv);
+vseq_module_platform_driver(dvfsrc_devfreq_platdrv);
 MODULE_DESCRIPTION("MTK DVFSRC devfreq driver");
 MODULE_AUTHOR("Arvin wang <arvin.wang@mediatek.com>");
 MODULE_LICENSE("GPL v2");

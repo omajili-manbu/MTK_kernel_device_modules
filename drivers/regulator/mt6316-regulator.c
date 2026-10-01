@@ -3,6 +3,7 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -401,7 +402,7 @@ static struct platform_driver mt6316_regulator_driver = {
 	.probe = mt6316_regulator_probe,
 };
 
-module_platform_driver(mt6316_regulator_driver);
+vseq_module_platform_driver(mt6316_regulator_driver);
 
 MODULE_AUTHOR("Wen Su <wen.su@mediatek.com>");
 MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6316 PMIC");

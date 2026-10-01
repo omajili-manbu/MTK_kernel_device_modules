@@ -3,6 +3,7 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -60,7 +61,7 @@ static struct platform_driver mm_fake_eng_drv = {
 		.of_match_table = mm_fake_eng_of_ids,
 	},
 };
-module_platform_driver(mm_fake_eng_drv);
+vseq_module_platform_driver(mm_fake_eng_drv);
 
 MODULE_LICENSE("GPL");
 

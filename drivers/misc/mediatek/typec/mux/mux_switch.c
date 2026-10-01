@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -451,7 +452,7 @@ static struct platform_driver typec_mux_switch_driver = {
 	},
 };
 
-module_platform_driver(typec_mux_switch_driver);
+vseq_module_platform_driver(typec_mux_switch_driver);
 
 MODULE_DESCRIPTION("Mediatek Type-C mux switch driver");
 MODULE_LICENSE("GPL");

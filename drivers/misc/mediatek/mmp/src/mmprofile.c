@@ -4,6 +4,7 @@
  */
 
 #include <linux/miscdevice.h>
+#include <linux/vseq.h>
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/mm.h>
@@ -2509,7 +2510,7 @@ static void __exit mmprofile_exit(void)
 
 /* Driver specific end */
 
-module_init(mmprofile_init);
+vseq_module_init(mmprofile_init);
 module_exit(mmprofile_exit);
 MODULE_AUTHOR("Tianshu Qiu <tianshu.qiu@mediatek.com>");
 MODULE_DESCRIPTION("MMProfile Driver");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/cpumask.h>
 #include <linux/debug_locks.h>
 #include <linux/debugfs.h>
@@ -1980,7 +1981,7 @@ static void __exit monitor_hang_exit(void)
 #endif
 }
 
-subsys_initcall_sync(monitor_hang_init);
+vseq_subsys_initcall_sync(monitor_hang_init);
 module_exit(monitor_hang_exit);
 
 

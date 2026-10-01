@@ -4,6 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/hw_random.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -167,7 +168,7 @@ static struct platform_driver sec_rng_driver = {
 	},
 };
 
-module_platform_driver(sec_rng_driver);
+vseq_module_platform_driver(sec_rng_driver);
 
 MODULE_DESCRIPTION("Security Random Number Generator Driver");
 MODULE_AUTHOR("Jackson Chang <jackson-kt.chang@mediatek.com>");

@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/power_supply.h>
@@ -1598,7 +1599,7 @@ static struct platform_driver pdm_driver = {
 	.id_table = pdm_id,
 };
 
-module_platform_driver(pdm_driver);
+vseq_module_platform_driver(pdm_driver);
 MODULE_AUTHOR("xiezhichang");
 MODULE_DESCRIPTION("charge pump manager for PD");
 MODULE_LICENSE("GPL");

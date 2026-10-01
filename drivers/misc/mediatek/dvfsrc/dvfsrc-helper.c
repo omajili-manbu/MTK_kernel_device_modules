@@ -4,6 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -1650,7 +1651,7 @@ static int __init mtk_dvfsrc_helper_init(void)
 #endif
 	return 0;
 }
-late_initcall_sync(mtk_dvfsrc_helper_init)
+vseq_late_initcall_sync(mtk_dvfsrc_helper_init)
 
 static void __exit mtk_dvfsrc_helper_exit(void)
 {
