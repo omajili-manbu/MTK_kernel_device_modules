@@ -26,6 +26,9 @@ static int disable_unused_probe(struct platform_device *pdev)
 	int clk_con, i = 0;
 	int pp1, en1, pp2, en2;
 	int retval = 0;
+	u32 node_reg = ~0;
+
+	of_property_read_u32(pdev->dev.of_node, "reg", &node_reg);
 
 	clk_con = of_count_phandle_with_args(pdev->dev.of_node, "clocks",
 			"#clock-cells");
@@ -49,6 +52,18 @@ static int disable_unused_probe(struct platform_device *pdev)
 				pr_notice("get clk [%d] fail, ret=%d, clk_con=%d\n",
 						i,  (int)ret, clk_con);
 		} else {
+			/* rodin #135: audiosys@8f [44]+ = AFE ASRC(CON3)/源CG(CON4)族的 _V
+			 * 虚拟门, enable->disable 净效果为零但会经父门写 CON3/CON4; CON3
+			 * ASRC 的 disable 写触发 PD 域掉电握手, 26M 已被 AFE free-run 后缀
+			 * 掐断, store 不 retire 即总线挂死。CON3 保持 free-run 0x0 = 6.6
+			 * 开机稳态, 跳过即等效。 */
+			if (node_reg == 0x8f && i >= 44) {
+				pr_notice("ddu-skip %s [%d] %s\n",
+					  dev_name(&pdev->dev), i,
+					  __clk_get_name(clk));
+				clk_put(clk);
+				continue;
+			}
 #if DUMP_UNUSED_CLKS
 			/* enable parent clk first because of clk dependency */
 			if (i == 44)

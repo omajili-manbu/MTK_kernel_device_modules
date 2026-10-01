@@ -377,6 +377,17 @@ static int mt6899_apu_power_on(struct mtk_apu *apu)
 
 	/* to force apu top power on synchronously */
 	ret = pm_runtime_get_sync(apu->power_dev);
+	/* rodin #135: =y 后 apu_top probe(唯一 pm_runtime_enable(power_dev) 者)可能被
+	 * fw_devlink/defer 推迟到 attach 之后, 6.6 的 .ko 装载序失效; 复刻下方 iommu
+	 * 的 nested-disable 兜底, 由 genpd 直接上电 */
+	if (ret == -EACCES) {
+		dev_info(apu->dev,
+			 "%s: power_dev disabled. Enable and retry\n",
+			 __func__);
+		pm_runtime_enable(apu->power_dev);
+		pm_runtime_put_sync(apu->power_dev);
+		ret = pm_runtime_get_sync(apu->power_dev);
+	}
 
 	/* set_apu_pm_status - power on */
 	mtk_iommu_update_pm_status(1, 0, true);

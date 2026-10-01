@@ -22,6 +22,12 @@ APUSYS_VERSION_MNOC = 1.5
 APUSYS_VERSION_VPU = 4.5
 APUSYS_VERSION_REVISER = 2.0
 
+# rodin #135: 6.6 上 apu_top.ko 先于 apusys.ko 装载, apu_top probe 先
+# pm_runtime_enable + all_on, mtk-apu attach 的 get_sync(power_dev) 才不会打在
+# 未 probe 设备(disabled+suspended)上吃 -EACCES; =y 后顺序=链接序, power/ 必须在
+# apusys.o 之前
+obj-$(CONFIG_MTK_APUSYS_SUPPORT) += power/
+
 # target object
 obj-$(CONFIG_MTK_APUSYS_SUPPORT) += apusys.o
 
@@ -212,7 +218,6 @@ apusys-objs += power/2.5/common/apu-tag.o
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/apusys/power/2.5/inc/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/apusys/power/3.0/inc/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/apusys/power/3.0/inc/platform/
-obj-$(CONFIG_MTK_APUSYS_SUPPORT) += power/
 
 # apusys power budget
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/pbm/
