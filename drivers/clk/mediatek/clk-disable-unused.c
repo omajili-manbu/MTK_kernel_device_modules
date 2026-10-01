@@ -34,7 +34,10 @@ static int disable_unused_probe(struct platform_device *pdev)
 		return 0;
 
 	pm_runtime_enable(&pdev->dev);
-	pm_runtime_get_sync(&pdev->dev);
+	retval = pm_runtime_get_sync(&pdev->dev);
+	pr_notice("disable-unused %s: get_sync=%d pm_domain=%d\n",
+			dev_name(&pdev->dev), retval,
+			pdev->dev.pm_domain ? 1 : 0);
 	for (i = 0; i < clk_con; i++) {
 		clk = of_clk_get(pdev->dev.of_node, i);
 		if (IS_ERR_OR_NULL(clk)) {
@@ -81,6 +84,9 @@ static int disable_unused_probe(struct platform_device *pdev)
 			if (pp1 != pp2 || en1 != en2)
 				pr_notice("disable_unused clk [%d]: %s done\n",
 					i, __clk_get_name(clk));
+			pr_notice("ddu-clk %s [%d] %s: en %d->%d pp %d->%d\n",
+				dev_name(&pdev->dev), i, __clk_get_name(clk),
+				en1, en2, pp1, pp2);
 #endif
 		}
 	}

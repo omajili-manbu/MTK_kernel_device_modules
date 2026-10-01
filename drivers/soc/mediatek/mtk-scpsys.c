@@ -624,6 +624,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_PROFILE))
 		pd_start_time = jiffies_to_msecs(jiffies);
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	/* wait until vcp is ready, for HFRP base MTCMOS */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_WAIT_VCP)) {
@@ -633,6 +634,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 			goto err_vcp_ready;
 	}
 
+	dev_notice(scp->dev, "[scpsys] %s: vcp-ok\n", genpd->name);
 	ret = scpsys_regulator_enable(scpd);
 	if (ret < 0)
 		goto err_regulator;
@@ -645,6 +647,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 	if (ret)
 		goto err_lp_clk;
 
+	dev_notice(scp->dev, "[scpsys] %s: basic-clks-on\n", genpd->name);
 	/* subsys power on */
 	val = readl(ctl_addr);
 	val |= PWR_ON_BIT;
@@ -808,6 +811,7 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_PROFILE))
 		pd_start_time = jiffies_to_msecs(jiffies);
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_BYPASS_OFF)) {
 		dev_err(scp->dev, "bypass power off %s for bringup\n", genpd->name);
@@ -963,6 +967,7 @@ static int scpsys_md_power_on(struct generic_pm_domain *genpd)
 	u32 val;
 	int ret, tmp;
 
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 	ret = scpsys_regulator_enable(scpd);
 	if (ret < 0)
 		return ret;
@@ -1032,6 +1037,7 @@ static int scpsys_md_power_off(struct generic_pm_domain *genpd)
 	u32 val;
 	int ret, tmp;
 
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 	ret = scpsys_bus_protect_enable(scpd);
 	if (ret < 0)
 		goto out;
@@ -1085,6 +1091,7 @@ static int scpsys_apu_power_on(struct generic_pm_domain *genpd)
 	struct scp *scp = scpd->scp;
 	int ret = 0;
 
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 	if (g_apucb && g_apucb->apu_power_on) {
 		ret = g_apucb->apu_power_on();
 		if (ret) {
@@ -1101,6 +1108,7 @@ static int scpsys_apu_power_off(struct generic_pm_domain *genpd)
 	struct scp *scp = scpd->scp;
 	int ret = 0;
 
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 	if (g_apucb && g_apucb->apu_power_off) {
 		ret = g_apucb->apu_power_off();
 		if (ret) {
@@ -1204,6 +1212,7 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 	int ret = 0;
 	int tmp;
 	int i = 0;
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	if (scpd->hwv_regmap)
 		hwv_regmap = scpd->hwv_regmap;
@@ -1225,6 +1234,7 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 			goto err_vcp_ready;
 	}
 
+	dev_notice(scp->dev, "[scpsys] %s: hwv vcp-ok\n", genpd->name);
 	ret = scpsys_regulator_enable(scpd);
 	if (ret < 0)
 		goto err_regulator;
@@ -1237,6 +1247,7 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 	if (ret)
 		goto err_lp_clk;
 
+	dev_notice(scp->dev, "[scpsys] %s: hwv pre-done-poll\n", genpd->name);
 	/* wait for irq status idle */
 	ret = readx_poll_timeout_atomic(mtk_hwv_is_done, scpd, tmp, tmp > 0,
 			MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
@@ -1311,6 +1322,7 @@ static int scpsys_hwv_power_off(struct generic_pm_domain *genpd)
 	int ret = 0;
 	int tmp;
 	int i = 0;
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	if (scpd->hwv_regmap)
 		hwv_regmap = scpd->hwv_regmap;
@@ -1428,6 +1440,7 @@ static int scpsys_pbus_power_on(struct generic_pm_domain *genpd)
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_PROFILE))
 		pd_start_time = jiffies_to_msecs(jiffies);
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	/* Turn on MTCMOS */
 	val = readl(ctl_addr);
@@ -1471,6 +1484,7 @@ static int scpsys_pbus_power_off(struct generic_pm_domain *genpd)
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_PROFILE))
 		pd_start_time = jiffies_to_msecs(jiffies);
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_BYPASS_OFF)) {
 		dev_err(scp->dev, "bypass power off %s for bringup\n", genpd->name);
@@ -1600,6 +1614,7 @@ static int scpsys_mminfra_hwv_power_on(struct generic_pm_domain *genpd)
 {
 	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
 	struct scp *scp = scpd->scp;
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	return __mminfra_hwv_power_ctrl(scpd, scpd->hwv_regmap,
 			scp->dev, genpd->name, true);
@@ -1609,6 +1624,7 @@ static int scpsys_mminfra_hwv_power_off(struct generic_pm_domain *genpd)
 {
 	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
 	struct scp *scp = scpd->scp;
+	dev_notice(scp->dev, "[scpsys] %s: %s enter\n", __func__, genpd->name);
 
 	return __mminfra_hwv_power_ctrl(scpd, scpd->hwv_regmap,
 			 scp->dev, genpd->name, false);
