@@ -39,6 +39,7 @@
 #include "pcm.h"
 
 #include "xhci.h"
+#include "xhci-dbgcap.h"
 #include "xhci-mtk.h"
 #include "quirks.h"
 
@@ -1266,6 +1267,11 @@ static int __init xhci_mtk_init(void)
 {
 	int ret;
 
+	/* DbC tty glue is compiled into this unit (xhci-dbgcap.c/dbgtty.c);
+	 * the kernel tree no longer builds CONFIG_USB_XHCI_DBGCAP, so the
+	 * upstream registration point (kernel xhci.c) no longer exists. */
+	xhci_dbc_init();
+
 	xhci_init_driver_(&xhci_mtk_hc_driver, &xhci_mtk_overrides);
 	ret = platform_driver_register(&mtk_xhci_p2_driver);
 	if (ret < 0)
@@ -1282,6 +1288,8 @@ static void __exit xhci_mtk_exit(void)
 	platform_driver_unregister(&mtk_xhci_p2_driver);
 	platform_driver_unregister(&mtk_xhci_p1_driver);
 	platform_driver_unregister(&mtk_xhci_driver);
+
+	xhci_dbc_exit();
 }
 module_exit(xhci_mtk_exit);
 

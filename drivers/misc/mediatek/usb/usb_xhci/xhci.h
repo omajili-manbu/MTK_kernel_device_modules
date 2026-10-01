@@ -2133,6 +2133,9 @@ int xhci_ring_expansion_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		unsigned int num_trbs, gfp_t flags);
 void xhci_initialize_ring_info_(struct xhci_ring *ring,
 			unsigned int cycle_state);
+/* Kernel-tree variant (1 arg): the vendor-built DbC glue (xhci-dbgcap.c)
+ * calls it on rings it owns itself. */
+void xhci_initialize_ring_info(struct xhci_ring *ring);
 void xhci_free_endpoint_ring_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		unsigned int ep_index);

@@ -15,6 +15,7 @@ xhci-mtk-hcd-v2-y += xhci-trace.o
 xhci-mtk-hcd-v2-y += xhci-mtk.o xhci-mtk-sch.o
 xhci-mtk-hcd-v2-y += quirks.o
 xhci-mtk-hcd-v2-y += xhci-sideband.o
+xhci-mtk-hcd-v2-y += xhci-dbgcap.o xhci-dbgtty.o
 
 ifneq ($(CONFIG_DEBUG_FS),)
 	xhci-mtk-hcd-v2-y		+= xhci-debugfs.o
