@@ -51,7 +51,13 @@ static int disable_unused_probe(struct platform_device *pdev)
 		} else {
 #if DUMP_UNUSED_CLKS
 			/* enable parent clk first because of clk dependency */
+			if (i == 44)
+				pr_notice("ddu-pre %s [%d] %s: parent-enable begin\n",
+					  dev_name(&pdev->dev), i, __clk_get_name(clk));
 			retval = clk_prepare_enable(clk_get_parent(clk));
+			if (i == 44)
+				pr_notice("ddu-aft %s [%d] %s: parent-enable ret %d\n",
+					  dev_name(&pdev->dev), i, __clk_get_name(clk), retval);
 			if (retval) {
 				pr_info("parent of clk %s clk_prepare_enable failed, err:%d\n",
 					__clk_get_name(clk), retval);

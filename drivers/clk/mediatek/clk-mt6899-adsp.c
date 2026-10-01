@@ -415,12 +415,17 @@ static int clk_mt6899_adsp_grp_probe(struct platform_device *pdev)
  */
 #define AUDSYS_AFE_SPM_CONTROL_REQ	0x60
 #define AUDSYS_AFE_SPM_CONTROL_ACK	0x64
+#define AUDSYS_AUDIO_TOP_CON0		0x0
+#define AUDSYS_AUDIO_TOP_CON1		0x4
+#define AUDSYS_AUDIO_TOP_CON2		0x8
 #define AUDSYS_AUDIO_TOP_CON3		0xc
+#define AUDSYS_AUDIO_TOP_CON4		0x10
 
 static int mt6899_audsys_26m_hold_init(void)
 {
 	struct regmap *regmap;
-	unsigned int req = 0, ack = 0, con3 = 0;
+	unsigned int req = 0, ack = 0;
+	unsigned int con0 = 0, con1 = 0, con2 = 0, con3 = 0, con4 = 0;
 	int ret;
 
 	regmap = syscon_regmap_lookup_by_compatible("mediatek,mt6899-audiosys");
@@ -429,14 +434,42 @@ static int mt6899_audsys_26m_hold_init(void)
 		return 0;
 	}
 
+	/* raw bank state before any write (evidence for the next comparison) */
+	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON0, &con0);
+	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON1, &con1);
+	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON2, &con2);
+	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON3, &con3);
+	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON4, &con4);
+	pr_notice("audsys-26m-hold: raw CON0 0x%x CON1 0x%x CON2 0x%x CON3 0x%x CON4 0x%x\n",
+		  con0, con1, con2, con3, con4);
+
 	ret = regmap_update_bits(regmap, AUDSYS_AFE_SPM_CONTROL_REQ, BIT(0), BIT(0));
 	regmap_read(regmap, AUDSYS_AFE_SPM_CONTROL_REQ, &req);
 	regmap_read(regmap, AUDSYS_AFE_SPM_CONTROL_ACK, &ack);
 	pr_notice("audsys-26m-hold: set ret %d req 0x%x ack 0x%x\n", ret, req, ack);
 
-	/* forensic read-back: the CON3 (ASRC gate) page must be reachable now */
-	ret = regmap_read(regmap, AUDSYS_AUDIO_TOP_CON3, &con3);
-	pr_notice("audsys-26m-hold: CON3 read ret %d val 0x%x\n", ret, con3);
+	/*
+	 * rodin b521 (#132 终验 FAIL): the 26M request alone did NOT clear the wedge.
+	 * #132 still stopped at audiosys@8f entry [44] (first AUDIO_TOP_CON3 write,
+	 * ASRC gate block at audiosys+0xc) with CON3 read back 0x3e00000 = all five
+	 * ASRC gates closed.
+	 *
+	 * The 6.6 baseline settles the mechanism: the AFE runtime resume writes
+	 * AUDIO_TOP_CON3 = 0x0 ("Add to be on for free run"), and the AFE runtime
+	 * suspend only re-gates CON4 and clears the 26M request -- it never touches
+	 * CON3.  On 6.6 the sequence is 3.0316s resume -> 3.0385s suspend -> 3.5475s
+	 * whitelist, so CON3 was still 0x0 across the whole whitelist window and its
+	 * first CON3 write never met a fully gated ASRC block.
+	 *
+	 * On 6.18 the AFE probe-time resume ran with regmap still NULL ("skip
+	 * regmap") and the sound card -- which would trigger a second, register-
+	 * writing resume -- fails to register (A-28).  CON3 therefore kept its
+	 * hardware default and the whitelist write stalled on the unclocked block.
+	 * Reproduce the AFE free-run write from the register owner.
+	 */
+	ret = regmap_write(regmap, AUDSYS_AUDIO_TOP_CON3, 0x0);
+	regmap_read(regmap, AUDSYS_AUDIO_TOP_CON3, &con3);
+	pr_notice("audsys-26m-hold: CON3 write ret %d readback 0x%x\n", ret, con3);
 
 	return 0;
 }
