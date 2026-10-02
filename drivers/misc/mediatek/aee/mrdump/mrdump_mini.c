@@ -43,20 +43,24 @@ static struct mrdump_mini_elf_header *mrdump_mini_ehdr;
 
 
 #ifdef CONFIG_MODULES
-struct module_sect_attr {
-	struct bin_attribute battr;
-	unsigned long address;
-};
-
+/*
+ * kernel 6.18 (kernel/module/sysfs.c) dropped the 6.6
+ * struct module_sect_attr {battr, address} wrapper and the section/notes
+ * counters (nsections / notes / dir): sect/notes attrs are now a flat
+ * bin_attribute array with the section address in battr->private.
+ * struct module::{sect,notes}_attrs stay opaque outside kernel/module/,
+ * so keep local definitions matched to the 6.18 layout and walk
+ * grp.bin_attrs (NULL-terminated) instead of indexing attrs[] --
+ * reading the 6.6 layout feeds attrs[0].attr.mode (0400) to strcmp as
+ * the "name" pointer (load_ko_addr_list Oops at 0x100).
+ */
 struct module_sect_attrs {
 	struct attribute_group grp;
-	unsigned int nsections;
-	struct module_sect_attr attrs[];
+	struct bin_attribute attrs[];
 };
 
 struct module_notes_attrs {
-	struct kobject *dir;
-	unsigned int notes;
+	struct attribute_group grp;
 	struct bin_attribute attrs[];
 };
 
@@ -86,41 +90,48 @@ static spinlock_t kolist_lock;
 
 static void fill_ko_list(unsigned int idx, struct module *mod)
 {
+	struct module_sect_attrs *sect_attrs = mod->sect_attrs;
+	struct module_notes_attrs *notes_attrs = mod->notes_attrs;
 	unsigned long text_addr = 0;
 	unsigned long init_addr = 0;
-	const void *build_id;
+	const void *build_id = NULL;
 	struct elf_note *note;
-	int i, search_nm, build_id_sz = 0;
+	struct bin_attribute **battr;
+	int build_id_sz = 0;
 
 	if (idx >= MAX_KO_NUM)
 		return;
 
-	if (mod->sect_attrs == NULL)
+	if (sect_attrs == NULL)
 		return;
 
-	search_nm = 2;
-	for (i = 0; i < mod->sect_attrs->nsections; i++) {
-		if (!strcmp(mod->sect_attrs->attrs[i].battr.attr.name,
-			    ".text")) {
-			text_addr = mod->sect_attrs->attrs[i].address;
-			search_nm--;
-		} else if (!strcmp(mod->sect_attrs->attrs[i].battr.attr.name,
-				   ".init.text")) {
-			init_addr = mod->sect_attrs->attrs[i].address;
-			search_nm--;
+	for (battr = sect_attrs->grp.bin_attrs; battr && *battr; battr++) {
+		const char *name = (*battr)->attr.name;
+
+		if (!name)
+			continue;
+		if (!strcmp(name, ".text")) {
+			text_addr = (unsigned long)(*battr)->private;
+		} else if (!strcmp(name, ".init.text")) {
+			init_addr = (unsigned long)(*battr)->private;
 		}
-		if (!search_nm)
-			break;
 	}
 
-	for (i = 0; i < mod->notes_attrs->notes; i++) {
-		if (!strcmp(mod->notes_attrs->attrs[i].attr.name,
-			    ".note.gnu.build-id")) {
-			note = mod->notes_attrs->attrs[i].private;
-			build_id = (void *)round_up(((unsigned long)(note + 1)
-						     + note->n_namesz), 4);
-			build_id_sz = note->n_descsz;
-			break;
+	if (notes_attrs) {
+		for (battr = notes_attrs->grp.bin_attrs;
+		     battr && *battr; battr++) {
+			const char *name = (*battr)->attr.name;
+
+			if (!name)
+				continue;
+			if (!strcmp(name, ".note.gnu.build-id")) {
+				note = (*battr)->private;
+				build_id = (void *)round_up(
+					((unsigned long)(note + 1)
+					 + note->n_namesz), 4);
+				build_id_sz = note->n_descsz;
+				break;
+			}
 		}
 	}
 
@@ -134,7 +145,7 @@ static void fill_ko_list(unsigned int idx, struct module *mod)
 			memcpy(ko_info_list[idx].build_id, build_id,
 					build_id_sz);
 	} else {
-		memset(&ko_info_list[i], 0, sizeof(struct ko_info));
+		memset(&ko_info_list[idx], 0, sizeof(struct ko_info));
 	}
 }
 
