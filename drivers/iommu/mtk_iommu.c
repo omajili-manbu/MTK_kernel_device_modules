@@ -274,7 +274,7 @@ static atomic_t init_once_flag = ATOMIC_INIT(0);
 static const char *IOMMU_BANKS_PROP_NAME = "mediatek,iommu_banks";
 static const char *IOMMU_BANKS_PROP_NAME_v2 = "mediatek,iommu-banks";
 
-static int mtk_iommu_hw_init(const struct mtk_iommu_data *data);
+static int mtk_iommu_hw_init(struct mtk_iommu_data *data);
 
 #define MTK_IOMMU_TLB_ADDR(iova) ({					\
 	dma_addr_t _addr = iova;					\
@@ -1762,6 +1762,83 @@ static int mtk_iommu_set_dev_dma(struct device *dev)
 	return 0;
 }
 
+#define MTK_IOMMU_HW_VERIFY_INTERVAL_MS	10
+#define MTK_IOMMU_HW_VERIFY_MAX_RETRY	600
+
+/*
+ * rodin #144: 6.18 注册期扫描在 mtk_iommu_probe 内同步 attach 全部消费者
+ * (b528 实证 0.549s T1)，APU SMMU 电源未上，一次性 hw_init 的写入全部
+ * 丢失(全寄存器读 0，PT_BASE 回读 0x0)。框架侧不会再有第二次 attach
+ * (消费者已分组，后续 probe 走 fwspec 早退)，自愈只能驱动侧做：
+ * 周期重放 hw_init + PT_BASE，直到回读非 0 才把 HW init 记为成功。
+ * 6.6 健康基线 APU tab1 回读 0x7bf10000，判据与电源态严格相关。
+ */
+static void mtk_iommu_hw_verify_work(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct mtk_iommu_data *data = container_of(dwork, struct mtk_iommu_data,
+						   hw_verify_work);
+	unsigned int tab_id = data->plat_data->tab_id;
+	bool got_pm = false, verified = false, resched = true;
+	u32 pt_base = 0;
+	int ret;
+
+	mutex_lock(&init_mutexs[tab_id]);
+
+	/* 并发的 attach 可能已完成并验证通过 */
+	if (!data->hw_init_unverified || !data->m4u_dom)
+		goto out_unlock;
+
+	ret = pm_runtime_resume_and_get(data->dev);
+	if (ret < 0) {
+		dev_err(data->dev, "%s, PM fail:%d\n", __func__, ret);
+		goto out_retry;
+	}
+	got_pm = true;
+
+	/* 寄存器配置面重放(irq 在首挂已请求，hw_init 内 irq_ready 跳过) */
+	ret = mtk_iommu_hw_init(data);
+	if (ret) {
+		dev_err(data->dev, "%s, hw re-init fail:%d\n", __func__, ret);
+		goto out_retry;
+	}
+
+	writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr,
+	       data->base + REG_MMU_PT_BASE_ADDR);
+	pt_base = readl_relaxed(data->base + REG_MMU_PT_BASE_ADDR);
+	if (pt_base == 0)
+		goto out_retry;
+
+	/* 回读落地才算"验过" */
+	data->hw_init_unverified = false;
+	verified = true;
+	resched = false;
+	pr_info("%s, iommu_dev:%s(%d,%d), PT_BASE verified:0x%x after %d retries, tab_id:%d\n",
+		__func__, dev_name(data->dev), data->plat_data->iommu_type,
+		data->plat_data->iommu_id, pt_base, data->hw_verify_retry,
+		tab_id);
+
+out_retry:
+	if (verified)
+		goto out_pm_put;
+	data->hw_verify_retry++;
+	if (data->hw_verify_retry >= MTK_IOMMU_HW_VERIFY_MAX_RETRY) {
+		resched = false;
+		dev_err(data->dev,
+			"%s, PT_BASE still reads 0x0 after %d retries, HW init unverified (%d,%d)\n",
+			__func__, data->hw_verify_retry,
+			data->plat_data->iommu_type, data->plat_data->iommu_id);
+	}
+	if (resched)
+		schedule_delayed_work(dwork,
+			msecs_to_jiffies(MTK_IOMMU_HW_VERIFY_INTERVAL_MS));
+out_pm_put:
+	if (got_pm)
+		pm_runtime_put(data->dev);
+out_unlock:
+	mutex_unlock(&init_mutexs[tab_id]);
+}
+
 static int mtk_iommu_attach_device(struct iommu_domain *domain,
 				   struct device *dev)
 {
@@ -1769,6 +1846,7 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
 	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
 	struct device *m4udev;
+	u32 pt_base;
 	int tab_id, domid, ret = 0;
 
 	if (!data || !dom || !fwspec) {
@@ -1819,13 +1897,28 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
 		}
 		writel(dom->cfg.arm_v7s_cfg.ttbr, data->base + REG_MMU_PT_BASE_ADDR);
 
+		/*
+		 * rodin #144: HW init 只在 PT_BASE 回读落地后才算成立。电源
+		 * 未上时写入全部丢失(回读 0x0)，此处不下"init 成功"的结论，
+		 * 置未验证标记并启动周期重放，直到回读非 0。
+		 */
+		pt_base = readl_relaxed(data->base + REG_MMU_PT_BASE_ADDR);
+
 		pr_info("%s, iommu_dev:%s(%d,%d), user_dev:%s, pgtable:0x%lx -- 0x%x -- 0x%x, tab_id:%d\n",
 			__func__, dev_name(data->dev), data->plat_data->iommu_type,
 			data->plat_data->iommu_id, dev_name(dev),
 			(unsigned long)dom->cfg.arm_v7s_cfg.ttbr,
-			dom->cfg.arm_v7s_cfg.ttbr,
-			readl_relaxed(data->base + REG_MMU_PT_BASE_ADDR),
+			dom->cfg.arm_v7s_cfg.ttbr, pt_base,
 			dom->tab_id);
+
+		if (pt_base == 0) {
+			data->hw_init_unverified = true;
+			data->hw_verify_retry = 0;
+			schedule_delayed_work(&data->hw_verify_work,
+				msecs_to_jiffies(MTK_IOMMU_HW_VERIFY_INTERVAL_MS));
+		} else {
+			data->hw_init_unverified = false;
+		}
 
 #if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_SECURE)
 		if (MTK_IOMMU_HAS_FLAG(data->plat_data, IOMMU_MAU_EN) &&
@@ -2185,7 +2278,7 @@ static const struct iommu_ops mtk_iommu_ops = {
 	}
 };
 
-static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+static int mtk_iommu_hw_init(struct mtk_iommu_data *data)
 {
 	u32 regval;
 	int i;
@@ -2250,35 +2343,38 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
 				data->plat_data->iommu_id);
 #endif
 
-	for (i = IOMMU_BK0; i < IOMMU_BK_NUM; i++) {
-		struct device *dev;
-		unsigned int irq;
+	if (!data->irq_ready) {
+		for (i = IOMMU_BK0; i < IOMMU_BK_NUM; i++) {
+			struct device *dev;
+			unsigned int irq;
 
-		if (i == IOMMU_BK0) {
-			dev = data->dev;
-			irq = data->irq;
-		} else {
-			if (!MTK_IOMMU_HAS_FLAG(data->plat_data,
-					IOMMU_SEC_EN))
-				break;
-			dev = data->bk_dev[i];
-			irq = data->bk_irq[i];
-		}
+			if (i == IOMMU_BK0) {
+				dev = data->dev;
+				irq = data->irq;
+			} else {
+				if (!MTK_IOMMU_HAS_FLAG(data->plat_data,
+						IOMMU_SEC_EN))
+					break;
+				dev = data->bk_dev[i];
+				irq = data->bk_irq[i];
+			}
 
-		if (!irq) {
-			pr_err("%s error, irq is 0(%d,%d,%d)\n", __func__,
-				data->plat_data->iommu_type,
-				data->plat_data->iommu_id, i);
-			continue;
+			if (!irq) {
+				pr_err("%s error, irq is 0(%d,%d,%d)\n", __func__,
+					data->plat_data->iommu_type,
+					data->plat_data->iommu_id, i);
+				continue;
+			}
+			if (devm_request_irq(dev, irq, mtk_iommu_isr, 0, dev_name(dev), (void *)data)) {
+				if (i == IOMMU_BK0)
+					writel_relaxed(0, data->base + REG_MMU_PT_BASE_ADDR);
+				dev_err(dev, "Failed @ IRQ-%d Request\n", irq);
+				return -ENODEV;
+			}
+			pr_info("%s, register irq done, (%d,%d,%d) %d\n", __func__,
+				data->plat_data->iommu_type, data->plat_data->iommu_id, i, irq);
 		}
-		if (devm_request_irq(dev, irq, mtk_iommu_isr, 0, dev_name(dev), (void *)data)) {
-			if (i == IOMMU_BK0)
-				writel_relaxed(0, data->base + REG_MMU_PT_BASE_ADDR);
-			dev_err(dev, "Failed @ IRQ-%d Request\n", irq);
-			return -ENODEV;
-		}
-		pr_info("%s, register irq done, (%d,%d,%d) %d\n", __func__,
-			data->plat_data->iommu_type, data->plat_data->iommu_id, i, irq);
+		data->irq_ready = true;
 	}
 
 	pr_info("%s done, (%d,%d), dump reg: 0x48:0x%x, 0x50:0x%x, 0x54:0x%x, 0xa0:0x%x, 0x110:0x%x, 0x114:0x%x, 0x120:0x%x, 0x124:0x%x\n",
@@ -2820,6 +2916,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	data->dev = dev;
 	data->plat_data = of_device_get_match_data(dev);
+	INIT_DELAYED_WORK(&data->hw_verify_work, mtk_iommu_hw_verify_work);
 
 	if (!atomic_cmpxchg(&init_once_flag, 0, 1)) {
 		for (i = 0; i < PGTBALE_NUM; i++)
@@ -3214,6 +3311,9 @@ out_runtime_disable:
 static void mtk_iommu_remove(struct platform_device *pdev)
 {
 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
+
+	/* rodin #144: 先停掉重放 work 再拆除 */
+	cancel_delayed_work_sync(&data->hw_verify_work);
 
 	iommu_device_sysfs_remove(&data->iommu);
 	iommu_device_unregister(&data->iommu);

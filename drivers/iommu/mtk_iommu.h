@@ -15,6 +15,8 @@
 #include <linux/iommu.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/jiffies.h>
+#include <linux/workqueue.h>
 #include <linux/dma-mapping.h>
 #include <soc/mediatek/smi.h>
 #include <dt-bindings/memory/mtk-memory-port.h>
@@ -194,6 +196,17 @@ struct mtk_iommu_data {
 	struct list_head		hw_list_head;
 	struct list_head		list;
 	struct mtk_smi_larb_iommu	larb_imu[MTK_LARB_NR_MAX];
+
+	/*
+	 * rodin #144: 6.18 注册期扫描在 probe 内同步 attach 全部消费者，
+	 * APU SMMU 此时电源未上，一次性 hw_init 写入全部丢失(b528 回读
+	 * 0x0 实锤)。PT_BASE 回读非 0 前 HW init 只算"跑过"不算"验过"，
+	 * hw_verify_work 周期重放直到回读验证通过。
+	 */
+	bool				hw_init_unverified;
+	bool				irq_ready;
+	u32				hw_verify_retry;
+	struct delayed_work		hw_verify_work;
 };
 
 struct mtk_iommu_mm_pm_ops {
