@@ -168,17 +168,17 @@ static int scp_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 
 /* ulposc calibration data */
 static void turn_onoff_ulposc2(enum ulposc_onoff_enum on);
-const char *ulposc_ver[MAX_ULPOSC_VERSION] __initconst = {
+const char *ulposc_ver[MAX_ULPOSC_VERSION] = {
 	[ULPOSC_VER_1] = "v1",
 	[ULPOSC_VER_2] = "v2",
 	[ULPOSC_VER_3] = "v3",
 };
 
-const char *scp_clk_ver[MAX_SCP_CLK_VERSION] __initconst = {
+const char *scp_clk_ver[MAX_SCP_CLK_VERSION] = {
 	[SCP_CLK_VER_1] = "v1",
 };
 
-const char *scp_dvfs_hw_chip_ver[MAX_SCP_DVFS_CHIP_HW] __initconst = {
+const char *scp_dvfs_hw_chip_ver[MAX_SCP_DVFS_CHIP_HW] = {
 	[MT6853] = "mediatek,mt6853",
 	[MT6873] = "mediatek,mt6873",
 	[MT6877] = "mediatek,mt6877",
@@ -186,7 +186,7 @@ const char *scp_dvfs_hw_chip_ver[MAX_SCP_DVFS_CHIP_HW] __initconst = {
 	[MT6833] = "mediatek,mt6833",
 };
 
-struct ulposc_cali_regs cali_regs[MAX_ULPOSC_VERSION] __initdata = {
+struct ulposc_cali_regs cali_regs[MAX_ULPOSC_VERSION] = {
 	[ULPOSC_VER_1] = {
 		REG_DEFINE(con0, 0x2C0, REG_MAX_MASK, 0)
 		REG_DEFINE(cali, 0x2C0, GENMASK(CAL_BITS - 1, 0), 0)
@@ -1399,7 +1399,7 @@ static const struct of_device_id scpdvfs_of_ids[] = {
 	{}
 };
 
-static void __init mt_pmic_sshub_init(void)
+static void mt_pmic_sshub_init(void)
 {
 #if !IS_ENABLED(CONFIG_FPGA_EARLY_PORTING)
 	int max_vcore = g_dvfs_dev.opp[g_dvfs_dev.scp_opp_nums - 1].tuned_vcore + 100000;
@@ -1507,7 +1507,7 @@ bool sync_ulposc_cali_data_to_scp(void)
 	return cali_ok;
 }
 
-static inline bool __init is_ulposc_cali_pass(unsigned int cur,
+static inline bool is_ulposc_cali_pass(unsigned int cur,
 		unsigned int target)
 {
 	if (cur > (target * (1000 - CALI_MIS_RATE) / 1000)
@@ -1522,7 +1522,7 @@ static inline bool __init is_ulposc_cali_pass(unsigned int cur,
 	return 0;
 }
 
-static unsigned int __init _get_ulposc_clk_by_fmeter_wrapper(void)
+static unsigned int _get_ulposc_clk_by_fmeter_wrapper(void)
 {
 	unsigned int result_freq;
 
@@ -1536,7 +1536,7 @@ static unsigned int __init _get_ulposc_clk_by_fmeter_wrapper(void)
 	return KHZ_TO_MHZ(FM_FREQ2CNT(result_freq));
 }
 
-static unsigned int __init get_freq_by_fmeter_wrapper(enum SCP_FM_CHANNE fm_channel)
+static unsigned int get_freq_by_fmeter_wrapper(enum SCP_FM_CHANNE fm_channel)
 {
 	unsigned int result_freq = 0;
 
@@ -1565,7 +1565,7 @@ static unsigned int __init get_freq_by_fmeter_wrapper(enum SCP_FM_CHANNE fm_chan
 	return result_freq;
 }
 
-static unsigned int __init get_ulposc_clk_by_fmeter(void)
+static unsigned int get_ulposc_clk_by_fmeter(void)
 {
 	unsigned int result = 0;
 
@@ -1575,7 +1575,7 @@ static unsigned int __init get_ulposc_clk_by_fmeter(void)
 	return result;
 }
 
-static void __init set_ulposc_cali_value_ext(unsigned int cali_val)
+static void set_ulposc_cali_value_ext(unsigned int cali_val)
 {
 	int ret = 0;
 
@@ -1588,7 +1588,7 @@ static void __init set_ulposc_cali_value_ext(unsigned int cali_val)
 	udelay(50);
 }
 
-static void __init set_ulposc_cali_value(unsigned int cali_val)
+static void set_ulposc_cali_value(unsigned int cali_val)
 {
 	int ret = 0;
 
@@ -1607,7 +1607,7 @@ static void __init set_ulposc_cali_value(unsigned int cali_val)
 *		1. g_dvfs_dev.ulposc_hw.ulposc_regs->_cali_ext
 *		2. g_dvfs_dev.ulposc_hw.ulposc_regs->_cali
 */
-static int __init ulposc_cali_process_vlp(unsigned int cali_idx,
+static int ulposc_cali_process_vlp(unsigned int cali_idx,
 		unsigned short *cali_res1, unsigned short *cali_res2)
 {
 	unsigned int target_val = 0, current_val = 0;
@@ -1703,7 +1703,7 @@ static int __init ulposc_cali_process_vlp(unsigned int cali_idx,
 	return 0;
 }
 
-static int __init ulposc_cali_process_vlp_v2(unsigned int cali_idx,
+static int ulposc_cali_process_vlp_v2(unsigned int cali_idx,
 		unsigned short *cali_res1, unsigned short *cali_res2)
 {
 	unsigned int target_val = 0, current_val = 0;
@@ -1807,7 +1807,7 @@ static int __init ulposc_cali_process_vlp_v2(unsigned int cali_idx,
 	return 0;
 }
 
-static int __init ulposc_cali_process(unsigned int cali_idx,
+static int ulposc_cali_process(unsigned int cali_idx,
 		unsigned short *cali_res)
 {
 	unsigned int target_val = 0, current_val = 0;
@@ -1929,7 +1929,7 @@ static void turn_onoff_ulposc2(enum ulposc_onoff_enum on)
 	udelay(50);
 }
 
-static int __init mt_scp_dvfs_do_ulposc_cali_process(void)
+static int mt_scp_dvfs_do_ulposc_cali_process(void)
 {
 	int ret = 0;
 	unsigned int i;
@@ -1992,7 +1992,7 @@ static int __init mt_scp_dvfs_do_ulposc_cali_process(void)
 	return ret;
 }
 
-static int __init mt_scp_dts_get_cali_hw_setting(struct device_node *node,
+static int mt_scp_dts_get_cali_hw_setting(struct device_node *node,
 		struct ulposc_cali_hw *cali_hw)
 {
 	unsigned int i;
@@ -2046,7 +2046,7 @@ CALI_DATA_INIT_FAILED:
 	return ret;
 }
 
-static int __init mt_scp_dts_get_cali_target(struct device_node *node,
+static int mt_scp_dts_get_cali_target(struct device_node *node,
 		struct ulposc_cali_hw *cali_hw)
 {
 	int ret = 0;
@@ -2119,7 +2119,7 @@ CALI_EXT_TARGET_ALLOC_FAILED:
 	return ret;
 }
 
-static int __init mt_scp_dts_get_cali_hw_regs(struct device_node *node,
+static int mt_scp_dts_get_cali_hw_regs(struct device_node *node,
 		struct ulposc_cali_hw *cali_hw)
 {
 	const char *str = NULL;
@@ -2334,7 +2334,7 @@ static struct notifier_block scp_pm_notifier_func = {
 };
 #endif /* IS_ENABLED(CONFIG_PM) */
 
-static int __init mt_scp_dts_init_scp_clk_hw(struct device_node *node)
+static int mt_scp_dts_init_scp_clk_hw(struct device_node *node)
 {
 	const char *str = NULL;
 	unsigned int i;
@@ -2359,7 +2359,7 @@ static int __init mt_scp_dts_init_scp_clk_hw(struct device_node *node)
 	return -ESCP_DVFS_NO_CALI_HW_FOUND;
 }
 
-static int __init mt_scp_dts_init_cali_regmap(struct device_node *node,
+static int mt_scp_dts_init_cali_regmap(struct device_node *node,
 		struct ulposc_cali_hw *cali_hw)
 {
 	/* init regmap for calibration process */
@@ -2384,7 +2384,7 @@ static int __init mt_scp_dts_init_cali_regmap(struct device_node *node,
 	return 0;
 }
 
-static int __init mt_scp_dts_ulposc_cali_init(struct device_node *node,
+static int mt_scp_dts_ulposc_cali_init(struct device_node *node,
 		struct ulposc_cali_hw *cali_hw)
 {
 	int ret = 0;
@@ -2446,7 +2446,7 @@ static int __init mt_scp_dts_ulposc_cali_init(struct device_node *node,
 	return ret;
 }
 
-static int __init mt_scp_dts_clk_init(struct platform_device *pdev)
+static int mt_scp_dts_clk_init(struct platform_device *pdev)
 {
 	char buf[15];
 	int ret = 0;
@@ -2482,7 +2482,7 @@ static int __init mt_scp_dts_clk_init(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init mt_scp_dts_init_dvfs_data(struct device_node *node,
+static int mt_scp_dts_init_dvfs_data(struct device_node *node,
 		struct dvfs_opp **opp)
 {
 	int ret = 0;
@@ -2591,7 +2591,7 @@ OPP_INIT_FAILED:
 	return ret;
 }
 
-static int __init mt_scp_dts_init_pmic_data(void)
+static int mt_scp_dts_init_pmic_data(void)
 {
 	unsigned int i;
 
@@ -2607,7 +2607,7 @@ static int __init mt_scp_dts_init_pmic_data(void)
 	return -ESCP_DVFS_NO_PMIC_REG_FOUND;
 }
 
-static int __init mt_scp_dts_regmap_init(struct platform_device *pdev,
+static int mt_scp_dts_regmap_init(struct platform_device *pdev,
 		struct device_node *node)
 {
 	struct platform_device *pmic_pdev;
@@ -2658,7 +2658,7 @@ REGMAP_FIND_FAILED:
 	return -ESCP_DVFS_REGMAP_INIT_FAILED;
 }
 
-static int __init mt_scp_dts_fmeter_get(struct device_node *node,
+static int mt_scp_dts_fmeter_get(struct device_node *node,
 					const char *propname,
 					int *fm_idx,
 					int *fm_type)
@@ -2687,7 +2687,7 @@ FINISH:
 	return ret;
 }
 
-static int __init mt_scp_dts_init(struct platform_device *pdev)
+static int mt_scp_dts_init(struct platform_device *pdev)
 {
 	struct device_node *node;
 	int ret = 0;
@@ -2881,7 +2881,7 @@ int scp_dvfs_feature_enable(void)
 	return atomic_read(&g_is_scp_dvfs_feature_enable);
 }
 
-static int __init mt_scp_dvfs_pdrv_probe(struct platform_device *pdev)
+static int mt_scp_dvfs_pdrv_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 
@@ -2968,7 +2968,7 @@ static struct platform_driver mt_scp_dvfs_pdrv __refdata = {
 /**********************************
  * mediatek scp dvfs initialization
  ***********************************/
-int __init scp_dvfs_init(void)
+int scp_dvfs_init(void)
 {
 	int ret = 0;
 

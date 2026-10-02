@@ -1078,7 +1078,7 @@ static int mt_scp_dvfs_pm_restore_early(struct device *dev)
 	return 0;
 }
 
-static int __init mt_scp_regmap_init(struct platform_device *pdev,
+static int mt_scp_regmap_init(struct platform_device *pdev,
 		struct device_node *node)
 {
 	struct platform_device *pmic_pdev;
@@ -1135,7 +1135,7 @@ fail_pmic:
 	return SCP_DVFS_DTSNO_PMIC_CONFIG;
 }
 
-static  int __init mt_scp_sub_feature_init_internal(struct device_node *node,
+static  int mt_scp_sub_feature_init_internal(struct device_node *node,
 		struct sub_feature_data *fd)
 {
 	char *buf = kzalloc(sizeof(char) * 25, GFP_KERNEL);
@@ -1241,7 +1241,7 @@ fail_1:
 	return ret;
 }
 
-static int __init mt_scp_sub_feature_init(struct device_node *node,
+static int mt_scp_sub_feature_init(struct device_node *node,
 		struct subsys_data *sys,
 		const char *str)
 {
@@ -1354,7 +1354,7 @@ static void mt_pmic_sshub_init_for_legacy_v1(void)
 #endif
 }
 
-static void __init mt_pmic_sshub_init(void)
+static void mt_pmic_sshub_init(void)
 {
 #if !IS_ENABLED(CONFIG_FPGA_EARLY_PORTING)
 	if (dvfs->legacy_support_v1) {
@@ -1400,7 +1400,7 @@ static void __init mt_pmic_sshub_init(void)
 #endif
 }
 
-static int __init mt_scp_dvfs_pdrv_probe(struct platform_device *pdev)
+static int mt_scp_dvfs_pdrv_probe(struct platform_device *pdev)
 {
 	struct device_node *node;
 	struct dvfs_opp *opp;
@@ -1678,14 +1678,14 @@ static struct platform_driver mt_scp_dvfs_pdrv __refdata = {
 /**********************************
  * mediatek scp dvfs initialization
  ***********************************/
-void __init mt_scp_dvfs_ipi_init(void)
+void mt_scp_dvfs_ipi_init(void)
 {
 	scp_ipi_registration(IPI_SCP_PLL_CTRL,
 			scp_pll_ctrl_handler,
 			"IPI_SCP_PLL_CTRL");
 }
 
-int __init scp_dvfs_init(void)
+int scp_dvfs_init(void)
 {
 	int ret = 0;
 

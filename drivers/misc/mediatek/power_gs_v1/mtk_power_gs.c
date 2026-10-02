@@ -140,7 +140,7 @@ static const struct of_device_id power_gs_of_ids[] = {
 	{}
 };
 
-static int __init mt_power_gs_pdrv_probe(struct platform_device *pdev)
+static int mt_power_gs_pdrv_probe(struct platform_device *pdev)
 {
 	struct platform_device *pmic_pdev = NULL;
 	struct device_node *pmic_node = NULL;
@@ -207,7 +207,7 @@ static void __exit mt_power_gs_exit(void)
 {
 }
 
-static int __init mt_power_gs_init(void)
+static int mt_power_gs_init(void)
 {
 	int ret = 0;
 

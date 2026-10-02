@@ -14,9 +14,9 @@ enum sspm_excep_id {
 
 extern void sspm_log_coredump_recv(unsigned int exists);
 extern void sspm_aed(enum sspm_excep_id type);
-extern unsigned int __init sspm_coredump_init(phys_addr_t start,
+extern unsigned int sspm_coredump_init(phys_addr_t start,
 	phys_addr_t limit);
-extern int __init sspm_coredump_init_done(void);
+extern int sspm_coredump_init_done(void);
 extern int sspm_excep_init(void);
 
 #endif

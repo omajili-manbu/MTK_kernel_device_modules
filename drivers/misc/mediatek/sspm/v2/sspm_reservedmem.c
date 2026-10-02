@@ -67,7 +67,7 @@ static void sspm_reserve_memory_ioremap(struct platform_device *pdev)
 }
 
 #elif defined(CONFIG_OF_RESERVED_MEM)
-static int __init sspm_reserve_mem_of_init(struct reserved_mem *rmem)
+static int sspm_reserve_mem_of_init(struct reserved_mem *rmem)
 {
 	sspm_mem_base_phys = rmem->base;
 	sspm_mem_size      = rmem->size;
@@ -175,7 +175,7 @@ int sspm_reserve_memory_init(void)
 	return 0;
 }
 
-void __init sspm_lock_emi_mpu(void)
+void sspm_lock_emi_mpu(void)
 {
 #if SSPM_EMI_PROTECTION_SUPPORT
 	if (sspm_mem_size > 0)

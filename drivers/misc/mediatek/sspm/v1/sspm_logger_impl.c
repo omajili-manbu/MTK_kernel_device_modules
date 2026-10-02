@@ -250,7 +250,7 @@ static ssize_t sspm_log_lastk_show(struct device *kobj,
 DEVICE_ATTR_RO(sspm_log_lastk);
 #endif
 
-unsigned int __init sspm_logger_init(phys_addr_t start, phys_addr_t limit)
+unsigned int sspm_logger_init(phys_addr_t start, phys_addr_t limit)
 {
 	unsigned int last_ofs;
 
@@ -307,7 +307,7 @@ error:
 	return 0;
 }
 
-int __init sspm_logger_init_done(void)
+int sspm_logger_init_done(void)
 {
 	int ret;
 

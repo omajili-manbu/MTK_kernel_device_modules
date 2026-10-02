@@ -507,7 +507,7 @@ static const struct dev_pm_ops tfa_pm_ops = {
 	.resume_noirq = tfa_time_sync_resume,
 };
 
-static int __init tfa_debug_probe(struct platform_device *pdev)
+static int tfa_debug_probe(struct platform_device *pdev)
 {
 	struct proc_dir_entry *runtime_log_snapshot_proc_file = NULL;
 	struct proc_dir_entry *runtime_log_proc_file = NULL;

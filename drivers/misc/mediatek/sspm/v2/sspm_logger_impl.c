@@ -207,7 +207,7 @@ static ssize_t sspm_mobile_log_store(struct device *kobj,
 
 DEVICE_ATTR_RW(sspm_mobile_log);
 
-unsigned int __init sspm_logger_init(phys_addr_t start, phys_addr_t limit)
+unsigned int sspm_logger_init(phys_addr_t start, phys_addr_t limit)
 {
 	unsigned int last_ofs;
 
@@ -248,7 +248,7 @@ error:
 	return 0;
 }
 
-int __init sspm_logger_init_done(void)
+int sspm_logger_init_done(void)
 {
 	int ret;
 

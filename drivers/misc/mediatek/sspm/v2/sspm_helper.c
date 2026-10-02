@@ -143,7 +143,7 @@ unsigned int is_sspm_ready(void)
 }
 EXPORT_SYMBOL_GPL(is_sspm_ready);
 
-static int __init sspm_module_init(void)
+static int sspm_module_init(void)
 {
 	if (atomic_inc_return(&sspm_inited) != 1)
 		return 0;
@@ -200,7 +200,7 @@ error:
 	return -1;
 }
 
-static int __init sspm_device_probe(struct platform_device *pdev)
+static int sspm_device_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	struct device *dev = &pdev->dev;
@@ -327,7 +327,7 @@ static struct platform_driver mtk_sspm_driver __refdata = {
 /*
  * driver initialization entry point
  */
-static int __init sspm_pdrv_init(void)
+static int sspm_pdrv_init(void)
 {
 	int ret;
 

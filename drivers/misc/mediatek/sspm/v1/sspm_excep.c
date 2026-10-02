@@ -80,7 +80,7 @@ void sspm_aed(enum sspm_excep_id type)
 
 }
 
-unsigned int __init sspm_coredump_init(phys_addr_t start, phys_addr_t limit)
+unsigned int sspm_coredump_init(phys_addr_t start, phys_addr_t limit)
 {
 #if SSPM_COREDUMP_SUPPORT
 	unsigned int last_ofs;
@@ -105,7 +105,7 @@ unsigned int __init sspm_coredump_init(phys_addr_t start, phys_addr_t limit)
 #endif
 }
 
-int __init sspm_coredump_init_done(void)
+int sspm_coredump_init_done(void)
 {
 #if SSPM_COREDUMP_SUPPORT
 	int ret;
@@ -129,7 +129,7 @@ int __init sspm_coredump_init_done(void)
  * init excep for sspm
  * @return: 0 if success
  */
-int __init sspm_excep_init(void)
+int sspm_excep_init(void)
 {
 	return 0;
 }

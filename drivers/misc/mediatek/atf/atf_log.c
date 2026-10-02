@@ -483,7 +483,7 @@ static struct miscdevice atf_raw_buf_dev = {
 	.mode       = 0440,
 };
 
-static int __init atf_logger_probe(struct platform_device *pdev)
+static int atf_logger_probe(struct platform_device *pdev)
 {
 	/* register module driver */
 	int err;
@@ -576,7 +576,7 @@ static struct platform_driver atf_logger_driver_probe = {
 	},
 };
 
-static int __init atf_log_init(void)
+static int atf_log_init(void)
 {
 	int ret = 0;
 
