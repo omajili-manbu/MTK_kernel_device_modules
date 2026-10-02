@@ -122,8 +122,10 @@ int ffa_driver_register(struct ffa_driver *driver, struct module *owner,
 	driver->driver.mod_name = mod_name;
 
 	ret = driver_register(&driver->driver);
-	if (!ret)
+	if (!ret) {
+		ffa_rescan_partitions(driver);
 		pr_debug("registered new ffa driver %s\n", driver->name);
+	}
 
 	return ret;
 }

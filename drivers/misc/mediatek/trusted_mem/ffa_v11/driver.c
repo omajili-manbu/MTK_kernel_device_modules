@@ -1177,20 +1177,24 @@ void ffa_device_match_uuid(struct ffa_device *ffa_dev, const uuid_t *uuid)
 	struct ffa_partition_info *pbuf, *tpbuf;
 
 	/*
-	 * FF-A v1.1 provides UUID for each partition as part of the discovery
-	 * API, the discovered UUID must be populated in the device's UUID and
-	 * there is no need to copy the same from the driver table.
+	 * rodin (#148): mitee.ko (6.6 blob) binds only through ffa UUID match.
+	 * On 6.18 the partition list captured at ffa_init time can leave this
+	 * device with a null UUID, and the v1.1-only early return kept the
+	 * blob's probe from ever firing, so its first ffa call dereferenced a
+	 * NULL context. Query the firmware per driver-UUID for v1.1 as well;
+	 * devices whose UUID was already populated never reach this path
+	 * (bus.c gates on uuid_is_null).
 	 */
-	if (drv_info->version > FFA_VERSION_1_0)
-		return;
-
 	count = ffa_partition_probe(uuid, &pbuf);
 	if (count <= 0)
 		return;
 
 	for (idx = 0, tpbuf = pbuf; idx < count; idx++, tpbuf++)
-		if (tpbuf->id == ffa_dev->vm_id)
+		if (tpbuf->id == ffa_dev->vm_id) {
 			uuid_copy(&ffa_dev->uuid, uuid);
+			pr_info("rodin: ffa vm_id=0x%04x matched uuid=%pUb via firmware query\n",
+				ffa_dev->vm_id, uuid);
+		}
 	kfree(pbuf);
 }
 
@@ -1208,9 +1212,12 @@ static void ffa_setup_partitions(void)
 		return;
 	}
 
+	pr_info("rodin: discovered %d partitions\n", count);
 	xa_init(&drv_info->partition_info);
 	for (idx = 0, tpbuf = pbuf; idx < count; idx++, tpbuf++) {
 		import_uuid(&uuid, (u8 *)tpbuf->uuid);
+		pr_info("rodin: partition id=0x%04x uuid=%pUb props=0x%08x\n",
+			tpbuf->id, &uuid, tpbuf->properties);
 
 		/* Note that if the UUID will be uuid_null, that will require
 		 * ffa_device_match() to find the UUID of this partition id
@@ -1246,6 +1253,49 @@ static void ffa_setup_partitions(void)
 		return;
 	xa_store(&drv_info->partition_info, drv_info->vm_id, info, GFP_KERNEL);
 	drv_info->partition_count++;
+}
+
+/*
+ * rodin (#148): the SPMC partition list captured at ffa_init time may miss
+ * partitions that register later (6.6 saw the MTEE service by the time
+ * mitee.ko loaded; the 6.18 vseq-replayed ffa_init queries earlier). When a
+ * driver registers, re-query the firmware for its UUIDs and create any
+ * missing partition devices so the driver core can bind them.
+ */
+void ffa_rescan_partitions(struct ffa_driver *drv)
+{
+	const struct ffa_device_id *id;
+	struct ffa_partition_info *pbuf, *tpbuf;
+	struct ffa_dev_part_info *info;
+	struct ffa_device *ffa_dev;
+	int count, idx;
+
+	if (!drv->id_table || !drv_info->partition_count)
+		return;
+
+	for (id = drv->id_table; !uuid_is_null(&id->uuid); id++) {
+		count = ffa_partition_probe(&id->uuid, &pbuf);
+		if (count <= 0)
+			continue;
+		for (idx = 0, tpbuf = pbuf; idx < count; idx++, tpbuf++) {
+			if (xa_load(&drv_info->partition_info, tpbuf->id))
+				continue;
+			ffa_dev = ffa_device_register(&id->uuid, tpbuf->id,
+						      &ffa_drv_ops);
+			if (!ffa_dev)
+				continue;
+			if (drv_info->version > FFA_VERSION_1_0 &&
+			    !(tpbuf->properties & FFA_PARTITION_AARCH64_EXEC))
+				_ffa_mode_32bit_set(ffa_dev);
+			info = kzalloc(sizeof(*info), GFP_KERNEL);
+			if (info)
+				xa_store(&drv_info->partition_info,
+					 tpbuf->id, info, GFP_KERNEL);
+			pr_info("rodin: added missing partition device id=0x%04x uuid=%pUb for %s\n",
+				tpbuf->id, &id->uuid, drv->name);
+		}
+		kfree(pbuf);
+	}
 }
 
 static void ffa_partitions_cleanup(void)
