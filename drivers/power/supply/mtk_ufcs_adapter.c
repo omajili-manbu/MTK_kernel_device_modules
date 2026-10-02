@@ -4,6 +4,7 @@
  */
 
 #include <linux/atomic.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/mod_devicetable.h>
@@ -279,7 +280,7 @@ static struct platform_driver mtk_ufcs_adapter_driver = {
 		   .of_match_table = mtk_ufcs_adapter_of_match,
 	},
 };
-module_platform_driver(mtk_ufcs_adapter_driver);
+vseq_module_platform_driver(mtk_ufcs_adapter_driver);
 
 MODULE_AUTHOR("Gene Chen <gene_chen@richtek.com>");
 MODULE_DESCRIPTION("MTK UFCS Adapter Driver");

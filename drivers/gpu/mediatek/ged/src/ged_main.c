@@ -4,6 +4,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/fs.h>
@@ -973,7 +974,7 @@ ERROR:
 	return err;
 }
 
-module_init(ged_init);
+vseq_module_init(ged_init);
 module_exit(ged_exit);
 
 MODULE_DEVICE_TABLE(of, g_ged_of_match);

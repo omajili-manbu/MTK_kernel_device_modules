@@ -5,6 +5,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/fs.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -629,7 +630,7 @@ static int __init emi_fake_eng_init(void)
 	return 0;
 }
 
-module_init(emi_fake_eng_init);
+vseq_module_init(emi_fake_eng_init);
 module_exit(emi_fake_eng_exit);
 
 MODULE_DESCRIPTION("MediaTek EMI Fake Engine Driver");

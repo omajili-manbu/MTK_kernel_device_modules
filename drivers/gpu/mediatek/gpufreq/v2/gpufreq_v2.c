@@ -14,6 +14,7 @@
  * ===============================================
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
@@ -2025,7 +2026,7 @@ static void __exit gpufreq_wrapper_exit(void)
 	platform_driver_unregister(&g_gpufreq_wrapper_pdrv);
 }
 
-module_init(gpufreq_wrapper_init);
+vseq_module_init(gpufreq_wrapper_init);
 module_exit(gpufreq_wrapper_exit);
 
 MODULE_DEVICE_TABLE(of, g_gpufreq_wrapper_of_match);

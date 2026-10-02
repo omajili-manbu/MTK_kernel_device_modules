@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
@@ -312,8 +313,8 @@ static int __init mt6877_scpsys_drv_init(void)
 {
 	return platform_driver_register(&mt6877_scpsys_drv);
 }
-subsys_initcall(mt6877_scpsys_drv_init);
+vseq_subsys_initcall(mt6877_scpsys_drv_init);
 #else
-module_platform_driver(mt6877_scpsys_drv);
+vseq_module_platform_driver(mt6877_scpsys_drv);
 #endif
 MODULE_LICENSE("GPL");

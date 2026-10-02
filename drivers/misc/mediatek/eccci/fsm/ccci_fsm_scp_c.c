@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -692,7 +693,7 @@ static void __exit ccci_scp_exit(void)
 {
 }
 
-module_init(ccci_scp_init);
+vseq_module_init(ccci_scp_init);
 module_exit(ccci_scp_exit);
 
 #endif

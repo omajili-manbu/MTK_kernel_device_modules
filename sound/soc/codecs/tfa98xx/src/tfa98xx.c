@@ -8,6 +8,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -3249,7 +3250,7 @@ static struct i2c_driver tfa98xx_i2c_driver = {
 	.remove = tfa98xx_i2c_remove,
 	.id_table = tfa98xx_i2c_id,
 };
-module_i2c_driver(tfa98xx_i2c_driver);
+vseq_module_i2c_driver(tfa98xx_i2c_driver);
 
 /* Module information */
 MODULE_DESCRIPTION("Goodix Speaker Amp Codec Driver");

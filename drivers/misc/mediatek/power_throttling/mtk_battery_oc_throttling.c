@@ -5,6 +5,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include "../../../../include/linux/mfd/mt6357/registers.h" /* rodin s3a: vendor-first, kernel same-name header shadows vendor FGADC regs */
@@ -970,7 +971,7 @@ static struct platform_driver battery_oc_throttling_driver = {
 	.probe = battery_oc_throttling_probe,
 	.remove = battery_oc_throtting_remove,
 };
-module_platform_driver(battery_oc_throttling_driver);
+vseq_module_platform_driver(battery_oc_throttling_driver);
 
 MODULE_AUTHOR("Jeter Chen");
 MODULE_DESCRIPTION("MTK battery over current throttling driver");

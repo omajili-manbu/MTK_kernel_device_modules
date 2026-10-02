@@ -4,6 +4,7 @@
  * Author: Samuel Hsieh <samuel.hsieh@mediatek.com>
  */
 #include <linux/cpufreq.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -402,7 +403,7 @@ static struct platform_driver cpu_power_throttling_driver = {
 		.of_match_table = cpu_power_throttling_of_match,
 	},
 };
-module_platform_driver(cpu_power_throttling_driver);
+vseq_module_platform_driver(cpu_power_throttling_driver);
 MODULE_AUTHOR("Samuel Hsieh");
 MODULE_DESCRIPTION("MTK cpu power throttling driver");
 MODULE_LICENSE("GPL");

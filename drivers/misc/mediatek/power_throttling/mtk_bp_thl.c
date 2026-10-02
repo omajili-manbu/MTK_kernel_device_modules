@@ -4,6 +4,7 @@
  * Author: Samuel Hsieh <samuel.hsieh@mediatek.com>
  */
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
@@ -592,7 +593,7 @@ static struct platform_driver bp_thl_driver = {
 	.probe = bp_thl_probe,
 };
 
-module_platform_driver(bp_thl_driver);
+vseq_module_platform_driver(bp_thl_driver);
 MODULE_AUTHOR("Samuel Hsieh");
 MODULE_DESCRIPTION("MTK battery percent throttling driver");
 MODULE_LICENSE("GPL");

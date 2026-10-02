@@ -17,6 +17,7 @@
 
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/kthread.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
@@ -1202,7 +1203,7 @@ static void __exit gz_main_exit(void)
 	platform_driver_unregister(&gz_main_driver);
 }
 
-module_init(gz_main_init);
+vseq_module_init(gz_main_init);
 module_exit(gz_main_exit);
 MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

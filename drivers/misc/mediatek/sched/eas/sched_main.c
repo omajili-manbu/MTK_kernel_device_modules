@@ -3,6 +3,7 @@
  * Copyright (c) 2021 MediaTek Inc.
  */
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -1210,9 +1211,9 @@ static void __exit mtk_scheduler_exit(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
-late_initcall(mtk_scheduler_init);
+vseq_late_initcall(mtk_scheduler_init);
 #else
-module_init(mtk_scheduler_init);
+vseq_module_init(mtk_scheduler_init);
 #endif
 module_exit(mtk_scheduler_exit);
 

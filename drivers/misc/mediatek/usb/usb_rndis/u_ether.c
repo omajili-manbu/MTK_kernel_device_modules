@@ -11,6 +11,7 @@
 /* #define VERBOSE_DEBUG */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/gfp.h>
 #include <linux/device.h>
@@ -1716,7 +1717,7 @@ static int __init mtk_gether_init(void)
 		pr_info("%s: create workqueue fail: uether_rps\n", __func__);
 	return 0;
 }
-module_init(mtk_gether_init);
+vseq_module_init(mtk_gether_init);
 
 static void __exit mtk_gether_exit(void)
 {

@@ -3,6 +3,7 @@
 // Copyright (c) 2019 MediaTek Inc.
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/of_device.h>
 #include <linux/of.h> /* rodin stage2: 6.18 of_device.h slimmed */
 #include <linux/platform_device.h>
@@ -169,7 +170,7 @@ static struct platform_driver mtk_spmi_pmic_debug_driver = {
 	.probe = mtk_spmi_pmic_debug_probe,
 	.remove = mtk_spmi_pmic_debug_remove,
 };
-module_platform_driver(mtk_spmi_pmic_debug_driver);
+vseq_module_platform_driver(mtk_spmi_pmic_debug_driver);
 
 MODULE_AUTHOR("Wen Su <wen.su@mediatek.com>");
 MODULE_AUTHOR("Jeter Chen <jeter.chen@mediatek.com>");

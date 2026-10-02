@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
@@ -1178,5 +1179,5 @@ static struct platform_driver mt6991_scpsys_mmpc_drv = {
 	},
 };
 
-module_platform_driver(mt6991_scpsys_mmpc_drv);
+vseq_module_platform_driver(mt6991_scpsys_mmpc_drv);
 MODULE_LICENSE("GPL");

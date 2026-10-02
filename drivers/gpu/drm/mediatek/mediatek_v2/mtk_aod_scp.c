@@ -3,6 +3,7 @@
  * Copyright (c) 2021 MediaTek Inc.
  */
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/of_reserved_mem.h>
@@ -686,7 +687,7 @@ static void __exit mtk_aod_scp_exit(void)
 {
 }
 
-module_init(mtk_aod_scp_init);
+vseq_module_init(mtk_aod_scp_init);
 module_exit(mtk_aod_scp_exit);
 
 MODULE_AUTHOR("Ahsin Chen <ahsin.chen@mediatek.com>");

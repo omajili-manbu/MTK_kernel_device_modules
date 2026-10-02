@@ -6,6 +6,7 @@
 #define pr_fmt(fmt)    "mtk_iommu: pseudo " fmt
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
@@ -304,5 +305,5 @@ static struct platform_driver mtk_iommu_pseudo_drv = {
 	}
 };
 
-module_platform_driver(mtk_iommu_pseudo_drv);
+vseq_module_platform_driver(mtk_iommu_pseudo_drv);
 MODULE_LICENSE("GPL v2");

@@ -6,6 +6,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/netdevice.h>
 
 #include "mddp_ctrl.h"
@@ -388,7 +389,7 @@ _init_fail:
 	mddp_exit();
 	return 0;
 }
-module_init(mddp_init);
+vseq_module_init(mddp_init);
 module_exit(mddp_exit);
 
 MODULE_LICENSE("GPL v2");

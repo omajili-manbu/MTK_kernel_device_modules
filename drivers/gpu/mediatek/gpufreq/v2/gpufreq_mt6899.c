@@ -14,6 +14,7 @@
  * ===============================================
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h>
 #include <linux/ioport.h>
 #include <linux/err.h>
@@ -1034,7 +1035,7 @@ static void __exit __gpufreq_exit(void)
 	platform_driver_unregister(&g_gpufreq_pdrv);
 }
 
-module_init(__gpufreq_init);
+vseq_module_init(__gpufreq_init);
 module_exit(__gpufreq_exit);
 
 MODULE_DEVICE_TABLE(of, g_gpufreq_of_match);

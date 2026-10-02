@@ -3,6 +3,7 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 
 #include <wla_dbg_sysfs.h>
 #include "wla.h"
@@ -528,7 +529,7 @@ static void __exit wla_fs_exit(void)
 {
 }
 
-module_init(wla_fs_init);
+vseq_module_init(wla_fs_init);
 module_exit(wla_fs_exit);
 
 MODULE_LICENSE("GPL");

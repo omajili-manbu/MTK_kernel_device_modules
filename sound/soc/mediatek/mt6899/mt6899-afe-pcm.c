@@ -7,6 +7,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -10262,7 +10263,7 @@ static const dai_register_cb dai_register_cbs[] = {
 };
 
 /* rodin b521 (#134): AUDIO_TOP_CON3 free-run owner, set at probe end; the
- * late_initcall at the file tail uses it to reproduce the 6.6 free-run window. */
+ * vseq_late_initcall at the file tail uses it to reproduce the 6.6 free-run window. */
 static struct mtk_base_afe *mt6899_afe_con3_owner;
 
 static int mt6899_afe_pcm_dev_probe(struct platform_device *pdev)
@@ -10584,8 +10585,8 @@ static struct platform_driver mt6899_afe_pcm_driver = {
  * the regmap (as on 6.6) and the second, register-writing resume is gated behind
  * the sound card probe (A-28, snd-scp-ultra).
  *
- * Reproduce the 6.6 free-run window from the register owner at late_initcall
- * (level 7, statically before the disable_unused walk's late_initcall_sync):
+ * Reproduce the 6.6 free-run window from the register owner at vseq_late_initcall
+ * (level 7, statically before the disable_unused walk's vseq_late_initcall_sync):
  * resume prefix (clocks + REQ + CON4/CON0/1/2) -> CON3 = 0x0 -> suspend suffix
  * (CON4 = 0x3fff, REQ = 0, clocks off).  The end state is the 6.6 post-boot
  * steady state; the A-28 card fix, once it lands, re-runs the same no-op writes.
@@ -10635,9 +10636,9 @@ static int mt6899_afe_con3_freerun_late_init(void)
 
 	return 0;
 }
-late_initcall(mt6899_afe_con3_freerun_late_init);
+vseq_late_initcall(mt6899_afe_con3_freerun_late_init);
 
-module_platform_driver(mt6899_afe_pcm_driver);
+vseq_module_platform_driver(mt6899_afe_pcm_driver);
 
 MODULE_DESCRIPTION("Mediatek ALSA SoC AFE platform driver for 6899");
 MODULE_AUTHOR("Shane Chien <shane.chien@mediatek.com>");

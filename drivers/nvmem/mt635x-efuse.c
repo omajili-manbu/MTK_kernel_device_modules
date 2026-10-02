@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/mfd/mt6397/core.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -478,7 +479,7 @@ static struct platform_driver mt635x_efuse_driver = {
 		.of_match_table = mt635x_efuse_of_match,
 	},
 };
-module_platform_driver(mt635x_efuse_driver);
+vseq_module_platform_driver(mt635x_efuse_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");

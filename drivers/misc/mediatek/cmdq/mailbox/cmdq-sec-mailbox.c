@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
@@ -2107,5 +2108,5 @@ static int __init cmdq_sec_init(void)
 	return err;
 }
 
-arch_initcall(cmdq_sec_init);
+vseq_arch_initcall(cmdq_sec_init);
 MODULE_LICENSE("GPL v2");

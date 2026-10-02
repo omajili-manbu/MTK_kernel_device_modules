@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/clk-provider.h>
 #include <linux/kernel.h>
@@ -136,6 +137,6 @@ static void __exit disable_unused_exit(void)
 	platform_driver_unregister(&disable_unused);
 }
 
-late_initcall_sync(disable_unused_init);
+vseq_late_initcall_sync(disable_unused_init);
 module_exit(disable_unused_exit);
 MODULE_LICENSE("GPL");

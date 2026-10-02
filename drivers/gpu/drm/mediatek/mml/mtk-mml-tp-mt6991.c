@@ -5,6 +5,7 @@
  */
 
 #include <dt-bindings/mml/mml-mt6991.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -1694,7 +1695,7 @@ static __init int mml_topology_ip_init(void)
 
 	return mml_topology_register_ip(TOPOLOGY_PLATFORM, &tp_ops_mt6991);
 }
-module_init(mml_topology_ip_init);
+vseq_module_init(mml_topology_ip_init);
 
 static __exit void mml_topology_ip_exit(void)
 {

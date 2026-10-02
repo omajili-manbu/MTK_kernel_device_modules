@@ -3,6 +3,7 @@
  * Copyright (c) 2021 MediaTek Inc.
  */
 #include <linux/bits.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -368,7 +369,7 @@ static struct platform_driver vtskin_driver = {
 	},
 };
 
-module_platform_driver(vtskin_driver);
+vseq_module_platform_driver(vtskin_driver);
 
 MODULE_AUTHOR("Samuel Hsieh <samuel.hsieh@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek on virtual tskin driver");

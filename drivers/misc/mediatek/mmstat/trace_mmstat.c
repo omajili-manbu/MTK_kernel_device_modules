@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/types.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
@@ -525,7 +526,7 @@ static void __exit trace_mmstat_exit(void)
 	cancel_delayed_work_sync(&mmstat_work);
 }
 
-module_init(trace_mmstat_init);
+vseq_module_init(trace_mmstat_init);
 module_exit(trace_mmstat_exit);
 
 MODULE_LICENSE("GPL");

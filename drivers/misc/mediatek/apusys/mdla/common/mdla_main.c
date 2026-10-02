@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/module.h>
 
@@ -66,7 +67,7 @@ static void mdla_mod_exit(void)
 	mdla_exit();
 }
 
-module_init(mdla_mod_init);
+vseq_module_init(mdla_mod_init);
 module_exit(mdla_mod_exit);
 MODULE_DESCRIPTION("MDLA Driver");
 MODULE_AUTHOR("SPT1/SS5");
@@ -76,7 +77,7 @@ static int mdla_mod_init(void)
 {
 	return mdla_init(NULL);
 }
-late_initcall(mdla_mod_init);
+vseq_late_initcall(mdla_mod_init);
 #endif
 #endif
 

@@ -4,6 +4,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/vseq.h>
 #include "mtk_drm_panel_drv.h"
 
 #ifdef CONFIG_MTK_ROUND_CORNER_SUPPORT
@@ -2805,7 +2806,7 @@ struct mipi_dsi_driver mtk_drm_panel_dsi_driver = {
 	},
 };
 
-//module_mipi_dsi_driver(mtk_drm_panel_dsi_driver);
+//vseq_module_mipi_dsi_driver(mtk_drm_panel_dsi_driver);
 
 MODULE_AUTHOR("Cui Zhang <cui.zhang@mediatek.com>");
 MODULE_DESCRIPTION("mediatek, drm panel dsi driver");

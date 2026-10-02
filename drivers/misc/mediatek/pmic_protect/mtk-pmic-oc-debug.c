@@ -3,6 +3,7 @@
 // Copyright (c) 2021 MediaTek Inc.
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/notifier.h>
 #include <linux/of.h>
@@ -397,7 +398,7 @@ static struct platform_driver pmic_oc_debug_driver = {
 	},
 	.probe	= pmic_oc_debug_probe,
 };
-module_platform_driver(pmic_oc_debug_driver);
+vseq_module_platform_driver(pmic_oc_debug_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");

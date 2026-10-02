@@ -7,6 +7,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include "mtk-base-afe.h"
 #include "mtk-sram-manager.h"
 
@@ -113,7 +114,7 @@ static void __exit mtk_scp_vow_exit(void)
 	unregister_vow_ipi_send_notifier(&vow_ipi_send_notifier);
 }
 
-module_init(mtk_scp_vow_init);
+vseq_module_init(mtk_scp_vow_init);
 module_exit(mtk_scp_vow_exit);
 
 MODULE_DESCRIPTION("Mediatek SCP VoW Common Driver");

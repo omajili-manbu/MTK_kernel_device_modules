@@ -2,6 +2,7 @@
 // Copyright (c) 2019 MediaTek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -989,7 +990,7 @@ static struct i2c_driver lm3644_i2c_driver = {
 	.id_table = lm3644_id_table,
 };
 
-module_i2c_driver(lm3644_i2c_driver);
+vseq_module_i2c_driver(lm3644_i2c_driver);
 
 MODULE_AUTHOR("Roger-HY Wang <roger-hy.wang@mediatek.com>");
 MODULE_DESCRIPTION("Texas Instruments LM3644 LED flash driver");

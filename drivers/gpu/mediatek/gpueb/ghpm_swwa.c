@@ -15,6 +15,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
@@ -474,7 +475,7 @@ static void __exit __ghpm_swwa_exit(void)
 	platform_driver_unregister(&g_ghpm_swwa_pdrv);
 }
 
-module_init(__ghpm_swwa_init);
+vseq_module_init(__ghpm_swwa_init);
 module_exit(__ghpm_swwa_exit);
 
 MODULE_DEVICE_TABLE(of, g_ghpm_swwa_of_match);

@@ -3,6 +3,7 @@
  * Copyright (C) 2023 MediaTek Inc.
  */
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -677,7 +678,7 @@ static void __exit mtk_ips_exit(void)
 	platform_driver_unregister(&mtkips_drv);
 }
 
-module_init(mtk_ips_init);
+vseq_module_init(mtk_ips_init);
 module_exit(mtk_ips_exit);
 MODULE_DESCRIPTION("MTK IPS driver");
 MODULE_AUTHOR("Arvin Wang<arvin.wang@mediatek.com>");

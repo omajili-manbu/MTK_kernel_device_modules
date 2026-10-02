@@ -5,6 +5,7 @@
  */
 
 #include <linux/io.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
@@ -373,7 +374,7 @@ static void __exit mtk_vmm_notifier_exit(void)
 	platform_driver_unregister(&drv_vmm_notifier);
 }
 
-module_init(mtk_vmm_notifier_init);
+vseq_module_init(mtk_vmm_notifier_init);
 module_exit(mtk_vmm_notifier_exit);
 MODULE_DESCRIPTION("MTK VMM notifier driver");
 MODULE_AUTHOR("Yuan Jung Kuo <yuan-jung.kuo@mediatek.com>");

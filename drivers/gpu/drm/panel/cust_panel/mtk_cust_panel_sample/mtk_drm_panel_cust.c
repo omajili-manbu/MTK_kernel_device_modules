@@ -4,6 +4,7 @@
  */
 
 #include "mtk_drm_panel_cust.h"
+#include <linux/vseq.h>
 
 static struct cust_lcm_params cust_params;
 static struct cust_lcm_ops_table cust_ops_dsi;
@@ -491,7 +492,7 @@ static void __exit simple_lcm_cust_drv_exit(void)
 	DDPMSG("%s,%d\n", __func__, __LINE__);
 	platform_driver_unregister(&simple_lcm_cust_driver);
 }
-module_init(simple_lcm_cust_drv_init);
+vseq_module_init(simple_lcm_cust_drv_init);
 module_exit(simple_lcm_cust_drv_exit);
 
 MODULE_AUTHOR("Cui Zhang <cui.zhang@mediatek.com>");

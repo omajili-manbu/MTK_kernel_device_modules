@@ -13,6 +13,7 @@
 /* #define SMMU_V3_TEST_EN */
 
 #include <linux/bitfield.h>
+#include <linux/vseq.h>
 #include <linux/bits.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-direct.h>
@@ -1827,6 +1828,6 @@ static void __exit iommu_test_exit(void)
 }
 #endif /* IOMMU_TEST_EN */
 
-module_init(iommu_test_init);
+vseq_module_init(iommu_test_init);
 module_exit(iommu_test_exit);
 MODULE_LICENSE("GPL v2");

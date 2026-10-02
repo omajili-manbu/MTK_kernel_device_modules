@@ -4,6 +4,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -176,7 +177,7 @@ static struct platform_driver backlight_cooling_driver = {
 		.of_match_table = backlight_cooling_of_match,
 	},
 };
-module_platform_driver(backlight_cooling_driver);
+vseq_module_platform_driver(backlight_cooling_driver);
 
 MODULE_AUTHOR("Ming-Hao Chou <minghao.chou@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek backlight cooling driver");

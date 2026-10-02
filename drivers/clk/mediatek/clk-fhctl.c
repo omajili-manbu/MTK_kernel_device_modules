@@ -4,6 +4,7 @@
  * Author: Yu-Chang Wang <Yu-Chang.Wang@mediatek.com>
  */
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -244,7 +245,7 @@ static struct platform_driver fhctl_driver = {
 		.of_match_table = fh_of_match,
 	},
 };
-module_platform_driver(fhctl_driver);
+vseq_module_platform_driver(fhctl_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek FHCTL Driver");
 MODULE_AUTHOR("Kuan-Hsin Lee <kuan-hsin.lee@mediatek.com>");

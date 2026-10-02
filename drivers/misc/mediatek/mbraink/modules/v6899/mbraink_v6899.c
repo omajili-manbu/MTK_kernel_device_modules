@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
@@ -129,7 +130,7 @@ static struct platform_driver mtk_mbraink_v6899_driver = {
 		.pm = NULL,
 	},
 };
-module_platform_driver(mtk_mbraink_v6899_driver);
+vseq_module_platform_driver(mtk_mbraink_v6899_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("<Wei-chin.Tsai@mediatek.com>");

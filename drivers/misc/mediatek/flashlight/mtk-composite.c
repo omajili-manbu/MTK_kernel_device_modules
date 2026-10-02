@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": %s: " fmt, __func__
 
 #include <linux/types.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -320,7 +321,7 @@ static void __exit mtk_composite_exit(void)
 #endif
 }
 
-late_initcall(mtk_composite_init);
+vseq_late_initcall(mtk_composite_init);
 module_exit(mtk_composite_exit);
 
 MODULE_LICENSE("GPL");

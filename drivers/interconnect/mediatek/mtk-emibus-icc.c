@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/interconnect-provider.h>
 #include <linux/module.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning (of_parse_phandle et al) */
@@ -332,7 +333,7 @@ static int __init mtk_emi_icc_init(void)
 {
 	return platform_driver_register(&emi_icc_emibus_driver);
 }
-subsys_initcall(mtk_emi_icc_init);
+vseq_subsys_initcall(mtk_emi_icc_init);
 
 static void __exit mtk_emi_icc_exit(void)
 {

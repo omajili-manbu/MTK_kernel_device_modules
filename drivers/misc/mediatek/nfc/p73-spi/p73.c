@@ -17,6 +17,7 @@
  ******************************************************************************/
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
@@ -869,7 +870,7 @@ static int __init p61_dev_init(void)
 	return ret;
 
 }
-module_init(p61_dev_init);
+vseq_module_init(p61_dev_init);
 
 /**
  * \ingroup spi_driver

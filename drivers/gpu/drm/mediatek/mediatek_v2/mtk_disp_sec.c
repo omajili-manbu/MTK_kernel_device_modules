@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/soc/mediatek/mtk-cmdq-ext.h>
 #include <linux/of_platform.h>
 
@@ -582,7 +583,7 @@ static void __exit mtk_disp_sec_exit(void)
 	platform_driver_unregister(&disp_sec_drv);
 }
 
-module_init(mtk_disp_sec_init);
+vseq_module_init(mtk_disp_sec_init);
 module_exit(mtk_disp_sec_exit);
 
 MODULE_AUTHOR("Aaron Chung <Aaron.Chung@mediatek.com>");

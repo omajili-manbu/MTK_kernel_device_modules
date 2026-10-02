@@ -4,6 +4,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 
@@ -21,7 +22,7 @@ static int __init dbg_early_initcall(void)
 	return 0;
 }
 #ifndef MTK_LPM_MODE_MODULE
-subsys_initcall(dbg_early_initcall);
+vseq_subsys_initcall(dbg_early_initcall);
 #endif
 
 static int __init dbg_device_initcall(void)
@@ -38,7 +39,7 @@ static int __init dbg_late_initcall(void)
 	return 0;
 }
 #ifndef MTK_LPM_MODE_MODULE
-late_initcall_sync(dbg_late_initcall);
+vseq_late_initcall_sync(dbg_late_initcall);
 #endif
 
 int __init lpm_dbg_init(void)
@@ -87,7 +88,7 @@ void __exit lpm_dbg_exit(void)
 #endif
 }
 
-module_init(lpm_dbg_init);
+vseq_module_init(lpm_dbg_init);
 module_exit(lpm_dbg_exit);
 
 MODULE_LICENSE("GPL");

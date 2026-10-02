@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include "sapu_driver.h"
+#include <linux/vseq.h>
 #include "mtk-smmu-v3.h"
 
 #define ENABLE_DRAM_FB 1
@@ -553,6 +554,6 @@ void sapu_exit(void)
 	platform_driver_unregister(&apusys_sapu_driver);
 }
 
-module_init(sapu_init);
+vseq_module_init(sapu_init);
 module_exit(sapu_exit);
 MODULE_LICENSE("GPL v2");

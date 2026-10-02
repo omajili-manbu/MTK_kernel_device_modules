@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/types.h>
 #include <linux/tracepoint.h>
 #include <linux/mm.h>
@@ -1246,7 +1247,7 @@ static int __init init_pgboost(void)
 
 	return 0;
 }
-module_init(init_pgboost);
+vseq_module_init(init_pgboost);
 
 static void  __exit exit_pgboost(void)
 {

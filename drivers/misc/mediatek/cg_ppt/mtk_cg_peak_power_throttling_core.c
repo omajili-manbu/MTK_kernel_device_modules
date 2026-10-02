@@ -5,6 +5,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/timer.h>
 #include <linux/ktime.h>
@@ -1641,7 +1642,7 @@ static void __exit cg_peak_power_throttling_exit(void)
 	platform_driver_unregister(&cgppt_driver);
 }
 
-module_init(cg_peak_power_throttling_init);
+vseq_module_init(cg_peak_power_throttling_init);
 module_exit(cg_peak_power_throttling_exit);
 
 MODULE_AUTHOR("Clouds Lee");

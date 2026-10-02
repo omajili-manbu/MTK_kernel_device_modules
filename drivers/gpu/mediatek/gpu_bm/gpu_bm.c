@@ -4,6 +4,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/vseq.h>
 #include <linux/fs.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
@@ -527,7 +528,7 @@ static void __exit mtk_gpu_qos_exit(void)
 	;
 }
 
-arch_initcall(mtk_gpu_qos_init);
+vseq_arch_initcall(mtk_gpu_qos_init);
 module_exit(mtk_gpu_qos_exit);
 
 MODULE_LICENSE("GPL");

@@ -3,6 +3,7 @@
 // Copyright (c) 2018 MediaTek Inc.
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include "mtk-base-afe.h"
 #include "mtk-sram-manager.h"
 
@@ -149,7 +150,7 @@ static void __exit mtk_ultrasound_exit(void)
 	unregister_afe_allocate_mem_notifier(&ultrasound_init_notifier);
 }
 
-module_init(mtk_ultrasound_init);
+vseq_module_init(mtk_ultrasound_init);
 module_exit(mtk_ultrasound_exit);
 
 MODULE_DESCRIPTION("Mediatek scp ultra platform driver");

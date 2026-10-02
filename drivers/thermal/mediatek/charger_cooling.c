@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -323,7 +324,7 @@ static struct platform_driver charger_cooling_driver = {
 		.of_match_table = charger_cooling_of_match,
 	},
 };
-module_platform_driver(charger_cooling_driver);
+vseq_module_platform_driver(charger_cooling_driver);
 
 MODULE_AUTHOR("Henry Huang <henry.huang@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek charger cooling driver");

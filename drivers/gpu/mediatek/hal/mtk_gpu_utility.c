@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
@@ -768,7 +769,7 @@ static void mtk_gpu_hal_exit(void)
 	;
 }
 
-arch_initcall(mtk_gpu_hal_init);
+vseq_arch_initcall(mtk_gpu_hal_init);
 module_exit(mtk_gpu_hal_exit);
 
 MODULE_LICENSE("GPL");

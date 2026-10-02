@@ -10,6 +10,7 @@
  *
  */
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/fs.h>
 
@@ -753,6 +754,6 @@ static struct i2c_driver wl2866d_regulator_driver = {
 	.id_table = wl2866d_id,
 };
 
-module_i2c_driver(wl2866d_regulator_driver);
+vseq_module_i2c_driver(wl2866d_regulator_driver);
 MODULE_LICENSE("GPL v2");
 

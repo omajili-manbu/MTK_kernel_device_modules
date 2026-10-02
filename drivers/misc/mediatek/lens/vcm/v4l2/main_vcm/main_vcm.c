@@ -2,6 +2,7 @@
 // Copyright (c) 2019 MediaTek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regulator/consumer.h>
@@ -939,7 +940,7 @@ static struct i2c_driver main_vcm_i2c_driver = {
 	.id_table = main_vcm_id_table,
 };
 
-module_i2c_driver(main_vcm_i2c_driver);
+vseq_module_i2c_driver(main_vcm_i2c_driver);
 
 MODULE_AUTHOR("Po-Hao Huang <Po-Hao.Huang@mediatek.com>");
 MODULE_DESCRIPTION("MAIN_VCM VCM driver");

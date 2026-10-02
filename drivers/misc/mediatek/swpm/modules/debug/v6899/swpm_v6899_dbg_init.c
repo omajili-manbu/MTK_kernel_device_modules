@@ -4,6 +4,7 @@
  */
 
 #include <linux/cpu.h>
+#include <linux/vseq.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -720,7 +721,7 @@ static int __init swpm_v6899_dbg_early_initcall(void)
 	return 0;
 }
 #ifndef MTK_SWPM_KERNEL_MODULE
-subsys_initcall(swpm_v6899_dbg_early_initcall);
+vseq_subsys_initcall(swpm_v6899_dbg_early_initcall);
 #endif
 
 static int __init swpm_v6899_dbg_device_initcall(void)
@@ -747,7 +748,7 @@ static int __init swpm_v6899_dbg_late_initcall(void)
 	return 0;
 }
 #ifndef MTK_SWPM_KERNEL_MODULE
-late_initcall_sync(swpm_v6899_dbg_late_initcall);
+vseq_late_initcall_sync(swpm_v6899_dbg_late_initcall);
 #endif
 
 int __init swpm_v6899_dbg_init(void)
@@ -782,7 +783,7 @@ void __exit swpm_v6899_dbg_exit(void)
 	swpm_v6899_ext_exit();
 }
 
-module_init(swpm_v6899_dbg_init);
+vseq_module_init(swpm_v6899_dbg_init);
 module_exit(swpm_v6899_dbg_exit);
 
 MODULE_LICENSE("GPL");

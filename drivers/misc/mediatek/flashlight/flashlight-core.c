@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": %s: " fmt, __func__
 
 #include <linux/types.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -2468,7 +2469,7 @@ static void __exit flashlight_exit(void)
 	pr_debug("Exit done\n");
 }
 
-module_init(flashlight_init);
+vseq_module_init(flashlight_init);
 module_exit(flashlight_exit);
 
 MODULE_LICENSE("GPL");

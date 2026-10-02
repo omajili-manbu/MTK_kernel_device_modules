@@ -3,6 +3,7 @@
  * Copyright (C) 2020 MediaTek Inc.
  */
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
@@ -87,7 +88,7 @@ static int __init mtk_dvfsrc_run_init(void)
 {
 	return platform_driver_register(&mtk_dvfsrc_run_drv);
 }
-late_initcall_sync(mtk_dvfsrc_run_init);
+vseq_late_initcall_sync(mtk_dvfsrc_run_init);
 
 static void __exit mtk_dvfsrc_run_exit(void)
 {

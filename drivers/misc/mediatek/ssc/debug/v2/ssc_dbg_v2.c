@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/kobject.h>
 #include <ssc_module.h>
@@ -156,7 +157,7 @@ static void __exit ssc_v2_exit(void)
 }
 
 
-module_init(ssc_v2_init);
+vseq_module_init(ssc_v2_init);
 module_exit(ssc_v2_exit);
 
 MODULE_LICENSE("GPL");

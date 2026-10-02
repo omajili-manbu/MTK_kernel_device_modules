@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>       /* needed by all modules */
+#include <linux/vseq.h>
 #include <linux/init.h>         /* needed by module macros */
 #include <linux/fs.h>           /* needed by file_operations* */
 #include <linux/miscdevice.h>   /* needed by miscdevice* */
@@ -3610,7 +3611,7 @@ static void __exit scp_exit(void)
 #endif
 }
 
-device_initcall_sync(scp_init);
+vseq_device_initcall_sync(scp_init);
 module_exit(scp_exit);
 
 MODULE_DESCRIPTION("MEDIATEK Module SCP driver");

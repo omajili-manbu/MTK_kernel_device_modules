@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/file.h>
 #include <linux/delay.h>
 #include <linux/cdev.h>
@@ -1323,7 +1324,7 @@ static void fmt_exit(void)
 	platform_driver_unregister(&vdec_fmt_driver);
 }
 
-subsys_initcall(fmt_init);
+vseq_subsys_initcall(fmt_init);
 module_exit(fmt_exit);
 
 

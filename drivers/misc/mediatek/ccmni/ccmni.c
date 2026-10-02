@@ -23,6 +23,7 @@
  *
  ****************************************************************************/
 #include <linux/netdevice.h>
+#include <linux/vseq.h>
 #include <linux/etherdevice.h>
 #include <linux/ip.h>
 #include <linux/of.h>
@@ -1711,7 +1712,7 @@ struct ccmni_dev_ops ccmni_ops = {
 };
 EXPORT_SYMBOL(ccmni_ops);
 
-module_init(ccmni_init);
+vseq_module_init(ccmni_init);
 module_exit(ccmni_exit);
 MODULE_AUTHOR("MTK CCCI");
 MODULE_DESCRIPTION("CCCI ccmni driver v0.1");

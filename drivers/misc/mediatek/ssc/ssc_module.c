@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/kobject.h>
 #include <linux/module.h>
@@ -459,7 +460,7 @@ static void __exit ssc_deinit(void)
 	ssc_vlogic_bound_unregister_notifier(&ssc_vlogic_notifier_func);
 }
 
-module_init(ssc_init);
+vseq_module_init(ssc_init);
 module_exit(ssc_deinit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("mtk ssc module");

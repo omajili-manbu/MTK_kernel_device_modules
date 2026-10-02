@@ -4,6 +4,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/dma-buf.h>
 #include <linux/errno.h>
@@ -241,7 +242,7 @@ static void __exit mtk_wv_exit(void)
 	WV_LOG(0, "driver exit successful\n");
 }
 
-module_init(mtk_wv_init);
+vseq_module_init(mtk_wv_init);
 module_exit(mtk_wv_exit);
 MODULE_AUTHOR("Shan Zhang <shan.zhang@mediatek.com>");
 MODULE_DESCRIPTION("Widevine Drm Driver");

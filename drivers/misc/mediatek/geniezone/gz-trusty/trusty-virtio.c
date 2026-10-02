@@ -25,6 +25,7 @@
  */
 /* #define DEBUG */
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -1204,7 +1205,7 @@ static void __exit trusty_virtio_exit(void)
 	platform_driver_unregister(&nebula_virtio_driver);
 }
 
-module_init(trusty_virtio_init);
+vseq_module_init(trusty_virtio_init);
 module_exit(trusty_virtio_exit);
 
 MODULE_LICENSE("GPL v2");

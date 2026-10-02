@@ -4,6 +4,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -494,7 +495,7 @@ static struct platform_driver md_cooling_driver = {
 		.of_match_table = md_cooling_of_match,
 	},
 };
-module_platform_driver(md_cooling_driver);
+vseq_module_platform_driver(md_cooling_driver);
 
 MODULE_AUTHOR("Shun-Yao Yang <brian-sy.yang@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek modem cooling driver");

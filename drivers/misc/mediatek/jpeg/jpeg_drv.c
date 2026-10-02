@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/device.h>
@@ -1369,7 +1370,7 @@ static void __exit jpeg_exit(void)
 	remove_proc_entry("mtk_jpeg", NULL);
 	platform_driver_unregister(&jpeg_driver);
 }
-module_init(jpeg_init);
+vseq_module_init(jpeg_init);
 module_exit(jpeg_exit);
 MODULE_AUTHOR("Jason Hsu <yeong-cherng.hsu@mediatek.com>");
 MODULE_DESCRIPTION("JPEG Dec Codec Driver");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
 #include <linux/err.h>
@@ -1240,7 +1241,7 @@ static struct i2c_driver rt5512_i2c_driver = {
 	.remove = rt5512_i2c_remove,
 	.id_table = rt5512_i2c_id,
 };
-module_i2c_driver(rt5512_i2c_driver);
+vseq_module_i2c_driver(rt5512_i2c_driver);
 
 MODULE_AUTHOR("Jeff Chang <jeff_chang@richtek.com>");
 MODULE_DESCRIPTION("RT5512 SPKAMP Driver");

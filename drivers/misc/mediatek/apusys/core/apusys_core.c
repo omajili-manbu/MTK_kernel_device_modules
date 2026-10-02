@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/module.h>  /* Needed by all modules */
+#include <linux/vseq.h>
 #include <linux/kernel.h>  /* Needed for KERN_ALERT */
 #include <linux/cdev.h>
 #include <linux/device.h>
@@ -80,7 +81,7 @@ static void __exit apusys_exit(void)
 	destroy_dbg_root();
 }
 
-module_init(apusys_init);
+vseq_module_init(apusys_init);
 module_exit(apusys_exit);
 MODULE_DESCRIPTION("MTK APUSys Driver");
 MODULE_AUTHOR("SPT1");

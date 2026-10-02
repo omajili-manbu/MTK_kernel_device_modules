@@ -3,6 +3,7 @@
 // Copyright (c) 2018 MediaTek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -114,7 +115,7 @@ static struct platform_driver scp_ultra_pcm_driver = {
 	.remove = scp_ultra_pcm_dev_remove,
 };
 
-module_platform_driver(scp_ultra_pcm_driver);
+vseq_module_platform_driver(scp_ultra_pcm_driver);
 
 MODULE_DESCRIPTION("Mediatek ALSA SoC scp ultrasound platform driver");
 MODULE_AUTHOR("Ning Li <Ning.Li@mediatek.com>");

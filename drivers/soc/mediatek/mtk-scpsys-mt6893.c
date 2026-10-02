@@ -3,6 +3,7 @@
 // Copyright (c) 2021 MediaTek Inc.
 // Author: Owen Chen <owen.chen@mediatek.com>
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
@@ -557,6 +558,6 @@ static void __exit mt6893_scpsys_exit(void)
 	platform_driver_unregister(&mt6893_scpsys_drv);
 }
 
-arch_initcall(mt6893_scpsys_init);
+vseq_arch_initcall(mt6893_scpsys_init);
 module_exit(mt6893_scpsys_exit);
 MODULE_LICENSE("GPL");

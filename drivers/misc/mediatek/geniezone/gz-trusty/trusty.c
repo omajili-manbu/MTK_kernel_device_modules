@@ -26,6 +26,7 @@
 
 /* #define DEBUG */
 #include <asm/compiler.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -1102,8 +1103,8 @@ static void __exit trusty_driver_exit(void)
 	platform_driver_unregister(&nebula_driver);
 }
 
-//subsys_initcall(trusty_driver_init);
-arch_initcall(trusty_driver_init);
+//vseq_subsys_initcall(trusty_driver_init);
+vseq_arch_initcall(trusty_driver_init);
 module_exit(trusty_driver_exit);
 
 MODULE_LICENSE("GPL");

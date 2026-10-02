@@ -17,6 +17,7 @@
 
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -1295,7 +1296,7 @@ static void __exit tz_system_exit(void)
 	platform_driver_unregister(&tz_system_driver);
 }
 
-module_init(tz_system_init);
+vseq_module_init(tz_system_init);
 module_exit(tz_system_exit);
 MODULE_SOFTDEP("pre: gz_virtio_mod.ko");
 MODULE_SOFTDEP("pre: gz_irq_mod.ko");

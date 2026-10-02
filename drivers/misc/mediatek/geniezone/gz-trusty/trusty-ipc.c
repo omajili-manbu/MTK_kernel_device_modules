@@ -26,6 +26,7 @@
 
 /* #define DEBUG */
 #include <linux/aio.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/cdev.h>
@@ -2323,7 +2324,7 @@ static void __exit tipc_exit(void)
 }
 
 /* We need to init this early */
-subsys_initcall(tipc_init);
+vseq_subsys_initcall(tipc_init);
 module_exit(tipc_exit);
 
 MODULE_DEVICE_TABLE(tipc, tipc_virtio_id_table);

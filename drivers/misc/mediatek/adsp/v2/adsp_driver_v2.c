@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/platform_device.h>
@@ -549,7 +550,7 @@ static void __exit platform_adsp_exit(void)
 	pr_info("[ADSP] platform-adsp Exit.\n");
 }
 
-module_init(platform_adsp_init);
+vseq_module_init(platform_adsp_init);
 module_exit(platform_adsp_exit);
 
 MODULE_AUTHOR("Chien-Wei Hsu <Chien-Wei.Hsu@mediatek.com>");

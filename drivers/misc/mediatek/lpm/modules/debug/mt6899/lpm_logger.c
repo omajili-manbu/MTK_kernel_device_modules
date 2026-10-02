@@ -5,6 +5,7 @@
 
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/errno.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -969,7 +970,7 @@ void __exit mt6899_dbg_exit(void)
 	unregister_lpm_logger_mbrain_dbg_ops();
 }
 
-module_init(mt6899_dbg_init);
+vseq_module_init(mt6899_dbg_init);
 module_exit(mt6899_dbg_exit);
 
 MODULE_LICENSE("GPL");

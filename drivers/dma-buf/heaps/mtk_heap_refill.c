@@ -8,6 +8,7 @@
  */
 
 #include <asm/page.h>
+#include <linux/vseq.h>
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/highmem.h>
@@ -399,5 +400,5 @@ static int mtk_heap_refill_enable_init(void)
 	return 0;
 }
 
-module_init(mtk_heap_refill_enable_init);
+vseq_module_init(mtk_heap_refill_enable_init);
 MODULE_LICENSE("GPL");

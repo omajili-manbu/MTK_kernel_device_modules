@@ -9,6 +9,7 @@
 #define pr_fmt(fmt) "dma_heap: mtk_sec " fmt
 
 #include <linux/arm-smccc.h>
+#include <linux/vseq.h>
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
 #include <linux/dma-mapping.h>
@@ -2316,7 +2317,7 @@ static void __exit mtk_sec_heap_exit(void)
 }
 
 MODULE_SOFTDEP("pre: apusys");
-module_init(mtk_sec_heap_init);
+vseq_module_init(mtk_sec_heap_init);
 module_exit(mtk_sec_heap_exit);
 MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

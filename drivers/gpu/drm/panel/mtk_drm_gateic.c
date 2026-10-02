@@ -4,6 +4,7 @@
  */
 
 #include "mtk_drm_gateic.h"
+#include <linux/vseq.h>
 
 static struct list_head dbi_gateic_list;
 static struct list_head dpi_gateic_list;
@@ -349,7 +350,7 @@ static void __exit mtk_drm_gateic_exit(void)
 	i2c_del_driver(&mtk_panel_i2c_driver);
 #endif
 }
-module_init(mtk_drm_gateic_init);
+vseq_module_init(mtk_drm_gateic_init);
 module_exit(mtk_drm_gateic_exit);
 
 MODULE_AUTHOR("Cui Zhang <cui.zhang@mediatek.com>");

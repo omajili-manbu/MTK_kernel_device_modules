@@ -4,6 +4,7 @@
  */
 
 #include <asm/cpuidle.h>
+#include <linux/vseq.h>
 #include <asm/suspend.h>
 #include <linux/cpu_pm.h>
 #include <linux/cpuidle.h>
@@ -704,10 +705,10 @@ static void __exit lpm_deinit(void)
 {
 }
 
-module_init(lpm_init);
+vseq_module_init(lpm_init);
 module_exit(lpm_deinit);
 #else
-device_initcall_sync(lpm_init);
+vseq_device_initcall_sync(lpm_init);
 #endif
 
 MODULE_LICENSE("GPL");

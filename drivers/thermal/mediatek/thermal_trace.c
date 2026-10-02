@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/cpumask.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
@@ -542,7 +543,7 @@ static int __init thermal_trace_init(void)
 
 	return ret;
 }
-module_init(thermal_trace_init)
+vseq_module_init(thermal_trace_init)
 
 static void __exit thermal_trace_exit(void)
 {

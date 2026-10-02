@@ -4,6 +4,7 @@
  */
 
 #include <linux/list.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -116,7 +117,7 @@ static int __init ccci_init(void)
 	return 0;
 }
 
-subsys_initcall(ccci_init);
+vseq_subsys_initcall(ccci_init);
 
 MODULE_AUTHOR("Xiao Wang <xiao.wang@mediatek.com>");
 MODULE_DESCRIPTION("Evolved CCCI driver");

@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) "Task-Turbo: " fmt
 
 #include <linux/sched/cputime.h>
+#include <linux/vseq.h>
 #include <linux/sched.h>
 #include <linux/pid.h>
 #include <linux/module.h>
@@ -2515,7 +2516,7 @@ static void  __exit exit_task_turbo(void)
 	 * vendor hook cannot unregister, please check vendor_hook.h
 	 */
 }
-module_init(init_task_turbo);
+vseq_module_init(init_task_turbo);
 module_exit(exit_task_turbo);
 
 MODULE_LICENSE("GPL");

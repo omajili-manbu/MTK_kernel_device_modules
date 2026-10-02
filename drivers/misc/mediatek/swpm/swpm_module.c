@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/ktime.h>
@@ -466,10 +467,10 @@ static void __exit swpm_deinit(void)
 	destroy_workqueue(swpm_common_wq);
 }
 
-module_init(swpm_init);
+vseq_module_init(swpm_init);
 module_exit(swpm_deinit);
 #else
-device_initcall_sync(swpm_init);
+vseq_device_initcall_sync(swpm_init);
 #endif
 
 MODULE_LICENSE("GPL");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/kconfig.h>
 #include <linux/kthread.h>
 #include <linux/kernel.h>
@@ -2419,7 +2420,7 @@ static int __init slbc_module_init(void)
 {
 	return platform_driver_register(&slbc_pdrv);
 }
-module_init(slbc_module_init);
+vseq_module_init(slbc_module_init);
 
 static void __exit slbc_module_exit(void)
 {

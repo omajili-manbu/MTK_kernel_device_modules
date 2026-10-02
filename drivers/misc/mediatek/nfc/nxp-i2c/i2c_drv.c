@@ -36,6 +36,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/uaccess.h>
@@ -553,7 +554,7 @@ static int __init nfc_i2c_dev_init(void)
 	return ret;
 }
 
-module_init(nfc_i2c_dev_init);
+vseq_module_init(nfc_i2c_dev_init);
 
 static void __exit nfc_i2c_dev_exit(void)
 {

@@ -13,6 +13,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/sched/cputime.h>
+#include <linux/vseq.h>
 #include <sched/sched.h>
 #include "cpufreq.h"
 #if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)
@@ -1476,9 +1477,9 @@ static void __exit cpufreq_mtk_exit(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
-late_initcall(cpufreq_mtk_init);
+vseq_late_initcall(cpufreq_mtk_init);
 #else
-module_init(cpufreq_mtk_init);
+vseq_module_init(cpufreq_mtk_init);
 #endif
 module_exit(cpufreq_mtk_exit);
 

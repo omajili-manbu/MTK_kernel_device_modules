@@ -3,6 +3,7 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 #include <linux/atomic.h>
+#include <linux/vseq.h>
 #include <linux/cpu.h>
 #include <linux/cpuidle.h>
 #include <linux/hrtimer.h>
@@ -817,7 +818,7 @@ static void __exit mtk_cpuidle_gov_exit(void)
 {
 }
 
-module_init(mtk_cpuidle_gov_init);
+vseq_module_init(mtk_cpuidle_gov_init);
 module_exit(mtk_cpuidle_gov_exit);
 
 MODULE_LICENSE("GPL");

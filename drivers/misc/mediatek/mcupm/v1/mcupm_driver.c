@@ -3,6 +3,7 @@
  * Copyright (C) 2021 MediaTek Inc.
  */
 #include <linux/module.h>       /* needed by all modules */
+#include <linux/vseq.h>
 #include <linux/init.h>         /* needed by module macros */
 #include <linux/types.h>
 #include <linux/atomic.h>
@@ -1066,7 +1067,7 @@ static int __init post_mcupm_set_emi_mpu(void)
 	return ret;
 }
 
-late_initcall(post_mcupm_set_emi_mpu);
+vseq_late_initcall(post_mcupm_set_emi_mpu);
 #endif
 #endif
 static void __exit mcupm_module_exit(void)
@@ -1076,5 +1077,5 @@ static void __exit mcupm_module_exit(void)
 }
 MODULE_DESCRIPTION("MEDIATEK Module MCUPM driver");
 MODULE_LICENSE("GPL v2");
-module_init(mcupm_module_init);
+vseq_module_init(mcupm_module_init);
 module_exit(mcupm_module_exit);

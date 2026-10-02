@@ -15,6 +15,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
@@ -301,7 +302,7 @@ static void __exit __gpueb_exit(void)
 	platform_driver_unregister(&g_gpueb_pdrv);
 }
 
-module_init(__gpueb_init);
+vseq_module_init(__gpueb_init);
 module_exit(__gpueb_exit);
 
 MODULE_DEVICE_TABLE(of, g_gpueb_of_match);

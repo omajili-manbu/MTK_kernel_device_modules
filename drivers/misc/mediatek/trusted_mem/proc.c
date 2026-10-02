@@ -5,6 +5,7 @@
 
 #define PR_FMT_HEADER_MUST_BE_INCLUDED_BEFORE_ALL_HDRS
 #include "private/tmem_pr_fmt.h" PR_FMT_HEADER_MUST_BE_INCLUDED_BEFORE_ALL_HDRS
+#include <linux/vseq.h>
 
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -380,7 +381,7 @@ static struct platform_driver trusted_mem_driver = {
 		.of_match_table = tm_of_match_table,
 	},
 };
-module_platform_driver(trusted_mem_driver);
+vseq_module_platform_driver(trusted_mem_driver);
 
 MODULE_AUTHOR("MediaTek Inc.");
 MODULE_DESCRIPTION("MediaTek Trusted Memory Driver");

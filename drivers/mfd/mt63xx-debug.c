@@ -3,6 +3,7 @@
 // Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/mfd/mt6397/core.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
@@ -121,7 +122,7 @@ static struct platform_driver mt63xx_debug_driver = {
 	.remove = mt63xx_debug_remove,
 };
 
-module_platform_driver(mt63xx_debug_driver);
+vseq_module_platform_driver(mt63xx_debug_driver);
 
 MODULE_AUTHOR("Wen Su <wen.su@mediatek.com>");
 MODULE_DESCRIPTION("Debug driver for MediaTek MT63xx PMIC");

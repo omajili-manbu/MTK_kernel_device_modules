@@ -8,6 +8,7 @@
 
 /* system includes */
 #include <linux/cpu.h>
+#include <linux/vseq.h>
 #include <linux/cpufreq.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -250,7 +251,7 @@ static int mtk_cpudvfs_init(void)
 
 	return 0;
 }
-module_init(mtk_cpudvfs_init);
+vseq_module_init(mtk_cpudvfs_init);
 
 static void mtk_cpudvfs_exit(void)
 {

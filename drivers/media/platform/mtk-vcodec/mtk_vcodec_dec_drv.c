@@ -6,6 +6,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/vseq.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/module.h>
@@ -831,7 +832,7 @@ static struct platform_driver mtk_vcodec_dec_driver = {
 	},
 };
 
-module_platform_driver(mtk_vcodec_dec_driver);
+vseq_module_platform_driver(mtk_vcodec_dec_driver);
 
 MODULE_IMPORT_NS("DMA_BUF");
 MODULE_LICENSE("GPL v2");

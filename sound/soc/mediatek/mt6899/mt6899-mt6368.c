@@ -7,6 +7,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/pm_runtime.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
@@ -2296,7 +2297,7 @@ static struct platform_driver mt6899_mt6368_driver = {
 	.probe = mt6899_mt6368_dev_probe,
 };
 
-module_platform_driver(mt6899_mt6368_driver);
+vseq_module_platform_driver(mt6899_mt6368_driver);
 
 /* Module information */
 MODULE_DESCRIPTION("MT6899 mt6368 ALSA SoC machine driver");

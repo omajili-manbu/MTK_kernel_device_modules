@@ -4,6 +4,7 @@
  */
 
 #include "mtk_drm_panel_drv.h"
+#include <linux/vseq.h>
 
 //static struct mtk_panel_context *ctx_dbi;
 
@@ -35,7 +36,7 @@ struct platform_driver mtk_drm_panel_dbi_driver = {
 		.of_match_table = mtk_panel_dbi_of_match,
 	},
 };
-//module_platform_driver(mtk_drm_panel_dbi_driver);
+//vseq_module_platform_driver(mtk_drm_panel_dbi_driver);
 
 MODULE_AUTHOR("Cui Zhang <cui.zhang@mediatek.com>");
 MODULE_DESCRIPTION("mediatek, drm panel dbi driver");

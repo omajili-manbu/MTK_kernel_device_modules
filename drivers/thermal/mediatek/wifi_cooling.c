@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -172,7 +173,7 @@ static struct platform_driver wifi_cooling_driver = {
 		.of_match_table = wifi_cooling_of_match,
 	},
 };
-module_platform_driver(wifi_cooling_driver);
+vseq_module_platform_driver(wifi_cooling_driver);
 
 MODULE_AUTHOR("Jerry-SC.Wu <jerry-sc.wu@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek wifi cooling driver");

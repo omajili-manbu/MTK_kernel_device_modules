@@ -7,6 +7,7 @@
 
 /* #define DEBUG */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
 /*  includes the file structure, that is, file open read close */
@@ -700,7 +701,7 @@ static int32_t elliptic_send_calibration_to_engine(size_t calib_data_size)
 /* rodin b513 #113: 与 6.6 的模块装载语义等价 —— 6.6 上 scp.ko 先
  * 装载并注册 scp_ipidev（2.5796s），userspace 之后才装载
  * elliptic-ultrasound.ko（2.9386s）。6.18 内建化后 elliptic 的
- * device_initcall 早于 SCP 提供者的 device_initcall_sync（scp_init），
+ * vseq_device_initcall 早于 SCP 提供者的 vseq_device_initcall_sync（scp_init），
  * mtk_ipi_register() 因 !ipidev->ipi_inited 返回 IPI_DEV_ILLEGAL，
  * 于是错误路径释放主设备号、留下 /sys/dev/char 悬挂（#113 实证）。
  * 因此拆两段：SCP 未就绪时先不建任何资源（chrdev/class/device/
@@ -761,7 +762,7 @@ static int elliptic_setup(void)
 			elliptic_class);
 		if (err) {
 			/* rodin b513 #113: 原实现在此不写 err（保持 0），
-			 * module_init 会假装成功。 */
+			 * vseq_module_init 会假装成功。 */
 			devices_to_destroy = i;
 			goto fail;
 		}
@@ -867,5 +868,5 @@ MODULE_AUTHOR("Elliptic Labs");
 MODULE_DESCRIPTION("Providing Interface to UPS data");
 MODULE_LICENSE("GPL");
 
-module_init(elliptic_driver_init);
+vseq_module_init(elliptic_driver_init);
 module_exit(elliptic_driver_exit);

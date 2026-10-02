@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/init.h>
 #include <linux/io.h>
@@ -760,5 +761,5 @@ struct generic_pm_domain *mt6991_mmup_get_power_domain(void)
 }
 EXPORT_SYMBOL_GPL(mt6991_mmup_get_power_domain);
 
-module_platform_driver(mt6991_scpsys_spm_drv);
+vseq_module_platform_driver(mt6991_scpsys_spm_drv);
 MODULE_LICENSE("GPL");

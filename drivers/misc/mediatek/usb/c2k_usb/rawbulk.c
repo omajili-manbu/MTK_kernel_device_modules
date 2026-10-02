@@ -12,6 +12,7 @@
 #define DRIVER_NAME     "usb_rawbulk"
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -759,7 +760,7 @@ static int __init rawbulk_init(void)
 
 	return 0;
 }
-module_init(rawbulk_init);
+vseq_module_init(rawbulk_init);
 
 static __exit void rawbulk_exit(void)
 {

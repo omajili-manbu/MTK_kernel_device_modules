@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include "perf_ioctl.h"
+#include <linux/vseq.h>
 
 #define TAG "PERF_IOCTL"
 
@@ -690,7 +691,7 @@ out_wq:
 	return ret_val;
 }
 
-module_init(init_perfctl);
+vseq_module_init(init_perfctl);
 module_exit(exit_perfctl);
 
 MODULE_LICENSE("GPL");

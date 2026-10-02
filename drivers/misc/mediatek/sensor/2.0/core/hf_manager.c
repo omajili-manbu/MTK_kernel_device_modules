@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) "[hf_manager]" fmt
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/fs.h>
@@ -1972,7 +1973,7 @@ static void __exit hf_manager_exit(void)
 	unregister_chrdev(hf_manager_major, "hf_manager");
 }
 
-subsys_initcall(hf_manager_init);
+vseq_subsys_initcall(hf_manager_init);
 module_exit(hf_manager_exit);
 
 MODULE_DESCRIPTION("high frequency manager");

@@ -15,6 +15,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/io.h>
@@ -683,7 +684,7 @@ static void __exit __ghpm_exit(void)
 	platform_driver_unregister(&g_ghpm_pdrv);
 }
 
-module_init(__ghpm_init);
+vseq_module_init(__ghpm_init);
 module_exit(__ghpm_exit);
 
 MODULE_DEVICE_TABLE(of, g_ghpm_of_match);

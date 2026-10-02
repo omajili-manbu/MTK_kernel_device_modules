@@ -10,6 +10,7 @@
  *
  */
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/of.h> /* rodin r25: 6.18 header pruning */
 #include <linux/fs.h>
 
@@ -756,6 +757,6 @@ static struct i2c_driver sgm38121_regulator_driver = {
 	.id_table = sgm38121_id,
 };
 
-module_i2c_driver(sgm38121_regulator_driver);
+vseq_module_i2c_driver(sgm38121_regulator_driver);
 MODULE_LICENSE("GPL v2");
 

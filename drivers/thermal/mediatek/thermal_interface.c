@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/platform_device.h>
@@ -2641,7 +2642,7 @@ static struct platform_driver therm_intf_driver = {
 	},
 };
 
-module_platform_driver(therm_intf_driver);
+vseq_module_platform_driver(therm_intf_driver);
 
 MODULE_AUTHOR("Henry Huang <henry.huang@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek thermal interface driver");

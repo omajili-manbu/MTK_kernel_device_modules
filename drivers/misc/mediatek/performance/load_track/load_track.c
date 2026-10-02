@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/mutex.h>
 #include <linux/ktime.h>
@@ -352,7 +353,7 @@ static void __exit load_track_exit(void)
 	destroy_workqueue(ps_lk_wq);
 }
 
-module_init(load_track_init);
+vseq_module_init(load_track_init);
 module_exit(load_track_exit);
 
 MODULE_LICENSE("GPL");

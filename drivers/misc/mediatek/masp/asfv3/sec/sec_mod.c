@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/moduleparam.h>
@@ -378,7 +379,7 @@ static void __exit masp_exit(void)
 }
 
 
-module_init(masp_init);
+vseq_module_init(masp_init);
 module_exit(masp_exit);
 
 /**************************************************************************

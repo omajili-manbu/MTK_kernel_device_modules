@@ -4,6 +4,7 @@
  */
 
 #include <linux/seq_file.h>
+#include <linux/vseq.h>
 #include <linux/proc_fs.h>
 #include <linux/cpumask.h>
 #include "mtk_perfmgr_internal.h"
@@ -953,7 +954,7 @@ static int __init uload_init(void)
 
 static void __exit uload_exit(void){}
 
-module_init(uload_init);
+vseq_module_init(uload_init);
 module_exit(uload_exit);
 
 MODULE_LICENSE("GPL");

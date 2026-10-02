@@ -19,6 +19,7 @@
 
 /* system includes */
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
@@ -338,7 +339,7 @@ static void __exit __et_exit(void)
 }
 
 
-late_initcall(__et_init);
+vseq_late_initcall(__et_init);
 module_exit(__et_exit);
 
 MODULE_DESCRIPTION("MediaTek et Driver v0.1");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
@@ -45,6 +46,6 @@ static int __init ccci_util_init(void)
 	return 0;
 }
 
-subsys_initcall(ccci_util_init);
+vseq_subsys_initcall(ccci_util_init);
 MODULE_DESCRIPTION("MTK CCCI UTIL Driver");
 MODULE_LICENSE("GPL");

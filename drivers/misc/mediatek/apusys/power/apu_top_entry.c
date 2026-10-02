@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
@@ -50,6 +51,6 @@ void apu_power_drv_exit(void)
 }
 EXPORT_SYMBOL(apu_power_drv_exit);
 
-module_init(apu_top_entry_init);
+vseq_module_init(apu_top_entry_init);
 module_exit(apu_top_entry_exit);
 MODULE_LICENSE("GPL");

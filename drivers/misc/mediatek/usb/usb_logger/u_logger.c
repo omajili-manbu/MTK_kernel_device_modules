@@ -6,6 +6,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -364,7 +365,7 @@ static struct platform_driver u_logger_driver = {
 	},
 };
 
-module_platform_driver(u_logger_driver);
+vseq_module_platform_driver(u_logger_driver);
 
 MODULE_DESCRIPTION("Mediatek USB logger driver");
 MODULE_LICENSE("GPL");

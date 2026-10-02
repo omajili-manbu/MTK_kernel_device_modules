@@ -4,6 +4,7 @@
  */
 
 #include <linux/arm-smccc.h> /* for Kernel Native SMC API */
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -598,7 +599,7 @@ static void __exit atf_log_exit(void)
 	pr_notice("atf_log: exited");
 }
 
-module_init(atf_log_init);
+vseq_module_init(atf_log_init);
 module_exit(atf_log_exit);
 
 MODULE_DESCRIPTION("MEDIATEK Module ATF Logging Driver");

@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include <linux/kthread.h>
+#include <linux/vseq.h>
 #include <linux/sched/cputime.h>
 #include <sched/sched.h>
 #include <linux/string.h>
@@ -1509,9 +1510,9 @@ static int __init fpsgo_init(void)
 }
 
 #if !IS_ENABLED(CONFIG_ARM64)
-late_initcall_sync(fpsgo_init);
+vseq_late_initcall_sync(fpsgo_init);
 #else
-module_init(fpsgo_init);
+vseq_module_init(fpsgo_init);
 #endif
 module_exit(fpsgo_exit);
 

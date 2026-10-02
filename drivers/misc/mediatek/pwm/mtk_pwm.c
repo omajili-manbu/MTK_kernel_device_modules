@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <generated/autoconf.h>
@@ -2101,7 +2102,7 @@ static void __exit mt_pwm_exit(void)
 	platform_driver_unregister(&pwm_plat_driver);
 }
 
-module_init(mt_pwm_init);
+vseq_module_init(mt_pwm_init);
 module_exit(mt_pwm_exit);
 
 MODULE_LICENSE("GPL");

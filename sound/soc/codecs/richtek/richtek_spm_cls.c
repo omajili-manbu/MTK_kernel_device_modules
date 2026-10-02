@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -604,7 +605,7 @@ out_cls_attr:
 	class_destroy(richtek_spm_class);
 	return ret;
 }
-subsys_initcall(richtek_spm_init);
+vseq_subsys_initcall(richtek_spm_init);
 
 static void __exit richtek_spm_exit(void)
 {

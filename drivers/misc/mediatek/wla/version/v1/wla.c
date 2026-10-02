@@ -3,6 +3,7 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 #include <linux/io.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -599,7 +600,7 @@ static struct platform_driver wla_driver = {
 	},
 	.probe	= wla_probe,
 };
-module_platform_driver(wla_driver);
+vseq_module_platform_driver(wla_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MTK work load aware - v1");

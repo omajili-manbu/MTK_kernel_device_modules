@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include <linux/seq_file.h>
+#include <linux/vseq.h>
 #include <linux/proc_fs.h>
 #include <linux/cpumask.h>
 #include <linux/module.h>
@@ -982,9 +983,9 @@ static void __exit powerhal_cpu_ctrl_exit(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_PERF_COMMON)
-late_initcall(powerhal_cpu_ctrl_init);
+vseq_late_initcall(powerhal_cpu_ctrl_init);
 #else
-module_init(powerhal_cpu_ctrl_init);
+vseq_module_init(powerhal_cpu_ctrl_init);
 #endif
 module_exit(powerhal_cpu_ctrl_exit);
 

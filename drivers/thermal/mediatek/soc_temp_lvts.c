@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/of_irq.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -7352,7 +7353,7 @@ static struct platform_driver soc_temp_lvts = {
 	},
 };
 
-module_platform_driver(soc_temp_lvts);
+vseq_module_platform_driver(soc_temp_lvts);
 MODULE_AUTHOR("Yu-Chia Chang <ethan.chang@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek soc temperature driver");
 MODULE_LICENSE("GPL v2");

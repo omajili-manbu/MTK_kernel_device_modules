@@ -6,6 +6,7 @@
 // Author: KaiChieh Chuang <kaichieh.chuang@mediatek.com>
 
 #include <linux/mfd/syscon.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/timer.h>
 #include <linux/of_address.h>
@@ -1639,7 +1640,7 @@ static struct platform_driver mtk_btcvsd_snd_driver = {
 	.remove = mtk_btcvsd_snd_remove,
 };
 
-module_platform_driver(mtk_btcvsd_snd_driver);
+vseq_module_platform_driver(mtk_btcvsd_snd_driver);
 
 MODULE_DESCRIPTION("Mediatek ALSA BT SCO CVSD/MSBC Driver");
 MODULE_AUTHOR("KaiChieh Chuang <kaichieh.chuang@mediatek.com>");

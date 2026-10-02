@@ -5,6 +5,7 @@
 #define pr_fmt(fmt) "shrink_async: " fmt
 
 #include <linux/swap.h>
+#include <linux/vseq.h>
 #include <linux/proc_fs.h>
 #include <linux/gfp.h>
 #include <linux/types.h>
@@ -219,7 +220,7 @@ static void __exit shrink_async_exit(void)
 	return;
 }
 
-module_init(shrink_async_init);
+vseq_module_init(shrink_async_init);
 module_exit(shrink_async_exit);
 
 MODULE_LICENSE("GPL v2");

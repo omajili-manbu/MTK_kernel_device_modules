@@ -10,6 +10,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/i2c.h>
 #include <linux/of_gpio.h>
@@ -3612,7 +3613,7 @@ static void __exit sih_i2c_exit(void)
 	i2c_del_driver(&sih_i2c_driver);
 }
 
-module_init(sih_i2c_init);
+vseq_module_init(sih_i2c_init);
 module_exit(sih_i2c_exit);
 
 MODULE_AUTHOR("tianchi zheng <tianchi.zheng@si-in.com>");

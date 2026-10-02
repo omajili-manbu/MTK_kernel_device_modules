@@ -5,6 +5,7 @@
 // Copyright (c) 2018 MediaTek Inc.
 // Author: Tina Tsai <tina.tsai@mediatek.com>
 #include <linux/platform_device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/delay.h>
@@ -7444,7 +7445,7 @@ static struct platform_driver mt6368_platform_driver = {
 	.probe = mt6368_platform_driver_probe,
 };
 
-module_platform_driver(mt6368_platform_driver)
+vseq_module_platform_driver(mt6368_platform_driver)
 
 /* Module information */
 MODULE_DESCRIPTION("MT6368 ALSA SoC codec driver");

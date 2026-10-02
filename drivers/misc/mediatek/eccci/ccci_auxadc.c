@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -147,7 +148,7 @@ static void __exit ccci_auxadc_exit(void)
 }
 
 
-module_init(ccci_auxadc_init);
+vseq_module_init(ccci_auxadc_init);
 module_exit(ccci_auxadc_exit);
 
 MODULE_AUTHOR("ccci");

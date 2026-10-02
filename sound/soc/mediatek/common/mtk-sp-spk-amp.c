@@ -3,6 +3,7 @@
 // Copyright (C) 2018 MediaTek Inc.
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/err.h>
@@ -443,7 +444,7 @@ static struct i2c_driver mtk_spk_i2c_driver = {
 	.id_table = mtk_spk_i2c_id,
 };
 
-module_i2c_driver(mtk_spk_i2c_driver);
+vseq_module_i2c_driver(mtk_spk_i2c_driver);
 #endif
 
 //add for combine spk start

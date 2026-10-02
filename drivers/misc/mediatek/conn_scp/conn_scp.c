@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -143,7 +144,7 @@ void conn_scp_exit(void)
 }
 
 
-module_init(conn_scp_init);
+vseq_module_init(conn_scp_init);
 module_exit(conn_scp_exit);
 MODULE_AUTHOR("Willy Yu <Willy.Yu@mediatek.com>");
 MODULE_DESCRIPTION("Conn SCP Bridge dev");

@@ -6,6 +6,7 @@
 */
 
 #include <linux/slab.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/of.h>
@@ -749,7 +750,7 @@ static struct platform_driver mtk_vcodec_enc_driver = {
 	},
 };
 
-module_platform_driver(mtk_vcodec_enc_driver);
+vseq_module_platform_driver(mtk_vcodec_enc_driver);
 
 
 MODULE_LICENSE("GPL v2");

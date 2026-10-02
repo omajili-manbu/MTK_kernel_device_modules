@@ -12,6 +12,7 @@
  */
 
 #include <linux/cdev.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
@@ -497,7 +498,7 @@ static int __init irtx_init(void)
 	return ret;
 }
 
-late_initcall(irtx_init);
+vseq_late_initcall(irtx_init);
 
 MODULE_AUTHOR("Chun-Hung Wu <chun-hung.wu@mediatek.com>");
 MODULE_DESCRIPTION("Consumer IR transmitter driver v0.1");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/kthread.h>
@@ -80,7 +81,7 @@ static void __exit mmdvfs_v3_start_exit(void)
 	platform_driver_unregister(&mmdvfs_v3_start_drv);
 }
 
-module_init(mmdvfs_v3_start_init);
+vseq_module_init(mmdvfs_v3_start_init);
 module_exit(mmdvfs_v3_start_exit);
 MODULE_DESCRIPTION("MMDVFS V3 start Driver");
 MODULE_AUTHOR("Anthony Huang<anthony.huang@mediatek.com>");

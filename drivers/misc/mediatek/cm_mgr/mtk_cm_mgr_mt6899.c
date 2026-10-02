@@ -5,6 +5,7 @@
 
 /* system includes */
 #include <linux/atomic.h>
+#include <linux/vseq.h>
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/cpu.h>
@@ -481,7 +482,7 @@ static int platform_cm_mgr_probe(struct platform_device *pdev)
 	int ret = 0;
 
 #if IS_ENABLED(CONFIG_MTK_CM_IPI) && IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
-	/* rodin b52: built-in probe (subsys_initcall) can outrun the SCMI
+	/* rodin b52: built-in probe (vseq_subsys_initcall) can outrun the SCMI
 	 * tinysys chain; defer until get_scmi_tinysys_info() is ready. */
 	if (!get_scmi_tinysys_info())
 		return -EPROBE_DEFER;
@@ -607,7 +608,7 @@ static void __exit platform_cm_mgr_exit(void)
 	pr_info("%s(%d): platform-cm_mgr Exit.\n", __func__, __LINE__);
 }
 
-subsys_initcall(platform_cm_mgr_init);
+vseq_subsys_initcall(platform_cm_mgr_init);
 module_exit(platform_cm_mgr_exit);
 
 MODULE_SOFTDEP("pre: thermal_interface.ko");

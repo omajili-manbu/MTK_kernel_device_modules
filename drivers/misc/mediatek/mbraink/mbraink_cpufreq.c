@@ -4,6 +4,7 @@
  */
 
 #include <linux/pm_qos.h>
+#include <linux/vseq.h>
 #include <linux/workqueue.h> /* rodin b515 #115 */
 #include <linux/hashtable.h>
 #include <linux/slab.h>
@@ -27,7 +28,7 @@ static int is_hooked;
 static struct notifier_block *freq_qos_max_notifier, *freq_qos_min_notifier;
 static int cluster_num;
 
-/* rodin b515 #115: cpufreq policy 就绪前不建 freq qos hooks（=y 后本函数在 module_init
+/* rodin b515 #115: cpufreq policy 就绪前不建 freq qos hooks（=y 后本函数在 vseq_module_init
  * 1.12s 执行 ⇒ cluster_num=0 ⇒ kcalloc(0)+hooks 永久漏注册；6.6 靠 .ko 装载序 3.57s
  * 天然就绪）。200ms×50=10s 有界重试。 */
 static void mbraink_cpufreq_init_retry(struct work_struct *work);

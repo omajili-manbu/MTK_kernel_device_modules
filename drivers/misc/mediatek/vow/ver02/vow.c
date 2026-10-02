@@ -11,6 +11,7 @@
  *****************************************************************************/
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -703,7 +704,7 @@ static void vow_service_Init(void)
 	/*Initialization*/
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
 	/* rodin b514 #114: SCP 预留内存由 scp_device_probe() → scp_reserve_memory_ioremap()
-	 * （device_initcall_sync=6s）建立；=y 内建后本函数在 VowDrv_mod_init(level 6)
+	 * （vseq_device_initcall_sync=6s）建立；=y 内建后本函数在 VowDrv_mod_init(level 6)
 	 * 里先跑，scp_get_reserve_mem_virt() 返回 0 ⇒ NULL+VOW_VOICEDATA_OFFSET
 	 * 当 memset 目标崩（6.6 是 =m：vow 装载 2.5853s 晚于 ioremap 2.5798s，仅 5.5ms）。
 	 * 判据取"被使用的那个资源"（预留内存），不取 is_scp_ready()——6.6 装载时
@@ -3748,8 +3749,8 @@ bool vow_service_GetVowRecoverStatus(void)
  *****************************************************************************/
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
 /* rodin b513 #113: SCP 就绪判定下的 IPI 注册。内建化后本 initcall
- * （VowDrv_mod_init = module_init/level 6）早于 SCP 提供者的
- * device_initcall_sync（scp_init），mtk_ipi_register() 因
+ * （VowDrv_mod_init = vseq_module_init/level 6）早于 SCP 提供者的
+ * vseq_device_initcall_sync（scp_init），mtk_ipi_register() 因
  * !scp_ipidev.ipi_inited 返回 IPI_DEV_ILLEGAL；6.6 上 vow.ko 在 scp.ko
  * 之后装载（6.6 日志 VowDrv_mod_init@2.5853s 晚于 scp_ipidev@2.5796s）
  * 故无此问题。一次性语义由 vow_ipi_registered 保证；未就绪时留给下面
@@ -4089,7 +4090,7 @@ static void __exit VowDrv_mod_exit(void)
 	mutex_unlock(&vow_extradata_mutex);
 	VOWDRV_DEBUG("-%s()\n", __func__);
 }
-module_init(VowDrv_mod_init);
+vseq_module_init(VowDrv_mod_init);
 module_exit(VowDrv_mod_exit);
 
 MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");

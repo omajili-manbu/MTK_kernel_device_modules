@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/cgroup.h>
 #include <linux/slab.h>
@@ -1241,5 +1242,5 @@ static void cpuqos_v3_proto_exit(void)
 	exit_cpuqos_v3_platform();
 }
 
-module_init(cpuqos_v3_proto_init);
+vseq_module_init(cpuqos_v3_proto_init);
 module_exit(cpuqos_v3_proto_exit);

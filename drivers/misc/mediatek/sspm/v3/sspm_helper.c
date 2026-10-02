@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>       /* needed by all modules */
+#include <linux/vseq.h>
 #include <linux/init.h>         /* needed by module macros */
 #include <linux/fs.h>           /* needed by file_operations* */
 #include <linux/miscdevice.h>   /* needed by miscdevice* */
@@ -263,5 +264,5 @@ MODULE_SOFTDEP("pre: tinysys-scmi.ko");
 MODULE_DESCRIPTION("MEDIATEK Module SSPM platform driver");
 MODULE_LICENSE("GPL v2");
 
-subsys_initcall(sspm_pdrv_init);
+vseq_subsys_initcall(sspm_pdrv_init);
 module_exit(sspm_pdrv_exit);

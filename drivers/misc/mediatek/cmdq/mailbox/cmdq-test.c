@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
@@ -1942,6 +1943,6 @@ static struct platform_driver cmdq_test_drv = {
 		.of_match_table = cmdq_test_of_ids,
 	},
 };
-module_platform_driver(cmdq_test_drv);
+vseq_module_platform_driver(cmdq_test_drv);
 
 MODULE_LICENSE("GPL v2");

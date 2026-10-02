@@ -3,6 +3,7 @@
 // Copyright (C) 2021 MediaTek Inc.
 // Author: Even Yang <even.yang@mediatek.com>
 #include <linux/compat.h>
+#include <linux/vseq.h>
 
 /* wake lock relate*/
 #include <linux/device.h>
@@ -1237,7 +1238,7 @@ static struct platform_driver mtk_offloadplayback_driver = {
 	.remove = mtk_dloffload_remove,
 };
 
-module_platform_driver(mtk_offloadplayback_driver);
+vseq_module_platform_driver(mtk_offloadplayback_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek Offload Driver");

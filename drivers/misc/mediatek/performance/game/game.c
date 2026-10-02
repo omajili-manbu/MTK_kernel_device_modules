@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <trace/hooks/sched.h>
 #include <linux/sched/clock.h>
 #include <linux/sched.h>
@@ -208,7 +209,7 @@ static int __init game_init(void)
 	return 0;
 }
 
-module_init(game_init);
+vseq_module_init(game_init);
 module_exit(game_exit);
 
 MODULE_LICENSE("GPL");

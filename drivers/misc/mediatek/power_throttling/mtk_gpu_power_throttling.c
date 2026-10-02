@@ -4,6 +4,7 @@
  * Author: Samuel Hsieh <samuel.hsieh@mediatek.com>
  */
 #include <linux/of.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h>
 #include "mtk_gpu_power_throttling.h"
 #include "mtk_battery_oc_throttling.h"
@@ -209,7 +210,7 @@ static struct platform_driver gpu_power_throttling_driver = {
 		.of_match_table = gpu_power_throttling_of_match,
 	},
 };
-module_platform_driver(gpu_power_throttling_driver);
+vseq_module_platform_driver(gpu_power_throttling_driver);
 MODULE_AUTHOR("Victor Lin");
 MODULE_DESCRIPTION("MTK gpu power throttling driver");
 MODULE_LICENSE("GPL");

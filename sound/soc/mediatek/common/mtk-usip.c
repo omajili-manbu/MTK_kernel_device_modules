@@ -5,6 +5,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -605,7 +606,7 @@ static void __exit usip_exit(void)
 	misc_deregister(&usip_miscdevice);
 }
 
-module_init(usip_init);
+vseq_module_init(usip_init);
 module_exit(usip_exit);
 
 MODULE_DESCRIPTION("Mediatek uSip memory control");

@@ -3,6 +3,7 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 #include "perf_ioctl_magt.h"
+#include <linux/vseq.h>
 #include "fpsgo_base.h"
 #define TAG "PERF_IOCTL_MAGT"
 #define cap_scale(v, s) ((v)*(s) >> SCHED_CAPACITY_SHIFT)
@@ -716,7 +717,7 @@ static int __init init_magt_perfctl(void)
 out_wq:
 	return ret_val;
 }
-module_init(init_magt_perfctl);
+vseq_module_init(init_magt_perfctl);
 module_exit(exit_magt_perfctl);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek MAGT ioctl");

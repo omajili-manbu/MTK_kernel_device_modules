@@ -22,6 +22,7 @@
  */
 
 #include <linux/cpu.h>
+#include <linux/vseq.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
@@ -793,7 +794,7 @@ static void __exit trusty_irq_driver_exit(void)
 	trusty_irq_cpuhp_slot = -1;
 }
 
-module_init(trusty_irq_driver_init);
+vseq_module_init(trusty_irq_driver_init);
 module_exit(trusty_irq_driver_exit);
 MODULE_LICENSE("GPL");
 

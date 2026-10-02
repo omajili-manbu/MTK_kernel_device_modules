@@ -4,6 +4,7 @@
 // Author: Owen Chen <owen.chen@mediatek.com>
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/module.h>
 #include <linux/of.h>
@@ -43,6 +44,6 @@ static void __exit scpsys_disable_unused_exit(void)
 	platform_driver_unregister(&scpsys_disable_unused);
 }
 
-late_initcall_sync(scpsys_disable_unused_init);
+vseq_late_initcall_sync(scpsys_disable_unused_init);
 module_exit(scpsys_disable_unused_exit);
 MODULE_LICENSE("GPL");

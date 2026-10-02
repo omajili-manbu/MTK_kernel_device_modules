@@ -5,6 +5,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -928,7 +929,7 @@ static struct platform_driver mdpm_driver = {
 	.probe = mdpm_probe,
 };
 
-module_platform_driver(mdpm_driver);
+vseq_module_platform_driver(mdpm_driver);
 
 MODULE_AUTHOR("Samuel Hsieh");
 MODULE_DESCRIPTION("MTK modem power meter driver");

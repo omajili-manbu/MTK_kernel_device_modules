@@ -4,6 +4,7 @@
  */
 
 #include <linux/list.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -3540,7 +3541,7 @@ static void __exit ccci_dpmaif_exit(void)
 {
 }
 
-module_init(ccci_dpmaif_init);
+vseq_module_init(ccci_dpmaif_init);
 module_exit(ccci_dpmaif_exit);
 
 MODULE_AUTHOR("ccci");

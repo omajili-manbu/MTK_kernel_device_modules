@@ -2,6 +2,7 @@
 // Copyright (c) 2019 MediaTek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/clk.h>
@@ -1212,7 +1213,7 @@ static struct i2c_driver dw9781c_i2c_driver = {
 	.id_table = dw9781c_id_table,
 };
 
-module_i2c_driver(dw9781c_i2c_driver);
+vseq_module_i2c_driver(dw9781c_i2c_driver);
 
 MODULE_AUTHOR("Po-Hao Huang <Po-Hao.Huang@mediatek.com>");
 MODULE_DESCRIPTION("DW9781C OIS driver");

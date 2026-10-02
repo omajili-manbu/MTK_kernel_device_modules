@@ -5,6 +5,7 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/vseq.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -878,9 +879,9 @@ static int __init mt6397_driver_init(void)
 {
 	return platform_driver_register(&mt6397_driver);
 }
-arch_initcall(mt6397_driver_init);
+vseq_arch_initcall(mt6397_driver_init);
 #else
-module_platform_driver(mt6397_driver);
+vseq_module_platform_driver(mt6397_driver);
 #endif
 
 MODULE_AUTHOR("Flora Fu, MediaTek");

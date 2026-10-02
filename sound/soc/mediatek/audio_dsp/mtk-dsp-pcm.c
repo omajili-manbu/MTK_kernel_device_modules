@@ -3,6 +3,7 @@
 // Copyright (c) 2018 MediaTek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -300,7 +301,7 @@ static struct platform_driver dsp_pcm_driver = {
 	.probe = dsp_pcm_dev_probe,
 };
 
-module_platform_driver(dsp_pcm_driver);
+vseq_module_platform_driver(dsp_pcm_driver);
 
 MODULE_DESCRIPTION("Mediatek ALSA SoC dsp platform driver for audio dsp");
 MODULE_AUTHOR("Chipeng Chang <Chipeng.Chang@mediatek.com>");

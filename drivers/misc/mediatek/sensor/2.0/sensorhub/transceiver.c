@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) "transceiver " fmt
 
 #include <linux/err.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/completion.h>
 #include <linux/kfifo.h>
@@ -1053,7 +1054,7 @@ static void __exit transceiver_exit(void)
 	transceiver_destroy_manager(dev);
 }
 
-module_init(transceiver_init);
+vseq_module_init(transceiver_init);
 module_exit(transceiver_exit);
 MODULE_AUTHOR("Mediatek");
 MODULE_DESCRIPTION("transceiver driver");

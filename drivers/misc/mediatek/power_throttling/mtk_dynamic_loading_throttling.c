@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/iio/consumer.h>
 #include <linux/kthread.h>
 #include <linux/linear_range.h>
@@ -670,7 +671,7 @@ static struct platform_driver dynamic_loading_throttling_driver = {
 	},
 	.probe = dlpt_probe,
 };
-module_platform_driver(dynamic_loading_throttling_driver);
+vseq_module_platform_driver(dynamic_loading_throttling_driver);
 
 MODULE_AUTHOR("Wen Su <Wen.Su@mediatek.com>");
 MODULE_DESCRIPTION("MTK dynamic loading throttling driver");

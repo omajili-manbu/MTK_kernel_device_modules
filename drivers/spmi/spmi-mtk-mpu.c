@@ -3,6 +3,7 @@
 // Copyright (c) 2023 MediaTek Inc.
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h> /* rodin stage2: 6.18 header pruning */
 #include <linux/of.h> /* of_property_read_u32 */
 #include <linux/io.h>
@@ -234,7 +235,7 @@ static struct platform_driver mtk_spmi_pmif_mpu_driver = {
 	.probe		= mtk_spmi_pmif_mpu_probe,
 	.remove		= mtk_spmi_pmif_mpu_remove,
 };
-module_platform_driver(mtk_spmi_pmif_mpu_driver);
+vseq_module_platform_driver(mtk_spmi_pmif_mpu_driver);
 
 MODULE_DESCRIPTION("MediaTek SPMI PMIF MPU Driver");
 MODULE_LICENSE("GPL");

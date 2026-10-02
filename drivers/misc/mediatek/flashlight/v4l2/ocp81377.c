@@ -2,6 +2,7 @@
 // Copyright (c) 2019 MediaTek Inc.
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -1179,7 +1180,7 @@ static struct i2c_driver ocp81377_i2c_driver = {
 	.id_table = ocp81377_id_table,
 };
 
-module_i2c_driver(ocp81377_i2c_driver);
+vseq_module_i2c_driver(ocp81377_i2c_driver);
 
 MODULE_AUTHOR("Roger-HY Wang <roger-hy.wang@mediatek.com>");
 MODULE_DESCRIPTION("Texas Instruments OCP81377 LED flash driver");

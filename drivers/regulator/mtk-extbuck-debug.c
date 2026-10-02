@@ -3,6 +3,7 @@
 // Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/of_device.h>
 #include <linux/of.h> /* rodin stage2: 6.18 of_device.h slimmed, of_device_id needs of.h */
 #include <linux/platform_device.h>
@@ -121,7 +122,7 @@ static struct platform_driver extbuck_debug_driver = {
 	.remove = extbuck_debug_remove,
 };
 
-module_platform_driver(extbuck_debug_driver);
+vseq_module_platform_driver(extbuck_debug_driver);
 
 MODULE_AUTHOR("Jeter Chen <jeter.chen@mediatek.com>");
 MODULE_DESCRIPTION("Debug driver for MediaTek Ext. BUCK PMIC");

@@ -5,6 +5,7 @@
  */
 
 #include <linux/of_gpio.h>
+#include <linux/vseq.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_device.h>
@@ -3548,7 +3549,7 @@ static void __exit accdet_soc_exit(void)
 {
 	platform_driver_unregister(&accdet_driver);
 }
-module_init(accdet_soc_init);
+vseq_module_init(accdet_soc_init);
 module_exit(accdet_soc_exit);
 
 /* Module information */

@@ -3,6 +3,7 @@
 // Copyright (c) 2016 MediaTek Inc.
 
 #include <linux/module.h>       /* needed by all modules */
+#include <linux/vseq.h>
 #include <linux/init.h>         /* needed by module macros */
 #include <linux/fs.h>           /* needed by file_operations* */
 #include <linux/miscdevice.h>   /* needed by miscdevice* */
@@ -705,7 +706,7 @@ static void __exit audio_ipi_exit(void)
 
 MODULE_SOFTDEP("pre: adsp-v2");
 
-module_init(audio_ipi_init);
+vseq_module_init(audio_ipi_init);
 module_exit(audio_ipi_exit);
 
 MODULE_AUTHOR("Harvey Huang <harvey.huang@mediatek.com>");

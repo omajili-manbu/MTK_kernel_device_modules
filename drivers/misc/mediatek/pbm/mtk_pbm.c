@@ -4,6 +4,7 @@
  */
 
 #include <linux/cpufreq.h>
+#include <linux/vseq.h>
 #include <linux/energy_model.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -1061,7 +1062,7 @@ static struct platform_driver pbm_driver = {
 		.of_match_table = pbm_of_match,
 	},
 };
-module_platform_driver(pbm_driver);
+vseq_module_platform_driver(pbm_driver);
 
 MODULE_AUTHOR("Samuel Hsieh");
 MODULE_DESCRIPTION("MTK power budget management");

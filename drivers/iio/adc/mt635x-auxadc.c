@@ -4,6 +4,7 @@
  */
 
 #include <linux/completion.h>
+#include <linux/vseq.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/iio/iio.h>
@@ -1518,7 +1519,7 @@ static struct platform_driver mt635x_auxadc_driver = {
 	.suspend = pmic_auxadc_suspend,
 	.resume =  pmic_auxadc_resume,
 };
-module_platform_driver(mt635x_auxadc_driver);
+vseq_module_platform_driver(mt635x_auxadc_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Jeter Chen <Jeter.Chen@mediatek.com>");

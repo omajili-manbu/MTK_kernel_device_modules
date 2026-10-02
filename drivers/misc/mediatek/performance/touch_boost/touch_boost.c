@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) "[touch_boost]"fmt
 
 #include <linux/proc_fs.h>
+#include <linux/vseq.h>
 #include <linux/seq_file.h>
 #include <linux/string.h>
 #include <linux/notifier.h>
@@ -1128,9 +1129,9 @@ static void __exit touch_boost_exit(void)
 }
 
 #if IS_BUILTIN(CONFIG_MTK_PERF_COMMON)
-late_initcall(touch_boost_init);
+vseq_late_initcall(touch_boost_init);
 #else
-module_init(touch_boost_init);
+vseq_module_init(touch_boost_init);
 #endif
 module_exit(touch_boost_exit);
 

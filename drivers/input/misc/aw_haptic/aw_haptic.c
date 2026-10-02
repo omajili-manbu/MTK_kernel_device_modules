@@ -13,6 +13,7 @@
  * option) any later version.
  */
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/i2c.h>
 #include <linux/of_gpio.h>
@@ -1388,7 +1389,7 @@ static int __init awinic_i2c_init(void)
 	return 0;
 }
 
-module_init(awinic_i2c_init);
+vseq_module_init(awinic_i2c_init);
 
 static void __exit awinic_i2c_exit(void)
 {

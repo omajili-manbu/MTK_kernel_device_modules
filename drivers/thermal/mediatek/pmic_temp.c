@@ -3,6 +3,7 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 #include <dt-bindings/iio/mt635x-auxadc.h>
+#include <linux/vseq.h>
 #include <linux/bits.h>
 #include <linux/delay.h>
 #include <linux/iio/consumer.h>
@@ -861,7 +862,7 @@ static struct platform_driver pmic_temp_driver = {
 	},
 };
 
-module_platform_driver(pmic_temp_driver);
+vseq_module_platform_driver(pmic_temp_driver);
 
 MODULE_AUTHOR("Henry Huang <henry.huang@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek pmic temp sensor driver");

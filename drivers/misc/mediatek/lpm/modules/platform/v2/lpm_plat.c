@@ -4,6 +4,7 @@
  */
 
 #include <asm/errno.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/cpuidle.h>
@@ -53,7 +54,7 @@ static int __init lpm_early_initcall(void)
 }
 
 #ifndef MTK_LPM_MODE_MODULE
-subsys_initcall(lpm_early_initcall);
+vseq_subsys_initcall(lpm_early_initcall);
 #endif
 
 static int __init lpm_device_initcall(void)
@@ -74,7 +75,7 @@ static int __init lpm_late_initcall(void)
 	return 0;
 }
 #ifndef MTK_LPM_MODE_MODULE
-late_initcall_sync(lpm_late_initcall);
+vseq_late_initcall_sync(lpm_late_initcall);
 #endif
 
 static int __init lpm_plat_init(void)
@@ -108,7 +109,7 @@ static void __exit lpm_plat_exit(void)
 {
 }
 
-module_init(lpm_plat_init);
+vseq_module_init(lpm_plat_init);
 module_exit(lpm_plat_exit);
 
 MODULE_LICENSE("GPL");

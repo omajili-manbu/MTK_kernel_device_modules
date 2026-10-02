@@ -13,6 +13,7 @@
 #define DEBUG
 #define pr_fmt(fmt)     KBUILD_MODNAME ": " fmt
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/ioctl.h>
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -332,7 +333,7 @@ static int __init cameralog_init(void)
     init_waitqueue_head(&camlog_is_not_empty);
     return 0;
 }
-module_init(cameralog_init);
+vseq_module_init(cameralog_init);
 static void __exit cameralog_exit(void)
 {
     device_destroy(camlog_class, devt);

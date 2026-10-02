@@ -21,6 +21,7 @@
  */
 
 #include <linux/platform_device.h>
+#include <linux/vseq.h>
 #include <gz-trusty/smcall.h>
 #include <gz-trusty/trusty.h>
 #include <linux/notifier.h>
@@ -211,7 +212,7 @@ static int gz_log_page_init(void)
 }
 
 /* get_gz_log_buffer is deprecated after GKI */
-/* get_gz_log_buffer was called in arch_initcall */
+/* get_gz_log_buffer was called in vseq_arch_initcall */
 void get_gz_log_buffer(unsigned long *addr, unsigned long *paddr,
 		       unsigned long *size, unsigned long *start)
 {
@@ -1025,9 +1026,9 @@ static void __exit trusty_gz_log_exit(void)
 	platform_driver_unregister(&trusty_gz_log_driver);
 }
 
-arch_initcall(trusty_gz_log_init);
+vseq_arch_initcall(trusty_gz_log_init);
 module_exit(trusty_gz_log_exit);
-/*module_platform_driver(trusty_gz_log_driver);*/
+/*vseq_module_platform_driver(trusty_gz_log_driver);*/
 MODULE_LICENSE("GPL");
 
 

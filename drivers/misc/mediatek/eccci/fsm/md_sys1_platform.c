@@ -4,6 +4,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/vseq.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -2326,7 +2327,7 @@ static void __exit modem_cd_exit(void)
 {
 }
 
-module_init(modem_cd_init);
+vseq_module_init(modem_cd_init);
 module_exit(modem_cd_exit);
 
 MODULE_AUTHOR("CCCI");

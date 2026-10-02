@@ -9,6 +9,7 @@
  */
 #define  DEBUG
 #include <linux/pinctrl/consumer.h>
+#include <linux/vseq.h>
 #include <linux/gpio.h>
 
 #include <linux/module.h>
@@ -1803,7 +1804,7 @@ static struct i2c_driver ics_haptic_driver =
     .remove = ics_haptic_remove,
 };
 
-module_i2c_driver(ics_haptic_driver);
+vseq_module_i2c_driver(ics_haptic_driver);
 
 MODULE_DESCRIPTION("ICS Haptic Driver");
 MODULE_AUTHOR("chenmaomao@icsense.com.cn, ICSense Semiconductor Co., Ltd");

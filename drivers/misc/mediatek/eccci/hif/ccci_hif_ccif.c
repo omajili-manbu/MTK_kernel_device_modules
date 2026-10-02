@@ -4,6 +4,7 @@
  */
 
 #include <linux/list.h>
+#include <linux/vseq.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -1940,7 +1941,7 @@ static void __exit ccci_hif_ccif_exit(void)
 {
 }
 
-module_init(ccci_hif_ccif_init);
+vseq_module_init(ccci_hif_ccif_init);
 module_exit(ccci_hif_ccif_exit);
 
 MODULE_AUTHOR("ccci");

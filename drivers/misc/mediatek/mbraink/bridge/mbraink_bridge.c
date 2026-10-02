@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 
 #include "mbraink_bridge.h"
 
@@ -23,7 +24,7 @@ static void mbraink_bridge_exit(void)
 	mbraink_bridge_camera_deinit();
 }
 
-module_init(mbraink_bridge_init);
+vseq_module_init(mbraink_bridge_init);
 module_exit(mbraink_bridge_exit);
 
 MODULE_LICENSE("GPL");

@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/vseq.h>
 #include <linux/clk-provider.h>
 #include <linux/io.h>
 #include <linux/seq_file.h>
@@ -799,6 +800,6 @@ static void __exit clkdbg_mt6899_exit(void)
 	platform_driver_unregister(&clk_dbg_mt6899_drv);
 }
 
-subsys_initcall(clkdbg_mt6899_init);
+vseq_subsys_initcall(clkdbg_mt6899_init);
 module_exit(clkdbg_mt6899_exit);
 MODULE_LICENSE("GPL");

@@ -3,6 +3,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
@@ -1244,7 +1245,7 @@ static int __init et7480_init(void)
 
 	return rc;
 }
-late_initcall(et7480_init);
+vseq_late_initcall(et7480_init);
 
 static void __exit et7480_exit(void)
 {

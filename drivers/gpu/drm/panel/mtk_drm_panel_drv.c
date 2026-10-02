@@ -4,6 +4,7 @@
  */
 
 #include "mtk_drm_panel_drv.h"
+#include <linux/vseq.h>
 
 int mtk_panel_register_drv_customization_funcs(char func,
 		const struct mtk_panel_cust *cust)
@@ -89,7 +90,7 @@ static void __exit mtk_drm_panel_drv_exit(void)
 
 	DDPMSG("%s-\n", __func__);
 }
-module_init(mtk_drm_panel_drv_init);
+vseq_module_init(mtk_drm_panel_drv_init);
 module_exit(mtk_drm_panel_drv_exit);
 
 MODULE_AUTHOR("Cui Zhang <cui.zhang@mediatek.com>");

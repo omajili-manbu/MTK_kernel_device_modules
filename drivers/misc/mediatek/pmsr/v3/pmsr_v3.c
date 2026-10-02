@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
@@ -818,7 +819,7 @@ static int __init pmsr_init(void)
 	return 0;
 }
 
-module_init(pmsr_init);
+vseq_module_init(pmsr_init);
 
 static void __exit pmsr_exit(void)
 {

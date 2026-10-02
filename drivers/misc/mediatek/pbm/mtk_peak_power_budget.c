@@ -4,6 +4,7 @@
  */
 
 #include <linux/proc_fs.h>
+#include <linux/vseq.h>
 #include <linux/kallsyms.h>
 #include <linux/types.h>
 #include <linux/of.h>
@@ -2244,7 +2245,7 @@ static struct platform_driver peak_power_budget_driver = {
 		.of_match_table = peak_power_budget_of_match,
 	},
 };
-module_platform_driver(peak_power_budget_driver);
+vseq_module_platform_driver(peak_power_budget_driver);
 
 MODULE_AUTHOR("Samuel Hsieh");
 MODULE_DESCRIPTION("MTK peak power budget");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/spinlock.h>
+#include <linux/vseq.h>
 #include <linux/time.h>
 #include <linux/cpu.h>
 #include <linux/delay.h>
@@ -469,7 +470,7 @@ static void __exit exit_perf_common(void)
 #endif
 }
 
-late_initcall_sync(init_perf_common);
+vseq_late_initcall_sync(init_perf_common);
 module_exit(exit_perf_common);
 
 MODULE_LICENSE("GPL");

@@ -4,6 +4,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
@@ -2210,7 +2211,7 @@ static void mbraink_exit(void)
 
 }
 
-module_init(mbraink_init);
+vseq_module_init(mbraink_init);
 module_exit(mbraink_exit);
 
 MODULE_LICENSE("GPL");

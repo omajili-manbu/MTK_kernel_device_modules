@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) "[TMEM] ssheap: " fmt
 
 #include <linux/types.h>
+#include <linux/vseq.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/printk.h>
 #include <linux/cma.h>
@@ -98,7 +99,7 @@ static struct platform_driver ssheap_driver = {
 			.of_match_table = tm_of_match_table,
 	},
 };
-module_platform_driver(ssheap_driver);
+vseq_module_platform_driver(ssheap_driver);
 
 MODULE_DESCRIPTION("Mediatek Trusted Secure Subsystem Heap Driver");
 MODULE_LICENSE("GPL");
