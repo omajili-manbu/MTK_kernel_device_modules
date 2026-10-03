@@ -20,6 +20,12 @@
 #include <linux/kernfs.h>
 #include <linux/workqueue.h>
 #include <linux/power_supply.h>
+/* rodin blob UND 面有 usb_set_property（klee 源 drop 缺失），原型+枚举取自 charger 头；
+ * 该头带的历史警告在本 TU 局部压制，不外溢 */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wignored-qualifiers"
+#include "../../power/supply/mtk_charger.h"
+#pragma clang diagnostic pop
 #include <base.h>
 
 #include <thermal_core.h>
@@ -353,6 +359,7 @@ thermal_sconfig_store(struct device *dev,
 	val = simple_strtol(buf, NULL, 10);
 
 	atomic_set(&switch_mode, val);
+	usb_set_property(USB_PROP_SCENE, val);
 
 	return len;
 }
@@ -494,9 +501,10 @@ thermal_board_sensor_temp_store(struct device *dev,
 
 	snprintf(board_sensor_temp, BOARD__BUFFER_SIZE, buf);
 	val = simple_strtol(buf, NULL, 10);
-	/* rodin blob 等同：无 charger notify（blob UND 面零 charger 符号；klee 源此调用为
-	 * 'charger_notifier_call_cnain' 拼写错误且本树无该 API——按"设备上跑的那份行为"
-	 * 仅存值，不通知 charger）。 */
+	/* rodin blob 等同（blob 反汇编实证）：klee 源 drop 相比 blob 缺三处 usb_set_property
+	 * 调用——sconfig→USB_PROP_SCENE、此处→USB_PROP_BOARD_TEMP、charger_temp→
+	 * USB_PROP_SIC_MODE；klee 源的 charger_notifier_call_cnain 为拼写错误、本树无此 API。 */
+	usb_set_property(USB_PROP_BOARD_TEMP, val);
 
 	return len;
 }
@@ -632,6 +640,7 @@ thermal_charger_temp_store(struct device *dev,
 	val = simple_strtol(buf, NULL, 10);
 
 	atomic_set(&charger_mode, val);
+	usb_set_property(USB_PROP_SIC_MODE, val);
 
 	return len;
 }
