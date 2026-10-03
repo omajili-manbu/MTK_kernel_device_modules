@@ -27,6 +27,16 @@ struct mievent_payload {
 	char *value;
 };
 
+#if IS_ENABLED(CONFIG_MIEV)
+/* export symbol */
+struct misight_mievent *cdev_tevent_alloc(unsigned int eventid);
+int cdev_tevent_add_int(struct misight_mievent *event, const char *key,
+			long value);
+int cdev_tevent_add_str(struct misight_mievent *event, const char *key,
+			const char *value);
+int cdev_tevent_write(struct misight_mievent *event);
+void cdev_tevent_destroy(struct misight_mievent *event);
+#else
 struct misight_mievent *cdev_tevent_alloc(unsigned int eventid)
 {
 
@@ -50,5 +60,6 @@ void cdev_tevent_destroy(struct misight_mievent *event)
 {
     return;
 }
+#endif
 #endif // _EVENT_MIEVENT_H_
 // END MiSight_LogEnhance

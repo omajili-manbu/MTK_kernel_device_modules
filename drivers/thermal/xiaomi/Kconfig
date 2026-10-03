@@ -1,0 +1,17 @@
+config MI_THERMAL_INTERFACE
+	tristate "Xiaomi thermal control interface"
+	default n
+	help
+	  Xiaomi thermal control interface (mi_thermal_interface).
+
+config MI_THERMAL_MULTI_CHARGE
+	bool "Xiaomi thermal multi-charge usb online notify (rodin inline gate)"
+	default n
+	help
+	  Device truth: blob strings carry usb_online / usb_online_work.
+
+config MI_THERMAL_ATC_ENABLE
+	bool "Xiaomi thermal ATC enable (rodin inline gate)"
+	default n
+	help
+	  Device truth: blob strings carry atc_enable.
