@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+config HWID
+	tristate "Xiaomi HwId Module Driver"
+	default n
+	help
+	  HwId Module driver for mi driver acquire some hwid build info,
+	  which is only used for xiaomi corporation internally.
+	  rodin: =y 内建（T2②，blob 合并代九处对齐重建）；dash 两树无源，
+	  门为 rodin 侧补写（T1 mi_log/mi_mem_engine 同款）。
