@@ -1,0 +1,6 @@
+config SCENE_SWAPPINESS
+	bool "Xiaomi scene swappiness vendor hook (6.6 blob scene_swappiness.ko builtin)"
+	help
+	  Registers the android_vh_tune_swappiness vendor hook and the
+	  /proc/mi_mem_swappiness/swappiness_para control. Rebuilt from the
+	  rodin 6.6 blob scene_swappiness.ko.

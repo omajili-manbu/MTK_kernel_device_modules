@@ -1,0 +1,7 @@
+config XIAOMI_SPI_TEE
+	bool "Xiaomi fingerprint TEE driver (6.6 blob xiaomi_spi_tee.ko builtin)"
+	help
+	  Xiaomi fingerprint chardev/netlink driver (compatible
+	  xiaomi,xiaomi-fp). Rebuilt from the rodin 6.6 blob
+	  xiaomi_spi_tee.ko; gf_netlink_* and fp_* surface aligns the blob
+	  symtab face.

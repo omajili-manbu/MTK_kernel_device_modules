@@ -1,0 +1,7 @@
+config XIAOMI_MI_MEMORY
+	bool "Xiaomi mi memory info (6.6 blob mi_memory.ko builtin)"
+	depends on SCSI_UFSHCD
+	help
+	  Xiaomi memory info provider (proc /proc/mv, /sys/class/mi_memory).
+	  Rebuilt from the rodin 6.6 blob mi_memory.ko; UFS ABI surface is
+	  provided by drivers/ufs/vendor/ufs-xiaomi.c.

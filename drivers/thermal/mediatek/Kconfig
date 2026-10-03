@@ -134,4 +134,12 @@ config MTK_FAN_THERMAL
 	  This option depends on MTK_PWM which is
 	  MTK pwm driver.
 
+config MTK_CPU_ISOLATE_THERMAL
+	bool "Mediatek cpu isolate cooling devices"
+	depends on MTK_CHARGER
+	help
+	  Enable this option to turn on cpu isolate cooler mechanisms
+	  for Mediatek platforms. (rodin #166: tristate→bool，=y 内建；
+	  6.6 装载位 vendor_dlkm modules.load 行 102，vseq 尾段 1250)
+
 endif

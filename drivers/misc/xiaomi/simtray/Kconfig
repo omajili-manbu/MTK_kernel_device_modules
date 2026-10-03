@@ -1,0 +1,7 @@
+config XIAOMI_SIMTRAY
+	bool "Xiaomi SIM tray status driver (6.6 blob simtray.ko builtin)"
+	depends on GPIOLIB
+	help
+	  Xiaomi SIM/SD card tray insertion and extraction monitoring.
+	  Rebuilt from the rodin 6.6 blob simtray.ko (compatible
+	  xiaomi,simtray-status).

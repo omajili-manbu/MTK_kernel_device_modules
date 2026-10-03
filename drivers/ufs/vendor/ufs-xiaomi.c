@@ -43,23 +43,7 @@ int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
 				  enum desc_idn idn, u8 index, u8 selector,
 				  u8 *desc_buf, int *buf_len);
 
-int ufshcd_query_descriptor_retry_xm(struct ufs_hba *hba, enum query_opcode opcode,
-				     enum desc_idn idn, u8 index, u8 selector,
-				     u8 *desc_buf, int *buf_len);
-int ufshcd_read_desc_param_sel(struct ufs_hba *hba, enum desc_idn desc_id,
-			       u8 desc_index, u8 selector, u8 param_offset,
-			       u8 *param_read_buf, u8 param_size);
-struct ufs_xiaomi_ctx *get_ufs_xiaomi(void);
-
-/*
- * 6.6 ko 里 ufs_xiaomi 是 1168 字节 .data 对象：0x68 与 0x70..0x1a0 为
- * mi_memory 的读面（6.6 恒零值），0x470 起是静态 completion（fill 到
- * 0x490 收尾，与 6.6 .data 自指重定位对完全一致）。
- */
-struct ufs_xiaomi_ctx {
-	u8 reserved[0x470];
-	struct completion ready;
-};
+#include "ufs-xiaomi.h"
 
 static struct ufs_xiaomi_ctx ufs_xiaomi = {
 	.ready = COMPLETION_INITIALIZER(ufs_xiaomi.ready),

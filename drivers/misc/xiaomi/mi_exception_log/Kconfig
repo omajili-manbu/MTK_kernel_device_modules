@@ -1,0 +1,5 @@
+config MI_EXCEPTION_LOG
+	bool "Xiaomi exception log device (6.6 blob mi_exception_log.ko builtin)"
+	help
+	  /dev/mi_exception_log ring buffer for AIS exception logs. Rebuilt
+	  from the rodin 6.6 blob mi_exception_log.ko.
