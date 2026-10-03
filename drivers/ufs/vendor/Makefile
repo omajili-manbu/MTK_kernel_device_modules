@@ -32,6 +32,9 @@ ufs-mediatek-mod-$(CONFIG_UFSTW)                += ufstw.o
 ufs-mediatek-mod-$(CONFIG_UFSHID)               += ufshid.o
 ufs-mediatek-mod-$(CONFIG_UFSRINGBUF)           += ufsringbuf.o
 
+# 小米 UFS ABI 面：6.6 blob mi_memory.ko 的唯一提供面（6.6 闭源 xiaomi/ 子树导出）
+ufs-mediatek-mod-y += ufs-xiaomi.o
+
 
 # UFS KO with iSE enabled
 ccflags-y += -I$(srctree)/drivers/ufs/
