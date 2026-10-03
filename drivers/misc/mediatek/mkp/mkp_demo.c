@@ -371,6 +371,33 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 		return;
 	}
 	if (mod != THIS_MODULE && policy_ctrl[MKP_POLICY_DRV] != 0) {
+		/* rodin #159: 6.6 blob（mod->rodin_66，装载器 force-load 时置位）
+		 * 停用 DRV 面 S2 保护 op。真机 #159：grant（ESS_1, 5.568s）后
+		 * 首个模块保护 op（scene_swappiness @6.370s 的 module_load 钩子，
+		 * grant 后唯一 mapping op 发起面）在 GZ mkp_service 内不返回：
+		 * 服务端反汇编（b57 tee/mkp_service）mapping op（HVC_FUNC
+		 * 0x30-0x34）post-grant 走 consume_ticket(MPIDR aff1)，票空即
+		 * do_action_panic(189) 写 "mkppanic" 自陷，sync handler 判
+		 * unhandled => GZ 静默死机；HVC 永不返回，CPU2 持
+		 * mkp_hvc_svc_lock 困于 HVC，CPU0/4 在 task_newtask/cred 钩子
+		 * 路径自旋等锁（raw spinlock IRQ 常闭），三 CPU 定时器死绝 =>
+		 * RCU stall（28.0s CPU2/4）+ devfreq quiesce 挂死（10.9s 起）
+		 * => 全机楔死。票据由"写票据槽页 fault"产（produce_ticket 校验
+		 * 槽值 == per-boot ticket_key，槽页在 krn rodata 保护范围内
+		 * S2=RO）；服务端 mapping op 自带 2M 块重整
+		 * （map_for_2mb_mapping_compaction / reset_to_s2_mapping_attrs），
+		 * 模块页 PFN-group 的 op 触及含槽页的 2M 块时槽页 S2 RO 被重置，
+		 * 后续 poke 落地不再 fault => 无票 => 首 op 即 panic。同一内核
+		 * 代码、同一 blob 在 #151 时代（10-02）可通过 = 模块页 PA 布局
+		 * 随内核构建漂移，属结构性彩票而非单点回归；服务端闭源不可修。
+		 * =y 面 =m 全集即 blob（源码一律 =y，内建总计划），blob 文本由
+		 * 6.18 装载器 strict_module_rwx 自护，mkp S2 层对其属冗余加固
+		 * 却承载全部死机风险，故停用；源码 =m 模块（rodin_66=false）
+		 * 不受影响。krn code/rodata/TASK_CRED/AVC 面保留（#159 boot
+		 * 5.57-6.37s cred 更新全程正常实证）。恢复：服务端票据路径
+		 * 真机稳定实证后按 b54-b57 方法回归再启用。 */
+		if (mod->rodin_66)
+			return;
 		if (drv_skip((char *)mod->name))
 			return;
 		module_enable_ro(mod, false, MKP_POLICY_DRV);
