@@ -703,6 +703,9 @@ static inline int cfs_rq_throttled(struct cfs_rq *cfs_rq)
 
 void inc_nr_over_thres_running(void *data, struct rq *rq, struct task_struct *p, int flags)
 {
+	if (!p)
+		return;
+
 #if IS_ENABLED(CONFIG_CFS_BANDWIDTH)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
@@ -719,6 +722,9 @@ void inc_nr_over_thres_running(void *data, struct rq *rq, struct task_struct *p,
 
 void dec_nr_over_thres_running(void *data, struct rq *rq, struct task_struct *p, int flags)
 {
+	if (!p)
+		return;
+
 #if IS_ENABLED(CONFIG_CFS_BANDWIDTH)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
