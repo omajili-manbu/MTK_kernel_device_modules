@@ -10350,6 +10350,14 @@ static const struct file_operations mtk_drm_fops = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = mtk_drm_compat_ioctl,
 #endif
+	/*
+	 * 6.18 上游要求 DRM 驱动自建 fops 显式声明 FOP_UNSIGNED_OFFSET：
+	 * drm_open_helper() 用 WARN_ON_ONCE + -EINVAL 硬校验（fs.h 的该标志
+	 * 是 fop_flags 成员，6.6 时代代码没有它）。缺它 = 每次 open 都 -EINVAL，
+	 * composer 拿不到 card0 直接 abort（#205 pmsg：Platform::createPlatformCommon
+	 * 6 连崩；console 9.323s drm_file.c:329 WARNING 同 PID）。
+	 */
+	.fop_flags = FOP_UNSIGNED_OFFSET,
 };
 
 static struct drm_driver mtk_drm_driver = {

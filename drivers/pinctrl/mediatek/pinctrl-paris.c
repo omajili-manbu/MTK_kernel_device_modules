@@ -188,6 +188,19 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 			break;
 		err = hw->soc->adv_drive_get(hw, desc, &ret);
 		break;
+	case PIN_CONFIG_LEVEL:
+		err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DIR, &ret);
+		if (err)
+			break;
+
+		/* 仅输出方向才有 level 可读（照上游 paris 语义） */
+		if (!ret) {
+			err = -EINVAL;
+			break;
+		}
+
+		err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DO, &ret);
+		break;
 	default:
 		err = -ENOTSUPP;
 	}
@@ -291,6 +304,23 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		if (!hw->soc->adv_drive_set)
 			break;
 		err = hw->soc->adv_drive_set(hw, desc, arg);
+		break;
+	/*
+	 * 6.18 上游把 PIN_CONFIG_OUTPUT 改名为 PIN_CONFIG_LEVEL
+	 * （203a83112e09，enum 随 INPUT_SCHMITT_UV 插入而位移）——DT 的
+	 * output-high/output-low 现在只落这个 param。6.6 版驱动没有该分支，
+	 * 组级配置一律走 default: -ENOTSUPP(-524) ⇒ pin_config_group_set
+	 * op failed（#205 实证 26 条；相机三 sensor / focaltech 触屏 /
+	 * awinic+ics 马达 reset 三面同根）。语义照上游 paris：先写 DO 再置
+	 * DIR=OUTPUT。
+	 */
+	case PIN_CONFIG_LEVEL:
+		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DO, arg);
+		if (err)
+			break;
+
+		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DIR,
+				       MTK_OUTPUT);
 		break;
 	default:
 		err = -ENOTSUPP;
@@ -1295,6 +1325,18 @@ static int mt63xx_pinconf_get(struct pinctrl_dev *pctldev,
 	case PIN_CONFIG_DRIVE_STRENGTH:
 		err = mt63xx_hw_get_value(hw, pin, PINCTRL_PIN_REG_DRV, &ret);
 		break;
+	case PIN_CONFIG_LEVEL:
+		err = mt63xx_hw_get_value(hw, pin, PINCTRL_PIN_REG_DIR, &ret);
+		if (err)
+			goto out;
+
+		if (!ret) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		err = mt63xx_hw_get_value(hw, pin, PINCTRL_PIN_REG_DO, &ret);
+		break;
 	default:
 		err = -EOPNOTSUPP;
 	}
@@ -1361,6 +1403,15 @@ static int mt63xx_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		break;
 	case PIN_CONFIG_DRIVE_STRENGTH:
 		err = mt63xx_hw_set_value(hw, pin, PINCTRL_PIN_REG_DRV, arg);
+		break;
+	/* 同 mtk_pinconf_set：6.18 的 output-high/low → PIN_CONFIG_LEVEL */
+	case PIN_CONFIG_LEVEL:
+		err = mt63xx_hw_set_value(hw, pin, PINCTRL_PIN_REG_DO, arg);
+		if (err)
+			goto err;
+
+		err = mt63xx_hw_set_value(hw, pin, PINCTRL_PIN_REG_DIR,
+				       MTK_OUTPUT);
 		break;
 	default:
 		err = -EOPNOTSUPP;

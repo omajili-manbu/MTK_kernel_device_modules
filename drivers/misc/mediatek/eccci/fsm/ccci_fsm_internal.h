@@ -226,7 +226,9 @@ struct ccci_fsm_event {
 	struct list_head entry;
 	enum CCCI_FSM_EVENT event_id;
 	unsigned int length;
-	unsigned char data[0];
+	/* 柔性数组：data[0] 在 -fstrict-flex-arrays=3 下不被认作 FAM，
+	 * FORTIFY 会把 memcpy(240B) 报成 field-spanning write（#205 10.270s） */
+	unsigned char data[];
 };
 
 struct ccci_fsm_command {
