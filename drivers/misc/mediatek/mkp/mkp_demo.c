@@ -406,11 +406,15 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 	}
 }
 
+/* rodin b559: 五个生产者（四 RVH + task_newtask）的推送结果原先全部
+ * 丢弃——任何一环丢写（含 secure 侧拒收）都让 check_cred 拿陈旧槽位
+ * 误报且无痕迹（#197 盲区）；此处仅补失败可见性，不改推送语义。 */
 static void probe_android_rvh_commit_creds(void *ignore, const struct task_struct *task,
 	const struct cred *new)
 {
 	int ret = -1;
 	struct cred_sbuf_content c;
+	static DEFINE_RATELIMIT_STATE(rs_upd, 10*HZ, 1);
 
 	if (g_ro_cred_handle == 0)
 		return;
@@ -433,6 +437,9 @@ static void probe_android_rvh_commit_creds(void *ignore, const struct task_struc
 	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid,
 		c.args[0], c.args[1], c.args[2], c.args[3]);
+	if (ret == -1 && __ratelimit(&rs_upd))
+		MKP_ERR("%s:%d: pid %d cred sharebuf update fail\n",
+			__func__, __LINE__, task->pid);
 
 	MKP_HOOK_END(__func__);
 }
@@ -441,6 +448,7 @@ static void probe_android_rvh_exit_creds(void *ignore, const struct task_struct 
 	const struct cred *cred)
 {
 	int ret = -1;
+	static DEFINE_RATELIMIT_STATE(rs_upd, 10*HZ, 1);
 
 	if (g_ro_cred_handle == 0)
 		return;
@@ -455,6 +463,9 @@ static void probe_android_rvh_exit_creds(void *ignore, const struct task_struct 
 
 	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid, 0, 0, 0, 0);
+	if (ret == -1 && __ratelimit(&rs_upd))
+		MKP_ERR("%s:%d: pid %d cred sharebuf update fail\n",
+			__func__, __LINE__, task->pid);
 
 	MKP_HOOK_END(__func__);
 }
@@ -464,6 +475,7 @@ static void probe_android_rvh_override_creds(void *ignore, const struct task_str
 {
 	int ret = -1;
 	struct cred_sbuf_content c;
+	static DEFINE_RATELIMIT_STATE(rs_upd, 10*HZ, 1);
 
 	if (g_ro_cred_handle == 0)
 		return;
@@ -486,6 +498,9 @@ static void probe_android_rvh_override_creds(void *ignore, const struct task_str
 	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid,
 		c.args[0], c.args[1], c.args[2], c.args[3]);
+	if (ret == -1 && __ratelimit(&rs_upd))
+		MKP_ERR("%s:%d: pid %d cred sharebuf update fail\n",
+			__func__, __LINE__, task->pid);
 
 	MKP_HOOK_END(__func__);
 }
@@ -495,6 +510,7 @@ static void probe_android_rvh_revert_creds(void *ignore, const struct task_struc
 {
 	int ret = -1;
 	struct cred_sbuf_content c;
+	static DEFINE_RATELIMIT_STATE(rs_upd, 10*HZ, 1);
 
 	if (g_ro_cred_handle == 0)
 		return;
@@ -517,6 +533,9 @@ static void probe_android_rvh_revert_creds(void *ignore, const struct task_struc
 	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid,
 		c.args[0], c.args[1], c.args[2], c.args[3]);
+	if (ret == -1 && __ratelimit(&rs_upd))
+		MKP_ERR("%s:%d: pid %d cred sharebuf update fail\n",
+			__func__, __LINE__, task->pid);
 
 	MKP_HOOK_END(__func__);
 }
@@ -984,6 +1003,7 @@ static void mkp_task_newtask(void *ignore, struct task_struct *task, u64 clone_f
 {
 	int ret = -1;
 	struct cred_sbuf_content c;
+	static DEFINE_RATELIMIT_STATE(rs_upd, 10*HZ, 1);
 
 	if (g_ro_cred_handle == 0)
 		return;
@@ -1000,6 +1020,9 @@ static void mkp_task_newtask(void *ignore, struct task_struct *task, u64 clone_f
 	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 			(unsigned long)task->pid,
 			c.args[0], c.args[1], c.args[2], c.args[3]);
+	if (ret == -1 && __ratelimit(&rs_upd))
+		MKP_ERR("%s:%d: pid %d cred sharebuf update fail\n",
+			__func__, __LINE__, task->pid);
 
 	MKP_HOOK_END(__func__);
 }
