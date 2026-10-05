@@ -95,12 +95,15 @@ static void fill_delay_info_by_task(struct task_struct *task, struct task_node *
 	get_task_struct(task);
 
 #ifdef CONFIG_TASK_DELAY_ACCT
-	unsigned long flags;
-	raw_spin_lock_irqsave(&task->delays->lock, flags);
-	blkio_delay = task->delays->blkio_delay;
-	swapin_delay = task->delays->swapin_delay;
-	freepages_delay = task->delays->freepages_delay;
-	raw_spin_unlock_irqrestore(&task->delays->lock, flags);
+	if (task->delays) {
+		unsigned long flags;
+
+		raw_spin_lock_irqsave(&task->delays->lock, flags);
+		blkio_delay = task->delays->blkio_delay;
+		swapin_delay = task->delays->swapin_delay;
+		freepages_delay = task->delays->freepages_delay;
+		raw_spin_unlock_irqrestore(&task->delays->lock, flags);
+	}
 #endif
 	t->delay_info.binder_target_tid = task->pid;
 	t->blkio_delay = blkio_delay;
@@ -183,12 +186,15 @@ static void binder_reply_handler(void *d, struct binder_proc *target_proc, struc
 	}
 
 #ifdef CONFIG_TASK_DELAY_ACCT
-	unsigned long flags;
-	raw_spin_lock_irqsave(&thread->task->delays->lock, flags);
-	blkio_delay = thread->task->delays->blkio_delay;
-	swapin_delay = thread->task->delays->swapin_delay;
-	freepages_delay = thread->task->delays->freepages_delay;
-	raw_spin_unlock_irqrestore(&thread->task->delays->lock, flags);
+	if (thread->task->delays) {
+		unsigned long flags;
+
+		raw_spin_lock_irqsave(&thread->task->delays->lock, flags);
+		blkio_delay = thread->task->delays->blkio_delay;
+		swapin_delay = thread->task->delays->swapin_delay;
+		freepages_delay = thread->task->delays->freepages_delay;
+		raw_spin_unlock_irqrestore(&thread->task->delays->lock, flags);
+	}
 #endif
 	t->delay_info.blkio_delay = blkio_delay - t->blkio_delay;
 	t->delay_info.swapin_delay = swapin_delay - t->swapin_delay;
@@ -307,12 +313,15 @@ static ssize_t delay_read(struct file *file, char __user *buf,
 		return -ESRCH;
 	get_task_struct(task);
 #ifdef CONFIG_TASK_DELAY_ACCT
-	unsigned long flags;
-	raw_spin_lock_irqsave(&task->delays->lock, flags);
-	blkio_delay = task->delays->blkio_delay;
-	swapin_delay = task->delays->swapin_delay;
-	freepages_delay = task->delays->freepages_delay;
-	raw_spin_unlock_irqrestore(&task->delays->lock, flags);
+	if (task->delays) {
+		unsigned long flags;
+
+		raw_spin_lock_irqsave(&task->delays->lock, flags);
+		blkio_delay = task->delays->blkio_delay;
+		swapin_delay = task->delays->swapin_delay;
+		freepages_delay = task->delays->freepages_delay;
+		raw_spin_unlock_irqrestore(&task->delays->lock, flags);
+	}
 #endif
 	d.version = 3;
 	d.blkio_delay = blkio_delay;
