@@ -5,9 +5,9 @@ obj-$(CONFIG_TOUCHSCREEN_FOCALTECH_RODIN) += focaltech_touch_rodin.o
 focaltech_touch_rodin-y := focaltech_core.o focaltech_ex_fun.o focaltech_ex_mode.o \
 	focaltech_gesture.o focaltech_esdcheck.o focaltech_point_report_check.o \
 	focaltech_test/focaltech_test.o focaltech_test/focaltech_test_ini.o \
-	focaltech_test/supported_ic/focaltech_test_ft3383.o \
-	focaltech_flash/focaltech_upgrade_ft3383.o \
-	focaltech_flash.o focaltech_spi.o focaltech_scp_tp.o focaltech_scp_tp.o focaltech_scp_tp.o
+	focaltech_test/supported_ic/focaltech_test_ft5672.o \
+	focaltech_flash/focaltech_upgrade_ft5008.o \
+	focaltech_flash.o focaltech_spi.o focaltech_scp_tp.o
 
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/input/touchscreen/focaltech_rodin -I$(DEVICE_MODULES_PATH)/drivers/input/touchscreen/xiaomi_touch_rodin -I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2/mi_disp -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/scp/include \
 	     -I$(DEVICE_MODULES_PATH)/drivers/input/touchscreen/focaltech_rodin/focaltech_test \

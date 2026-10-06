@@ -44,7 +44,7 @@
 struct fts_test *fts_ftest;
 
 struct test_funcs *test_func_list[] = {
-    &test_func_ft5572,
+    &test_func_ft5672,
 };
 
 /*****************************************************************************
@@ -2049,7 +2049,7 @@ int fts_test_init_basicinfo(struct fts_test *tdata)
     return ret;
 }
 
-static int fts_test_main_init(void)
+int fts_test_main_init(void)
 {
     int ret = 0;
     struct fts_test *tdata = fts_ftest;
@@ -2292,8 +2292,15 @@ static ssize_t fts_test_store(
 /*static DEVICE_ATTR(fts_test, S_IRUGO | S_IWUSR, fts_test_show, fts_test_store);*/
 static DEVICE_ATTR_RW(fts_test);
 
+extern struct device_attribute dev_attr_fts_test_rawshift_fre;
+extern struct device_attribute dev_attr_fts_test_rawshift_pic_black;
+extern struct device_attribute dev_attr_fts_test_rawshift_pic_white;
+
 static struct attribute *fts_test_attributes[] = {
     &dev_attr_fts_test.attr,
+    &dev_attr_fts_test_rawshift_fre.attr,
+    &dev_attr_fts_test_rawshift_pic_black.attr,
+    &dev_attr_fts_test_rawshift_pic_white.attr,
     NULL
 };
 
@@ -2326,7 +2333,6 @@ ssize_t tp_selftest_write(struct file *file, const char __user *buf, size_t coun
 	struct fts_ts_data *ts_data = fts_data;
 	struct input_dev *input_dev;
 	char *ini_file_name = "Conf_MultipleTest_CSOT.ini";
-	bool rst_test_result = true;
 
 	tp_selftest_result = SELFTEST_INVALID;
 	if (ts_data->suspended) {
@@ -2357,18 +2363,11 @@ ssize_t tp_selftest_write(struct file *file, const char __user *buf, size_t coun
 	}
 	if (!strncmp(tmp, "short", 5) && tdata->func->short_test) {
 		tp_selftest_result = tdata->func->short_test();
-		if (tdata->func->rst_test) {
-			tdata->func->rst_test(tdata, &rst_test_result);
-		}
 	} else if (!strncmp(tmp, "open", 4) && tdata->func->open_test) {
 		tp_selftest_result = tdata->func->open_test();
-		if (tdata->func->rst_test) {
-			tdata->func->rst_test(tdata, &rst_test_result);
-		}
 	} else if (!strncmp(tmp, "i2c", 3)) {
         tp_selftest_result = tdata->func->spi_test();
     }
-	tp_selftest_result = (rst_test_result == false) ? SELFTEST_FAIL : tp_selftest_result;
 	ret = tp_selftest_result;
     if (ret == SELFTEST_PASS) {
         FTS_TEST_INFO("tp selftest pass");

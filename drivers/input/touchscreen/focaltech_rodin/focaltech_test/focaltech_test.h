@@ -646,7 +646,13 @@ enum csv_itemcode_sc {
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
-extern struct test_funcs test_func_ft5572;
+extern struct test_funcs test_func_ft5672;
+bool compare_data_new(struct fts_test_fail_buf *out, int *data,
+                      int min, int max, int min_vk, int max_vk, bool key);
+bool compare_array_new(struct fts_test_fail_buf *out, int *data,
+                       int *min, int *max, bool key);
+int fts_test_write_command(u8 cmd);   /* focaltech_scp_tp.c（blob 0x111c8/88B GLOBAL） */
+int fts_test_main_init(void);         /* focaltech_test.c（blob 0x150e8/360B LOCAL，跨 TU 供 rawshift entry 调用） */
 
 /*extern struct fts_test *fts_ftest;*/
 

@@ -1024,6 +1024,7 @@ int goodix_htc_set_idle_threshold(int threshold);
 int goodix_htc_set_display_fps(int value);
 
 int goodix_htc_enable_empty_int(bool en);
+int goodix_htc_enable_ic_dump(int en);
 
 
 #ifdef CONFIG_TOUCH_FACTORY_BUILD

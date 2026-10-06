@@ -3676,21 +3676,14 @@ int fts_ic_fw_version(char *fw_version_buf)
 int fts_ic_self_test(char *type, int *result)
 {
 	int retval = 0;//0 invalid; 1 fail; 2 pass
-	bool rst_test_result = true;
 
 	ic_in_selftest = 1;
 
 	if ((!strncmp("short", type, 5) || !strncmp("open", type, 4))) {
 		if (!strncmp("short", type, 5)) {
 			retval = fts_ftest->func->short_test();
-			if (fts_ftest->func->rst_test) {
-				fts_ftest->func->rst_test(fts_ftest, &rst_test_result);
-			}
 		} else {
 			retval = fts_ftest->func->open_test();
-			if (fts_ftest->func->rst_test) {
-				fts_ftest->func->rst_test(fts_ftest, &rst_test_result);
-			}
 		}
 	} else if (!strncmp("i2c", type, 3) || !strncmp("spi", type, 3)) {
 		retval = fts_ftest->func->spi_test();
@@ -3698,7 +3691,6 @@ int fts_ic_self_test(char *type, int *result)
 
 	ic_in_selftest = 0;
 
-	retval = (rst_test_result == false)? 1 : retval;
 	*result = retval;
 
 	if (retval == 2) {

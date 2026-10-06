@@ -2683,6 +2683,17 @@ static void goodix_reset_charge_state(struct goodix_ts_core *core_data, int stat
 	//	core_data->hw_ops->charger_on(goodix_core_data, false);
 }
 
+#if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
+static void goodix_reset_ic_dump_state(struct goodix_ts_core *core_data)
+{
+	if (core_data->dump_type <= DUMP_OFF)
+		return;
+
+	if (!goodix_htc_enable_ic_dump(1))
+		ts_debug("restore dump state as %d", core_data->dump_type);
+}
+#endif /* TOUCH_THP_SUPPORT */ /* TOUCH_DUMP_TIC_SUPPORT */
+
 /**
  * goodix_ts_resume - Touchscreen resume function
  * Called by PM/FB/EARLYSUSPEN module to wakeup device
@@ -2790,6 +2801,10 @@ out:
 	core_data->work_status = TP_NORMAL;
 	enable_temperature_detection_func(TOUCH_ID, true);
 	goodix_set_thermal_temp(0, true);
+
+#if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
+	goodix_reset_ic_dump_state(core_data);
+#endif /* TOUCH_THP_SUPPORT */ /* TOUCH_DUMP_TIC_SUPPORT */
 
 	/* enable palm sensor */
 	if (core_data->palm_status) {
@@ -3835,9 +3850,11 @@ static void goodix_set_cur_value(int mode, int *value)
 #if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
 		case Touch_THP_Dump:
 			if ((gtp_value == DUMP_OFF || gtp_value == DUMP_ON) && goodix_core_data->dump_type != gtp_value) {
-				ts_debug("change dump state(%d) as %d",
-					goodix_core_data->dump_type, gtp_value);
-				goodix_core_data->dump_type = gtp_value;
+				if (!goodix_htc_enable_ic_dump(gtp_value)) {
+					ts_debug("change dump state(%d) as %d",
+						goodix_core_data->dump_type, gtp_value);
+					goodix_core_data->dump_type = gtp_value;
+				}
 			}
 			break;
 #endif //TOUCH_DUMP_TIC_SUPPORT

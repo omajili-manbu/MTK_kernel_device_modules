@@ -2170,6 +2170,36 @@ int goodix_htc_enable_b_array(void)
 
 #endif /* TOUCH_THP_SUPPORT */
 
+#define GOODIX_CMD_DEBUGDATA 0xCD
+
+int goodix_htc_enable_ic_dump(int en)
+{
+	struct goodix_ts_hw_ops *hw_ops;
+	struct goodix_ts_cmd raw_cmd;
+	int ret = 0;
+
+	ts_info("enter");
+	if (!goodix_core_data)
+		return -EINVAL;
+	hw_ops = goodix_core_data->hw_ops;
+	raw_cmd.cmd = GOODIX_CMD_DEBUGDATA;
+	if (en) {
+		raw_cmd.data[0] = 0x01;
+	}
+	else
+		raw_cmd.data[0] = 0x00;
+
+	raw_cmd.len = 5;
+	ret = hw_ops->send_cmd(goodix_core_data, &raw_cmd);
+	if (ret)
+		ts_err("failed send rawdata cmd %d, ret %d", en, ret);
+	else {
+		ts_info("success send rawdata cmd %d", en);
+	}
+
+	return ret;
+}
+
 #define GOODIX_CMD_EMPTY_INT 0x11
 int goodix_htc_enable_empty_int(bool en)
 {
