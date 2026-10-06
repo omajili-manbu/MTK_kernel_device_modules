@@ -1370,7 +1370,8 @@ static void fts_test_save_data_csv(struct fts_test *tdata)
     struct item_info *info = NULL;
 
     FTS_TEST_INFO("save data in csv format");
-    csv_buffer = vmalloc(CSV_BUFFER_LEN);
+    /* _b571：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
+    csv_buffer = tdata->csv_data_buffer;
     if (!csv_buffer) {
         FTS_TEST_ERROR("csv_buffer malloc fail\n");
         return ;
@@ -1511,10 +1512,7 @@ csv_save_err:
         line2_buffer = NULL;
     }
 
-    if (csv_buffer) {
-        vfree(csv_buffer);
-        csv_buffer = NULL;
-    }
+    /* _b571：blob 语义——缓冲常驻不释放（fts_free_test_memory 统一 vfree） */
 #endif
 }
 
@@ -1525,7 +1523,8 @@ static void fts_test_save_data_csv_private(struct fts_test *tdata)
     int csv_length = 0;
 
     FTS_TEST_INFO("save data in csv format");
-    csv_buffer = vmalloc(CSV_BUFFER_LEN);
+    /* _b571：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
+    csv_buffer = tdata->csv_data_buffer;
     if (!csv_buffer) {
         FTS_TEST_ERROR("csv_buffer malloc fail\n");
         return;
@@ -1542,10 +1541,7 @@ static void fts_test_save_data_csv_private(struct fts_test *tdata)
                               csv_buffer, csv_length);
 #endif
 
-    if (csv_buffer) {
-        vfree(csv_buffer);
-        csv_buffer = NULL;
-    }
+    /* _b571：blob 语义——缓冲常驻不释放（fts_free_test_memory 统一 vfree） */
 #endif
 }
 

@@ -26,6 +26,12 @@
 #define IC_CODE_OFFSET                          (16)
 #define FTS_MAX_COMPATIBLE_TYPE                  4
 
+/* _b571：CSV/TXT_SUPPORT 迁活区（原定义在 focaltech_test.h 的死区 #if 0 内，
+ * 导致 csv/txt 链整段被剔除——blob 二进制证明两宏 =1：csv vmalloc(0x64000)+
+ * TXT testresult 分配均在）。*/
+#define CSV_SUPPORT                              1
+#define TXT_SUPPORT                              1
+
 /*****************************************************************************
 * enumerations, structures and unions
 *****************************************************************************/

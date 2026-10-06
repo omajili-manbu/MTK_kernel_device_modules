@@ -61,6 +61,16 @@
 * Global variable or extern global variabls/functions
 *****************************************************************************/
 struct fts_ts_data *fts_data;
+
+/* _b571：镜像定义前移（recovery/game_mode_update 早期使用点需要在声明之前）*/
+/* ==== FT5672 驱动本地模式镜像（blob *.bss touch_mode，840B）==== */
+#define FTS_TOUCH_MODE_MAX		35
+#define FTS_TOUCH_MODE_VALUE_NUM	6
+
+static int fts_touch_mode[FTS_TOUCH_MODE_MAX][FTS_TOUCH_MODE_VALUE_NUM];
+
+static void fts_update_touchmode_data(struct fts_ts_data *ts_data);
+
 enum FTS_LOG_LEVEL fts_debug_log_level = FTS_LOG_INFO;
 
 #define FOCALTECH_RX_NUM                    9
@@ -306,6 +316,17 @@ void fts_tp_state_recovery(struct fts_ts_data *ts_data)
 	/* recover TP report_rate state 0x92 */
 	fts_report_rate_recovery(ts_data);
 #ifdef FTS_XIAOMI_TOUCHFEATURE
+	/* _b571：blob 0x3b8-0x3fc 段——镜像 GET_CUR 复位为 GET_DEF + 刷新。
+	 * （blob 段尾的 game idle refresh 0x8e 重开由既有
+	 *  fts_game_idle_high_refresh_recovery 覆盖，不重复插入） */
+	{
+		int __i;
+		int __modes[] = { DATA_MODE_0, DATA_MODE_7, DATA_MODE_8 };
+		for (__i = 0; __i < 3; __i++)
+			fts_touch_mode[__modes[__i]][GET_CUR_VALUE] =
+				fts_touch_mode[__modes[__i]][GET_DEF_VALUE];
+	}
+	fts_update_touchmode_data(ts_data);
 	/* recover TP game mode state */
 	fts_game_mode_recovery(ts_data);
 	/* recover TP idle refresh state 0x8E */
@@ -3145,6 +3166,20 @@ static void fts_ic_switch_mode(u8 _gesture_type)
 
 static void fts_game_mode_update(long mode_update_flag, int mode_value[DATA_MODE_45])
 {
+	/* _b571：blob 0x42c4-0x4494 段——框架下发的 mode_value 写入驱动本地镜像
+	 * （SET_CUR 槽）并按镜像 [GET_MIN,GET_MAX] clamp */
+	{
+		int __i;
+		for (__i = 0; __i <= DATA_MODE_8 && __i < FTS_TOUCH_MODE_MAX; __i++) {
+			int __v = mode_value[__i];
+			fts_touch_mode[__i][SET_CUR_VALUE] = __v;
+			if (__v > fts_touch_mode[__i][GET_MAX_VALUE])
+				fts_touch_mode[__i][SET_CUR_VALUE] = fts_touch_mode[__i][GET_MAX_VALUE];
+			else if (__v < fts_touch_mode[__i][GET_MIN_VALUE])
+				fts_touch_mode[__i][SET_CUR_VALUE] = fts_touch_mode[__i][GET_MIN_VALUE];
+		}
+	}
+
 	int mode = 0;
 	s32 temp_value = 0;
 	int ret = 0;
@@ -3414,12 +3449,6 @@ static void fts_game_mode_recovery(struct fts_ts_data *ts_data)
 	FTS_ERROR("this is null !!!!!");
 }
 
-/* ==== FT5672 驱动本地模式镜像（blob *.bss touch_mode，840B）==== */
-#define FTS_TOUCH_MODE_MAX		35
-#define FTS_TOUCH_MODE_VALUE_NUM	6
-
-static int fts_touch_mode[FTS_TOUCH_MODE_MAX][FTS_TOUCH_MODE_VALUE_NUM];
-
 static void fts_init_touchmode_data(struct fts_ts_data *ts_data)
 {
 	struct fts_ts_platform_data *pdata = ts_data->pdata;	/* blob: ts_data->[0x38] */
@@ -3654,26 +3683,24 @@ u8 fts_get_super_resolution_factor(void)
 	return (u8)SUPER_RESOLUTION_FACOTR;
 }
 
+/* _b571 fw_version 对齐（blob 0x3c44/220B） */
 int fts_ic_fw_version(char *fw_version_buf)
 {
 	int ret = 0;
 	u8 fwver = 0;
-	mutex_lock(&fts_data->input_dev->mutex);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
-	ret = fts_read_reg(FTS_REG_FW_VER, &fwver);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
-	mutex_unlock(&fts_data->input_dev->mutex);
-	if ((ret < 0) || (fwver == 0xFF) || (fwver == 0x00))
-	{
-		FTS_INFO("get tp fw version fail!\n");
+
+	if (!fts_data)
 		return -1;
+	mutex_lock(&fts_data->input_dev->mutex);
+	ret = fts_read_reg(FTS_REG_FW_VER, &fwver);
+	mutex_unlock(&fts_data->input_dev->mutex);
+	if ((ret < 0) || (fwver == 0xFF) || (fwver == 0x00)) {
+		memcpy(fw_version_buf, "get tp fw version fail!\n",
+		       sizeof("get tp fw version fail!\n"));
 	} else {
-		return snprintf(fw_version_buf, 64, "%02x", fwver);
+		snprintf(fw_version_buf, 64, "%02x\n", fwver);
 	}
+	return 0;
 }
 
 int fts_ic_self_test(char *type, int *result)
@@ -4120,7 +4147,6 @@ void fts_init_hardware_param(void)
 
 
 /* ==================== _b571 缺件重建（blob 机器码）插入段 ==================== */
-static void fts_update_touchmode_data(struct fts_ts_data *ts_data);
 
 static void fts_seed_touch_mode_mirror(void)
 {
@@ -4459,7 +4485,7 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 	hardware_operation.ic_self_test = fts_ic_self_test;
 	hardware_operation.ic_data_collect = fts_ic_data_collect;
 	hardware_operation.ic_get_lockdown_info = fts_lockdown_info_read;
-	hardware_operation.ic_get_fw_version = NULL;
+	hardware_operation.ic_get_fw_version = fts_ic_fw_version;	/* _b571 接线（blob 0x18 槽） */
 
 	hardware_operation.set_mode_value = fts_set_cur_value;
 	hardware_operation.get_mode_value = fts_get_mode_value;
