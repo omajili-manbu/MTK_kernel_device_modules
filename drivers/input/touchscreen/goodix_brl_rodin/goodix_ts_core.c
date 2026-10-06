@@ -981,6 +981,72 @@ static ssize_t goodix_ts_scan_freq_index_store(struct device *dev,
 }
 #endif
 
+/* ==================== _b571 缺件重建：scp_debug（blob 机器码）==================== */
+static ssize_t goodix_ts_scp_debug_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "ENABLE_SCP_TP, state=%d\n",
+			scp_tp_param.param0);
+}
+
+static ssize_t goodix_ts_scp_debug_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct goodix_ts_core *cd = dev_get_drvdata(dev);
+	int ret = -EINVAL;
+
+	if (!buf || count <= 0)
+		return ret;			/* 0xc864/0xc86c → 0xcaa8 */
+
+	if (buf[0] < '4' || buf[0] > 'a')
+		return count;			/* 0xc880 b.hi → 0xcaa4 */
+
+	switch (buf[0]) {			/* 跳表 .rodata+0x540，46 项，default=0x80 */
+	case '4':
+		scp_tp_ipi_send(0xf1, 0, 0, 0);
+		ts_info("scp test0");				/* 760 */
+		break;
+	case '5':
+		ts_info("scp_tp_sendparam0");			/* 763 */
+		/* blob 0xc8f4：ldur w8,[x21(cd),#0xd3] → str w8,[scp_tp_param+8]
+		 * cd+0xd3 = cd->ic_info.misc.touch_data_addr（见 §3 字段判定）
+		 * [TODO-VERIFY-6] */
+		scp_tp_param.field_08 = cd->ic_info.misc.touch_data_addr;
+		scp_tp_sendparam();				/* 0xc900 */
+		ts_info("scp_tp_sendparam1");			/* 766 */
+		break;
+	case '6':
+		scp_tp_switch(0);				/* 0xc92c */
+		cd->hw_ops->irq_enable(cd, 1);			/* 0xc930，树侧写法 ts_test_irq_enable 不可用 */
+		ts_info("change to ap");			/* 771 */
+		break;
+	case '7':
+		scp_tp_switch(1);				/* 0xc984 */
+		cd->hw_ops->irq_enable(cd, 0);			/* 0xc988 */
+		ts_info("change to scp");			/* 776 */
+		break;
+	case '8':
+		scp_tp_ipi_send(0xf2, buf[1] - '0', 0, 0);	/* 0xc9d8 */
+		ts_info("scp test1 set nonui = %d", buf[1] - '0');	/* 780 */
+		break;
+	case '9':
+		scp_tp_ipi_send(0x6, buf[1] - '0', 0, 0);	/* 0xca1c */
+		ts_info("scp set log level = %d", buf[1] - '0');	/* 784 */
+		break;
+	case 'a':
+		scp_tp_ipi_send(0xf4, 0, 0, 0);			/* 0xca68 */
+		ts_info("scp test3 clean data_statistic");	/* 788 */
+		break;
+	default:
+		return ret;			/* 表内 0x80 → 0xcaa8：x0 仍为入口 -EINVAL */
+	}
+
+	return count;				/* 0xcaa4: mov x0, x19 */
+}
+
+static DEVICE_ATTR(scp_debug, 0664,
+		goodix_ts_scp_debug_show, goodix_ts_scp_debug_store);
+
 static DEVICE_ATTR(driver_info, 0444, goodix_ts_driver_info_show, NULL);
 static DEVICE_ATTR(chip_info, 0444, goodix_ts_chip_info_show, NULL);
 static DEVICE_ATTR(reset, 0220, NULL, goodix_ts_reset_store);
@@ -1025,6 +1091,7 @@ static struct attribute *sysfs_attrs[] = {
 #ifdef TOUCH_THP_SUPPORT
 	&dev_attr_scan_freq_index.attr,
 #endif
+	&dev_attr_scp_debug.attr,
 	&dev_attr_test_stage.attr,
 	&dev_attr_do_inspect.attr,
 	&dev_attr_diff_shift_start.attr,

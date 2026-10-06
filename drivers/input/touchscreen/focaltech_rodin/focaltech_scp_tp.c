@@ -118,7 +118,11 @@ static wait_queue_head_t fts_ap_wait_queue;	/* blob .bss+0x660, 24B [LOCAL] */
 struct work_struct fts_scp_tp_gesture_process_work;	/* blob .bss+0x678, 48B */
 struct delayed_work fts_scp_tp_sendparam_work;	/* blob .bss+0x6a8, 136B */
 static u32 fts_notify_payload[3];		/* blob .bss+0x730, 12B [LOCAL] */
-static struct notifier_block fts_scp_tp_scp_ready_notifier;	/* blob .data+0x2858, 24B */
+static int fts_scp_tp_scp_ready_notifier_call(struct notifier_block *nb,
+					      unsigned long action, void *v);
+static struct notifier_block fts_scp_tp_scp_ready_notifier = {
+	.notifier_call = fts_scp_tp_scp_ready_notifier_call,	/* blob .data+0x2858+0x0 ABS64 实证（_b571 修） */
+};
 
 /* ==================================================================== *
  *  预留内存（blob 0x30b64, 208B；printk 行 31/33）

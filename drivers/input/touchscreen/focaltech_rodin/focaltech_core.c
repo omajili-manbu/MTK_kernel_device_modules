@@ -2479,24 +2479,28 @@ static void fts_xiaomi_touch_fod_test(int value)
 	struct input_dev *input_dev = fts_data->input_dev;
 
 	if (value) {
+		/* blob 54d4: input_event(input, EV_KEY, 0x152, 1) */
+		input_report_key(input_dev, BTN_INFO, 1);
 		update_fod_press_status_common(1);
-		/* mi_disp_set_fod_queue_work(1, true); */
+		/* blob 54f0: input_event(input, EV_SYN, 0, 0) */
+		input_sync(input_dev);
 		input_mt_slot(input_dev, 0);
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 1);
 		input_report_key(input_dev, BTN_TOUCH, 1);
 		input_report_key(input_dev, BTN_TOOL_FINGER, 1);
 		input_report_abs(input_dev, ABS_MT_TRACKING_ID, 0);
 		input_report_abs(input_dev, ABS_MT_WIDTH_MINOR, 1);
-		input_report_abs(input_dev, ABS_MT_POSITION_X, 60900);	//609*16 =9744
-		input_report_abs(input_dev, ABS_MT_POSITION_Y, 243700);	//2437*16 = 38992
+		input_report_abs(input_dev, ABS_MT_POSITION_X, 9744);	/* 609*16 */
+		input_report_abs(input_dev, ABS_MT_POSITION_Y, 38992);	/* 2437*16 */
 		input_sync(input_dev);
 	} else {
 		input_mt_slot(input_dev, 0);
 		input_report_abs(input_dev, ABS_MT_WIDTH_MINOR, 0);
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 0);
 		input_report_abs(input_dev, ABS_MT_TRACKING_ID, -1);
+		/* blob 55f0: input_event(input, EV_KEY, 0x152, 0) */
+		input_report_key(input_dev, BTN_INFO, 0);
 		update_fod_press_status_common(0);
-		/* mi_disp_set_fod_queue_work(0, true); */
 		input_sync(input_dev);
 	}
 }
@@ -3410,63 +3414,62 @@ static void fts_game_mode_recovery(struct fts_ts_data *ts_data)
 	FTS_ERROR("this is null !!!!!");
 }
 
+/* ==== FT5672 驱动本地模式镜像（blob *.bss touch_mode，840B）==== */
+#define FTS_TOUCH_MODE_MAX		35
+#define FTS_TOUCH_MODE_VALUE_NUM	6
+
+static int fts_touch_mode[FTS_TOUCH_MODE_MAX][FTS_TOUCH_MODE_VALUE_NUM];
+
 static void fts_init_touchmode_data(struct fts_ts_data *ts_data)
 {
-	// struct fts_ts_platform_data *pdata = ts_data->pdata;
-	/* Touch Game Mode Switch */
-/*	touch_mode[DATA_MODE_0][GET_MAX_VALUE] = 1;
-	touch_mode[DATA_MODE_0][GET_MIN_VALUE] = 0;
-	touch_mode[DATA_MODE_0][GET_DEF_VALUE] = 0;
-	touch_mode[DATA_MODE_0][SET_CUR_VALUE] = 0;
-	touch_mode[DATA_MODE_0][GET_CUR_VALUE] = 0;*/
-	/* Acitve Mode */
-/*	touch_mode[DATA_MODE_1][GET_MAX_VALUE] = 1;
-	touch_mode[DATA_MODE_1][GET_MIN_VALUE] = 0;
-	touch_mode[DATA_MODE_1][GET_DEF_VALUE] = 0;
-	touch_mode[DATA_MODE_1][SET_CUR_VALUE] = 0;
-	touch_mode[DATA_MODE_1][GET_CUR_VALUE] = 0;*/
-	/* UP_THRESHOLD */
-/*	touch_mode[DATA_MODE_2][GET_MAX_VALUE] = 5;
-	touch_mode[DATA_MODE_2][GET_MIN_VALUE] = 1;
-	touch_mode[DATA_MODE_2][GET_DEF_VALUE] = pdata->touch_def_array[0];
-	touch_mode[DATA_MODE_2][SET_CUR_VALUE] = pdata->touch_def_array[0];
-	touch_mode[DATA_MODE_2][GET_CUR_VALUE] = pdata->touch_def_array[0];*/
-	/*  Tolerance */
-/*	touch_mode[DATA_MODE_3][GET_MAX_VALUE] = 5;
-	touch_mode[DATA_MODE_3][GET_MIN_VALUE] = 1;
-	touch_mode[DATA_MODE_3][GET_DEF_VALUE] = pdata->touch_def_array[1];
-	touch_mode[DATA_MODE_3][SET_CUR_VALUE] = pdata->touch_def_array[1];
-	touch_mode[DATA_MODE_3][GET_CUR_VALUE] = pdata->touch_def_array[1];*/
-	/*  Aim_Sensitivity */
-/*	touch_mode[DATA_MODE_4][GET_MAX_VALUE] = 5;
-	touch_mode[DATA_MODE_4][GET_MIN_VALUE] = 1;
-	touch_mode[DATA_MODE_4][GET_DEF_VALUE] = pdata->touch_def_array[2];
-	touch_mode[DATA_MODE_4][SET_CUR_VALUE] = pdata->touch_def_array[2];
-	touch_mode[DATA_MODE_4][GET_CUR_VALUE] = pdata->touch_def_array[2];*/
-	/*  Tap_Stability */
-/*	touch_mode[DATA_MODE_5][GET_MAX_VALUE] = 5;
-	touch_mode[DATA_MODE_5][GET_MIN_VALUE] = 1;
-	touch_mode[DATA_MODE_5][GET_DEF_VALUE] = pdata->touch_def_array[3];
-	touch_mode[DATA_MODE_5][SET_CUR_VALUE] = pdata->touch_def_array[3];
-	touch_mode[DATA_MODE_5][GET_CUR_VALUE] = pdata->touch_def_array[3];*/
-	/* panel orientation*/
-/*	touch_mode[DATA_MODE_8][GET_MAX_VALUE] = 3;
-	touch_mode[DATA_MODE_8][GET_MIN_VALUE] = 0;
-	touch_mode[DATA_MODE_8][GET_DEF_VALUE] = 0;
-	touch_mode[DATA_MODE_8][SET_CUR_VALUE] = 0;
-	touch_mode[DATA_MODE_8][GET_CUR_VALUE] = 0;*/
-	/* Expert_Mode*/
-/*	touch_mode[DATA_MODE_6][GET_MAX_VALUE] = 3;
-	touch_mode[DATA_MODE_6][GET_MIN_VALUE] = 1;
-	touch_mode[DATA_MODE_6][GET_DEF_VALUE] = 1;
-	touch_mode[DATA_MODE_6][SET_CUR_VALUE] = 1;
-	touch_mode[DATA_MODE_6][GET_CUR_VALUE] = 1;*/
-	/* edge filter area*/
-/*	touch_mode[DATA_MODE_7][GET_MAX_VALUE] = 3;
-	touch_mode[DATA_MODE_7][GET_MIN_VALUE] = 0;
-	touch_mode[DATA_MODE_7][GET_DEF_VALUE] = 2;
-	touch_mode[DATA_MODE_7][SET_CUR_VALUE] = 2;
-	touch_mode[DATA_MODE_7][GET_CUR_VALUE] = 2;*/
+	struct fts_ts_platform_data *pdata = ts_data->pdata;	/* blob: ts_data->[0x38] */
+
+	/* mode0/mode1：仅 GET_MAX=1 */
+	fts_touch_mode[DATA_MODE_0][GET_MAX_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_1][GET_MAX_VALUE] = 1;
+
+	/* mode2..mode5：默认值取自 pdata->touch_def_array[]，范围 1..5 */
+	fts_touch_mode[DATA_MODE_2][SET_CUR_VALUE] = pdata->touch_def_array[0];
+	fts_touch_mode[DATA_MODE_2][GET_CUR_VALUE] = pdata->touch_def_array[0];
+	fts_touch_mode[DATA_MODE_2][GET_DEF_VALUE] = pdata->touch_def_array[0];
+	fts_touch_mode[DATA_MODE_2][GET_MIN_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_2][GET_MAX_VALUE] = 5;
+
+	fts_touch_mode[DATA_MODE_3][SET_CUR_VALUE] = pdata->touch_def_array[1];
+	fts_touch_mode[DATA_MODE_3][GET_CUR_VALUE] = pdata->touch_def_array[1];
+	fts_touch_mode[DATA_MODE_3][GET_DEF_VALUE] = pdata->touch_def_array[1];
+	fts_touch_mode[DATA_MODE_3][GET_MIN_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_3][GET_MAX_VALUE] = 5;
+
+	fts_touch_mode[DATA_MODE_4][SET_CUR_VALUE] = pdata->touch_def_array[2];
+	fts_touch_mode[DATA_MODE_4][GET_CUR_VALUE] = pdata->touch_def_array[2];
+	fts_touch_mode[DATA_MODE_4][GET_DEF_VALUE] = pdata->touch_def_array[2];
+	fts_touch_mode[DATA_MODE_4][GET_MIN_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_4][GET_MAX_VALUE] = 5;
+
+	fts_touch_mode[DATA_MODE_5][SET_CUR_VALUE] = pdata->touch_def_array[3];
+	fts_touch_mode[DATA_MODE_5][GET_CUR_VALUE] = pdata->touch_def_array[3];
+	fts_touch_mode[DATA_MODE_5][GET_DEF_VALUE] = pdata->touch_def_array[3];
+	fts_touch_mode[DATA_MODE_5][GET_MIN_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_5][GET_MAX_VALUE] = 5;
+
+	/* mode6（Expert_Mode） */
+	fts_touch_mode[DATA_MODE_6][SET_CUR_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_6][GET_CUR_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_6][GET_DEF_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_6][GET_MIN_VALUE] = 1;
+	fts_touch_mode[DATA_MODE_6][GET_MAX_VALUE] = 3;
+
+	/* mode7（edge filter area） */
+	fts_touch_mode[DATA_MODE_7][SET_CUR_VALUE] = 2;
+	fts_touch_mode[DATA_MODE_7][GET_CUR_VALUE] = 2;
+	fts_touch_mode[DATA_MODE_7][GET_DEF_VALUE] = 2;
+	fts_touch_mode[DATA_MODE_7][GET_MIN_VALUE] = 2;
+	fts_touch_mode[DATA_MODE_7][GET_MAX_VALUE] = 3;
+
+	/* mode8（panel orientation）：SET/GET_CUR=0，GET_MAX=3 */
+	fts_touch_mode[DATA_MODE_8][GET_MAX_VALUE] = 3;
+
 	FTS_INFO("touchfeature value init done");
 }
 
@@ -4115,6 +4118,337 @@ void fts_init_hardware_param(void)
 	fts_ic_fw_version(hardware_param.fw_version);
 }
 
+
+/* ==================== _b571 缺件重建（blob 机器码）插入段 ==================== */
+static void fts_update_touchmode_data(struct fts_ts_data *ts_data);
+
+static void fts_seed_touch_mode_mirror(void)
+{
+	int i;
+	int val;
+
+	for (i = 0; i <= DATA_MODE_8; i++) {
+		val = driver_get_touch_mode_common(TOUCH_ID, i);
+		if (val < 0)
+			continue;	/* -1：框架不存在/越界，保留镜像原值 */
+		fts_touch_mode[i][SET_CUR_VALUE] = val;
+		fts_touch_mode[i][GET_CUR_VALUE] = val;
+	}
+}
+
+static void fts_get_mode_value(common_data_t *common_data)
+{
+	int mode = common_data->mode;			/* blob: ldrh [x0,#0x2] */
+	int value_type = common_data->data_buf[0];	/* blob: ldr  [x0,#0x8] */
+
+	if (mode >= FTS_TOUCH_MODE_MAX) {
+		/* blob 串面为 "mode:% d don't support"（% 后带空格，vendor 原文如此） */
+		if (fts_debug_log_level)
+			FTS_ERROR("mode:% d don't support", mode);
+		return;
+	}
+
+	if (value_type < 0 || value_type >= FTS_TOUCH_MODE_VALUE_NUM) {
+		/* blob 此处 b.hi → brk（UB 界，不可达）；树侧以显式检查代 trap */
+		if (fts_debug_log_level)
+			FTS_ERROR("value_type(%d) out of range", value_type);
+		return;
+	}
+
+	fts_seed_touch_mode_mirror();	/* 【树侧适配】见文件头 §说明 1 */
+	common_data->data_buf[0] = fts_touch_mode[mode][value_type];
+
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("mode:%d, value_type:%d, value:%d",
+			 mode, value_type, common_data->data_buf[0]);
+}
+
+static void fts_get_mode_all(common_data_t *common_data)
+{
+	int mode = common_data->mode;			/* blob: ldrh [x0,#0x2] */
+	int *val = (int *)common_data->data_buf;
+
+	if (mode < FTS_TOUCH_MODE_MAX) {
+		fts_seed_touch_mode_mirror();	/* 【树侧适配】见文件头 §说明 1 */
+		val[0] = fts_touch_mode[mode][GET_CUR_VALUE];	/* blob [x9,#0x4] → [x0,#0x8]  */
+		val[1] = fts_touch_mode[mode][GET_DEF_VALUE];	/* blob [x8,#0x8] → [x0,#0xc]  */
+		val[2] = fts_touch_mode[mode][GET_MIN_VALUE];	/* blob [x8,#0xc] → [x0,#0x10] */
+		val[3] = fts_touch_mode[mode][GET_MAX_VALUE];	/* blob [x8,#0x10] → [x0,#0x14] */
+	} else {
+		if (fts_debug_log_level)
+			FTS_ERROR("mode:%d don't support", mode);
+	}
+
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("mode:%d, value:%d:%d:%d:%d",
+			 mode, val[0], val[1], val[2], val[3]);
+}
+
+static void fts_reset_mode(common_data_t *common_data)
+{
+	int mode = common_data->mode;		/* blob: ldrh [x0,#0x2] */
+	int i;
+
+	fts_seed_touch_mode_mirror();		/* 【树侧适配】见文件头 §说明 1 */
+
+	if (mode == DATA_MODE_0) {
+		/* 全量复位：mode0..7 的 SET_CUR 归位到 GET_DEF（blob 展平 8 组） */
+		for (i = DATA_MODE_0; i <= DATA_MODE_7; i++)
+			fts_touch_mode[i][SET_CUR_VALUE] = fts_touch_mode[i][GET_DEF_VALUE];
+
+		fts_data->gamemode_enabled = false;	/* blob [ts_data+0xbe8] = 0 */
+		fts_data->is_expert_mode = false;	/* blob [ts_data+0xbea] = 0 */
+		fts_write_reg(0x8E, 0);			/* 0x8E：game idle high refresh 关 */
+	} else if (mode <= DATA_MODE_8) {
+		fts_touch_mode[mode][SET_CUR_VALUE] = fts_touch_mode[mode][GET_DEF_VALUE];
+	} else {
+		if (fts_debug_log_level)
+			FTS_ERROR("mode:%d don't support", mode);
+	}
+
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("mode:%d reset", mode);
+
+	fts_update_touchmode_data(fts_data);	/* blob 0x4d64: ldr x0,[fts_data]; bl */
+}
+
+static int fts_palm_sensor_write(int on)
+{
+	int ret = 0;
+
+	if (!fts_data)
+		return -EINVAL;
+
+	fts_data->palm_status = on;		/* blob: str w0, [x8,#0xbd8] */
+
+	if (fts_data->suspended)		/* blob: ldrb [x8,#0x2d9] */
+		return 0;
+
+	if (IS_ERR(fts_data)) {
+		ret = -EINVAL;
+		if (fts_debug_log_level)
+			FTS_ERROR("set palm sensor cmd failed: %d\n", on);
+	} else {
+		ret = fts_write_reg(0x9A, on ? 5 : 0);	/* 0x9A：骨架无宏 [TODO-VERIFY] */
+		if (ret < 0) {
+			if (fts_debug_log_level)
+				FTS_ERROR("Set palm sensor switch failed!\n");
+		} else if (fts_debug_log_level >= 3) {
+			FTS_INFO("Set palm sensor switch: %d\n", on != 0);
+		}
+	}
+
+	if (!fts_data->palm_status) {
+		if (fts_debug_log_level >= 3)
+			FTS_INFO("disable palm reg and update palm_status_value for palm_sensor node :%d", 0);
+		update_palm_sensor_value_common(0);
+	}
+
+	return ret;
+}
+
+static int fts_log_level_control(int value)
+{
+	if (!fts_data) {
+		if (fts_debug_log_level)
+			FTS_ERROR("fts data is null");
+		return -1;
+	}
+
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("debug level: %d", value);
+
+	fts_debug_log_level = value;
+
+	if (!fts_scp_tp_mistouch_close)
+		fts_scp_tp_ipi_send(6, value, 0, 0);
+
+	if (fts_debug_log_level >= 3)		/* blob: 重读（=value）后 cmp #3 */
+		FTS_INFO("scp set log level = %d", value);
+
+	return value;
+}
+
+static int fts_set_thermal_temp(int temp, bool force)
+{
+	int temp0 = 0;
+	int ret;
+
+	if (force) {
+		temp0 = get_bms_temp_common();
+		if (abs(temp0) >= INVAILD_TEMPERATURE)	/* blob: abs > 999（0x3e7）→ -1 */
+			return -1;
+
+		temp = (temp0 + 5) / 10;	/* Rounding, in degrees Celsius */
+		add_common_data_to_buf_common(0, SET_CUR_VALUE, DATA_MODE_156, 1, &temp);
+	}
+
+	if (fts_debug_log_level >= 4)
+		FTS_DEBUG("temp: %d", temp);
+
+	ret = fts_write_reg(SET_TEMPERATURE_STATUS_EN_TYPE, temp);	/* 0x97 */
+	if (ret < 0) {
+		if (fts_debug_log_level)
+			FTS_ERROR("failed send temp:%d", temp);
+	}
+
+	return ret;
+}
+
+static void fts_touch_dfs_test(int value)
+{
+	switch (value) {
+	case TOUCH_EVENT_TRANSFER_ERR:
+		xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_TRANSFER_ERR, 0,
+						       "TpTransferErr", "focal");
+		break;
+	case TOUCH_EVENT_FWLOAD_ERR:
+		xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
+						       "TpFirmwareLoadFail", "focal");
+		break;
+	case TOUCH_EVENT_PARAM_ERR:
+		xiaomi_touch_mievent_report_int_common(TOUCH_EVENT_PARAM_ERR, 0,
+						       "TpParamParseFail", "focal",
+						       ERROR_GPIO_REQUEST);
+		break;
+	case TOUCH_EVENT_OPENTEST_FAIL:
+		xiaomi_touch_mievent_report_int_common(TOUCH_EVENT_OPENTEST_FAIL, 0,
+						       "TpOpenTestFail", "focal", 0);
+		break;
+	case TOUCH_EVENT_SHORTTEST_FAIL:
+		xiaomi_touch_mievent_report_int_common(TOUCH_EVENT_SHORTTEST_FAIL, 0,
+						       "TpShortTestFail", "focal", 0);
+		break;
+	default:
+		if (fts_debug_log_level)
+			FTS_ERROR("don't support touch dfs test\n");
+		break;
+	}
+}
+
+static void fts_update_touchmode_data(struct fts_ts_data *ts_data)
+{
+	u8 cmd[7] = {0xC1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	int mode0_changed = 0;
+	int mode8;
+	int val;
+	int ret;
+	int i;
+
+#if defined(CONFIG_PM) && FTS_PATCH_COMERR_PM
+	if (ts_data && ts_data->pm_suspend) {		/* blob: ldrb [x19,#0x2d8] */
+		if (fts_debug_log_level)
+			FTS_ERROR("SYSTEM is in suspend mode, don't set touch mode data");
+		return;
+	}
+#endif
+
+	fts_seed_touch_mode_mirror();			/* 【树侧适配】见文件头 §说明 1 */
+
+	pm_stay_awake(ts_data->dev);			/* blob: ldr x0,[x19,#0x10] */
+	mutex_lock(&ts_data->cmd_update_mutex);		/* blob: x20 = x19+0xba8 */
+
+	/* ---- 7 字节 0xC1 命令组装（blob 0x57dc..0x58c4） ---- */
+	cmd[1] = (u8)fts_touch_mode[DATA_MODE_0][SET_CUR_VALUE];
+	cmd[2] = (u8)(fts_touch_mode[DATA_MODE_1][SET_CUR_VALUE] ? 30 : 3);
+
+	if (ts_data->is_expert_mode) {			/* blob: ldrb [x19,#0xbea] */
+		val = fts_touch_mode[DATA_MODE_6][SET_CUR_VALUE];
+		if (val < 1 || val > 4) {		/* blob: (val-1)*4 ≤ 0xc 界限 */
+			if (fts_debug_log_level)
+				FTS_ERROR("expert mode value(%d) out of range", val);
+			val = 1;
+		}
+		cmd[3] = (u8)ts_data->pdata->touch_expert_array[(val - 1) * 4 + 0];
+		cmd[4] = (u8)ts_data->pdata->touch_expert_array[(val - 1) * 4 + 1];
+		cmd[5] = (u8)ts_data->pdata->touch_expert_array[(val - 1) * 4 + 2];
+		cmd[6] = (u8)ts_data->pdata->touch_expert_array[(val - 1) * 4 + 3];
+	} else {
+		val = fts_touch_mode[DATA_MODE_3][SET_CUR_VALUE];
+		if (val >= 1 && val <= 5)
+			cmd[3] = (u8)ts_data->pdata->touch_range_array[val - 1];
+		val = fts_touch_mode[DATA_MODE_2][SET_CUR_VALUE];
+		if (val >= 1 && val <= 5)
+			cmd[4] = (u8)ts_data->pdata->touch_range_array[val - 1];
+		val = fts_touch_mode[DATA_MODE_4][SET_CUR_VALUE];
+		if (val >= 1 && val <= 5)
+			cmd[5] = (u8)ts_data->pdata->touch_range_array[val - 1];
+		val = fts_touch_mode[DATA_MODE_5][SET_CUR_VALUE];
+		if (val >= 1 && val <= 5)
+			cmd[6] = (u8)ts_data->pdata->touch_range_array[val - 1];
+	}
+
+	ret = fts_write(cmd, sizeof(cmd));
+	if (ret < 0) {
+		if (fts_debug_log_level)
+			FTS_ERROR("write game mode parameter failed\n");
+	} else {
+		if (fts_debug_log_level >= 3)
+			FTS_INFO("update game mode cmd: %02X,%02X,%02X,%02X,%02X,%02X,%02X",
+				 cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]);
+
+		/* mode0 变化 → 刷 gamemode 标志（blob 0x58e4-0x58fc，先比较后同步） */
+		mode0_changed = (fts_touch_mode[DATA_MODE_0][GET_CUR_VALUE] !=
+				 fts_touch_mode[DATA_MODE_0][SET_CUR_VALUE]);
+		if (mode0_changed)
+			ts_data->gamemode_enabled =
+				(fts_touch_mode[DATA_MODE_0][SET_CUR_VALUE] != 0);
+
+		/* mode0..6: GET_CUR = SET_CUR（blob 0x5908-0x5938，7 组） */
+		for (i = DATA_MODE_0; i <= DATA_MODE_6; i++)
+			fts_touch_mode[i][GET_CUR_VALUE] =
+				fts_touch_mode[i][SET_CUR_VALUE];
+	}
+
+	/* ---- 方向寄存器 0x8C（mode8；blob 0x5944-0x59dc） ---- */
+	mode8 = fts_touch_mode[DATA_MODE_8][SET_CUR_VALUE];
+	if ((mode8 != fts_touch_mode[DATA_MODE_8][GET_CUR_VALUE]) || mode0_changed) {
+		val = mode8;
+		if (mode8 == PANEL_ORIENTATION_DEGREE_0 ||
+		    mode8 == PANEL_ORIENTATION_DEGREE_180) {
+			val = ORIENTATION_0_OR_180;
+		} else if (mode8 == PANEL_ORIENTATION_DEGREE_270) {
+			val = ts_data->gamemode_enabled ? GAME_ORIENTATION_270 :
+							  NORMAL_ORIENTATION_270;
+		} else if (mode8 == PANEL_ORIENTATION_DEGREE_90) {
+			val = ts_data->gamemode_enabled ? GAME_ORIENTATION_90 :
+							  NORMAL_ORIENTATION_90;
+		}	/* else：blob 原值透传（0x5970 b.ne 落 0x59b8） */
+
+		ret = fts_write_reg(FTS_REG_ORIENTATION, (u8)val);
+		if (ret < 0) {
+			if (fts_debug_log_level)
+				FTS_ERROR("write touch mode:%d reg failed", DATA_MODE_8);
+		} else {
+			if (fts_debug_log_level >= 3)
+				FTS_INFO("write touch mode:%d, value: %d, addr:0x%02X",
+					 DATA_MODE_8, val, FTS_REG_ORIENTATION);
+			fts_touch_mode[DATA_MODE_8][GET_CUR_VALUE] =
+				fts_touch_mode[DATA_MODE_8][SET_CUR_VALUE];
+		}
+	}
+
+	/* ---- 边缘滤波寄存器 0x8D（mode7；blob 0x59e4-0x5a1c） ---- */
+	if (fts_touch_mode[DATA_MODE_7][GET_CUR_VALUE] !=
+	    fts_touch_mode[DATA_MODE_7][SET_CUR_VALUE]) {
+		val = fts_touch_mode[DATA_MODE_7][SET_CUR_VALUE];
+		ret = fts_write_reg(FTS_REG_EDGE_FILTER_LEVEL, (u8)val);
+		if (ret < 0) {
+			if (fts_debug_log_level)
+				FTS_ERROR("write touch mode:%d reg failed", DATA_MODE_7);
+		} else {
+			if (fts_debug_log_level >= 3)
+				FTS_INFO("write touch mode:%d, value: %d, addr:0x%02X",
+					 DATA_MODE_7, val, FTS_REG_EDGE_FILTER_LEVEL);
+			fts_touch_mode[DATA_MODE_7][GET_CUR_VALUE] =
+				fts_touch_mode[DATA_MODE_7][SET_CUR_VALUE];
+		}
+	}
+
+	mutex_unlock(&ts_data->cmd_update_mutex);
+	pm_relax(ts_data->dev);
+}
+
 void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 {
 	mutex_init(&ts_data->cmd_update_mutex);
@@ -4128,11 +4462,14 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 	hardware_operation.ic_get_fw_version = NULL;
 
 	hardware_operation.set_mode_value = fts_set_cur_value;
+	hardware_operation.get_mode_value = fts_get_mode_value;
+	hardware_operation.get_mode_all = fts_get_mode_all;
+	hardware_operation.reset_mode = fts_reset_mode;
 	hardware_operation.ic_switch_mode = fts_ic_switch_mode;
 	hardware_operation.cmd_update_func = fts_game_mode_update;
 	hardware_operation.set_mode_long_value = NULL;
 
-	hardware_operation.palm_sensor_write = NULL;
+	hardware_operation.palm_sensor_write = fts_palm_sensor_write;
 	hardware_operation.enable_touch_raw = fts_enable_touch_raw;
 	hardware_operation.panel_vendor_read = fts_panel_vendor_read;
 	hardware_operation.panel_color_read = fts_panel_color_read;
@@ -4141,7 +4478,7 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 	hardware_operation.get_touch_ic_buffer = NULL;
 	hardware_operation.touch_doze_analysis = fts_touch_doze_analysis;
 	hardware_operation.touch_log_level_control = NULL;
-	hardware_operation.touch_log_level_control_v2 = fts_touch_log_level_control;
+	hardware_operation.touch_log_level_control_v2 = fts_log_level_control;
 	hardware_operation.set_nfc_to_touch_event = NULL;
 	hardware_operation.htc_ic_setModeValue = fts_htc_ic_setModeValue;
 	hardware_operation.htc_ic_getModeValue = fts_htc_ic_getModeValue;
@@ -4154,6 +4491,8 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 #ifdef TOUCH_MULTI_PANEL_NOTIFIER_SUPPORT
 	hardware_operation.set_panel_notifier_status = fts_set_panel_notifier_status;
 #endif
+	hardware_operation.set_thermal_temp = fts_set_thermal_temp;
+	hardware_operation.touch_dfs_test = fts_touch_dfs_test;
 
 #ifdef TOUCH_DUMP_TIC_SUPPORT
 	fts_data->dump_type = DUMP_OFF;
@@ -4673,6 +5012,28 @@ static void fts_ts_remove(struct spi_device *spi)
     fts_ts_remove_entry(spi_get_drvdata(spi));
 }
 
+/* blob fts_ts_shutdown @0x8c68/240B 重建（_b571） */
+static void fts_ts_shutdown(struct spi_device *spi)
+{
+	struct fts_ts_data *ts_data = spi_get_drvdata(spi);
+
+	if (!ts_data)		/* 【树侧加固】blob 无此检查；树侧 fts_ts_remove 先例（4665 行） */
+		return;
+
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("fts_ts_shutdown enter");
+
+	fts_irq_disable();	/* blob 内联 fts_irq_disable()（0x8c90..0x8cc8） */
+
+	usleep_range(500, 510);	/* blob: usleep_range_state(500, 510, 2) */
+
+	if (fts_data)
+		fts_power_source_ctrl(fts_data, DISABLE);
+
+	xiaomi_unregister_panel_notifier_common(ts_data->dev, TOUCH_ID);
+	unregister_touch_panel_common(TOUCH_ID);
+}
+
 static const struct spi_device_id fts_ts_id[] = {
     {FTS_DRIVER_NAME, 0},
     {},
@@ -4686,6 +5047,7 @@ MODULE_DEVICE_TABLE(of, fts_dt_match);
 static struct spi_driver fts_ts_driver = {
     .probe = fts_ts_probe,
     .remove = fts_ts_remove,
+    .shutdown = fts_ts_shutdown,
     .driver = {
         .name = FTS_DRIVER_NAME,
         .owner = THIS_MODULE,

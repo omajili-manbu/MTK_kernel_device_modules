@@ -1547,6 +1547,68 @@ static ssize_t fts_lockdown_show(
 	return count;
 }*/
 
+/* ==================== _b571 缺件重建：fts_scp_debug（blob 机器码）==================== */
+/* 活树 focaltech_scp_tp.c 提供（recon 前缀统一） */
+extern int fts_scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);
+extern int fts_scp_tp_sendparam(void);
+extern int fts_scp_tp_switch(u32 mode);
+extern struct scp_tp_params fts_scp_tp_param;
+
+static ssize_t fts_scp_debug_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	/* blob：snprintf(buf, 0x1000, "ENABLE_SCP_TP, state=%d\n", scp_tp_param.param0) */
+	return snprintf(buf, PAGE_SIZE, "ENABLE_SCP_TP, state=%d\n", fts_scp_tp_param.param0);
+}
+
+static ssize_t fts_scp_debug_store(struct device *dev, struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+	struct input_dev *input_dev = ts_data->input_dev;
+
+	mutex_lock(&input_dev->mutex);	/* blob cfe8（进入前无 FTS_FUNC_ENTER） */
+
+	switch (buf[0]) {
+	case '4':
+		fts_scp_tp_ipi_send(0xf1, 0, 0, 0);
+		FTS_INFO("scp test0");			/* blob L1448 */
+		break;
+	case '5':
+		FTS_INFO("scp_tp_sendparam0");		/* blob L1451 */
+		fts_scp_tp_sendparam();
+		FTS_INFO("scp_tp_sendparam1");		/* blob L1454 */
+		break;
+	case '6':
+		fts_scp_tp_switch(0);
+		FTS_INFO("change to ap");		/* blob L1458 */
+		break;
+	case '7':
+		fts_scp_tp_switch(1);
+		FTS_INFO("change to scp");		/* blob L1462 */
+		break;
+	case '8':
+		fts_scp_tp_ipi_send(0xf2, buf[1] - 0x30, 0, 0);
+		FTS_INFO("scp test1 set nonui = %d", buf[1] - 0x30);	/* blob L1466 */
+		break;
+	case '9':
+		fts_scp_tp_ipi_send(6, buf[1] - 0x30, 0, 0);
+		FTS_INFO("scp set log level = %d", buf[1] - 0x30);	/* blob L1470 */
+		break;
+	case 'a':
+		fts_scp_tp_ipi_send(0xf4, 0, 0, 0);
+		FTS_INFO("scp test3 clean data_statistic");		/* blob L1474 */
+		break;
+	default:
+		break;		/* blob 0xd1b4：直接 unlock + return count（无日志） */
+	}
+
+	mutex_unlock(&input_dev->mutex);
+
+	return count;			/* blob d1bc: mov x0, x19（无 FTS_FUNC_EXIT） */
+}
+
+static DEVICE_ATTR_RW(fts_scp_debug);
+
 /* fts_monitor interface */
 static ssize_t fts_monitor_show(
     struct device *dev, struct device_attribute *attr, char *buf)
@@ -1866,6 +1928,7 @@ static struct attribute *fts_attributes[] = {
     &dev_attr_fts_pen.attr,
     &dev_attr_fts_touch_size.attr,
     &dev_attr_fts_ta_mode.attr,
+    &dev_attr_fts_scp_debug.attr,
     &dev_attr_fts_monitor_mode.attr,
     &dev_attr_fts_htc_cmd.attr,
     &dev_attr_fts_lockdown.attr,

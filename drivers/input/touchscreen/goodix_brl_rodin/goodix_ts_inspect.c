@@ -994,11 +994,29 @@ static int goodix_tptest_prepare(struct goodix_ts_test *ts_test)
 	return 0;
 }
 
+/* _b571：blob 版（补 normal config 重发块）helper */
+static int ts_test_send_normal_config(struct goodix_ts_core *cd)
+{
+	struct goodix_ic_config *cfg = cd->ic_configs[CONFIG_TYPE_NORMAL];
+
+	if (!cfg || cfg->len <= 0) {
+		ts_err("no valid normal config found");
+		return -EINVAL;
+	}
+	return cd->hw_ops->send_config(cd, cfg->data, cfg->len);
+}
+
 static void goodix_tptest_finish(struct goodix_ts_test *ts_test)
 {
 	ts_info("TP test finish IN");
 	/* reset chip */
 	ts_test_reset(ts_test, 100);
+
+	/* blob 0x1f4f0：测试用 cfg 发过就别把测试配置留在 IC 里，重发常规配置 */
+	if (ts_test->test_config.len >= 1) {
+		if (ts_test_send_normal_config(ts_test->ts))
+			ts_err("Send normal config failed");
+	}
 
 	/* open esd */
 	goodix_ts_blocking_notify(NOTIFY_ESD_ON, NULL);
@@ -4296,6 +4314,178 @@ exit_finish:
 	return ret;
 }
 
+/* ==================== _b571 缺件重建：auto_test proc（blob 机器码）==================== */
+static struct seq_file *g_auto_test_seq;	/* blob .bss+0x5970 [TODO-VERIFY-1] */
+
+static int auto_test_result_show(struct seq_file *m, void *v);	/* 前向声明：open 引用它 */
+
+/* blob 内联 static int fs_write(const void *buf, size_t size)（__func__="fs_write"，错误行 2410）
+ * —— 选树侧无重名语义体，故拟名 auto_test_seq_write()。[TODO-VERIFY-2] 名称 */
+static int auto_test_seq_write(const void *buf, size_t size)
+{
+	if (!g_auto_test_seq) {
+		ts_err("seq file is NULL");	/* .rodata.str1.1+0xd15b，line 2410，tag "fs_write" */
+		return -EINVAL;
+	}
+	return seq_write(g_auto_test_seq, buf, size);
+}
+
+/*
+ * auto_test_open —— blob 0x20194（48B）
+ * 反汇编逐条 → C：
+ *   201a0 ldr x2,[x0,#0x2b8]   ；x0=inode → pde_data(inode)= inode->i_private（本内核 0x2b8）
+ *   201a4 mov x0,x1            ；x0 = file（file_operations.open 第 2 参）
+ *   201a8 adrp/add x1,.text+0x201c8 = auto_test_result_show
+ *   201b0 mov w3,#0x100000     ；size = 1MB = 树侧 DEFAULT_SEQ_FILE_SIZE(inspect.c:35)
+ *   201b4 bl single_open_size
+ * 与树侧 rawdata_proc_open / framedata_proc_open（core.c）的 open 形态逐指令同形（同为
+ * [x0,#0x2b8] → pde_data），可直接对拍。
+ */
+static int auto_test_open(struct inode *inode, struct file *file)
+{
+	return single_open_size(file, auto_test_result_show,
+			pde_data(inode), DEFAULT_SEQ_FILE_SIZE);	/* 0x100000 */
+}
+
+/*
+ * auto_test_result_show —— blob 0x201c8（2516B）
+ * 调用面（CALL26 重定位 + 段内直接 bl 双向核对）：
+ *   kmalloc_large ×3 / msleep ×6 / kfree ×4 / sprintf ×2 / strncmp ×1 / seq_write ×1 /
+ *   _printk ×19 / __stack_chk_fail ×1
+ *   段内：goodix_tptest_prepare、goodix_capacitance_test、goodix_shortcircut_test、
+ *         goodix_put_test_result、goodix_tptest_finish
+ *   hw_ops 间接：+0x20(cd,0) [DC-9FC1BE]、+0x28 reset(cd,100)[DC-9FC1BE]、
+ *         +0x38 read(cd,addr,dst,len)[493F-7C6F]、+0x48 read_flash(cd,addr,dst,len)[493F-7C6F]、
+ *         +0x70 read_version(cd,&ver)[2B15-2B11]、+0x0? 无
+ *   **没有** do_inspect_thread / version_test / key_info_test / custom_info_test / reset_test 的调用
+ *   —— 这 4+1 个 static 函数在 blob 中被内联进本函数（各自 __func__ 串仍留在 printk 里：
+ *      "goodix_do_inspect"(0x4f3a, line 3261/3274/3278/3278)、"goodix_check_key_info_test"(0x3be1,
+ *      line 2266/2240/2245/2259/2279/2312/2317/2333/2339)、"goodix_custom_info_test"(0x2346,
+ *      line 2312/2317/2339)…），说明 blob 源里这 4 个测试函数各只被调用一次 → 被完全内联，
+ *      符号表里因此没有它们（树侧 .o 同样只有内联后的 goodix_do_inspect_thread）。
+ * 关键内存/结构事实（本轮实测）：
+ *   m->private（seq_file+0x80）= cd（proc_create_data 的 core_data）
+ *   28000B 缓冲（x19）：最终 sprintf(...,"test_result:%s\n",info->result) 的输出缓冲
+ *   sizeof(struct ts_rawdata_info)=14104（第二次 kmalloc 的常量 0x3718），且
+ *     info->result 位于 +0x36b4（=0x3568? 实测 14004；同一常量出现在 goodix_get_rawdata
+ *     @0x170e0、goodix_put_test_result @0x1c41c）→ 与树侧 xiaomi_touch.h 的
+ *     TS_RAWDATA_RESULT_MAX=100 尾字段吻合（14004+100=14104）
+ *   ts_test = kmalloc(sizeof(struct goodix_ts_test)=0x1d3880, GFP_KERNEL|__GFP_ZERO)（0x1d3880）
+ *   版本串：sprintf(ts_test->cur_version, "%s-%02x.%02x.%02x_%s_%02x.%02x.%02x.%02x", …)
+ *     实测 dest=ts_test+0x1d375e，args 取自 cd+0x10(6B rom_pid, u32+u16)、cd+0x16/17/18(rom_vid)、
+ *     cd+0x1a(patch_pid)…0x25，与树侧 goodix_version_test()（inspect.c:2830）逐参同构。
+ *     树侧同函数内联展开（tree_goodix_ts_inspect.disr goodix_do_inspect_thread 0x17d4）用的
+ *     [x8,#0x16]/[x8,#0x17] 偏移与 blob 完全一致 → 该分支跨构建同形，可放心复用树侧函数。
+ *   chip_pid 读出（3 次 read_flash + msleep(100)，addr = IC_TYPE_BERLIN_B?0x3f051:0x1f031）
+ *   memcmp(chip_pid, cd->fw_version.patch_pid, 7)（blob 0x203fc-0x20414：两组 w 比较）
+ *   chip_info 校验和/UID（0x205e0-0x20640）与树侧 goodix_check_key_info_test() 逐条同构
+ *   custom_info：read_flash(cd,0x3f000/0x7f000/0x1e000, ts_test->custom_info_flash,16) +
+ *                read(cd,0x10028/0x10030, ts_test->custom_info_sram,16)（0x20780-0x207f8）
+ *   reset 测试：hw_ops->+0x20(cd,0)? → read_version(cd,&ver) → reset(cd,100) →
+ *                strncmp(ver.patch_pid, cd->fw_version.patch_pid, 8)（0x2082c-0x20954）
+ *                失败置 test_result[GTP_RESET_TEST](=9)=GTP_PANEL_REASON(=2)
+ *   尾部：capacitance_test → if(test_items[GTP_SHORT_TEST=3]) shortcircut_test →
+ *         put_test_result → tptest_finish → kfree(ts_test) →
+ *         sprintf(buf,"test_result:%s\n",info->result) → fs_write 内联体（seq_write）
+ *         → kfree(info) → kfree(buf) → ts_info("-----------tp self test end!------------")
+ *         → return 0
+ * 与树侧 goodix_get_rawdata()（inspect.c:4258）的差异：blob 版把"跑测试"这一段写成了独立
+ *   static 函数 goodix_do_inspect(cd, info)（被内联）；树侧对应物是 goodix_do_inspect_thread()
+ *   + show_result_all_show()。重建按 blob 语义（一个 show 里跑完测试并打印），但复用树侧
+ *   已有的测试函数名与 1 参 goodix_put_test_result()（blob 是 2 参 (ts_test, info)）。
+ *   [TODO-VERIFY-3] blob 的 goodix_put_test_result(ts_test, info) 是否除 info->result 外还回填
+ *   info 其他字段（树侧 1 参版只写 ts_test->test_info；本重建用 info->result 承接，语义等价）。
+ *   [TODO-VERIFY-4] 28000 这个字面量语义（暂拟"seq 输出缓冲"，也可能是某个 14104 之外的
+ *   xiaomi 结构体尺寸）。
+ */
+static int auto_test_result_show(struct seq_file *m, void *v)
+{
+	struct goodix_ts_core *cd = m->private;	/* seq_file.private @+0x80 */
+	struct ts_rawdata_info *info;
+	struct goodix_ts_test *ts_test;
+	char *buf;
+	int ret;
+
+	ts_info("-----------tp self test start!------------");	/* line 3311 */
+
+	buf = kmalloc(28000, GFP_KERNEL | __GFP_ZERO);	/* 0x6d60 [TODO-VERIFY-4] */
+	if (!buf) {
+		ts_err("memory failed");	/* line 3315 */
+		return -ENOMEM;
+	}
+	info = kmalloc(sizeof(*info), GFP_KERNEL | __GFP_ZERO);	/* blob 常量 14104 */
+	if (!info) {
+		kfree(buf);
+		ts_err("memory failed");
+		return -ENOMEM;
+	}
+	g_auto_test_seq = m;	/* blob .bss+0x5970 [TODO-VERIFY-1] */
+
+	if (!cd) {
+		ts_err("core_data or info is NULL");	/* 内联 goodix_do_inspect: line 3261 */
+		goto exit_free_info;	/* blob 0x20448 → 0x20990：仍旧走"输出并 return 0"尾 */
+	}
+
+	ts_test = kmalloc(sizeof(*ts_test), GFP_KERNEL | __GFP_ZERO);	/* 0x1d3880 */
+	if (!ts_test) {
+		ts_err("memory failed");
+		goto exit_free_info;
+	}
+	ts_test->ts = cd;
+	ret = goodix_tptest_prepare(ts_test);
+	if (ret < 0) {
+		ts_err("Failed to prepare TP test, exit");	/* 内联 goodix_do_inspect: 3274 */
+		strncpy(info->result, "[FAIL]-0F-software reason\n",
+				TS_RAWDATA_RESULT_MAX - 1);	/* .rodata+0x9d8 常量串 */
+		goto exit_free_ts;
+	}
+	ts_info("TP test prepare OK");	/* 内联 goodix_do_inspect: 3278 */
+
+	/* —— 以下 4 个测试函数在 blob 中内联（__func__ 串见上），按树侧同名函数调用 —— */
+	goodix_version_test(ts_test);
+	goodix_check_key_info_test(ts_test);
+	goodix_custom_info_test(ts_test);
+	goodix_reset_test(ts_test);
+	ts_test->test_result[GTP_RESET_TEST] = GTP_PANEL_REASON;	/* 0x20954: [x22,#0x71]=2 */
+
+	goodix_capacitance_test(ts_test);
+	if (ts_test->test_params.test_items[GTP_SHORT_TEST])
+		goodix_shortcircut_test(ts_test);
+
+	goodix_put_test_result(ts_test);
+	/* blob 版为 goodix_put_test_result(ts_test, info)（2 参）；树侧 1 参，故此处补搬运，
+	 * 与树侧 goodix_get_rawdata() 的收尾写法一致。 */
+	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
+	goodix_tptest_finish(ts_test);
+
+exit_free_ts:
+	kfree(ts_test);
+exit_free_info:
+	/* —— 结果回写（blob: sprintf → fs_write 内联(seq_write) → kfree → end 日志 → return 0）—— */
+	ret = sprintf(buf, "test_result:%s\n", info->result);	/* .rodata.str1.1+0x5bdd */
+	ret = auto_test_seq_write(buf, ret);	/* blob 内联 fs_write() */
+	if (ret < 0) {
+		ts_err("fs_write failed");			/* line 3329 */
+		ts_info("test_result:%s", info->result);	/* line 3331 [TODO-VERIFY-5] 位置 */
+	}
+	kfree(info);
+	kfree(buf);
+	ts_info("-----------tp self test end!------------");	/* line 3335 */
+	return 0;
+}
+
+/* blob .rodata+0x978（96B，LOCAL）：struct proc_ops，12 槽全审计（见 §1 头）。
+ * 槽位顺序按 include/linux/proc_fs.h 的 struct proc_ops：
+ *   proc_flags(0) / proc_open(8) / proc_read(0x10) / proc_read_iter(0x18) / proc_write(0x20) /
+ *   proc_lseek(0x28) / proc_release(0x30) / proc_poll(0x38) / proc_ioctl(0x40) /
+ *   proc_compat_ioctl(0x48) / proc_mmap(0x50) / proc_get_unmapped_area(0x58) —— 共 0x60 字节 ✓ */
+static const struct proc_ops auto_test_ops = {
+	.proc_open = auto_test_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release,
+};
+
 int inspect_module_init(struct goodix_ts_core *core_data)
 {
 	if (module_initialized) {
@@ -4303,10 +4493,11 @@ int inspect_module_init(struct goodix_ts_core *core_data)
 		return 0;
 	}
 
-	proc_create_data("show_result_all",
-			0660, NULL, &show_result_all, core_data);
-	proc_create_data("show_result",
-			0660, NULL, &show_result, core_data);
+	/* _b571：blob 忠实形态（inspect_module_init 仅建 auto_test @0x1f614；donor show_result* 移除） */
+	if (!proc_create_data("goodix_ts/auto_test", 0660, NULL, &auto_test_ops, core_data)) {
+		ts_err("failed to create proc entry");
+		return -ENOMEM;
+	}
 	module_initialized = true;
 	ts_info("inspect module init success");
 	return 0;
@@ -4318,8 +4509,7 @@ void inspect_module_exit(void)
 	if (!module_initialized)
 		return;
 
-	remove_proc_entry("goodix_ts.0/show_result_all", NULL);
-	remove_proc_entry("goodix_ts.0/show_result", NULL);
+	remove_proc_entry("goodix_ts/auto_test", NULL);
 	module_initialized = false;
 }
 

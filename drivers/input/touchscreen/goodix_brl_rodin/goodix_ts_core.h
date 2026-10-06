@@ -1045,3 +1045,20 @@ int goodix_do_inspect_thread(void *arg);
 int goodix_get_final_result(void);
 
 #endif
+
+/* ==================== _b571：SCP-TP 对外面（scp_debug 节点用）==================== */
+struct scp_tp_params {
+	u32 param0;		/* 0x00 状态机 */
+	u32 unknown_04;
+	u32 field_08;
+	u32 unknown_0c;
+	u32 field_10;
+	u32 unknown_14[5];
+	u32 gesture_type;	/* 0x28 */
+	u32 gesture_len;	/* 0x2c */
+	u8  gesture_data[64];	/* 0x30 */
+};
+extern struct scp_tp_params scp_tp_param;
+int scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);
+int scp_tp_sendparam(void);
+int scp_tp_switch(u32 mode);

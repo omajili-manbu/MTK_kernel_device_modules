@@ -125,6 +125,7 @@
 #define PANEL_ORIENTATION_DEGREE_270        3   /* anticlockwise 270 degrees */
 #define FTS_FRAME_DATA_ADDR                 0x01
 #define TOUCH_DUMP_TIC_SUPPORT
+#define TOUCH_FOD_SUPPORT
 
 #define FOCAL_DRIVER_VERSION "FT3383-2025.07.04-01"
 #define TX_NUM                              9
@@ -179,6 +180,8 @@ struct scp_tp_params {
 };				/* sizeof == 112 (0x70) */
 
 extern struct scp_tp_params fts_scp_tp_param;   /* focaltech_scp_tp.c */
+extern int fts_scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);	/* _b571 patch G */
+extern bool fts_scp_tp_mistouch_close;		/* _b571 patch G */
 int fts_read_and_report_foddata(struct fts_ts_data *data);
 extern hardware_param_t hardware_param;
 // extern int touch_mode[DATA_MODE_45][VALUE_TYPE_SIZE];
@@ -533,6 +536,7 @@ struct fts_ts_data {
 	bool enable_touch_raw;
 	struct tp_frame thp_frame;
 	bool fod_pressed;
+	int palm_status;	/* blob 0xbd8：fts_palm_sensor_write 存（_b571） */
 
 #ifdef TOUCH_THP_SUPPORT
 	struct delayed_work thp_signal_work;

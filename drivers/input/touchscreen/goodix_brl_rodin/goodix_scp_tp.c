@@ -95,17 +95,7 @@ extern struct goodix_module goodix_modules;			/* :58 */
  *    +0x30 u8[64] data 数据（手势/FOD 上报体；goodix_gesture_ist 从这里 memcpy 出去）
  *  112 = 0x30 + 0x40 精确吻合，见 scp_tp_recon.md §共享模板分析。
  * ==================================================================== */
-struct scp_tp_params {
-	u32 param0;		/* 0x00 状态机 */
-	u32 unknown_04;		/* 0x04 [TODO-VERIFY] 无访问点 */
-	u32 field_08;		/* 0x08 仅 verbose 打印 */
-	u32 unknown_0c;		/* 0x0c [TODO-VERIFY] 无访问点 */
-	u32 field_10;		/* 0x10 仅 verbose 打印 */
-	u32 unknown_14[5];	/* 0x14..0x28 [TODO-VERIFY] 无访问点 */
-	u32 gesture_type;	/* 0x28 SCP->AP: type */
-	u32 gesture_len;	/* 0x2c SCP->AP: len */
-	u8  gesture_data[64];	/* 0x30 SCP->AP: data */
-};				/* sizeof == 112 (0x70) */
+/* struct scp_tp_params 已上移 goodix_ts_core.h（core.c 的 scp_debug 节点要用，_b571） */
 
 struct scp_tp_params scp_tp_param;		/* blob .bss+0x5ad0, 112B */
 u8 goodix_scp_tp_mistouch_close;   /* 框架同名全局为 u8，=y 单符号空间统一 */			/* blob .bss+0x5b44, 1B（=y 撞名后续改为
@@ -123,7 +113,11 @@ struct work_struct scp_tp_gesture_process_work;	/* blob .bss+0x5b80, 48B [GLOBAL
 struct delayed_work scp_tp_sendparam_work;	/* blob .bss+0x5bb0, 136B [GLOBAL] */
 static u32 notify_payload[3];			/* blob .bss+0x5c38, 12B [LOCAL]（mtk_ipi_register
 						 * 的第 5 参 void *msg） */
-static struct notifier_block scp_tp_scp_ready_notifier;	/* blob .data+0xa28, 24B [LOCAL] */
+static int scp_tp_scp_ready_notifier_call(struct notifier_block *nb,
+					  unsigned long action, void *v);
+static struct notifier_block scp_tp_scp_ready_notifier = {
+	.notifier_call = scp_tp_scp_ready_notifier_call,	/* blob .data+0xa28+0x0 ABS64 实证（_b571 修） */
+};
 
 /* ==================================================================== *
  *  SCP 预留内存（ddr_*）取自 scp.ko；地址经 .bss reloc 逐条确认

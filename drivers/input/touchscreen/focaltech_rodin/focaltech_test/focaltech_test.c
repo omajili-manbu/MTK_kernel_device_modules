@@ -32,6 +32,7 @@
 /*****************************************************************************
 * Included header files
 *****************************************************************************/
+#include <linux/proc_fs.h>
 #include "focaltech_test.h"
 
 /*****************************************************************************
@@ -2309,6 +2310,49 @@ static struct attribute_group fts_test_attribute_group = {
 };
 
 int tp_selftest_result;
+/* ==================== _b571 缺件重建：fts_test_csv proc（blob 机器码）==================== */
+static struct proc_dir_entry *fts_proccsv_entry;
+
+static int fts_csv_show(struct seq_file *m, void *v)
+{
+	struct fts_test *tdata = (struct fts_test *)m->private;
+
+	if ((tdata == NULL) || (tdata->csv_data_buffer == NULL)) {
+		FTS_TEST_ERROR("tdata/csv_file_buf is null");	/* blob +0x413（E 级） */
+		return -ENODATA;				/* blob mov w0,#-0x3d */
+	}
+
+	/* blob 打印 (m->size, strlen(buf))；len 供下面分支用 */
+	{
+		int len = (int)strlen(tdata->csv_data_buffer);
+
+		FTS_TEST_INFO("csv_show, size=%d,%d", (int)m->size, len);
+
+		if (len > 0) {
+			if (m->size >= (size_t)len)
+				seq_printf(m, "%s", tdata->csv_data_buffer);
+			else
+				m->count = m->size;	/* blob 188b4 str x8,[x19,#0x18] */
+		} else {
+			seq_printf(m, "no csv data, please do test first\n");
+		}
+	}
+
+	return 0;
+}
+
+static int fts_csv_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, fts_csv_show, pde_data(inode));
+}
+
+static const struct proc_ops fts_proccsv_fops = {
+	.proc_open = fts_csv_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release,
+};
+
 static int tp_selftest_open(struct inode *inode, struct file *file)
 {
 	return 0;
@@ -2692,6 +2736,10 @@ int fts_test_init(struct fts_ts_data *ts_data)
 	proc->tp_data_dump_proc = proc_create("tp_data_dump_v0", 0444, NULL, &tp_datadump_fops);
 	if (proc->tp_data_dump_proc == NULL)
 		FTS_TEST_ERROR("tp_data_dump_v0 proc create failed.");
+	/* _b571：blob fts_test_init 16630 实证（name "fts_test_csv", 0777, data=fts_ftest） */
+	fts_proccsv_entry = proc_create_data("fts_test_csv", 0777, NULL, &fts_proccsv_fops, fts_ftest);
+	if (fts_proccsv_entry == NULL)
+		FTS_TEST_ERROR("create proc_csv entry fail");
 	FTS_TEST_FUNC_EXIT();
 	return ret;
 }
