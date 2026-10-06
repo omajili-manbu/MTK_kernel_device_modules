@@ -853,6 +853,9 @@ static ssize_t goodix_ts_debug_log_store(struct device *dev,
 	}
 
 	debug_log_level = buf[0] - '0';
+	/* _b573 scp 联动：blob 0xc2d4-0xc2e4 = !mistouch_close 时把日志等级同步给 SCP */
+	if (!goodix_scp_tp_mistouch_close)
+		scp_tp_ipi_send(6, debug_log_level, 0, 0);
 	return count;
 }
 
@@ -1740,15 +1743,12 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 
 	/* improve irq thread priority, bindcpu affinity and set VIP (once) */
 	if (!core_data->irq_priority_high) {
-		struct cpumask irq_thread_cpu_mask;
+		/* _b573 boost wiring: blob 0xb000-0xb008 = touch_irq_cpumask(0)；
+		 * DT 配置 normal_cpu_mask=<0x0f>（xiaomi_rodin_mt6899_touch.dtsi），
+		 * 树版原硬编码 0-2 会覆盖 DT 配置，改回框架调用 */
+		touch_irq_cpumask(TOUCH_ID);
 
 		goodix_sched_sethigh(current);
-
-		cpumask_clear(&irq_thread_cpu_mask);
-		for (int cpu = 0; cpu <= 2; cpu++) {
-			cpumask_set_cpu(cpu, &irq_thread_cpu_mask);
-		}
-		set_cpus_allowed_ptr(current, &irq_thread_cpu_mask);
 
 		core_data->irq_priority_high = true;
 		ts_info("set goodix_irq priority high, cpu affinity: %d",
@@ -2628,9 +2628,17 @@ static int goodix_ts_suspend(struct goodix_ts_core *core_data)
 			atomic_read(&core_data->suspended))
 		return 0;
 	mutex_lock(&core_data->core_mutex);
-	ts_info("Suspend start");
+	ts_info("Suspend start, scptp_cur_state=%d", scp_tp_param.param0);
 	atomic_set(&core_data->suspended, 1);
 	enable_temperature_detection_func(TOUCH_ID, false);
+	/* _b573 scp 联动：blob 0x10040-0x1008c = suspend 时 FOD 值==3 则推送模式数组
+	 * （touch_mode[Touch_Fod_Enable]=1，掩码 BIT(Touch_Fod_Enable)=0x400）保持指纹通道 */
+	if (driver_get_touch_mode_common(TOUCH_ID, Touch_Fod_Enable) == 3) {
+		int touch_mode[DATA_MODE_45] = { 0 };
+
+		touch_mode[Touch_Fod_Enable] = 1;
+		driver_update_touch_mode_common(TOUCH_ID, touch_mode, BIT(Touch_Fod_Enable));
+	}
 	core_data->irq_trig_cnt = 0;
 
 	/*
@@ -2732,6 +2740,18 @@ out:
 
 	goodix_ts_release_connects(core_data);
 
+	/* _b573 scp 联动：blob 0x1062c-0x10680 = suspend 释指后把手势移交 SCP
+	 * （防误触关时改为写 10diff 复位） */
+	if (core_data->gesture_enabled) {
+		if (goodix_scp_tp_mistouch_close) {
+			goodix_gesture_10diff_write(core_data, 0);
+		} else if (scp_tp_param.param0 >= 2) {
+			ret = scp_tp_switch(1);
+			if (ret)
+				ts_err("scp_tp_switch fail, ret=%d", ret);
+		}
+	}
+
 #ifdef CONFIG_TOUCH_FACTORY_BUILD
 	goodix_ts_power_off(core_data);
 #endif
@@ -2785,7 +2805,15 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 		return 0;
 	}
 	mutex_lock(&core_data->core_mutex);
-	ts_info("Resume start");
+	ts_info("Resume start, scptp_cur_state=%d", scp_tp_param.param0);
+	/* _b573 scp 联动：blob 0xfef0-0xff28 = resume 时从 SCP 收回手势
+	 * （param0∈{2,3} 且（param0==3 或未关防误触）） */
+	if (scp_tp_param.param0 >= 2 &&
+	    (scp_tp_param.param0 == 3 || !goodix_scp_tp_mistouch_close)) {
+		ret = scp_tp_switch(0);
+		if (ret)
+			ts_info("scp_tp_switch fail, ret=%d", ret);
+	}
 	atomic_set(&core_data->suspended, 0);
 	core_data->irq_trig_cnt = 0;
 
@@ -3628,6 +3656,14 @@ void goodix_ic_switch_mode(u8 _gesture_type)
 	}
 #endif // TOUCH_TRUSTED_SUPPORT
 
+	/* _b573 scp 联动：blob 0xa654-0xa684 = SCP 托管手势（param0==3）时把手势类型同步给
+	 * SCP（ipi cmd 5）；Nonui 模式当前值作第 3 参一并下发 */
+	if (scp_tp_param.param0 == 3) {
+		ts_info("[scp-tp]: goodix_ic_switch_mode, cur_gesture=0x%x", gesture_type);
+		scp_tp_ipi_send(5, gesture_type,
+				driver_get_touch_mode_common(TOUCH_ID, Touch_Nonui_Mode), 0);
+	}
+
 	pm_stay_awake(core_data->bus->dev);
 	if (core_data->tp_pm_suspend) {
 		ts_info("device in suspend, wait to resume");
@@ -3652,6 +3688,12 @@ void goodix_ic_switch_mode(u8 _gesture_type)
 		ts_info("gesture enable changed from 0x%x to 0x%x", core_data->gesture_enabled, gesture_type);
 		core_data->gesture_enabled = gesture_type;
 
+		/* _b573 scp 联动：blob 0xa6e8-0xa71c = SCP 托管（param0==3）时跳过 IC 手势命令 */
+		if (scp_tp_param.param0 == 3) {
+			ts_info("scp working don't process!");
+			goto out;
+		}
+
 		if (0 == atomic_read(&core_data->suspended)) {
 			ts_debug("tp is in resume state, wait suspend to send cmd!");
 			goto out;
@@ -3662,10 +3704,18 @@ void goodix_ic_switch_mode(u8 _gesture_type)
 			goto out;
 		}
 
-		if (core_data->gesture_enabled && core_data->work_status == TP_SLEEP)
+		if (core_data->gesture_enabled && core_data->work_status == TP_SLEEP) {
 			goodix_sleep_to_gesture(core_data);
-		else
+			/* _b573 scp 联动：blob 0xa81c-0xa84c = sleep_to_gesture 后未关防误触且
+			 * param0∈{2,4} 时切 scp 手势通道 */
+			if (!goodix_scp_tp_mistouch_close &&
+			    (scp_tp_param.param0 == 2 || scp_tp_param.param0 == 4)) {
+				ts_info("sleep_to_gesture, switch to scp");
+				scp_tp_switch(1);
+			}
+		} else {
 			hw_ops->gesture(core_data, core_data->gesture_enabled);
+		}
 	}
 out:
 	pm_relax(core_data->bus->dev);
@@ -4081,6 +4131,10 @@ static int goodix_log_level_control(int value)
 	}
 	ts_info("debug level: %d", value);
 	debug_log_level = value;
+	/* _b573 scp 联动：blob 0x118b4-0x118c8 = !mistouch_close 时同步日志等级给 SCP */
+	if (!goodix_scp_tp_mistouch_close)
+		scp_tp_ipi_send(6, value, 0, 0);
+	ts_info("scp set log level = %d", debug_log_level);
 	return value;
 }
 
@@ -4576,9 +4630,24 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		goto err_out;
 	}
 
+	/* _b573 boost wiring: blob 0xe000-0xe008 = init_touch_irq(0, bus_interface->dev->of_node) */
+	init_touch_irq(TOUCH_ID, bus_interface->dev->of_node);
+
+	/* _b573 scp 接线：blob 0xe00c-0xe044 = 探针尾填 scp_tp_param 缺省后 scp_tp_init()。
+	 * blob 从 core_data 0xa7/0xbf/0xd3 读的三字节全模块零写入（kzalloc 后恒 0），按 0 种子化。 */
+	scp_tp_param.param0 = 1;
+	scp_tp_param.unknown_04 = 0;
+	scp_tp_param.field_08 = 0;
+	scp_tp_param.unknown_0c = 32;
+	scp_tp_param.unknown_14[2] = 0;
+	scp_tp_param.unknown_14[3] = 2500;
+	scp_tp_init();
+
 	return 0;
 
 err_out:
+	/* _b573 boost wiring: blob 0xdbcc-0xdbd0 = err 清理最前 remove_touch_irq_boost(0) */
+	remove_touch_irq_boost(TOUCH_ID);
 	core_data->init_stage = CORE_INIT_FAIL;
 	core_module_prob_sate = CORE_MODULE_PROB_FAILED;
 	if (core_data->pinctrl) {
@@ -4597,7 +4666,11 @@ static void goodix_ts_remove(struct platform_device *pdev)
 	struct goodix_ts_hw_ops *hw_ops = core_data->hw_ops;
 	struct goodix_ts_esd *ts_esd = &core_data->ts_esd;
 
+	/* _b573 scp 接线：blob 0xe1b0-0xe1cc = remove 起手 scp_tp_exit + 框架双反注册 */
+	scp_tp_exit();
 	goodix_ts_unregister_notifier(&core_data->ts_notifier);
+	xiaomi_unregister_panel_notifier_common(core_data->bus->dev, TOUCH_ID);
+	unregister_touch_panel_common(TOUCH_ID);
 	goodix_tools_exit();
 
 	if (core_data->init_stage >= CORE_INIT_STAGE2) {
@@ -4619,6 +4692,8 @@ static void goodix_ts_remove(struct platform_device *pdev)
 		goodix_ts_procfs_exit(core_data);
 		goodix_ts_power_off(core_data);
 	}
+	/* _b573 boost wiring: blob 0xe34c-0xe350 = remove 末尾 remove_touch_irq_boost(0) */
+	remove_touch_irq_boost(TOUCH_ID);
 }
 
 static void goodix_ts_shutdown(struct platform_device *pdev)

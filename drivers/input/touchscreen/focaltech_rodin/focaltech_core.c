@@ -1688,6 +1688,9 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
             memcpy(ts_data->ta_buf, ts_data->touch_buf, ts_data->ta_size);
         wake_up_interruptible(&ts_data->ts_waitqueue);
     }
+    /* _b573 boost wiring: blob 0x6a8c-0x6a90 = touch_irq_cpumask(0)（框架内 once 语义） */
+    touch_irq_cpumask(TOUCH_ID);
+
     dev_pm_qos_remove_request(&ts_data->dev_pm_qos_req_irq);
 
     return IRQ_HANDLED;
@@ -3085,6 +3088,15 @@ static void fts_ic_switch_mode(u8 _gesture_type)
 		FTS_INFO("wait finished, its time to go ahead");
 	}
 #endif
+	/* _b573 scp 联动：blob 0x3ddc-0x3e24 = SCP 托管手势（param0==3）时同步手势类型位图
+	 * 给 SCP（ipi cmd 5；位序重排 bit0→bit2、bit1-2→bit0-1；Nonui 模式值作第 3 参） */
+	if (fts_scp_tp_param.param0 == 3) {
+		int scp_gesture_type = ((_gesture_type & 0x1) << 2) | ((_gesture_type >> 1) & 0x3);
+
+		FTS_INFO("[scp-tp]: fts_ic_switch_mode, cur_gesture=0x%x", scp_gesture_type);
+		fts_scp_tp_ipi_send(5, scp_gesture_type,
+				driver_get_touch_mode_common(TOUCH_ID, Touch_Nonui_Mode), 0);
+	}
 	ts_data->fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10);
 	ts_data->aod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_11);
 	ts_data->doubletap_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_14);
@@ -3145,6 +3157,13 @@ static void fts_ic_switch_mode(u8 _gesture_type)
 		if (ts_data->poweroff_on_sleep && ts_data->gesture_support) {
 			fts_recover_gesture_from_sleep(ts_data);
 			ts_data->poweroff_on_sleep = false;
+			/* _b573 scp 联动：blob 0x3fc8-0x3ff4 = 从睡眠恢复手势后未关防误触且
+			 * param0∈{2,4} 时切 scp 手势通道 */
+			if (!fts_scp_tp_mistouch_close &&
+			    (fts_scp_tp_param.param0 == 2 || fts_scp_tp_param.param0 == 4)) {
+				FTS_INFO("sleep_to_gesture, switch to scp");
+				fts_scp_tp_switch(1);
+			}
 		} else if (!ts_data->poweroff_on_sleep && !ts_data->gesture_support) {
 		// gesture -> sleep
 			fts_recover_sleep_from_gesture(ts_data);
@@ -4529,6 +4548,9 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 	fts_init_touchmode_data(ts_data);
 	register_touch_panel_common(ts_data->dev, TOUCH_ID, &hardware_param, &hardware_operation);
 	xiaomi_register_panel_notifier_common(fts_data->dev, TOUCH_ID);
+	/* _b573 boost wiring: blob 0x3b0c-0x3b1c = if (ts_data->dev->of_node) init_touch_irq(0, of_node) */
+	if (ts_data->dev->of_node)
+		init_touch_irq(TOUCH_ID, ts_data->dev->of_node);
 #ifdef TOUCH_GESTURE_ALWAYSON_SUPPORT
 #ifndef CONFIG_TOUCH_FACTORY_BUILD
 	set_touch_mode(DATA_MODE_14, 1);
@@ -4729,6 +4751,17 @@ if (ts_data->fts_tp_class == NULL) {
 
 	ts_data->charger_status = -1;
 
+	/* _b573 scp 接线：blob 0x88b8-0x88f4 = 探针尾填 fts_scp_tp_param 缺省后 fts_scp_tp_init()。
+	 * blob 从 ts_data 0x434 读的一字全模块零写入（kzalloc 后恒 0），按 0 种子化。 */
+	fts_scp_tp_param.param0 = 2;
+	fts_scp_tp_param.unknown_04 = 211;
+	fts_scp_tp_param.unknown_0c = 26;
+	fts_scp_tp_param.unknown_14[0] = 225;
+	fts_scp_tp_param.unknown_14[1] = 9;
+	fts_scp_tp_param.unknown_14[2] = 1;
+	fts_scp_tp_param.unknown_14[3] = 0;
+	fts_scp_tp_init();
+
 	/*fts_init_xiaomi_touchfeature_v3 in fw_upgrade_work*/
 	/*fts_init_xiaomi_touchfeature_v3(ts_data);
 	fts_enable_touch_raw(1);*/
@@ -4759,6 +4792,9 @@ err_buffer_init:
 err_input_init:
 	if (ts_data->ts_workqueue)
 		destroy_workqueue(ts_data->ts_workqueue);
+
+	/* _b573 boost wiring: blob 0x8454-0x8458 = destroy_workqueue 之后 remove_touch_irq_boost(0) */
+	remove_touch_irq_boost(TOUCH_ID);
 err_bus_init:
 	kfree_safe(ts_data->bus_tx_buf);
 	kfree_safe(ts_data->bus_rx_buf);
@@ -4771,6 +4807,11 @@ err_bus_init:
 static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
 {
     FTS_FUNC_ENTER();
+
+    /* _b573 boost wiring: blob 0x8b10 = 起手 fts_scp_tp_exit() */
+    fts_scp_tp_exit();
+    /* _b573 boost wiring: blob 0x8b1c = remove_touch_irq_boost(0) */
+    remove_touch_irq_boost(TOUCH_ID);
 
     fts_point_report_check_exit(ts_data);
     fts_release_apk_debug_channel(ts_data);
@@ -4888,6 +4929,17 @@ static int fts_ts_suspend(struct device *dev)
 #endif
 	ts_data->finger_in_fod = false;
 
+	/* _b573 scp 联动：blob 0x2b3c-0x2b88 = suspend 尾把手势移交 SCP
+	 * （10diff 复位先行；未关防误触且 param0>=2 时切 scp 通道） */
+	if (ts_data->gesture_status) {
+		fts_gesture_10diff_reg_write(0);
+		if (!fts_scp_tp_mistouch_close && fts_scp_tp_param.param0 >= 2) {
+			ret = fts_scp_tp_switch(1);
+			if (ret)
+				FTS_ERROR("scp_tp_switch fail, ret=%d", ret);
+		}
+	}
+
 	fts_release_all_finger();
 	ts_data->suspended = true;
 	/*notify thp for suspend state*/
@@ -4904,6 +4956,15 @@ static int fts_ts_resume(struct device *dev)
 	if (!ts_data->suspended) {
 		FTS_DEBUG("Already in awake state");
 		return 0;
+	}
+	/* _b573 scp 联动：blob 0x25d4-0x2608 = resume 先从 SCP 收回手势
+	 * （param0∈{2,3} 且（param0==3 或未关防误触）） */
+	if (fts_scp_tp_param.param0 >= 2 &&
+	    (fts_scp_tp_param.param0 == 3 || !fts_scp_tp_mistouch_close)) {
+		int ret = fts_scp_tp_switch(0);
+
+		if (ret)
+			FTS_ERROR("scp_tp_switch fail, ret=%d", ret);
 	}
 	ts_data->suspended = false;
 #ifndef CONFIG_FACTORY_BUILD

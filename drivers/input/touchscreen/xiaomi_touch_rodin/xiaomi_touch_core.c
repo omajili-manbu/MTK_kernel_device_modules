@@ -689,7 +689,8 @@ static void xiaomi_touch_suspend_work(struct work_struct *work)
 
 }
 
-static void xiaomi_touch_suspend_tddi(s8 touch_id)
+/* blob 同为全模块零调用；保留结构，__maybe_unused 压制孤儿告警 */
+static __maybe_unused void xiaomi_touch_suspend_tddi(s8 touch_id)
 {
 	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(touch_id);
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);

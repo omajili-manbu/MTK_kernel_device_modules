@@ -6,5 +6,5 @@ xiaomi_touch_rodin-y := xiaomi_touch_core.o xiaomi_touch_device.o xiaomi_touch_e
 	xiaomi_touch_knock_data.o xiaomi_touch_mode.o xiaomi_touch_operations.o \
 	xiaomi_touch_proc.o xiaomi_touch_sys.o xiaomi_touch_boost.o
 
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/input/touchscreen/xiaomi_touch_rodin -DTOUCH_FOD_SUPPORT \
+ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/input/touchscreen/xiaomi_touch_rodin -DTOUCH_FOD_SUPPORT -DTOUCH_THP_SUPPORT \
 	     -I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2/mi_disp

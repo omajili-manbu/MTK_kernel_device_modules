@@ -180,6 +180,10 @@ struct scp_tp_params {
 };				/* sizeof == 112 (0x70) */
 
 extern struct scp_tp_params fts_scp_tp_param;   /* focaltech_scp_tp.c */
+int fts_scp_tp_init(void);
+void fts_scp_tp_exit(void);
+int fts_scp_tp_switch(u32 mode);
+int fts_gesture_10diff_reg_write(u8 value);
 extern int fts_scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);	/* _b571 patch G */
 extern bool fts_scp_tp_mistouch_close;		/* _b571 patch G */
 int fts_read_and_report_foddata(struct fts_ts_data *data);

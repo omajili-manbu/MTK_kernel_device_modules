@@ -1059,6 +1059,10 @@ struct scp_tp_params {
 	u8  gesture_data[64];	/* 0x30 */
 };
 extern struct scp_tp_params scp_tp_param;
+extern u8 goodix_scp_tp_mistouch_close;	/* blob .bss+0x5b44（原框架同名全局，=y 单符号空间改名） */
 int scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);
 int scp_tp_sendparam(void);
 int scp_tp_switch(u32 mode);
+int scp_tp_init(void);
+void scp_tp_exit(void);
+int goodix_gesture_10diff_write(struct goodix_ts_core *cd, u8 type);
