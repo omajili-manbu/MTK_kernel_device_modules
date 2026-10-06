@@ -51,7 +51,7 @@ struct dump_data {
 
 static struct dump_data data;
 
-int debug_log_level;
+int apusys_debug_log_level;
 bool apusys_dump_force;
 bool apusys_dump_skip_gals;
 static void *apu_top;
@@ -311,7 +311,7 @@ static int debug_probe(struct platform_device *pdev)
 	struct reg_dump_info *range_table;
 	struct dbg_hw_info *hw_info;
 
-	debug_log_level = 0;
+	apusys_debug_log_level = 0;
 	LOG_DEBUG("+\n");
 
 	debug_drv = *(struct debug_plat_drv *)of_device_get_match_data(&pdev->dev);

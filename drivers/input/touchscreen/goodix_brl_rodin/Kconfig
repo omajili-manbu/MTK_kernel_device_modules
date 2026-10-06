@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config TOUCHSCREEN_GOODIX_BRL_RODIN
+	tristate "Goodix BRL touch driver for rodin"
+	depends on TOUCHSCREEN_XIAOMI_TOUCH_RODIN
+	default n
+	help
+	  Goodix brl-series touch IC driver (goodix_core_rodin) built-in port.
+	  SPI bus binding: compatible "xiaomi,touch-spi" competes with the
+	  focaltech rodin driver; first probed driver claims the device
+	  (stock 6.6 behavior, per-unit IC population decides the winner).

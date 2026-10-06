@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config TOUCHSCREEN_FOCALTECH_RODIN
+	tristate "FocalTech touch driver for rodin"
+	depends on TOUCHSCREEN_XIAOMI_TOUCH_RODIN
+	default n
+	help
+	  FocalTech thp touch IC driver (focaltech_touch_rodin) built-in port.
+	  SPI bus binding: compatible "xiaomi,touch-spi"; on rodin the
+	  focaltech IC (FT5672) wins the probe race on this unit.

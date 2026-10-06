@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config TOUCHSCREEN_XIAOMI_TOUCH_RODIN
+	tristate "Xiaomi touch framework driver for rodin"
+	default n
+	help
+	  Xiaomi touch framework (xiaomi_touch_rodin) built-in port for the
+	  rodin device. =y built-in per the rodin builtin policy; the 6.6
+	  stock blob (vendor_dlkm/xiaomi_touch_rodin.ko) is answered success
+	  by the skip loader.
+
+config TOUCHSCREEN_XIAOMI_TOUCH_RODIN_DEBUG
+	bool "xiaomi_touch_rodin debug features"
+	depends on TOUCHSCREEN_XIAOMI_TOUCH_RODIN
+	default n
+	help
+	  Stock blob gate equivalent for debug-only code paths.

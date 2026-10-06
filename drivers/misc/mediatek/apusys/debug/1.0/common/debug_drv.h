@@ -19,14 +19,14 @@ pr_info(APUSYS_DEBUG_LOG_PREFIX "[info] %s " x, __func__, ##args)
 
 #define LOG_DEBUG(x, args...) \
 	{ \
-		if (debug_log_level > 0) \
+		if (apusys_debug_log_level > 0) \
 			pr_info(APUSYS_DEBUG_LOG_PREFIX "[debug] %s/%d "\
 			x, __func__, __LINE__, ##args); \
 	}
 
 #define LOG_DETAIL(x, args...) \
 	{ \
-		if (debug_log_level > 1) \
+		if (apusys_debug_log_level > 1) \
 			pr_info(APUSYS_DEBUG_LOG_PREFIX "[detail] %s/%d "\
 			x, __func__, __LINE__, ##args); \
 	}
@@ -40,7 +40,7 @@ pr_info(APUSYS_DEBUG_LOG_PREFIX "[info] %s " x, __func__, ##args)
 			x, __func__, __LINE__, ##args); \
 	}
 
-extern int debug_log_level;
+extern int apusys_debug_log_level;
 
 
 #endif
