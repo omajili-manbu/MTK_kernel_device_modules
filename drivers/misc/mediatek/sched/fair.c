@@ -2499,6 +2499,13 @@ static struct task_struct *detach_a_hint_task(struct rq *src_rq, int dst_cpu)
 		if (task_on_cpu(src_rq, p))
 			continue;
 
+		/* rodin 6.18（A-75）: DELAY_DEQUEUE 只拒绝出队、不摘
+		 * cfs_tasks 链，阻塞中的僵尸仍挂在本 rq 的链表上；这种
+		 * 任务只允许由 core 的唤醒/block 路径收尾，不得迁移。
+		 */
+		if (!mtk_task_migratable(p))
+			continue;
+
 		task_util = uclamp_task_util(p);
 
 		compute_effective_softmask(p, &latency_sensitive, &effective_softmask);
@@ -2550,7 +2557,11 @@ static int mtk_active_load_balance_cpu_stop(void *data)
 		target_rq == busiest_rq)
 		goto out_unlock;
 
-	if (!task_on_rq_queued(target_task))
+	/* rodin 6.18（A-75）: arming 时任务还在跑，stopper 真正执行时可能
+	 * 已经 futex_wait→block 成 delayed 僵尸（on_rq 仍 QUEUED），
+	 * 照旧搬它会把 sched_delayed 与账目拆开。
+	 */
+	if (!mtk_task_migratable(target_task))
 		goto out_unlock;
 
 	if (!cpu_active(busiest_cpu) || !cpu_active(target_cpu))
@@ -2596,6 +2607,8 @@ int migrate_running_task(int this_cpu, struct task_struct *p, struct rq *target,
 	raw_spin_rq_lock_irqsave(target, flags);
 	if (!target->active_balance &&
 		(task_rq(p) == target) && READ_ONCE((p)->__state) != TASK_DEAD &&
+		 /* rodin 6.18（A-75）: delayed 僵尸不 arm stopper */
+		 mtk_task_migratable(p) &&
 		 !(latency_sensitive && !cpumask_test_cpu(this_cpu, &effective_softmask))) {
 		target->active_balance = 1;
 		target->push_cpu = this_cpu;
@@ -2671,13 +2684,34 @@ void try_to_pull_VVIP(int this_cpu, bool *had_pull_vvip, struct rq_flags *src_rf
 				update_rq_clock(src_rq);
 			p = next_vip_runnable_in_cpu(src_rq, VVIP);
 			if (p && cpumask_test_cpu(this_cpu, p->cpus_ptr)) {
+				/* rodin 6.18（A-75）: 先在 src_rq 锁下钉住候选并
+				 * 取引用，再用 core 的 pi_lock -> rq_lock 顺序复锁
+				 * 复核（复核前任务可能已被 core/别的迁移器搬走，
+				 * 或转成 delayed 僵尸）；复核不过就放弃。
+				 */
+				get_task_struct(p);
+				rq_unlock_irqrestore(src_rq, src_rf);
+
+				raw_spin_lock(&p->pi_lock);
+				rq_lock_irqsave(src_rq, src_rf);
+				if (task_rq(p) != src_rq ||
+				    !mtk_task_migratable(p) ||
+				    !cpumask_test_cpu(this_cpu, p->cpus_ptr)) {
+					rq_unlock_irqrestore(src_rq, src_rf);
+					raw_spin_unlock(&p->pi_lock);
+					put_task_struct(p);
+					continue;
+				}
+
 				deactivate_task(src_rq, p, DEQUEUE_NOCLOCK);
 				set_task_cpu(p, this_cpu);
 				rq_unlock_irqrestore(src_rq, src_rf);
+				raw_spin_unlock(&p->pi_lock);
 
 				if (trace_sched_force_migrate_enabled())
 					trace_sched_force_migrate(p, this_cpu, MIGR_IDLE_PULL_VIP_RUNNABLE);
 				attach_one_task(this_rq, p);
+				put_task_struct(p);
 				*had_pull_vvip = true;
 				goto unlock;
 			}

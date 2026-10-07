@@ -266,6 +266,11 @@ struct task_struct *next_vip_runnable_in_cpu(struct rq *rq, int type)
 			continue;
 
 		p = vts_to_ts(tmp_vts);
+		/* rodin 6.18（A-75）: 链表项可能已不在本 rq 的"真可跑"
+		 * 集合里（delayed 僵尸/已迁走），只挑真在队列上的。
+		 */
+		if (!mtk_task_migratable(p))
+			continue;
 		/* we should pull runnable here, so don't pull curr*/
 		if (!rq->curr || p->pid != rq->curr->pid)
 			return p;
@@ -1349,9 +1354,15 @@ void vip_push_runnable(struct rq *src_rq)
 	if (in_interrupt())
 		goto unlock;
 
+	/* rodin 6.18（A-75）: task_to_pushed 是 switch-out 时留下的 prev，
+	 * 此后可能已 futex_wait→block 成 delayed 僵尸；本回调入口已持
+	 * src_rq 锁、另持 dst_rq 锁（double_lock_balance），等价 core
+	 * __migrate_swap_task()/detach_task()+attach_task() 的锁形态，
+	 * 故只补 delayed 门，不动锁。
+	 */
 	if ((task_rq(task_to_pushed) != src_rq) ||
 		(cpu_rq(task_cpu(task_to_pushed))->curr->pid == task_to_pushed->pid) ||
-		(!task_on_rq_queued(task_to_pushed)))
+		(!mtk_task_migratable(task_to_pushed)))
 		goto unlock;
 
 	/* de-queue from curr rq */

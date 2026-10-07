@@ -16,6 +16,34 @@
 	BUILD_BUG_ON(sizeof(mstruct) > (sizeof(u64) *		\
 		ARRAY_SIZE(((kstruct *)0)->android_vendor_data1)))
 
+/* rodin 6.18（A-75）：DELAY_DEQUEUE 僵尸语义下的"真在队列上"判定。
+ *
+ * 6.18 core 对阻塞任务默认走 delayed dequeue：dequeue_task_fair() 拒绝出队、
+ * 置 se->sched_delayed = 1 后提前返回，block_task() 于是跳过下线 ⇒ 任务保持
+ * p->on_rq == TASK_ON_RQ_QUEUED 却已不在运行队列语义里（下称僵尸）。
+ * core 自己所有"把它当活任务搬/激活"的地方都显式排除 se.sched_delayed
+ * （can_migrate_task() kernel/sched/fair.c:9839 直接 return 0；
+ * __set_next_task_fair()/switched_to_fair()/try_to_wake_up() 均带
+ * WARN_ON_ONCE(se->sched_delayed) 断言；pick_next_entity() 对选中的 delayed
+ * 实体先 dequeue_entities(DEQUEUE_SLEEP|DEQUEUE_DELAYED) 收尾再返回 NULL）。
+ *
+ * 厂商迁移器原先只看 task_on_rq_queued()：会把僵尸 deactivate_task() 真出队
+ * （flags 不带 DEQUEUE_DELAYED ⇒ finish_delayed_dequeue_entity() 不执行、
+ * sched_delayed 残留；也不带 DEQUEUE_SLEEP ⇒ h_nr_runnable 走"不算 runnable"
+ * 分支），随后再重新入树，造成 se->on_rq / p->on_rq / sched_delayed /
+ * h_nr_runnable 四者裂脑，与真唤醒或任务自身 block 并发时崩在
+ * dequeue_entity()→update_entity_lag() 的 WARN_ON_ONCE(!se->on_rq)（A-75）。
+ * 所有"挑任务迁移/激活"的判定点统一走本函数。
+ */
+static inline bool mtk_task_migratable(const struct task_struct *p)
+{
+	/* 语义 = task_on_rq_queued(p) && !p->se.sched_delayed；此处按
+	 * kernel/sched/sched.h:2366 的实现原样内联，以免 const 形参在
+	 * task_on_rq_queued()（形参非 const）上丢限定符。
+	 */
+	return READ_ONCE(p->on_rq) == TASK_ON_RQ_QUEUED && !p->se.sched_delayed;
+}
+
 #define GEAR_HINT_UNSET -1
 #define MTK_TASK_GROUP_FLAG 1
 #define MTK_TASK_FLAG 9

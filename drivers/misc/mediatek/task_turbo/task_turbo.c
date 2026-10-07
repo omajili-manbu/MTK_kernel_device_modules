@@ -991,7 +991,13 @@ static void probe_android_rvh_rtmutex_prepare_setprio(void *ignore, struct task_
 				rq = __task_rq_lock(p, &rf);
 				update_rq_clock(rq);
 
-				queued = task_on_rq_queued(p);
+				/* rodin 6.18（A-75）: delayed 僵尸的实体仍在树上，
+				 * 只允许经 core 的 requeue_delayed_entity()/pick 路径
+				 * 收尾；这里若照旧 deactivate/activate 会把 entity
+				 * 账目与其 sched_delayed 位拆开。权重变更由
+				 * set_load_weight()→reweight_task() 自行在树上重排。
+				 */
+				queued = mtk_task_migratable(p);
 				running = task_current(rq, p);
 				if (queued)
 					deactivate_task(rq, p,
