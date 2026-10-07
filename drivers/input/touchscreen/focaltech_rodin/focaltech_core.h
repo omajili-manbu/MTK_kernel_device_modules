@@ -187,6 +187,11 @@ int fts_gesture_10diff_reg_write(u8 value);
 extern int fts_scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);	/* _b571 patch G */
 extern bool fts_scp_tp_mistouch_close;		/* _b571 patch G */
 int fts_read_and_report_foddata(struct fts_ts_data *data);
+/* _b582-INTA：A-80④② —— fts_charger_on 定义在 focaltech_scp_tp.c:578，原无原型
+ * （② 的临时原型暂放 focaltech_core.c:92-95）；按 blob 收口后它同时被
+ * fts_{charger,cover,glove}_mode_store → fts_ex_mode_switch（MODE_CHARGER）与
+ * fts_ts_resume/fts_tp_state_recovery 直调 ⇒ 声明并入本块，删除 .c 内临时声明。 */
+int fts_charger_on(struct fts_ts_data *ts_data, bool on);
 extern hardware_param_t hardware_param;
 // extern int touch_mode[DATA_MODE_45][VALUE_TYPE_SIZE];
 /*****************************************************************************
@@ -201,12 +206,13 @@ extern hardware_param_t hardware_param;
 * Private enumerations, structures and unions using typedef
 *****************************************************************************/
 
+/* _b582-TEST：A) 触控测试面 proc 收口——blob 的 struct ftxxxx_proc 只有 proc_entry +
+ * opmode/cmd_len/cmd[]（opmode@+0x08、sizeof=0x20，⑥-b 实证）；原 donor 的
+ * tp_lockdown_info_proc/tp_fw_version_proc/tp_selftest_proc/tp_data_dump_proc 四个 v0 记录
+ * 字段舍去：前两者 ⑥-b 已删其使用侧，后两者随 focaltech_test.c 的 tp_selftest_v0 /
+ * tp_data_dump_v0 两个 blob 全 ko 无串的 proc 节点一并删除（成对改，避免半对中间态）。 */
 struct ftxxxx_proc {
         struct proc_dir_entry *proc_entry;
-	struct proc_dir_entry *tp_lockdown_info_proc;
-	struct proc_dir_entry *tp_fw_version_proc;
-	struct proc_dir_entry *tp_selftest_proc;
-	struct proc_dir_entry *tp_data_dump_proc;
         u8 opmode;
         u8 cmd_len;
         u8 cmd[FTS_MAX_COMMMAND_LENGTH];
@@ -434,6 +440,33 @@ struct fts_ts_data {
         struct input_dev *input_dev;
 	struct class *fts_tp_class;
         struct input_dev *pen_dev;
+	/* _b582-INTA：A-80/③§6.2「前段 8B 缺口」收口 —— blob 反汇编逐点实证（工具
+	 * tools/_b582_intA/intA_strref.py + intA_fnstr.py，全部为**符号访问之外的**
+	 * 立即数偏移，故不受本轮改名影响）：
+	 *   input_dev  @0x18 与 blob **同址**（fts_ts_probe 0x823c `str x21,[x19,#0x18]`，
+	 *                    0x8440 `ldr x0,[x19,#0x18]` → input_unregister_device）；
+	 *   pdata      @0x38 vs 树 0x30（0x7774 kmalloc_trace(size=0x10c=sizeof(pdata)) →
+	 *                    0x7778 `str x0,[x19,#0x38]`；0x7dc0/0x8280 `ldr x,[x19,#0x38]`
+	 *                    后按 pdata 语义读 +0xa0/+0xa8）；
+	 *   ic_info    @0x40 vs 树 0x38（fts_get_ic_information：is_incell `ldrb [x19,#0x40]`、
+	 *                    hid_supported #0x41、ids.chip_idh/idl #0x44/#0x45、
+	 *                    cid.type `ldrh [x19,#0x4c]`；ic_info 内部布局与树完全同构）；
+	 *   ts_workqueue @0x60 vs 树 0x58（0x7cf4 alloc_workqueue 结果 `str x0,[x19,#0x60]`，
+	 *                    紧接 "create fts workqueue fail"）；
+	 *   proc/proc_ta @0x1c8/0x1e8 vs 树 0x1c0/0x1e0（fts_create_apk_debug_channel
+	 *                    0xa40c/0xa438）；pm_qos@0x270、log_level@0x2ac（fts_log_level_store
+	 *                    0xc9ec `ldr w3,[x23,#0x2ac]`）vs 树 0x268/0x2a4；irq@0x2a8
+	 *                    （fts_ts_remove 0x8b8c → free_irq）、pm_completion@0x2b8
+	 *                    （0x8890 `str wzr,[x19,#0x2b8]` + 尾 swait_queue_head@0x2c0）、
+	 *                    pm_suspend@0x2d8（0x88a0 / fts_spi_transfer 0x2ff74）vs 树
+	 *                    0x2a0/0x2b0/0x2d0。
+	 *   ⇒ 全链恒定 Δ=+8 ⇒ 缺口严格在 input_dev(0x18) 与 pdata 之间：blob 该窗有
+	 *     **3 个 8B 槽**（0x20/0x28/0x30），树侧只有 2 个（fts_tp_class/pen_dev）。
+	 *   blob 全 ko 对 0x20/0x28/0x30 三个槽**零访问点**（probe/remove/各函数全扫；
+	 *   也无 class_create / get_xiaomi_touch_class_common / pen 设备调用面）⇒ 该槽
+	 *   在 blob 中是无语义死槽（无可命名成员）。此处以显式 8B 占位补齐布局，只占位、
+	 *   不引入任何代码或行为；如需语义命名须有 6.6 厂商源佐证。 */
+	u64 front_slot_reserved;	/* 只占位（blob 0x30 槽；全 ko 无读写点） */
         struct fts_ts_platform_data *pdata;
         struct ts_ic_info ic_info;
         struct workqueue_struct *ts_workqueue;
@@ -447,7 +480,11 @@ struct fts_ts_data {
         spinlock_t irq_lock;
         struct mutex report_mutex;
         struct mutex bus_lock;
-        struct dev_pm_qos_request dev_pm_qos_req_irq;
+        /* _b582-INPUT：blob fts_irq_handler 用 cpu_latency_qos_add/remove_request
+         * （blob 0x5e2c/0x6a98 直调），句柄槽 blob [ts+0x270] 恒 48B =
+         * sizeof(struct pm_qos_request)（struct dev_pm_qos_request 为 56B）⇒ 按 blob
+         * 换型换名，与 goodix（goodix_ts_core.h:pm_qos_req_irq）同形。 */
+        struct pm_qos_request pm_qos_req_irq;
         unsigned long intr_jiffies;
         int irq;
         int log_level;
@@ -553,6 +590,37 @@ struct fts_ts_data {
 #endif /* TOUCH_DUMP_TIC_SUPPORT */
 #endif
 };
+
+/* _b582-TEST：ftxxxx_proc / proc_ta 布局判据（⑥-b 实证：opmode @+0x08、
+ * sizeof(struct ftxxxx_proc) = 0x20、proc_ta.proc_entry @ ts_data+0x1e8）。 */
+_Static_assert(__builtin_offsetof(struct ftxxxx_proc, opmode) == 0x08, "_b582-TEST opmode@0x08");
+_Static_assert(sizeof(struct ftxxxx_proc) == 0x20, "_b582-TEST sizeof(ftxxxx_proc)==0x20");
+/* 相对不变量（与 blob 同构；前段 8B 缺口修复后仍成立）：两条 proc 记录相距 0x20。 */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, proc_ta)
+               - __builtin_offsetof(struct fts_ts_data, proc) == 0x20,
+               "_b582-TEST proc_ta-proc==0x20 (blob 0x1e8-0x1c8)");
+/* _b582-INTA（A-80/③§6.2 收口）：前段 8B 缺口按 blob 补齐后，③ 预留的硬断言启用
+ * （原为注释态）。blob 绝对目标（intA_strref/intA_fnstr 逐点）：
+ *   proc@0x1c8 / proc_ta@0x1e8（fts_create_apk_debug_channel 0xa40c/0xa438）、
+ *   pm_qos 槽@0x270（fts_irq_handler 0x5e2c cpu_latency_qos_add_request(&req)）、
+ *   log_level@0x2ac（fts_log_level_store 0xc9ec ldr w3,[x23,#0x2ac]）。
+ * （⑥-b 的 proc_ta@0x1e8 断言 = 本条；③ 原文里写 ==0x1e0 的版本为缺口未补时的
+ *  中间态，本次按 blob 换成 ==0x1e8 并启用。） */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, proc) == 0x1c8,
+               "_b582-INTA proc@0x1c8 (blob fts_create_apk_debug_channel 0xa40c)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, proc_ta) == 0x1e8,
+               "_b582-INTA proc_ta@0x1e8 (blob fts_create_apk_debug_channel 0xa438)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pm_qos_req_irq) == 0x270,
+               "_b582-INTA pm_qos_req_irq@0x270 (blob fts_irq_handler 0x5e2c)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, log_level) == 0x2ac,
+               "_b582-INTA log_level@0x2ac (blob fts_log_level_store 0xc9ec)");
+/* _b582-INTA：同链抽检（缺口补齐的旁证，非 ③ 三条判据） */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pdata) == 0x38,
+               "_b582-INTA pdata@0x38 (blob fts_ts_probe 0x7778)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ic_info) == 0x40,
+               "_b582-INTA ic_info@0x40 (blob fts_get_ic_information 0x40/0x44/0x4c)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, irq) == 0x2a8,
+               "_b582-INTA irq@0x2a8 (blob fts_ts_remove 0x8b8c free_irq)");
 
 enum GESTURE_MODE_TYPE {
 	GESTURE_DOUBLETAP,
@@ -704,6 +772,10 @@ void fts_init_hardware_param(void);
 void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data);
 int fts_htc_ic_getModeValue(common_data_t *common_data);
 int fts_htc_ic_setModeValue(common_data_t *common_data);
+/* _b582-INTE：blob focal_get_ic_self_test_mode (0x14d90, 88B, [GLOBAL]) —— 读
+ * ic_self_test_flag（blob .bss+0x5b8）；定义在 focaltech_scp_tp.c:520。
+ * 全模块唯一调用点 = fts_htc_ic_setModeValue（blob CALL26 xref 仅 0x3344）。 */
+u8 focal_get_ic_self_test_mode(void);
 
 /* Gesture functions */
 int fts_gesture_init(struct fts_ts_data *ts_data);
@@ -741,6 +813,12 @@ void fts_esdcheck_resume(struct fts_ts_data *ts_data);
 int fts_test_init(struct fts_ts_data *ts_data);
 int fts_test_exit(struct fts_ts_data *ts_data);
 #endif
+/* _b582-INTA：fts_ic_self_test 的 blob teardown 直调 fts_test_malloc_free_thr
+ * （blob fts_ic_self_test 0x14ff0；定义在 focaltech_test/focaltech_test.c:1796，
+ * GLOBAL 符号）。原型原只在 focaltech_test/focaltech_test.h:696，而 core.c 的 TU
+ * 不含该头（core.h 只 include focaltech_test_ini.h）⇒ 按 ② 处理 fts_charger_on 的
+ * 同款做法，声明并入本头，避免在 .c 里放临时原型。 */
+int fts_test_malloc_free_thr(struct fts_test *tdata, bool allocate);
 
 /* Point Report Check*/
 int fts_point_report_check_init(struct fts_ts_data *ts_data);

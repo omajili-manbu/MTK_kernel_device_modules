@@ -96,7 +96,9 @@ enum ioctl_cmd {
 	SELECT_TOUCH_ID,
 	GET_FRAME_DATA_INDEX,
 	RAW_DATA_INDEX,
-	UPDATE_REPORT_POINT,
+	/* _b582-INPUT：UPDATE_REPORT_POINT(=6) 随 report-point 面删除——blob
+	 * xiaomi_touch_dev_ioctl 只处理 0..5（0x6af0 cmp #0x5 / 跳表 6 项），
+	 * 前六项取值不变。 */
 };
 
 enum common_data_cmd {

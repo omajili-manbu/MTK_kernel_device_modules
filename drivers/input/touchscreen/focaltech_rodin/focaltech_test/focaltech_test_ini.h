@@ -27,10 +27,13 @@
 #define FTS_MAX_COMPATIBLE_TYPE                  4
 
 /* _b571：CSV/TXT_SUPPORT 迁活区（原定义在 focaltech_test.h 的死区 #if 0 内，
- * 导致 csv/txt 链整段被剔除——blob 二进制证明两宏 =1：csv vmalloc(0x64000)+
- * TXT testresult 分配均在）。*/
+ * 导致 csv/txt 链整段被剔除——blob 二进制证明 csv 链 =1：csv_data_buffer
+ * vmalloc(0x64000)@fts_test_init 0x16594 在）。
+ * _b582-INTB 更正：TXT_SUPPORT=0——blob 无 testresult 分配（fts_test_main_init 仅一次
+ * vzalloc=buffer；fts_test_malloc_free_data_txt/fts_test_save_result_txt 无符号；
+ * show_data 4B 空体；"testresult" 串面 0 命中）。*/
 #define CSV_SUPPORT                              1
-#define TXT_SUPPORT                              1
+#define TXT_SUPPORT                              0
 
 /*****************************************************************************
 * enumerations, structures and unions
@@ -465,11 +468,20 @@ struct fts_test {
     int *rawshift_fre_data;           /* 0x78 blob: 9*node_num ints（donor buffer 位） */
     u8 reserved_80[8];                /* 0x80..0x87 */
     int *item8_data;                  /* 0x88 第 8 个 malloc 数组（malloc/free_item_data 配对） */
-    int *node_valid_sc;               /* 0x90 */
-    int basic_thr_count;              /* 0x98 */
-    u8 reserved_9c[4];                /* 0x9c..0x9f */
-    int *node_valid;                  /* 0xa0 blob 实证（compare_* 检查面/fts_test_malloc_free_thr 分配面/ini_init_test） */
-    u8 reserved_a8[0x10];             /* 0xa8..0xb7 */
+    /* _b582-TEST：A-80③ 偏移收口（全部为符号访问，重排对 C 代码透明；总尺寸不变）——
+     * blob 实证：buffer@0x90（fts_test_main_init 0x151e4 vzalloc 后 0x151ec str x0,[x19,#0x90]）、
+     * buffer_length@0x98（0x151d4 str w2,[x19,#0x98]）、node_valid@0xa0（fts_test_malloc_free_thr
+     * 0x1678c str x0,[x19,#0xa0]）、node_valid_sc@0xa8（0x167a8）、basic_thr_count@0xb0
+     * （get_basic_threshold 0x1cf44 ldr w3,[x8,#0xb0]、0x1cf54 ldr w9,[x8,#0xb0]）。
+     * 原树把 node_valid_sc/basic_thr_count 摆在 0x90/0x98、把 buffer/buffer_length 摆在
+     * 0x11a0/0x11a8（donor 位）⇒ 本轮按 blob 归位，0x9c-0x9f / 0xb4-0xb7 为洞。 */
+    int *buffer;                      /* 0x90 blob 实证（main_init str / start_test_ft5672 memset） */
+    int buffer_length;                /* 0x98 blob 实证（main_init 0x151d4） */
+    u8 reserved_9c[4];                /* 0x9c..0x9f 洞（blob 无成员） */
+    int *node_valid;                  /* 0xa0 blob 实证（compare_* 检查面/malloc_free_thr 分配面/ini_init_test） */
+    int *node_valid_sc;               /* 0xa8 blob 实证（fts_test_malloc_free_thr 0x167a8/0x167d8） */
+    int basic_thr_count;              /* 0xb0 blob 实证（get_basic_threshold 0x1cf44） */
+    u8 reserved_b4[4];                /* 0xb4..0xb7 洞（blob 无成员） */
     /* _b581：A-74 续行④ 归位 —— blob 的 CSV 文本缓冲在 struct fts_test+0xb8：
      *   fts_test_init 0x1658c-0x165c0: vmalloc(0x64000) -> str x0,[fts_ftest,#0xb8]
      *   -> memset(buf,0,0x64000)（失败打 "malloc csv_file_buf fail"）
@@ -493,7 +505,8 @@ struct fts_test {
     } ic;                             /* 0xf0 */
 
     struct test_funcs *func;          /* 0x3c8 */
-    u8 reserved_3d0[8];               /* 0x3d0 */
+    struct proc_dir_entry *proc_entry; /* 0x3d0 blob 实证（fts_test_init 0x16650 str x0,[x8,#0x3d0]、
+                                        * fts_test_exit 0x166f8 ldr x0,[x21,#0x3d0] → proc_remove） */
     struct fts_test_data testdata;    /* 0x3d8 (0x808) */
     char *testresult;                 /* 0xbe0 */
     int testresult_len;               /* 0xbe8 */
@@ -514,8 +527,8 @@ struct fts_test {
     u8 reserved_1168[0x30];           /* 0x1168..0x1197 */
     int panel_differ_max;             /* 0x1198 */
     int panel_differ_min;             /* 0x119c */
-    int *buffer;                      /* 0x11a0 donor 字段落未锚定区 */
-    int buffer_length;                /* 0x11a8 */
+    u8 reserved_11a0[0xc];            /* 0x11a0..0x11ab：donor 的 buffer/buffer_length 旧位；
+                                       * _b582-TEST 已按 blob 归位到 0x90/0x98，此处留洞保其后锚点不变 */
     int code1;                        /* 0x11ac */
     int code2;                        /* 0x11b0 */
     int offset;                       /* 0x11b4 */
@@ -562,8 +575,15 @@ _Static_assert(__builtin_offsetof(struct fts_test, rawshift_pic_white_data) == F
 _Static_assert(__builtin_offsetof(struct fts_test, rawshift_pic_black_data) == FTS_TEST_OFF_BLACK, "black@0x12d7f4");
 _Static_assert(__builtin_offsetof(struct fts_test, rawshift_pic_differ_data) == FTS_TEST_OFF_DIFFER, "differ@0x1335b4");
 _Static_assert(sizeof(struct fts_test) == FTS_TEST_SIZE, "fts_test total 0x139378");
-_Static_assert(__builtin_offsetof(struct fts_test, node_valid_sc) == 0x90, "node_valid_sc@0x90");
-_Static_assert(__builtin_offsetof(struct fts_test, basic_thr_count) == 0x98, "basic_thr_count@0x98");
+/* _b582-TEST：A-80③ 偏移收口判据（blob 逐点实证；node_valid_sc/basic_thr_count 由
+ * donor 的 0x90/0x98 归位到 blob 的 0xa8/0xb0，buffer/buffer_length 由 donor 的
+ * 0x11a0/0x11a8 归位到 blob 的 0x90/0x98，proc_entry 由 global 归位到 0x3d0）。 */
+_Static_assert(__builtin_offsetof(struct fts_test, buffer) == 0x90, "buffer@0x90 (blob main_init 0x151ec)");
+_Static_assert(__builtin_offsetof(struct fts_test, buffer_length) == 0x98, "buffer_length@0x98 (blob main_init 0x151d4)");
+_Static_assert(__builtin_offsetof(struct fts_test, node_valid) == 0xa0, "node_valid@0xa0 (blob malloc_free_thr 0x1678c)");
+_Static_assert(__builtin_offsetof(struct fts_test, node_valid_sc) == 0xa8, "node_valid_sc@0xa8 (blob malloc_free_thr 0x167a8)");
+_Static_assert(__builtin_offsetof(struct fts_test, basic_thr_count) == 0xb0, "basic_thr_count@0xb0 (blob get_basic_threshold 0x1cf44)");
+_Static_assert(__builtin_offsetof(struct fts_test, proc_entry) == 0x3d0, "proc_entry@0x3d0 (blob fts_test_init 0x16650)");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_cnt) == 0xc0, "csv_item_cnt@0xc0");
 /* _b581：A-74 续行④ 判据——blob 的 csv 文本缓冲在 +0xb8（fts_test_init 0x1659c
  * str / fts_csv_show 0x18844 ldr），与树侧同名字段必须同址；0xbf0 只许是洞。 */

@@ -425,7 +425,9 @@ int fts_fod_reg_write(u8 mask, bool enable)
 			reg_value &= ~mask;
 		/* If the value in the register is equal to the modified value, skip writing to the register */
 		if (reg_value == reg_value_last_time) {
-			FTS_DEBUG("reg 0xCF do not need to be modified, reg_value = %02X", reg_value);
+			/* _b582-INTA：族对齐 D→I（blob 0x11965 '\0016[FTS_TS_I][%s:%d]: reg 0xCF
+			 * do not need to be modified, reg_value = %02X'，blob 侧为死串（无引用）） */
+			FTS_INFO("reg 0xCF do not need to be modified, reg_value = %02X", reg_value);
 			return 0;
 		}
 		fts_write_reg(FTS_REG_GESTURE_SUPPORT, reg_value);
@@ -438,7 +440,9 @@ int fts_fod_reg_write(u8 mask, bool enable)
 		FTS_ERROR("[GESTURE]Write fod reg failed! fod reg status: %d\n", enable);
 		return -EIO;
 	}
-	FTS_DEBUG("[GESTURE]Write fod reg success! fod reg status: %d\n", enable);
+	/* _b582-INTA：族对齐 D→I（blob 0x27c '\0016[FTS_TS_I][%s:%d]: [GESTURE]Write fod reg
+	 * success! fod reg status: %d\n'，引用点 fts_fod_reg_write+0x25c） */
+	FTS_INFO("[GESTURE]Write fod reg success! fod reg status: %d\n", enable);
 	return 0;
 }
 

@@ -42,7 +42,9 @@
 *****************************************************************************/
 #define FTS_FW_REQUEST_SUPPORT                      1
 /* Example: focaltech_ts_fw_tianma.bin */
-#define FTS_FW_NAME_PREX_WITH_REQUEST               "focaltech_ts_fw"
+/* _b582-INTB：blob 串面 0x132e "focaltech_ts_fw_rodin"（%s%s.bin + module_info->name，
+ * 设备侧契约名 focaltech_ts_fw_rodin.bin，_b548_logdiff/norm66 实测同名） */
+#define FTS_FW_NAME_PREX_WITH_REQUEST               "focaltech_ts_fw_rodin"
 
 /*****************************************************************************
 * Global variable or extern global variabls/functions
@@ -207,7 +209,9 @@ static int fts_fwupg_reset_to_romboot(struct fts_upgrade *upg)
     return 0;
 }
 
-static u16 fts_crc16_calc_host(u8 *pbuf, u32 length)
+/* _b582-INTB：blob 保 out-of-line 符号并直调（0x2d9e4/316B，fts_flash_write_buf、pram 尾各 1 处
+ * reloc 直调）⇒ 与 §81 fts_update_gesture_state 同法加 noinline 对齐调用面 */
+static noinline u16 fts_crc16_calc_host(u8 *pbuf, u32 length)
 {
     u16 ecc = 0;
     u32 i = 0;
@@ -1294,7 +1298,10 @@ int fts_upgrade_bin(char *fw_name, bool force)
     }
 
     if (ret < 0) {
-        FTS_ERROR("upgrade fw bin failed");
+        FTS_ERROR("failed do fw update");   /* _b582-INTB：blob LINE 1292 串面（同 goodix 侧用词） */
+        /* blob 0x2e308-0x2e320：mi event（TOUCH_EVENT_FWLOAD_ERR,"TpFirmwareLoadFail","focal"） */
+        xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
+                                               "TpFirmwareLoadFail", "focal");
         fts_fwupg_reset_in_boot();
         goto err_bin;
     }
@@ -1952,11 +1959,12 @@ static int fts_get_fw_file_via_request_firmware(struct fts_upgrade *upg)
         return -EINVAL;
     }
 
-    snprintf(fwname, FILE_NAME_LENGTH, "%s.bin", FTS_FW_NAME_PREX_WITH_REQUEST);
-
+    /* _b582-INTB：blob 形态（fmt "%s%s.bin" + 前缀 + module_info->name；串 0xd994/0x132e） */
+    snprintf(fwname, FILE_NAME_LENGTH, "%s%s.bin", FTS_FW_NAME_PREX_WITH_REQUEST, upg->module_info->vendor_name);
+    FTS_INFO("Fwname is %s.", fwname);   /* blob LINE 1964 */
     ret = request_firmware(&fw, fwname, upg->ts_data->dev);
     if (ret == 0) {
-        FTS_INFO("firmware(%s) request successfully", fwname);
+        FTS_INFO("firmware2(%s) request successfully", fwname);   /* blob LINE 1968 串面（"firmware2"） */
         tmpbuf = vmalloc(fw->size);
         if (tmpbuf == NULL) {
             FTS_ERROR("fw buffer vmalloc fail");
@@ -1968,7 +1976,8 @@ static int fts_get_fw_file_via_request_firmware(struct fts_upgrade *upg)
             upg->fw_from_request = 1;
         }
     } else {
-        FTS_ERROR("[DIS-TF-TOUCH] Fail to request %s, ret = %d\n", fwname, ret);
+        /* _b582-INTB：blob LINE 1980 串面（I 级、"firmware2"、无 [DIS-TF-TOUCH] 前缀） */
+        FTS_INFO("firmware2(%s) request fail,ret=%d", fwname, ret);
     }
 
     if (fw != NULL) {
@@ -2086,7 +2095,10 @@ static void fts_fwupg_work(struct work_struct *work)
     /* get fw */
     ret = fts_fwupg_get_fw_file(upg);
     if (ret < 0) {
-        FTS_ERROR("[DIS-TF-TOUCH] get file fail, can't upgrade");
+        FTS_ERROR("get file fail, can't upgrade");   /* _b582-INTB：blob LINE 2101（无 [DIS-TF-TOUCH]） */
+        /* blob 0x2f34c-0x2f368：mi event（TOUCH_EVENT_FWLOAD_ERR,"TpFirmwareLoadFail","focal"） */
+        xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
+                                               "TpFirmwareLoadFail", "focal");
     } else {
         /* ic init if have */
         fts_fwupg_init_ic_detail(upg);
@@ -2098,8 +2110,9 @@ static void fts_fwupg_work(struct work_struct *work)
     fts_irq_enable();
     upg->ts_data->fw_loading = 0;
 
-    /*init hardware_param/hardware_operation for right data*/
-    fts_init_xiaomi_touchfeature_v3(fts_data);
+    /* _b582-INTB：删 fts_init_xiaomi_touchfeature_v3(fts_data)——blob fwupg_work 0x2f0ac-0x2f594
+     * 无此调用（唯一调用点在 fts_ts_probe 0x88a8）；跨侧项：focaltech_core.c fts_ts_probe 必须按
+     * blob 补调（否则 ops 表空），见交付报告"跨侧清单"。 */
     /*open report_switch*/
     fts_enable_touch_raw(1);
 }
@@ -2128,7 +2141,7 @@ int fts_fwupg_init(struct fts_ts_data *ts_data)
 
     fwupgrade = kzalloc(sizeof(*fwupgrade), GFP_KERNEL);
     if (NULL == fwupgrade) {
-        FTS_ERROR("malloc memory for upgrade fail");
+        FTS_ERROR("malloc fwupgrade memory failed");   /* _b582-INTB：blob LINE 2144 串面 */
         return -ENOMEM;
     }
 

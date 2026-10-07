@@ -45,7 +45,9 @@ static bool module_initialized;
 #define IRQ_EVENT_HEAD_LEN          8
 #define FOD_EVENT_LEN               10
 #define GOODIX_GESTURE_EVENT        0x20
-#define IRQ_EVENT_HEAD_LEN_LARGER   16
+/* _b582-GXI：blob gesture_event_handler 0x169c8 的 6[GTP_I] "touch_head %*ph"
+ * 其 w3=0x20（读满 goodix_gesture_ist 的 gesture_data[32]）⇒ 常量按 blob 为 32。 */
+#define IRQ_EVENT_HEAD_LEN_LARGER   32
 
 static int gesture_event_handler(struct goodix_ts_core *cd,
 			struct goodix_ts_event *ts_event, u8 *pre_buf)
@@ -79,7 +81,9 @@ static int gesture_event_handler(struct goodix_ts_core *cd,
 	}
 
 	event_status = pre_buf[0];
-	ts_debug("touch_head %*ph", IRQ_EVENT_HEAD_LEN_LARGER, pre_buf);
+	/* _b582-GXI：blob 该点 = 6[GTP_I]（0x169c8，__func__ gesture_event_handler，
+	 * 32 字节）；树原 D 级 16 字节为 warsaw 残项。 */
+	ts_info("touch_head %*ph", IRQ_EVENT_HEAD_LEN_LARGER, pre_buf);
 	if (event_status & GOODIX_GESTURE_EVENT || sync_late) {
 		ts_event->event_type = EVENT_GESTURE;
 		ts_event->gesture_type = pre_buf[4];

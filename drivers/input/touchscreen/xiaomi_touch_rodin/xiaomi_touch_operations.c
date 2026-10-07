@@ -192,10 +192,10 @@ static int xiaomi_touch_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	} else if (client_private_data->mmap_area == 3) {
 		LOG_INFO("mmap input event buf mmap");
 		temp_phy_bas = xiaomi_touch->input_event_time_line_phy_base;
-	} else if (client_private_data->mmap_area == 4) {
-		LOG_INFO("mmap report point buf mmap");
-		temp_phy_bas = get_report_point_info_phy_addr();
 	}
+	/* _b582-INPUT：blob xiaomi_touch_dev_mmap（0x6fd4-0x6fec）只比较 3/2/1 三个 area，
+	 * 无 area==4 分支、无 get_report_point_info_phy_addr 调用、"mmap report point buf
+	 * mmap" 串在 blob 零命中 ⇒ 树侧 report-point 面（device.c）整层删除后本分支一并删除。 */
 	if (!temp_phy_bas) {
 		LOG_ERROR("phy bas is NULL, return!");
 		return -1;
@@ -265,9 +265,9 @@ static long xiaomi_touch_dev_ioctl(struct file *file, unsigned int cmd, unsigned
 		LOG_INFO("select mmap area %lu", arg);
 		client_private_data->mmap_area = arg;
 		return 0;
-	case UPDATE_REPORT_POINT:
-		report_touch_event(client_private_data->touch_id, arg);
-		return 0;
+	/* _b582-INPUT：blob xiaomi_touch_dev_ioctl 0x6af0 = `cmp w8,#0x5; b.hi`（跳表 6 项）
+	 * ⇒ 只处理 cmd 0..5，UPDATE_REPORT_POINT(=6) 无跳表项、report_touch_event 零调用面
+	 * ⇒ 本 case 随 device.c 整层删除；cmd==6 落 default 返回 -EINVAL，与 blob 一致。 */
 	case SELECT_TOUCH_ID:
 		if (client_private_data->touch_id < 0) {
 			if (IS_TOUCH_ID_INVALID(arg)) {

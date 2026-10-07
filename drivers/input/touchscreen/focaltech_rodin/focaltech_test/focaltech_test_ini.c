@@ -346,7 +346,7 @@ static int fts_test_get_ini_via_request_firmware(struct ini_data *ini, char *fwn
         FTS_TEST_INFO("firmware request(%s) success", fwname);
         ini->data = vmalloc(fw->size + 1);
         if (ini->data == NULL) {
-            FTS_TEST_ERROR("ini->data buffer vmalloc fail");
+            FTS_TEST_ERROR("ini->data buffer valloc fail");   /* _b582-INTB：blob 串面（valloc 拼写） */
             ret = -ENOMEM;
         } else {
             memcpy(ini->data, fw->data, fw->size);
@@ -1336,7 +1336,7 @@ static void ini_init_interface(struct ini_data *ini)
     memset(str, 0, MAX_KEYWORD_VALUE_LEN);
     ini_get_string_value("Interface", "INI_VERSION", str);
     snprintf(ini->ini_ver, MAX_KEYWORD_NAME_LEN, "%s", str);
-    FTS_TEST_INFO("ic name:%s, ic code:%x, limit version: %s", ini->ic_name, ini->ic_code, ini->ini_ver);
+    FTS_TEST_INFO("ic name:%s, ic code:%x", ini->ic_name, ini->ic_code);   /* _b582-INTB：blob 串面无 limit version 段 */
 
     if (tdata->func->hwtype == IC_HW_MC_SC) {
         get_value_interface("Normalize_Type", &value);
@@ -1412,7 +1412,7 @@ int fts_test_get_testparam_from_ini(char *config_name)
 
     ini->tmp = vmalloc(sizeof(struct ini_keyword) * MAX_KEYWORD_NUM);
     if (ini->tmp == NULL) {
-        FTS_TEST_ERROR("malloc memory for ini tmp fail");
+        FTS_TEST_ERROR("malloc ini tmp memory failed");   /* _b582-INTB：blob 串面 */
         ret = -ENOMEM;
         goto get_ini_err;
     }

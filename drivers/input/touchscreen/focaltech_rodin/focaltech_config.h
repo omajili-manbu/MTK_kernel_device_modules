@@ -281,8 +281,10 @@
  * You should rename fw to "focaltech_ts_fw_tianma", and push it into
  * etc/firmware or by customers
  */
-#define FTS_MODULE_NAME                         "_tianma"
-#define FTS_MODULE2_NAME                        "_gvo"
+/* _b582-INTB：blob .data+0x27d8 module_list 全零 ⇒ 模块名空串；
+ * 与前缀 "focaltech_ts_fw_rodin" 合成设备契约名 focaltech_ts_fw_rodin.bin */
+#define FTS_MODULE_NAME                         ""
+#define FTS_MODULE2_NAME                        ""
 #define FTS_MODULE3_NAME                        ""
 
 /*

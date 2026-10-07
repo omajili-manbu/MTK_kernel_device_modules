@@ -743,101 +743,32 @@ void fts_release_apk_debug_channel(struct fts_ts_data *ts_data)
 }
 
 
-static ssize_t fts_fw_version_read(struct file *filp,
-								   char __user *buf, size_t count, loff_t *pos)
-{
-	int ret = 0, cnt = 0;
-	char tmp[PROC_BUF_SIZE];
-	struct fts_ts_data *ts_data = fts_data;
-	u8 fwver = 0;
-	if (*pos != 0)
-		return 0;
-	mutex_lock(&ts_data->input_dev->mutex);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
-	ret = fts_read_reg(FTS_REG_FW_VER, &fwver);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
-	if ((ret < 0) || (fwver == 0xFF) || (fwver == 0x00))
-		cnt = snprintf(tmp, PROC_BUF_SIZE, "get tp fw version fail!\n");
-	else
-		cnt = snprintf(tmp, PROC_BUF_SIZE, "%02x\n", fwver);
-	mutex_unlock(&ts_data->input_dev->mutex);
-	ret = copy_to_user(buf, tmp, cnt);
-	*pos += cnt;
-	if (ret != 0)
-		return 0;
-	else
-		return cnt;
-}
-/*
-static const struct file_operations tp_fw_version_fops = {
-	.read = fts_fw_version_read,
-};
-*/
-
-static const struct proc_ops tp_fw_version_fops = {
-	.proc_read = fts_fw_version_read,
-};
-
-static ssize_t fts_lockdown_info_read(struct file *filp,
-									  char __user *buf, size_t count, loff_t *pos)
-{
-	int cnt = 0, ret = 0;
-	int cnt1 = 0;
-	int i = 0;
-	char tmp[PROC_BUF_SIZE];
-	u8 format_buf[256] = {0};
-	struct fts_ts_data *ts_data = fts_data;
-	if (*pos != 0)
-		return 0;
-
-	for(i = 0; i < 8; i++) {
-		cnt1 += sprintf(format_buf + cnt1, " 0x%02x ", ts_data->lockdown_info[i]);
-	}
-
-	cnt += snprintf(tmp, PROC_BUF_SIZE, "lockdown info:%s\n", format_buf);
-	ret = copy_to_user(buf, tmp, cnt);
-	*pos += cnt;
-	if (ret != 0)
-		return 0;
-	else
-		return cnt;
-}
-
-static const struct proc_ops tp_lockdown_info_fops = {
-	.proc_read = fts_lockdown_info_read,
-};
+/* _b582-PROC：A-80⑥-b —— dev 层 blob 串面确无此族，删 donor 的 v0 proc 记录节点。
+ * blob 实证（llvm-objdump -dr + .rodata.str1.1 全表，见 tools/_b582_proc/nodeface.py）：
+ *   ① 全 ko 无 "tp_lockdown_info*"/"tp_fw_version*"/"tp_selftest*"/"tp_data_dump*" 串；
+ *      且未导入 proc_create（只 proc_create_data）⇒ blob 侧零 proc_create 调用点。
+ *   ② blob fts_create_proc(0xa50c) = `mov w0,wzr; ret`（8B 空体，fts_ts_probe+0x1098 @0x8650 单处调用）。
+ *   ③ blob fts_remove_proc(0xa518) 只 proc_remove(proc_entry@+0x1c8) + 置 NULL（全 ko 无调用点）。
+ *   ④ lockdown/fw_version 数据面不在本函数：blob 的 fts_lockdown_info_read(u8*)（0x3bc4,124B）与
+ *      fts_fw_version_read（0x3c44,220B，树侧 = core.c fts_ic_fw_version 槽）均保留未动。
+ * 删除面 = 两个 proc handler（filp 版 fts_fw_version_read/fts_lockdown_info_read）+ 两个 fops +
+ * fts_create_proc 的两处 proc_create（L746-841 原件见 tools/_b582_proc/pre/）。
+ * 注：core.h `struct ftxxxx_proc` 的 4 个 v0 记录节点字段（tp_lockdown_info_proc /
+ *     tp_fw_version_proc / tp_selftest_proc / tp_data_dump_proc）**已随 _b582-TEST 删除**，
+ *     见 focaltech_core.h 的 ftxxxx_proc 块与偏移断言（opmode@0x08 / sizeof==0x20 /
+ *     proc_ta-proc==0x20）。 */
 int fts_create_proc(struct fts_ts_data *ts_data)
 {
-	struct ftxxxx_proc *proc = &ts_data->proc;
-	proc->tp_lockdown_info_proc = proc_create("tp_lockdown_info_v0", 0444, NULL, &tp_lockdown_info_fops);
-	if (proc->tp_lockdown_info_proc == NULL) {
-		FTS_ERROR("tp_lockdown_info_v0 proc create failed");
-		return -ENOMEM;
-	}
-	proc->tp_fw_version_proc = proc_create("tp_fw_version_v0", 0444, NULL, &tp_fw_version_fops);
-	if (proc->tp_fw_version_proc == NULL) {
-		FTS_ERROR("tp_fw_version_v0 proc create failed");
-		return -ENOMEM;
-	}
-	FTS_INFO("Create proc entry success!");
 	return 0;
 }
+
 void fts_remove_proc(struct fts_ts_data *ts_data)
 {
 	struct ftxxxx_proc *proc = &ts_data->proc;
+
 	if (proc->proc_entry)
 		proc_remove(proc->proc_entry);
-	if (proc->tp_fw_version_proc)
-		proc_remove(proc->tp_fw_version_proc);
-	if (proc->tp_lockdown_info_proc)
-		proc_remove(proc->tp_lockdown_info_proc);
 	proc->proc_entry = NULL;
-	proc->tp_fw_version_proc = NULL;
-	proc->tp_lockdown_info_proc = NULL;
 }
 
 

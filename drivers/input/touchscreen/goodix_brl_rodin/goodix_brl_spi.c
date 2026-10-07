@@ -23,7 +23,6 @@
 #include <linux/of_gpio.h>
 #include <linux/err.h>
 #include <linux/delay.h>
-#include <uapi/linux/sched/types.h>
 #include "goodix_ts_core.h"
 #define TS_DRIVER_NAME		"xiaomi,touch-spi"
 
@@ -254,7 +253,12 @@ static int goodix_spi_probe(struct spi_device *spi)
 		if (!ret) {
 			int gpio_det1 = gpio_get_value(PANEL_ID_DET1);
 
-			ts_info("gpio_det1 = %d", gpio_det1);
+			/* _b582-INTD（A3）：blob .rodata.str1.1+0x3881 =
+			 * b'\0016[GTP_I][%s:%d]: gpio_det1 = %d\n'（goodix_core_rodin.disr
+			 * init_module+0xc8/0xcc，行 0xab6=2742）——blob 带尾 \n，树缺 ⇒ 补齐。
+			 * 同文件其它 DET 面串已核对：'(TP is not goodix!' 0x33bf 无尾 \n（树同）、
+			 * 'goodix spi probe in' 0x79c7、'failed set spi mode' 0x42c9 均与树逐字节同。 */
+			ts_info("gpio_det1 = %d\n", gpio_det1);
 			if (gpio_det1 != 1) {
 				ts_info("TP is not goodix!");
 				return -ENODEV;
@@ -286,19 +290,9 @@ static int goodix_spi_probe(struct spi_device *spi)
 		return ret;
 	}
 
-	/* improve SPI controller kworker thread to RT priority */
-	if (spi->controller && spi->controller->kworker) {
-		struct sched_param par = { .sched_priority = MAX_RT_PRIO - 1 };
-
-		ret = sched_setscheduler_nocheck(
-			spi->controller->kworker->task, SCHED_FIFO, &par);
-		if (ret < 0)
-			ts_err("Failed to improve SPI kworker prio");
-		else
-			ts_info("SPI kworker PID %d set prio to %d",
-				spi->controller->kworker->task->pid,
-				MAX_RT_PRIO - 1);
-	}
+	/* _b582-GXI：blob goodix_spi_probe 0x928-0x978 只有 spi_setup+goodix_get_ic_type，
+	 * 无 sched_setscheduler_nocheck（全 ko 无 "SPI kworker"/"MAX_RT_PRIO" 串、无
+	 * kworker RT 提升体）⇒ warsaw 只树有的 RT 提升块连同 2 条打印按 blob 删除。 */
 
 	/* get ic type */
 	ret = goodix_get_ic_type(spi->dev.of_node);
@@ -345,7 +339,7 @@ static int goodix_spi_probe(struct spi_device *spi)
 err_pdev:
 	kfree(goodix_pdev);
 	goodix_pdev = NULL;
-	ts_info("spi probe out, %d", ret);
+	ts_info("spi probe out failed, %d", ret);
 	return ret;
 }
 

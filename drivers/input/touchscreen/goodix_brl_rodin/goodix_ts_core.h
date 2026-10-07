@@ -1046,8 +1046,6 @@ bool goodix_get_ic_self_test_mode(void);
 void goodix_ts_esd_off(struct goodix_ts_core *cd);
 void goodix_ts_esd_on(struct goodix_ts_core *cd);
 
-int goodix_do_inspect_thread(void *arg);
-int goodix_get_final_result(void);
 
 #endif
 

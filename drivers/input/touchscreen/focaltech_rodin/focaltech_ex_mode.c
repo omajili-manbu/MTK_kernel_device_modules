@@ -58,7 +58,18 @@ enum _ex_mode {
 /*****************************************************************************
 * 6.Static function prototypes
 *******************************************************************************/
-static int fts_ex_mode_switch(enum _ex_mode mode, u8 value)
+/* _b582-INTA：A-80④② ex_mode helper 化 —— blob 的 MODE_CHARGER 走 fts_charger_on
+ * （blob fts_charger_mode_store+0x54/+0x94 = `bl fts_charger_on`，实参 (fts_data, 1/0)；
+ * 串 "MODE_CHARGER switch to %d fail" 的 __func__ = "fts_ex_mode_switch" 证明该 switch
+ * 仍是源码里的独立函数），且 blob 全 ko **无** fts_ex_mode_switch 符号（3 个 store +
+ * recovery 里全内联）⇒ 此处
+ *   ① MODE_CHARGER 分支 fts_write_reg(0x8B,m_val) → fts_charger_on(fts_data, m_val)；
+ *   ② 与 core.c `fts_ts_suspend/resume` 同款加 always_inline，使 4 个调用点的被调面
+ *      （fts_write_reg ×2 / fts_charger_on / 各 E 打印）与 blob 一致。
+ * 证据：tools/_b581_fts/callface_post.txt fts_charger_mode_store
+ *   only-blob={_printk:2, fts_charger_on:2} / only-tree={fts_ex_mode_switch:2}；
+ *   fts_cover/glove_mode_store only-blob={_printk:2, fts_write_reg:2}。 */
+static __attribute__((always_inline)) inline int fts_ex_mode_switch(enum _ex_mode mode, u8 value)
 {
     int ret = 0;
     u8 m_val = 0;
@@ -82,7 +93,8 @@ static int fts_ex_mode_switch(enum _ex_mode mode, u8 value)
         }
         break;
     case MODE_CHARGER:
-        ret = fts_write_reg(FTS_REG_CHARGER_MODE_EN, m_val);
+        /* blob：0x8B 由 fts_charger_on 统一下发（同一寄存器 + D 级成功打印） */
+        ret = fts_charger_on(fts_data, m_val);
         if (ret < 0) {
             FTS_ERROR("MODE_CHARGER switch to %d fail", m_val);
         }

@@ -68,28 +68,26 @@ static struct proc_dir_entry *last_touch_events_pde = NULL;
 static struct last_touch_event last_touch_events;
 static int slot;
 static int event_state[MAX_TOUCH_ID] = {0};
-void last_touch_events_collect_common(struct input_handle *handle, unsigned int type, unsigned int code, int value);
+void last_touch_events_collect_common(int slot, int state);
 EXPORT_SYMBOL(last_touch_events_collect_common);
 
-void last_touch_events_collect_common(struct input_handle *handle, unsigned int type, unsigned int code, int value)
+/* _b582-INPUT：A-80① 成对拆改的 fts 侧要求本函数为 blob 的 **2 参形态**
+ * （blob 0x4fbc：w0=slot、w1=state，体内直接 `if (slot > 9) return;`
+ * `if (event_state[slot] == state) return;`），原树 donor 的
+ * (handle, type, code, value) 四参签名与 `handle->dev->name` 面已无消费者，
+ * 按 blob 收口；调用点（xiaomitouch_input_event）同步改为传 (slot, state)。 */
+void last_touch_events_collect_common(int slot, int state)
 {
-	int state;
-
-	if (code == ABS_MT_SLOT)
-		slot = value;
-	if (code == ABS_MT_TRACKING_ID) {
-		state = (value == -1 ? 0 : 1);
-		if (slot >= MAX_TOUCH_ID || event_state[slot] == state)
-			return;
-		event_state[slot] = state;
-		/* _b581-XT③：blob 体内无任何 strncpy/默认名写入（blob 无 strncpy 调用点）；
-		 * 树侧 donor 的 handle->dev->name 拷贝与 DEFAULT_INPUT_DEVICE_NAME 一并删除。 */
-		last_touch_events.touch_event_buf[last_touch_events.head].state = !!state ? EVENT_DOWN : EVENT_UP;
-		last_touch_events.touch_event_buf[last_touch_events.head].slot = slot;
-		ktime_get_real_ts64(&last_touch_events.touch_event_buf[last_touch_events.head].touch_time);
-		last_touch_events.head++;
-		last_touch_events.head &= LAST_TOUCH_EVENTS_MAX - 1;
-	}
+	if (slot >= MAX_TOUCH_ID || event_state[slot] == state)
+		return;
+	event_state[slot] = state;
+	/* _b581-XT③：blob 体内无任何 strncpy/默认名写入（blob 无 strncpy 调用点）；
+	 * 树侧 donor 的 handle->dev->name 拷贝与 DEFAULT_INPUT_DEVICE_NAME 一并删除。 */
+	last_touch_events.touch_event_buf[last_touch_events.head].state = !!state ? EVENT_DOWN : EVENT_UP;
+	last_touch_events.touch_event_buf[last_touch_events.head].slot = slot;
+	ktime_get_real_ts64(&last_touch_events.touch_event_buf[last_touch_events.head].touch_time);
+	last_touch_events.head++;
+	last_touch_events.head &= LAST_TOUCH_EVENTS_MAX - 1;
 }
 
 static void print_version_info_in_last_touch_events(struct seq_file *m) {
@@ -260,7 +258,13 @@ static void xiaomitouch_input_event(struct input_handle *handle,
 	if (type == EV_KEY && (code == KEY_POWER || code == KEY_VOLUMEDOWN || code ==  KEY_VOLUMEUP))
 		LOG_INFO("keycode:%d,value:%d", code, value);
 	if (type == EV_ABS) {
-		last_touch_events_collect_common(handle, type, code, value);
+		/* _b582-INPUT：blob 0xb724-0xb73c + 0xb740（内联 collect）——
+		 * code==ABS_MT_TRACKING_ID(0x39) 先 collect(slot, (value==-1?0:1))，
+		 * code==ABS_MT_SLOT(0x2f) 存 slot=value；两者互斥。 */
+		if (code == ABS_MT_TRACKING_ID)
+			last_touch_events_collect_common(slot, (value == -1 ? 0 : 1));
+		else if (code == ABS_MT_SLOT)
+			slot = value;
 		add_input_event_event_time(handle);
 	}
 }

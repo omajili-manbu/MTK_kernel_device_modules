@@ -82,8 +82,16 @@ enum FTS_LOG_LEVEL fts_debug_log_level = FTS_LOG_INFO;
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
-static int fts_ts_suspend(struct device *dev);
-static int fts_ts_resume(struct device *dev);
+/* _b582-SLEEP：blob 侧 resume/suspend 是单函数（fts_resume_suspend，符号表无
+ * fts_ts_* 条目）——两半被 LLVM 全内联进入口。树侧保留两半函数便于阅读，此处
+ * 强制内联以复现 blob 的单函数调用面（否则 fts_resume_suspend 只剩 2 条调用，
+ * 两半的 22 类被调全落 only-blob/only-tree）。 */
+static __attribute__((always_inline)) inline int fts_ts_suspend(struct device *dev);
+static __attribute__((always_inline)) inline int fts_ts_resume(struct device *dev);
+static int fts_set_thermal_temp(int temp, bool force);
+/* _b582-INTA：A-80④② —— fts_charger_on（focaltech_scp_tp.c:578）的临时原型已按
+ * ② 的建议并入 focaltech_core.h 的 scp_tp 声明块（blob 0x2890 resume 半直调、
+ * ex_mode 的 MODE_CHARGER 也走它），此处不再重复声明。 */
 
 #ifdef FTS_XIAOMI_TOUCHFEATURE
 int fts_ic_data_collect(char *buf, int *length);
@@ -124,7 +132,17 @@ static struct proc_dir_entry *touch_debug;
 #endif /* TPDEBUG_IN_D */
 
 static int htc_ic_mode = 0;
-static bool ic_in_selftest = 0;
+
+/* _b582-INTD：fts_ic_self_test 宿主链（blob 0x14dec-0x150e4）所需的跨 TU 符号。
+ * core.c 的 TU 不含 focaltech_test/focaltech_test.h（core.h:72 只 include
+ * focaltech_test_ini.h），故按 A-80④② 的临时原型做法就地声明；签名与
+ * focaltech_test.h:655（fts_test_main_init）、:667（enter_work_mode）、
+ * :695（fts_test_main_exit）逐字一致。ic_self_test_flag 定义在
+ * focaltech_scp_tp.c:518（= blob .bss+0x5b8，blob 唯一写点即本宿主链）。 */
+extern int fts_test_main_init(void);
+extern int fts_test_main_exit(void);
+extern int enter_work_mode(void);
+extern bool ic_self_test_flag;
 
 int fts_check_cid(struct fts_ts_data *ts_data, u8 id_h)
 {
@@ -284,10 +302,14 @@ int fts_wait_tp_to_valid(void)
     do {
         ret = fts_read_reg(FTS_REG_CHIP_ID, &idh);
         if ((idh == chip_idh) || (fts_check_cid(ts_data, idh) == 0)) {
-            FTS_DEBUG("TP Ready,Device ID:0x%02x", idh);
+            /* _b582-INTA：族对齐 D→I（blob 0x4b1a '\0016[FTS_TS_I][%s:%d]: TP Ready,Device ID:0x%02x'，
+             * 引用点 fts_wait_tp_to_valid+0x1b4，门 cmp w8,#3; b.hs） */
+            FTS_INFO("TP Ready,Device ID:0x%02x", idh);
             return 0;
         } else
-            FTS_ERROR("TP Not Ready,ReadData:0x%02x,ret:%d", idh, ret);
+            /* _b582-INTA：族对齐 E→D（blob 0x5f8c '\0016[FTS_TS_D][%s:%d]: TP Not Ready,ReadData:0x%02x,ret:%d'，
+             * 引用点 fts_wait_tp_to_valid+0x2c，门 cmp w8,#4; b.hs） */
+            FTS_DEBUG("TP Not Ready,ReadData:0x%02x,ret:%d", idh, ret);
 
         cnt++;
         msleep(INTERVAL_READ_REG);
@@ -399,7 +421,11 @@ void fts_irq_disable(void)
 {
     unsigned long irqflags;
 
-    FTS_FUNC_ENTER();
+    /* _b582-INTA：打印形态按 blob —— fts_irq_disable(0xbe8) 只有**一条** I 级
+     * "Enter"（str1.1+0x105e2 '\0016[FTS_TS_I][%s:%d]: Enter'，引用点 +0x70，
+     * 门 cmp w8,#3 = FTS_LOG_INFO），**无** Exit 打印；树侧原 FTS_FUNC_ENTER +
+     * FTS_FUNC_EXIT（V 族/门 ≥5，且多一条 _printk）⇒ 收成单条 FTS_INFO("Enter")。 */
+    FTS_INFO("Enter");
     spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (!fts_data->irq_disabled) {
@@ -408,14 +434,15 @@ void fts_irq_disable(void)
     }
 
     spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
-    FTS_FUNC_EXIT();
 }
 
 void fts_irq_enable(void)
 {
     unsigned long irqflags = 0;
 
-    FTS_FUNC_ENTER();
+    /* _b582-INTA：同 fts_irq_disable —— blob fts_irq_enable(0xc78) 只有一条 I 级
+     * "Enter"（引用点 +0x6c，门 cmp w8,#3），无 Exit。 */
+    FTS_INFO("Enter");
     spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (fts_data->irq_disabled) {
@@ -424,7 +451,6 @@ void fts_irq_enable(void)
     }
 
     spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
-    FTS_FUNC_EXIT();
 }
 
 void fts_hid2std(void)
@@ -650,19 +676,26 @@ static int fts_get_ic_information(struct fts_ts_data *ts_data)
 int fts_get_lockdown_information(struct fts_ts_data *ts_data)
 {
 	int ret = 0;
-	int i = 0;
-	int count = 0;
-	u8 temp_lockdown[256] = {0};
+
+	/* _b582-INTA：A-80④① lockdown 格式化按 blob 收口（⑥-b 报告 §5.3）——
+	 * blob fts_get_lockdown_information(0xe5c) 全函数只两条打印：
+	 *   失败 0xeb4：E "can't get lockdown"（0x5fd1，线 638；树侧 "lockdown_info init fail"
+	 *               在 blob 全 ko 无此串 ⇒ 一并按 blob 换字面量）；
+	 *   成功 0xed4：**单条** I "lockdown info: 0x%02x,×8"（0xb71，线 644），
+	 *               直接读 ts_data->lockdown_info[0..7]（blob 0xaf0..0xaf7）。
+	 * 树侧原 8 次 sprintf 拼 " %02x " + before/after 两条 I 打印（callface
+	 * fts_get_lockdown_information only-tree={sprintf:8, _printk:1}）⇒ 按 blob 删净；
+	 * 无调用面变化（ft_read_lockdown_info_proc 仍 1 次）。 */
 	ret = fts_read_lockdown_info_proc(ts_data->lockdown_info);
 	if (ret) {
-		FTS_ERROR("lockdown_info init fail");
+		FTS_ERROR("can't get lockdown");
 		return -EIO;
 	}
-	for(i = 0; i < 8; i++) {
-		count += sprintf(temp_lockdown + count, " %02x ", ts_data->lockdown_info[i]);
-	}
-	FTS_INFO("lockdown information before formatting:%s", ts_data->lockdown_info);
-	FTS_INFO("lockdown information after formatting:%s", temp_lockdown);
+	FTS_INFO("lockdown info: 0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x",
+		 ts_data->lockdown_info[0], ts_data->lockdown_info[1],
+		 ts_data->lockdown_info[2], ts_data->lockdown_info[3],
+		 ts_data->lockdown_info[4], ts_data->lockdown_info[5],
+		 ts_data->lockdown_info[6], ts_data->lockdown_info[7]);
 	return 0;
 }
 
@@ -703,8 +736,23 @@ void fts_release_all_finger(void)
     u32 max_touches = ts_data->pdata->max_touch_number;
 #endif
 #ifdef FTS_TOUCHSCREEN_FOD
-	fts_data->finger_in_fod = false;
-	fts_data->overlap_area = 0;
+	/* _b582-INPUT：按 blob 收口——FOD 收尾块（blob 0xf48 cbz [ts+0xb50]）整块条件化：
+	 * 仅 finger_in_fod 置位时进锁，锁内清 finger_in_fod/overlap_area 后**补发**
+	 * 0x152(BTN_INFO) UP + ABS_MT_WIDTH_MAJOR/MINOR 归零 + SYN，再
+	 * update_fod_press_status_common(0)（blob 4 处 input_event 全在本块：
+	 * 0xf80/0xf94/0xfa8/0xfbc）；finger_in_fod 打印在块后（blob 源行 695 > 692）。 */
+	if (ts_data->finger_in_fod) {
+		mutex_lock(&ts_data->report_mutex);
+		ts_data->finger_in_fod = false;
+		ts_data->overlap_area = 0;
+		input_report_key(input_dev, BTN_INFO, 0);
+		input_report_abs(input_dev, ABS_MT_WIDTH_MAJOR, 0);
+		input_report_abs(input_dev, ABS_MT_WIDTH_MINOR, 0);
+		input_sync(input_dev);
+		update_fod_press_status_common(0);
+		FTS_INFO("ts fod up for suspend");
+		mutex_unlock(&ts_data->report_mutex);
+	}
 	FTS_INFO("%s : finger_in_fod = %d", __func__, fts_data->finger_in_fod);
 #endif
 
@@ -713,7 +761,8 @@ void fts_release_all_finger(void)
     for (finger_count = 0; finger_count < max_touches; finger_count++) {
         input_mt_slot(input_dev, finger_count);
         input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
-        // last_touch_events_collect_common(finger_count, 0);
+        /* _b582-INPUT：blob 0x1028 处逐槽 last_touch_events_collect_common(finger_count, 0) */
+        last_touch_events_collect_common(finger_count, 0);
     }
 #else
     input_mt_sync(input_dev);
@@ -837,6 +886,9 @@ static int fts_input_report_b(struct fts_ts_data *ts_data, struct ts_event *even
             /*FTS_DEBUG("fod_finger_skip%d,overlap_area%d,", ts_data->fod_finger_skip, ts_data->overlap_area);*/
             if (!ts_data->fod_finger_skip && ts_data->overlap_area == 100 && !ts_data->suspended) {
                 /*be useful when panel has been resumed */
+                /* _b582-INPUT：blob 0x71e4 = 先补发 0x152(BTN_INFO) 按下，再 update_fod_press_status_common(1)，
+                 * 后接 "Report_0x152 resume DOWN"（blob 0x7430）——原树缺这条 input_event。 */
+                input_report_key(input_dev, BTN_INFO, 1);
                 update_fod_press_status_common(1);
                 FTS_INFO("Report_0x152 resume DOWN");
                 /* mi_disp_set_fod_queue_work(1, true); */
@@ -845,8 +897,11 @@ static int fts_input_report_b(struct fts_ts_data *ts_data, struct ts_event *even
             input_report_abs(input_dev, ABS_MT_TOUCH_MINOR, events[i].minor);
 	    /*input_report_abs(input_dev, ABS_MT_WIDTH_MINOR, ts_data->overlap_area);*/
             /*input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, events[i].area);*/
-            input_report_abs(input_dev, ABS_MT_POSITION_X, events[i].x * fts_get_super_resolution_factor() / ts_data->pdata->super_resolution_factors);
-            input_report_abs(input_dev, ABS_MT_POSITION_Y, events[i].y * fts_get_super_resolution_factor() / ts_data->pdata->super_resolution_factors);
+            /* _b582-INPUT：blob 0x722c/0x7240 直接上送 events[i].x/.y（无超分换算）——
+             * 树侧 device-coords 系数 100 == SUPER_RESOLUTION_FACOTR，原式在 rodin 上恒等，
+             * 按 blob 形态收口。 */
+            input_report_abs(input_dev, ABS_MT_POSITION_X, events[i].x);
+            input_report_abs(input_dev, ABS_MT_POSITION_Y, events[i].y);
 
             touch_down_point_cur |= (1 << events[i].id);
             touch_point_pre |= (1 << events[i].id);
@@ -857,14 +912,16 @@ static int fts_input_report_b(struct fts_ts_data *ts_data, struct ts_event *even
                           events[i].id, events[i].x, events[i].y,
                           events[i].p, events[i].area);
             }
-            // last_touch_events_collect_common(events[i].id, 1);
+            /* _b582-INPUT：blob 0x70b8 = 下行 collect(id, 1) */
+            last_touch_events_collect_common(events[i].id, 1);
         } else {
             input_mt_slot(input_dev, events[i].id);
             input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
             touch_point_pre &= ~(1 << events[i].id);
             if (ts_data->log_level >= 1)
                     FTS_DEBUG("[B]P%d UP!", events[i].id);
-            // last_touch_events_collect_common(events[i].id, 0);
+            /* _b582-INPUT：blob 0x7330 = 上行 collect(id, 0) */
+            last_touch_events_collect_common(events[i].id, 0);
         }
     }
 
@@ -875,7 +932,8 @@ static int fts_input_report_b(struct fts_ts_data *ts_data, struct ts_event *even
                         FTS_DEBUG("[B]P%d UP!", i);
                 input_mt_slot(input_dev, i);
                 input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
-                // last_touch_events_collect_common(i, 0);
+                /* _b582-INPUT：blob 0x7560 = 差集补发 collect(i, 0) */
+                last_touch_events_collect_common(i, 0);
             }
         }
     }
@@ -1326,12 +1384,14 @@ static void show_raw(u8 *data, u64 cnt, int tx, int rx)
 			j = 0;
 			col++;
 			if (col % TX_PRINT_MAX_NUM == 0) {
-				FTS_DEBUG("TX%d ~ TX%d (cnt:%llu, frame_no:%hu):\n%s",
+				/* _b582-INTA：族对齐 D→V（blob 0x56ea '\0016[FTS_TS_V][%s:%d]: TX%d ~ TX%d …'，
+				 * 引用点 fts_irq_handler+0xb98/0xe04，门 cmp w8,#5; b.hs） */
+				FTS_VERBOSE("TX%d ~ TX%d (cnt:%llu, frame_no:%hu):\n%s",
 						(col - TX_PRINT_MAX_NUM), col - 1, cnt, frame_no, str);
 				memset(str, 0, sizeof(str));
 				sprintf(str + strlen(str), "[FTS]");
 			} else if (i == size - 1) {
-				FTS_DEBUG("TX%d ~ TX%d (cnt:%llu, frame_no:%hu):\n%s",
+				FTS_VERBOSE("TX%d ~ TX%d (cnt:%llu, frame_no:%hu):\n%s",
 						((col / TX_PRINT_MAX_NUM) * TX_PRINT_MAX_NUM), col - 1, cnt, frame_no, str);
 			} else {
 				sprintf(str + strlen(str), "\n[FTS]");
@@ -1415,7 +1475,9 @@ static int fts_irq_read_report(struct fts_ts_data *ts_data)
 			notify_raw_data_update_common(TOUCH_ID);
 			rtc_time64_to_tm(ts.tv_sec, &tm);
 			ic_head_cnt = (tp_frame->thp_frame_buf[2] << 8) + (tp_frame->thp_frame_buf[3]);
-			FTS_DEBUG("frame size: %d, frame data index: %d", ts_data->touch_size, ic_head_cnt);
+			/* _b582-INTA：族对齐 D→V（blob 0xaea4 '\0016[FTS_TS_V][%s:%d]: frame size: %d, frame data index: %d'，
+			 * 引用点 fts_irq_handler+0x908，门 cmp w8,#5; b.lo） */
+			FTS_VERBOSE("frame size: %d, frame data index: %d", ts_data->touch_size, ic_head_cnt);
 			FTS_DEBUG("frame_head %px", (u8 *)&tp_frame->thp_frame_buf);
 			return 0;
 		} else {
@@ -1641,7 +1703,8 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
     struct fts_ts_data *ts_data = fts_data;
     static struct task_struct *touch_task = NULL;
     struct sched_param par = { .sched_priority = MAX_RT_PRIO - 1};
-    int ret;
+    /* _b582-INPUT：原 int ret 仅服务于 donor 的 dev_pm_qos_add_request 返回值检查，
+     * 按 blob 换成 cpu_latency_qos_（void）后删除，避免 unused-variable 告警。 */
 
     if (touch_task == NULL) {
         touch_task = current;
@@ -1661,13 +1724,12 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
 //     // touch_irq_boost();
 #endif
 
-    ret = dev_pm_qos_add_request(ts_data->dev,
-                        &ts_data->dev_pm_qos_req_irq,
-                        DEV_PM_QOS_RESUME_LATENCY,
-                        0);
-    if(ret < 0){
-        FTS_ERROR("Touch dev_pm_qos_add_request fail \n");
-    }
+    /* _b582-INPUT：blob 0x5e2c/0x6a98 = cpu_latency_qos_add_request(&req, 0) /
+     * cpu_latency_qos_remove_request(&req)——树侧 donor 的 dev_pm_qos_* 三参形态
+     * （blob 无 dev_pm_qos_add_request 调用面）按 blob 收口；句柄类型随之由
+     * struct dev_pm_qos_request 改为 struct pm_qos_request（blob 该槽 0x270 恒 48B，
+     * 二者同宽，布局不变；goodix 同形先例 core.h:pm_qos_req_irq）。 */
+    cpu_latency_qos_add_request(&ts_data->pm_qos_req_irq, 0);
 
     ts_data->intr_jiffies = jiffies;
     fts_prc_queue_work(ts_data);
@@ -1675,6 +1737,31 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
     lpm_disable_for_dev(true, LPM_EVENT_INPUT);
 #endif
     fts_irq_read_report(ts_data);
+
+    /* _b582-INTA：按 blob 补 fts_irq_handler 内联的掌面读数块（①报告 §四.2，
+     * blob 0x5ea8-0x5f20，紧跟在 fts_irq_handler 内联的 touch 数据 fts_read(0x5ea4) 之后）：
+     *   0x5ea8  ldr w8,[x19,#0xbd8]  → 门控 ts_data->palm_status（blob +0xbd8；
+     *                                6.18 树侧 palm_status 为 +0x20b0，符号访问不受漂移影响）
+     *   0x5ec0  mov w0,#0x9b         → fts_read_reg(0x9B, &val)（val 初值 0）
+     *   0x5ecc  tbnz w0,#0x1f        → val 读失败：E "read palm data error\n"
+     *                                （blob 0x10f8f，引用点 +0xd44，门 cbnz lv ⇒ E 族）
+     *   0x5ed4  cmp w0,#0x1 / cbnz   → val∈{0,1} 才处理
+     *   0x5ee0  update_palm_sensor_value_common(val)（实参 = val，非恒 0）
+     *   0x5f00  I "update palm data:0x%02X"（blob 0x82ed，引用点 +0x16c，门 cmp w8,#3）
+     * 成对性：本块内 update_palm_sensor_value_common 的调用面 = 1（与 blob 一致），
+     * fts_read_reg = 1（blob fts_irq_handler 亦各 1；① gate_b582.txt 的
+     * "fts_read_reg:1 / update_palm_sensor_value_common:1" 残留即指本缺口）。 */
+    if (ts_data->palm_status && fts_data) {
+        u8 palm_value = 0;
+
+        if (fts_read_reg(0x9B, &palm_value) < 0) {
+            FTS_ERROR("read palm data error\n");
+        } else if (palm_value <= 1) {
+            update_palm_sensor_value_common(palm_value);
+            FTS_INFO("update palm data:0x%02X", palm_value);
+        }
+    }
+
     if (ts_data->touch_analysis_support && ts_data->ta_flag) {
         ts_data->ta_flag = 0;
         if (ts_data->ta_buf && ts_data->ta_size)
@@ -1684,7 +1771,7 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
     /* _b573 boost wiring: blob 0x6a8c-0x6a90 = touch_irq_cpumask(0)（框架内 once 语义） */
     touch_irq_cpumask(TOUCH_ID);
 
-    dev_pm_qos_remove_request(&ts_data->dev_pm_qos_req_irq);
+    cpu_latency_qos_remove_request(&ts_data->pm_qos_req_irq);
 
     return IRQ_HANDLED;
 }
@@ -1752,22 +1839,27 @@ static int fts_input_pen_init(struct fts_ts_data *ts_data)
 
 static int fts_input_init(struct fts_ts_data *ts_data)
 {
-#if 0
+    /* _b582-INPUT：A-80① 输入设备层成对拆改（fts 侧，行为基准 = blob）——
+     * blob `fts_ts_probe`（fts_input_init 全内联，0x7dcc/0x8014 input_allocate_device
+     * … 0x81f4 input_register_device）为 **IC 自建**输入设备，且 blob 全 ko 无
+     * register_xiaomi_input_dev 类符号/串 ⇒ 此处按 blob 自建，删框架调用。
+     * 逐项常量（blob 反汇编）：name = "focaltech_ts"（0x7dd4）；
+     * bustype = ([ts_data+0xad8]==1) ? BUS_I2C(0x18) : BUS_SPI(0x1c)（0x7dec-0x7e00）；
+     * propbit |= INPUT_PROP_DIRECT、evbit |= EV_SYN|EV_KEY|EV_ABS（0x7e1c-0x7e28）；
+     * keybit |= BTN_TOOL_FINGER|BTN_TOUCH（0x7e04 orr #0x420）；
+     * slots = max_touch_number + INPUT_MT_DIRECT(0x2)（0x811c-0x8128）；
+     * abs ×5 = POSITION_X/Y(0x35/0x36，x_min→x_max **不减 1**，0x812c-0x8160)、
+     * TOUCH_MAJOR(0x30，0→0xFF)、WIDTH_MAJOR(0x32)/WIDTH_MINOR(0x33，x_min→x_max-1)；
+     * cap ×7 = 键区最多 4 枚（have_key/key_number 门控）+ KEY_WAKEUP(0x8f) +
+     * KEY_GOTO(0x162) + BTN_INFO(0x152)（0x818c/0x819c/0x81ac）；
+     * 失败路径 = input_set_drvdata(dev,NULL) + input_free_device（0x8208-0x8210）。
+     * 笔设备为 blob 所无（blob 无 pen allocate/串），不引入。 */
     int ret = 0;
     int key_num = 0;
     struct fts_ts_platform_data *pdata = ts_data->pdata;
-#endif
     struct input_dev *input_dev;
 
     FTS_FUNC_ENTER();
-#if 1
-    input_dev = register_xiaomi_input_dev(TOUCH_ID, fts_get_x_resolution()*fts_get_super_resolution_factor() -1, fts_get_y_resolution()*fts_get_super_resolution_factor() -1, FOCAL_SEC);
-    if (!input_dev) {
-        FTS_ERROR("Failed to allocate memory for input device");
-        return -ENOMEM;
-    }
-    input_set_drvdata(input_dev, ts_data);
-#else
     input_dev = input_allocate_device();
     if (!input_dev) {
         FTS_ERROR("Failed to allocate memory for input device");
@@ -1802,14 +1894,15 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 #else
     input_set_abs_params(input_dev, ABS_MT_TRACKING_ID, 0, 0x0F, 0, 0);
 #endif
-    input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, pdata->x_max - 1, 0, 0);
-    input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max - 1, 0, 0);
+    input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, pdata->x_max, 0, 0);
+    input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max, 0, 0);
     input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 0xFF, 0, 0);
 #if FTS_REPORT_PRESSURE_EN
     input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
 #endif
     input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
     input_set_capability(input_dev, EV_KEY, KEY_GOTO);
+    input_set_capability(input_dev, EV_KEY, BTN_INFO);
 #ifdef FTS_TOUCHSCREEN_FOD
     input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, pdata->x_min, pdata->x_max - 1, 0, 0);
     input_set_abs_params(input_dev, ABS_MT_WIDTH_MINOR, pdata->x_min, pdata->x_max - 1, 0, 0);
@@ -1823,7 +1916,6 @@ static int fts_input_init(struct fts_ts_data *ts_data)
         input_dev = NULL;
         return ret;
     }
-#endif
 #if FTS_PEN_EN
     ret = fts_input_pen_init(ts_data);
     if (ret) {
@@ -2031,7 +2123,9 @@ static int fts_power_source_ctrl_simplify(struct fts_ts_data *ts_data, int enabl
 				if (ret)
 					FTS_ERROR("enable avdd regulator failed,ret=%d", ret);	/* L1969 */
 				else
-					FTS_INFO("successs to enable avdd");			/* L1971 */
+					/* _b582-INTA：HIT_NL 补尾 '\n'（blob 0xbf27 '\0016[FTS_TS_I][%s:%d]:
+					 * successs to enable avdd\n'，引用点 fts_power_source_ctrl_simplify+0x2a8） */
+					FTS_INFO("successs to enable avdd\n");			/* L1971 */
 			}
 			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
 				struct gpio_desc *avdd_desc =
@@ -2046,10 +2140,14 @@ static int fts_power_source_ctrl_simplify(struct fts_ts_data *ts_data, int enabl
 				if (ret)
 					FTS_ERROR("enable iovdd regulator failed,ret=%d", ret);	/* L1981 */
 				else
-					FTS_INFO("successs to enable iovdd");			/* L1983 */
+					/* _b582-INTA：HIT_NL 补尾 '\n'（blob 0x1eef '\0016[FTS_TS_I][%s:%d]:
+					 * successs to enable iovdd\n'，引用点 fts_power_source_ctrl_simplify+0x2c4） */
+					FTS_INFO("successs to enable iovdd\n");			/* L1983 */
 			} else {
-				/* blob 0x6cf8：iovdd 指针为空/err 时的 else 打印（L1986） */
-				FTS_ERROR("failed to get iovdd regulator");
+				/* blob 0x6cf8：iovdd 指针为空/err 时的 else 打印（L1986）
+				 * _b582-INTA：HIT_NL 补尾 '\n'（blob 0x263f '\0016[FTS_TS_E][%s:%d]:
+				 * failed to get iovdd regulator\n'，引用点 +0x108） */
+				FTS_ERROR("failed to get iovdd regulator\n");
 			}
 			ts_data->power_disabled = false;
 		}
@@ -2060,7 +2158,9 @@ static int fts_power_source_ctrl_simplify(struct fts_ts_data *ts_data, int enabl
 				if (ret)
 					FTS_ERROR("disable iovdd regulator failed,ret=%d", ret);	/* L1995 */
 				else
-					FTS_INFO("%s: successs to disable iovdd", __func__);	/* L1997 */
+					/* _b582-INTA：HIT_NL 补尾 '\n'（blob 0x2f25 '\0016[FTS_TS_I][%s:%d]:
+					 * %s: successs to disable iovdd\n'，`%s` 前缀与 __func__ 实参保持） */
+					FTS_INFO("%s: successs to disable iovdd\n", __func__);	/* L1997 */
 			}
 			usleep_range(3000, 3100);
 			if (!IS_ERR_OR_NULL(ts_data->avdd)) {
@@ -2068,7 +2168,9 @@ static int fts_power_source_ctrl_simplify(struct fts_ts_data *ts_data, int enabl
 				if (ret)
 					FTS_ERROR("disable avdd regulator failed,ret=%d", ret);	/* L2007 */
 				else
-					FTS_INFO("successs to disable avdd");			/* L2009 */
+					/* _b582-INTA：HIT_NL 补尾 '\n'（blob 0x117d9 '\0016[FTS_TS_I][%s:%d]:
+					 * successs to disable avdd\n'，引用点 fts_power_source_ctrl_simplify+0x300） */
+					FTS_INFO("successs to disable avdd\n");			/* L2009 */
 			}
 			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
 				struct gpio_desc *avdd_desc =
@@ -2449,7 +2551,9 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
             pdata->max_touch_number = temp_val;
     }
 
-    FTS_INFO("max touch number:%d, irq gpio:%d, reset gpio:%d",
+    /* _b582-INTA：族对齐 I→D（blob 0xb638 '\0016[FTS_TS_D][%s:%d]: max touch number:%d, irq gpio:%d, reset gpio:%d'，
+     * 引用点 fts_ts_probe+0x948（fts_parse_dt 全内联），门 cmp w8,#4; b.hs） */
+    FTS_DEBUG("max touch number:%d, irq gpio:%d, reset gpio:%d",
              pdata->max_touch_number, pdata->irq_gpio, pdata->reset_gpio);
 
 
@@ -2489,13 +2593,19 @@ static void fts_set_charge_state(int status)
 	}
 
 	fts_data->charger_status = status;
+	/* _b582-INTA：族对齐 I→D ×2（blob 0x9ab0 '\0016[FTS_TS_D][%s:%d]: success to set power supply
+	 * status:%d'，引用点 fts_charger_on+0x58/0x5c，门 cmp w8,#4; b.lo）。
+	 * 【跨侧残留】blob 的该串宿主 = fts_charger_on，本函数在 blob 内只调
+	 * fts_charger_on + pm_stay_awake/pm_relax（callface: only-blob={fts_charger_on:1,
+	 * pm_relax:1, pm_stay_awake:1} / only-tree={_printk:3, fts_write_reg:2}）——
+	 * 本批只做族对齐（I→D），本函数整体重构另账。 */
 	if(status) {
 		FTS_INFO("charger usb in");
 		ret = fts_write_reg(FTS_REG_CHARGER_MODE_EN, true);
 		if (ret < 0) {
 			FTS_ERROR("failed to set power supply status:%d", fts_data->charger_status);
 		} else {
-			FTS_INFO("success to set power supply status:%d", fts_data->charger_status);
+			FTS_DEBUG("success to set power supply status:%d", fts_data->charger_status);
 		}
 	}else {
 		FTS_INFO("charger usb out");
@@ -2503,7 +2613,7 @@ static void fts_set_charge_state(int status)
 		if (ret < 0) {
 			FTS_ERROR("failed to set power supply status:%d", fts_data->charger_status);
 		} else {
-			FTS_INFO("success to set power supply status:%d", fts_data->charger_status);
+			FTS_DEBUG("success to set power supply status:%d", fts_data->charger_status);
 		}
 	}
 }
@@ -2567,9 +2677,28 @@ static noinline void fts_update_gesture_state(struct fts_ts_data *ts_data, int b
 		ts_data->gesture_cmd &= ~(1 << cmd_shift);
 	}
 
-	FTS_DEBUG("AOD: %d DoubleClick: %d ", ts_data->gesture_status>>1 & 0x01, ts_data->gesture_status & 0x01);
-	FTS_INFO("gesture state:0x%02X, write cmd:0x%02X", ts_data->gesture_status, ts_data->gesture_cmd);
-	ts_data->gesture_support = ts_data->gesture_status != 0 ? ENABLE : DISABLE;
+	/* _b582-SLEEP：blob 0x5bdc 起 suspended（+0x2d9）分支——睡眠期只登记
+	 * 「延迟」（gesture_cmd_delay/+0xbec），不动 gesture_support；唤醒时由
+	 * fts_ts_suspend 的 gesture_cmd_delay 块消费（成对）。blob 串：
+	 * 0x8235 = "TP is suspended, do not update gesture state"（E 级，门 debug!=0，
+	 * L2645）；0x11688 = "delay gesture state:0x%02X, delay write cmd:0x%02X"
+	 * （I 级，门 debug>=3，L2647，实参 gesture_status/gesture_cmd）。 */
+	if (ts_data->suspended) {
+		if (fts_debug_log_level)
+			FTS_ERROR("TP is suspended, do not update gesture state");
+		ts_data->gesture_cmd_delay = true;
+		if (fts_debug_log_level >= 3)
+			FTS_INFO("delay gesture state:0x%02X, delay write cmd:0x%02X", ts_data->gesture_status, ts_data->gesture_cmd);
+	} else {
+		/* blob 0x5bf8 起 else 半：L2651（I 级串 "AOD: %d DoubleClick: %d "，门
+		 * debug>=3）+ L2652（"gesture state:0x%02X, write cmd:0x%02X"，门 debug>=3）
+		 * + gesture_support = (gesture_status != 0)（blob 0x5c00）。 */
+		/* _b582-SLEEP：blob 该条是 I 级串（\0016[FTS_TS_I]...: AOD: %d DoubleClick: %d ，
+		 * 0xae47，门 debug>=3），树侧原 FTS_DEBUG 为 D 级/门>=4，改回 FTS_INFO 对齐。 */
+		FTS_INFO("AOD: %d DoubleClick: %d ", ts_data->gesture_status>>1 & 0x01, ts_data->gesture_status & 0x01);
+		FTS_INFO("gesture state:0x%02X, write cmd:0x%02X", ts_data->gesture_status, ts_data->gesture_cmd);
+		ts_data->gesture_support = ts_data->gesture_status != 0 ? ENABLE : DISABLE;
+	}
 	mutex_unlock(&ts_data->input_dev->mutex);
 }
 
@@ -2976,15 +3105,13 @@ static void fts_set_cur_value(int mode_input, int *value_input)
 		FTS_INFO("tp is suspend, skip set_cur_value: touch mode:%d, value:%d", mode, value);
 		return;
 	}
-	if (ic_in_selftest) {
-		FTS_INFO("tp is in selftest, skip set_cur_value: touch mode:%d, value:%d", mode, value);
-		return;
-	}
 
-	if (mode_input != DATA_MODE_153)
-		FTS_INFO("touch mode:%d, value:%d", mode, value);
-	else
-		FTS_DEBUG("touch mode:%d, value:%d", mode, value);
+	/* _b582-INTA：族对齐 D→I + 站点数收口 —— blob fts_set_cur_value 只有**一个**
+	 * touch mode 站点（0x48cc，\0016[FTS_TS_I][%s:%d]: touch mode:%d, value:%d，
+	 * 门 cmp w8,#3; b.hs），且**无** DATA_MODE_153 门（0x4644 直接 cmp lv,#3 后进
+	 * 模式分派）；树侧原 if (mode_input != DATA_MODE_153) I / else D 两条等价分支
+	 * ⇒ 按 blob 收成单条 FTS_INFO（打印行为逐字一致）。 */
+	FTS_INFO("touch mode:%d, value:%d", mode, value);
 	if (mode == DATA_MODE_9) {
 		FTS_INFO("Mode:DATA_MODE_9  Report_Rate_status = %d", value);
 		if (value == 0) {
@@ -3083,6 +3210,11 @@ static void fts_set_cur_value(int mode_input, int *value_input)
 		update_weak_doubletap_value(value);
 		return;
 	}
+	/* _b582-INTA：补树侧**完全缺失**的 W 族站点 —— blob fts_set_cur_value+0x3cc
+	 * （0x49b0）为模式分派的 else 尾块：ldr w8,[x22]; cmp w8,#0x2; b.lo <ret>;
+	 * _printk(.rodata.str1.1+0x1170b '\0016[FTS_TS_W][%s:%d]: not support mode!',
+	 * __func__, 3160) ⇒ 门控 = 级别 ≥ 2（FTS_LOG_WARNING），族 W。 */
+	FTS_WARNING("not support mode!");
 	return;
 }
 
@@ -3321,11 +3453,13 @@ static int fts_touch_doze_analysis(int value)
 	return result;
 }
 
-int fts_touch_log_level_control(int value)
-{
-	fts_debug_log_level = value;
-	return 0;
-}
+/* _b582-INTA：删除第二个 log-level 写点 —— 原 fts_touch_log_level_control()
+ * { fts_debug_log_level = value; return 0; }（全树 0 引用，无原型）在本轮删除。
+ * 证据：blob 全模块对模块级 debug_log_level（.data+0x0、4B、初值 3）只有**一个**
+ * 写点 = fts_log_level_control（blob 0x4ee8, 212B，`str w19,[x20]`，
+ * tools/_b582_log/evid_b582.txt §[4]：ldr(读)=825 / str(写)=1）。
+ * ops 槽保持：hardware_operation.touch_log_level_control_v2 = fts_log_level_control
+ * （blob 有的槽）；touch_log_level_control(v1) 槽仍为 NULL。 */
 
 static void fts_charger_status_recovery(struct fts_ts_data *ts_data)
 {
@@ -3630,36 +3764,149 @@ int fts_ic_fw_version(char *fw_version_buf)
 int fts_ic_self_test(char *type, int *result)
 {
 	int retval = 0;//0 invalid; 1 fail; 2 pass
+	int ret = 0;
+	int i = 0;
+	struct fts_ts_data *ts_data = fts_data;
 
-	ic_in_selftest = 1;
+	/* _b582-INTD（B）：宿主链按 blob 收口 —— blob fts_ic_self_test 0x14dec-0x150e4
+	 * （focaltech_core.c 侧；符号表 size 0x2f8）逐段：
+	 *   0x14e0c-0x14e28 三点守卫（!fts_data / !fts_ftest / !fts_ftest->func(+0x3c8)）
+	 *       → FTS_ERROR(.rodata.str1.1+0x460e = b'\0016[FTS_TS_E][%s:%d]: invalid params'，
+	 *         行 2743) + 返回 -EINVAL（0x14e68 mov w0,#-0x16；__func__ 0x7b24
+	 *         "fts_ic_self_test"）
+	 *   0x14e2c ldrb w9,[fts_data+0x2d9]（= ts_data->suspended）非 0
+	 *       → FTS_INFO(0x111c3 = b'\0016[FTS_TS_I][%s:%d]: In suspend, no test, return now'，
+	 *         行 2748) + -EINVAL
+	 *   0x14ea8-0x14ebc mutex_lock(&ts_data->input_dev->mutex)
+	 *         （ldr x8,[fts_data+0x18] = input_dev；mutex @ +0x208）
+	 *   0x14ec0 fts_irq_disable()
+	 *   0x14ed4 ic_self_test_flag = 1（strb w9=1,[.bss+0x5b8]）
+	 *   0x14ed8-0x14ef8 FTS_DEBUG("enter ic_self_test_flag %d", 1)（cmp w8,#4; b.lo，行 2756）
+	 *   0x14efc fts_test_main_init()；失败 → FTS_TEST_ERROR(0x111f8 =
+	 *         b'\0013[FTS_TS/E][TEST]%s:fts_test_main_init error.\n'，形如
+	 *         focaltech_test.h:723 FTS_TEST_ERROR) ⇒ retval = 0（0x14f34 mov w22,wzr）
+	 *         → 直落尾块（0x1509c），不跑 teardown（blob 同形，保留）
+	 *   0x14f10-0x14f30 fts_test_get_testparam_from_ini("Conf_MultipleTest.ini")
+	 *         （0xde6b = 实参串）；失败 → FTS_TEST_ERROR(0x633a =
+	 *         b'\0013[FTS_TS/E][TEST]%s:get testparam fail\n') ⇒ retval = 0 → 尾块
+	 *   0x14f3c-0x14fc8 分派（逐支先 strncmp 再判 func 槽非空）：
+	 *         0x712b "short"/w2=5 → +0x40 short_test；0x261d "open"/w2=4 → +0x38 open_test；
+	 *         0xcb36 "i2c"/w2=3 → +0x48 spi_test；无匹配 → retval = 0；retval = w0(被调)
+	 *   0x14fcc fts_test_main_exit()
+	 *   0x14fe8-0x1506c 厂测侧 fts_free_test_memory 全内联体（INT-A 已落，见下）
+	 *   0x15070-0x15094 fts_ftest->func->free_item_data(fts_ftest)（func+0x78）
+	 *   0x15098 enter_work_mode()
+	 *   尾块 0x1509c-0x150e0：fts_irq_enable() → mutex_unlock(input_dev+0x208)
+	 *         → ic_self_test_flag = 0（strb wzr,[.bss+0x5b8]）
+	 *         → FTS_DEBUG("enter ic_self_test_flag %d", 0)（行 2789）
+	 *         → *result = retval（0x150bc str w22,[x19]）→ return 0（mov w0,wzr）
+	 * 成对性：mutex_lock↔mutex_unlock、fts_irq_disable↔fts_irq_enable 均在单一尾块闭合
+	 * （含两条错误路径）；分配↔释放 = fts_test_main_init ↔ fts_test_main_exit+
+	 * fts_test_malloc_free_thr(false)+vfree×3 —— 注意 blob 的两条前置错误路径
+	 * 直落尾块、**不**跑释放（厂测固有：main_init 失败即未完成分配；按 blob 保留）。
+	 * _b582-INTE 收口：原 INT-D 记的「树侧偏离（唯一）：额外写 ic_in_selftest」已按 blob
+	 * 删除 —— blob .bss+0x5b8（ic_self_test_flag）全模块唯一写点即本宿主链；blob
+	 * fts_set_cur_value (0x45f0,1244B) 对 .bss+0x5b8 与 focal_get_ic_self_test_mode 均无
+	 * 引用（后者全模块 CALL26 仅 fts_htc_ic_setModeValue+0xcc = 0x3344 一处，且该函数
+	 * 以「tp is in open/short test」串自门）。 */
 
-	if ((!strncmp("short", type, 5) || !strncmp("open", type, 4))) {
-		if (!strncmp("short", type, 5)) {
-			retval = fts_ftest->func->short_test();
-		} else {
-			retval = fts_ftest->func->open_test();
-		}
-	} else if (!strncmp("i2c", type, 3) || !strncmp("spi", type, 3)) {
-		retval = fts_ftest->func->spi_test();
+	if (!ts_data || !fts_ftest || !fts_ftest->func) {
+		FTS_ERROR("invalid params");
+		return -EINVAL;
+	}
+	if (ts_data->suspended) {
+		FTS_INFO("In suspend, no test, return now");
+		return -EINVAL;
 	}
 
-	ic_in_selftest = 0;
+	mutex_lock(&ts_data->input_dev->mutex);
+	fts_irq_disable();
+	ic_self_test_flag = 1;
+	FTS_DEBUG("enter ic_self_test_flag %d", ic_self_test_flag);
+
+	ret = fts_test_main_init();
+	if (ret < 0) {
+		pr_err("[FTS_TS/E][TEST]%s:" "fts_test_main_init error." "\n", __func__);
+		goto selftest_out;
+	}
+	ret = fts_test_get_testparam_from_ini("Conf_MultipleTest.ini");
+	if (ret < 0) {
+		pr_err("[FTS_TS/E][TEST]%s:" "get testparam fail" "\n", __func__);
+		goto selftest_out;
+	}
+
+	if (!strncmp("short", type, 5) && fts_ftest->func->short_test) {
+		retval = fts_ftest->func->short_test();
+	} else if (!strncmp("open", type, 4) && fts_ftest->func->open_test) {
+		retval = fts_ftest->func->open_test();
+	} else if (!strncmp("i2c", type, 3)) {
+		retval = fts_ftest->func->spi_test();
+	} else {
+		retval = 0;
+	}
+
+	fts_test_main_exit();
+
+	/* _b582-INTA：teardown 按 blob（③报告 §6.1，blob fts_ic_self_test 0x14fe8-0x1506c
+	 * = 厂测侧 fts_free_test_memory 全内联体）——分派之后依次：
+	 *   0x14fe8/0x14ff0  fts_test_malloc_free_thr(fts_ftest, false)（w1 = false）
+	 *   0x14ff4-0x15038  for (i = 0; i < testdata.item_count; i++)
+	 *                      if (info[i].data) { vfree(info[i].data); info[i].data = NULL; }
+	 *                    （count @fts_ftest+0x3d8 = testdata.item_count；数组 @+0x408、
+	 *                      步长 0x40 = sizeof(struct item_info)；编译器另加 i!=0x20 越界守卫）
+	 *   0x1503c-0x15048  if (buffer@0x90) { vfree(buffer); buffer = NULL; }
+	 *   0x1504c-0x15068  vfree(*(fts_ftest+0xbf0)); *(fts_ftest+0xbf0) = NULL;
+	 *                    ⚠️ 该槽 blob 全 ko 无写入点（恒 NULL，只 vfree(NULL)+置 NULL）
+	 *                    ⇒ 树侧保持为洞：core.h 不为其造成员，此处借用 ③ 的保位洞
+	 *                    `reserved_bf0`（u64，blob 无对应语义成员）承载同形态调用。
+	 * 0x14fd0/0x15054 的两条 TEST 族 FUNC 打印（__func__ = "fts_free_test_memory"）
+	 * 因树侧以「内联体」形态落地而无同名函数可打印，保持 INT-A 决定：另账（④ 记录）。 */
+	fts_test_malloc_free_thr(fts_ftest, false);
+
+	for (i = 0; i < fts_ftest->testdata.item_count; i++) {
+		if (fts_ftest->testdata.info[i].data) {
+			vfree(fts_ftest->testdata.info[i].data);
+			fts_ftest->testdata.info[i].data = NULL;
+		}
+	}
+
+	if (fts_ftest->buffer) {
+		vfree(fts_ftest->buffer);
+		fts_ftest->buffer = NULL;
+	}
+
+	vfree((void *)fts_ftest->reserved_bf0[0]);
+	fts_ftest->reserved_bf0[0] = 0;
+
+	/* _b582-INTD（B）：0x15070-0x15094 = fts_ftest->func->free_item_data(fts_ftest)
+	 * （x8 = fts_ftest->func(+0x3c8)；x8 = [x8+0x78]；x0 = fts_ftest；无判空，
+	 * 仅 KCFI 检查 ldur w16,[x8,#-4]）。树侧 test_funcs 槽位同布局
+	 * （focaltech_test_ini.h:628/633 `_Static_assert(... free_item_data) == 0x78`）。 */
+	fts_ftest->func->free_item_data(fts_ftest);
+
+	/* _b582-INTD（B）：0x15098 = enter_work_mode() */
+	enter_work_mode();
+
+selftest_out:
+	/* _b582-INTD（B）：尾块（0x1509c-0x150e0，成功与两条错误路径共用）——
+	 * fts_irq_enable() → mutex_unlock() → ic_self_test_flag = 0 → 调试打印 → 结果回填。 */
+	fts_irq_enable();
+	mutex_unlock(&ts_data->input_dev->mutex);
+	ic_self_test_flag = 0;
+	FTS_DEBUG("enter ic_self_test_flag %d", ic_self_test_flag);
 
 	*result = retval;
-
-	if (retval == 2) {
-		FTS_INFO("tp selftest pass");
-	} else if (retval == 1) {
-		FTS_ERROR("tp selftest fail");
-	} else if (retval == 0) {
-		FTS_ERROR("tp selftest invalid");
-	} else {
-		FTS_ERROR("tp selftest error");
-	}
 
 	return 0;
 }
 
+
+/* _b582-SLEEP：blob 入口形态（0x25a0 单函数）——符号 GLOBAL，取址存
+ * hardware_operation+0xb0（blob 0x390c/0x3914 stp xzr,x9,[x8,#0xa8]，即
+ * ic_resume_suspend 槽），由 xiaomi_touch 侧 schedule_resume_suspend_work_common
+ * 回调（树侧 tpdbg_shutdown/tpdbg_suspend 发起）。blob 只测 w0 低位
+ * （0x25cc: tbz w0,#0x0）选 resume/suspend 半，w1（gesture_type）全程未读，
+ * 返回恒 0（0x290c: mov w0,wzr; ret）。 */
 int fts_resume_suspend(bool resume, u8 gesture_type)
 {
 	if(resume)
@@ -3940,14 +4187,298 @@ int fts_thp_ic_read_interfaces(u8 addr, u8* value, int value_len)
     return 0;
 }
 
+/* _b582-INTE：blob 忠实形态重建 —— blob fts_htc_ic_setModeValue (0x3278, 668B)。
+ * 逐段：ldrh w21,[x0,#0x2]=mode / ldrh w19,[x0,#0x4]=data_len / add x20,x0,#0x8=data_buf
+ *   行 3968 FTS_INFO("mode: %d", mode)                串 .rodata.str1.1+0xc07（门 lv>=3）
+ *   行 3971 FTS_INFO("value[i:%d]:%x", i, value[i])   串 +0x563b；blob 取 [x20+i*4]（32 位步长）
+ *   if (mode <= 0xbb7 = THP_IC_CMD_BASE-1) → 行 3974 FTS_ERROR("mode is error!!\n")
+ *       （串 +0x37b0；该 printk 只有 format/__func__/line，**无可变参**）→ return -1
+ *   if (focal_get_ic_self_test_mode()) → 行 3980 FTS_INFO("tp is in open/short test")
+ *       （串 +0x685f，同样无可变参）→ return 0
+ *   htc_ic_mode = mode（blob str w21,[.bss+0x8]）
+ *   switch(mode)：blob .rodata 跳表 [49]（0x0..0x30，索引 = mode - IC_MODE_0(=0xbb9)）；
+ *     命中即**尾调用** fts_thp_ic_write_interfaces(cmd, data_buf, data_len)（blob 0x34ec，
+ *     函数返回被调返回值）；IC_MODE_20 = 空 case（直跳尾声 → return 0）；表外（> IC_MODE_48）
+ *     → b.hi 直返 0。常量 = 跳表项逐项解码。 */
 int fts_htc_ic_setModeValue(common_data_t *common_data)
 {
-        return 0;
+	int mode = common_data->mode;		/* blob: ldrh w21,[x0,#0x2] */
+	int value_len = common_data->data_len;	/* blob: ldrh w19,[x0,#0x4] */
+	s32 *value = common_data->data_buf;	/* blob: add x20,x0,#0x8 */
+	int i = 0;
+
+	FTS_INFO("mode: %d", mode);
+	for (i = 0; i < value_len; i++)
+		FTS_INFO("value[i:%d]:%x", i, value[i]);
+
+	if (mode < THP_IC_CMD_BASE) {
+		FTS_ERROR("mode is error!!\n");
+		return -1;
+	}
+
+	if (focal_get_ic_self_test_mode()) {
+		FTS_INFO("tp is in open/short test");
+		return 0;
+	}
+
+	htc_ic_mode = mode;
+
+	switch (mode) {
+	case IC_MODE_0:
+		return fts_thp_ic_write_interfaces(SET_IDLE_THD_TYPE, value, value_len);
+	case IC_MODE_1:
+		return fts_thp_ic_write_interfaces(SET_IDLE_RATE_TYPE, value, value_len);
+	case IC_MODE_2:
+	case IC_MODE_3:
+	case IC_MODE_4:
+		return fts_thp_ic_write_interfaces(SET_NULL_MODE_TYPE, value, value_len);
+	case IC_MODE_5:
+		return fts_thp_ic_write_interfaces(SET_FOD_EN_TYPE, value, value_len);
+	case IC_MODE_6:
+		return fts_thp_ic_write_interfaces(SET_REPORT_RATE_TYPE, value, value_len);
+	case IC_MODE_7:
+		return fts_thp_ic_write_interfaces(SET_SCAN_FREQ_TYPE, value, value_len);
+	case IC_MODE_8:
+		return fts_thp_ic_write_interfaces(SET_SCAN_FREQ_HOPPING_EN_TYPE, value, value_len);
+	case IC_MODE_9:
+		return fts_thp_ic_write_interfaces(SET_AFE_EN_TYPE, value, value_len);
+	case IC_MODE_10:
+		return fts_thp_ic_write_interfaces(SET_MC_SCAN_EN_TYPE, value, value_len);
+	case IC_MODE_11:
+		return fts_thp_ic_write_interfaces(SET_SC_SCAN_EN_TYPE, value, value_len);
+	case IC_MODE_12:
+		return fts_thp_ic_write_interfaces(SET_MC_CALIBRATION_EN_TYPE, value, value_len);
+	case IC_MODE_13:
+		return fts_thp_ic_write_interfaces(SET_SC_CALIBRATION_EN_TYPE, value, value_len);
+	case IC_MODE_14:
+		return fts_thp_ic_write_interfaces(SET_NULL_MODE_TYPE, value, value_len);
+	case IC_MODE_15:
+		return fts_thp_ic_write_interfaces(SET_INT_STATE_TYPE, value, value_len);
+	case IC_MODE_16:
+		return fts_thp_ic_write_interfaces(SET_BASE_REFRESH_EN_TYPE, value, value_len);
+	case IC_MODE_17:
+		return fts_thp_ic_write_interfaces(SET_FRAME_DATA_TYPE_TYPE, value, value_len);
+	case IC_MODE_18:
+		return fts_thp_ic_write_interfaces(SET_GAME_MODE_EN_TYPE, value, value_len);
+	case IC_MODE_19:
+		return fts_thp_ic_write_interfaces(SET_CHARGING_STATUS_EN_TYPE, value, value_len);
+	case IC_MODE_20:
+		break;
+	case IC_MODE_21:
+		return fts_thp_ic_write_interfaces(SET_GESTURE_EN_TYPE, value, value_len);
+	case IC_MODE_22:
+		return fts_thp_ic_write_interfaces(SET_CHLICK_GESTURE_EN_TYPE, value, value_len);
+	case IC_MODE_23:
+		return fts_thp_ic_write_interfaces(SET_DOUBLE_CHLICK_EN_TYPE, value, value_len);
+	case IC_MODE_24:
+		return fts_thp_ic_write_interfaces(SET_FLAG_BUF_TYPE, value, value_len);
+	case IC_MODE_25:
+	case IC_MODE_26:
+	case IC_MODE_27:
+	case IC_MODE_28:
+	case IC_MODE_29:
+	case IC_MODE_30:
+		return fts_thp_ic_write_interfaces(SET_NULL_MODE_TYPE, value, value_len);
+	case IC_MODE_31:
+		return fts_thp_ic_write_interfaces(SET_IC_RUN_STEP_TYPE, value, value_len);
+	case IC_MODE_32:
+		return fts_thp_ic_write_interfaces(SET_NULL_MODE_TYPE, value, value_len);
+	case IC_MODE_33:
+		return fts_thp_ic_write_interfaces(SET_IC_LOG_LEVEL_TYPE, value, value_len);
+	case IC_MODE_34:
+		return fts_thp_ic_write_interfaces(SET_IC_CALIBRATEION_TYPE, value, value_len);
+	case IC_MODE_35:
+		return fts_thp_ic_write_interfaces(SET_IC_SELF_TEST_TYPE, value, value_len);
+	case IC_MODE_36:
+		return fts_thp_ic_write_interfaces(SET_IC_SOFT_RETEST_TYPE, value, value_len);
+	case IC_MODE_37:
+		return fts_thp_ic_write_interfaces(SET_SCAN_SLOPE_TYPE, value, value_len);
+	case IC_MODE_38:
+		return fts_thp_ic_write_interfaces(SET_SCAN_VOLTAGE_TYPE, value, value_len);
+	case IC_MODE_39:
+		return fts_thp_ic_write_interfaces(SET_SCAN_NUM_TYPE, value, value_len);
+	case IC_MODE_40:
+		return fts_thp_ic_write_interfaces(SET_SCAN_FREQ_NUM_TYPE, value, value_len);
+	case IC_MODE_41:
+		return fts_thp_ic_write_interfaces(SET_IC_WORK_MODE_TYPE, value, value_len);
+	case IC_MODE_42:
+		return fts_thp_ic_write_interfaces(SET_FILTER_LEVEL_TYPE, value, value_len);
+	case IC_MODE_43:
+		return fts_thp_ic_write_interfaces(SET_RAW_TYPE_TYPE, value, value_len);
+	case IC_MODE_44:
+		return fts_thp_ic_write_interfaces(SET_OPEN_TRANSPORT_MODE_TYPE, value, value_len);
+	case IC_MODE_45:
+		return fts_thp_ic_write_interfaces(SET_CRC_EN_TYPE, value, value_len);
+	case IC_MODE_46:
+	case IC_MODE_47:
+	case IC_MODE_48:
+		return fts_thp_ic_write_interfaces(0x2, value, value_len);
+	}
+
+	return 0;
 }
 
+/* _b582-INTE：blob 忠实形态重建 —— blob fts_htc_ic_getModeValue (0x3518, 524B)。
+ * 逐段：ldrh w21,[x0,#0x2]=mode / ldrh w19,[x0,#0x4]=data_len / add x20,x0,#0x8=data_buf
+ *   行 4148 FTS_INFO("mode:%d, value:%s, value_len:%d", mode, value, value_len)
+ *       串 +0x25b6；实参 x3=mode、x4=[x0+0x8]（指针，按 %s 传入）、w5=data_len（门 lv>=3）
+ *   if (mode < THP_IC_CMD_BASE) → 行 4150 FTS_ERROR("mode is error!!\n") → return -1
+ *   **无** focal_get_ic_self_test_mode 门 —— blob 0x3588 b.ls 直落 0x3550 错误支，
+ *   全模块对 focal_get_ic_self_test_mode 的 CALL26 只有 setModeValue+0xcc 一处。
+ *   htc_ic_mode = mode
+ *   switch(mode)：跳表 [50]（.rodata+0x31..0x62，IC_MODE_0..IC_MODE_49）
+ *     → fts_thp_ic_read_interfaces(cmd, data_buf, data_len)（blob 0x3700）；IC_MODE_20 = 空 case；
+ *     每支调用后 mov w0,wzr ⇒ **恒 return 0**。 */
 int fts_htc_ic_getModeValue(common_data_t *common_data)
 {
-        return 0;
+	int mode = common_data->mode;		/* blob: ldrh w21,[x0,#0x2] */
+	int value_len = common_data->data_len;	/* blob: ldrh w19,[x0,#0x4] */
+	s32 *value = common_data->data_buf;	/* blob: add x20,x0,#0x8 */
+
+	FTS_INFO("mode:%d, value:%s, value_len:%d", mode, (char *)value, value_len);
+
+	if (mode < THP_IC_CMD_BASE) {
+		FTS_ERROR("mode is error!!\n");
+		return -1;
+	}
+
+	htc_ic_mode = mode;
+
+	switch (mode) {
+	case IC_MODE_0:
+		fts_thp_ic_read_interfaces(SET_IDLE_THD_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_1:
+		fts_thp_ic_read_interfaces(SET_IDLE_RATE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_2:
+	case IC_MODE_3:
+	case IC_MODE_4:
+		fts_thp_ic_read_interfaces(SET_NULL_MODE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_5:
+		fts_thp_ic_read_interfaces(SET_FOD_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_6:
+		fts_thp_ic_read_interfaces(SET_REPORT_RATE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_7:
+		fts_thp_ic_read_interfaces(SET_SCAN_FREQ_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_8:
+		fts_thp_ic_read_interfaces(SET_SCAN_FREQ_HOPPING_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_9:
+		fts_thp_ic_read_interfaces(SET_AFE_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_10:
+		fts_thp_ic_read_interfaces(SET_MC_SCAN_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_11:
+		fts_thp_ic_read_interfaces(SET_SC_SCAN_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_12:
+		fts_thp_ic_read_interfaces(SET_MC_CALIBRATION_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_13:
+		fts_thp_ic_read_interfaces(SET_SC_CALIBRATION_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_14:
+		fts_thp_ic_read_interfaces(SET_NULL_MODE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_15:
+		fts_thp_ic_read_interfaces(SET_INT_STATE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_16:
+		fts_thp_ic_read_interfaces(SET_BASE_REFRESH_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_17:
+		fts_thp_ic_read_interfaces(SET_FRAME_DATA_TYPE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_18:
+		fts_thp_ic_read_interfaces(SET_GAME_MODE_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_19:
+		fts_thp_ic_read_interfaces(SET_CHARGING_STATUS_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_20:
+		break;
+	case IC_MODE_21:
+		fts_thp_ic_read_interfaces(SET_GESTURE_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_22:
+		fts_thp_ic_read_interfaces(SET_CHLICK_GESTURE_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_23:
+		fts_thp_ic_read_interfaces(SET_DOUBLE_CHLICK_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_24:
+		fts_thp_ic_read_interfaces(SET_FLAG_BUF_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_25:
+	case IC_MODE_26:
+	case IC_MODE_27:
+	case IC_MODE_28:
+	case IC_MODE_29:
+	case IC_MODE_30:
+		fts_thp_ic_read_interfaces(SET_NULL_MODE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_31:
+		fts_thp_ic_read_interfaces(SET_IC_RUN_STEP_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_32:
+		fts_thp_ic_read_interfaces(SET_NULL_MODE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_33:
+		fts_thp_ic_read_interfaces(SET_IC_LOG_LEVEL_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_34:
+		fts_thp_ic_read_interfaces(SET_IC_CALIBRATEION_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_35:
+		fts_thp_ic_read_interfaces(SET_IC_SELF_TEST_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_36:
+		fts_thp_ic_read_interfaces(SET_IC_SOFT_RETEST_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_37:
+		fts_thp_ic_read_interfaces(SET_SCAN_SLOPE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_38:
+		fts_thp_ic_read_interfaces(SET_SCAN_VOLTAGE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_39:
+		fts_thp_ic_read_interfaces(SET_SCAN_NUM_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_40:
+		fts_thp_ic_read_interfaces(SET_SCAN_FREQ_NUM_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_41:
+		fts_thp_ic_read_interfaces(SET_IC_WORK_MODE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_42:
+		fts_thp_ic_read_interfaces(SET_FILTER_LEVEL_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_43:
+		fts_thp_ic_read_interfaces(SET_RAW_TYPE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_44:
+		fts_thp_ic_read_interfaces(SET_OPEN_TRANSPORT_MODE_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_45:
+		fts_thp_ic_read_interfaces(SET_CRC_EN_TYPE, (u8 *)value, value_len);
+		break;
+	case IC_MODE_46:
+	case IC_MODE_47:
+	case IC_MODE_48:
+		fts_thp_ic_read_interfaces(0x2, (u8 *)value, value_len);
+		break;
+	case IC_MODE_49:
+		fts_thp_ic_read_interfaces(SET_TOUCH_IC_INFO_TYPE, (u8 *)value, value_len);
+		break;
+	}
+
+	return 0;
 }
 
 int fts_lockdown_info_read(u8 *lockdown_info_buf)
@@ -4060,9 +4591,15 @@ void fts_init_hardware_param(void)
 	hardware_param.raw_data_page_size = 5;
 	hardware_param.raw_data_buf_size = 5;
 	memset(hardware_param.config_file_name, 0, 64);
-	memcpy(hardware_param.config_file_name, "pandora_focal_thp_config.ini", strlen("pandora_focal_thp_config.ini"));
+	/* _b582-INTD（A5-②）：blob fts_init_xiaomi_touchfeature_v3 0x37a4-0x37c8 的
+	 * config_file_name 实参 = .rodata.str1.1+0xe473 b'rodin_fts_thp_config.ini'
+	 * （19B+NUL）；树原串 "pandora_focal_thp_config.ini" 全 ko 0 命中 ⇒ 按 blob 换名。 */
+	memcpy(hardware_param.config_file_name, "rodin_fts_thp_config.ini", strlen("rodin_fts_thp_config.ini"));
 	memset(hardware_param.driver_version, 0, 64);
-	memcpy(hardware_param.driver_version, FOCAL_DRIVER_VERSION, strlen(FOCAL_DRIVER_VERSION));
+	/* _b582-INTD（A5-②）：blob 同位实参 = .rodata.str1.1+0x9b27 b'FT3683:2025.04.23-001'
+	 * （0x37bc-0x37e0 拷贝 24B；树 FOCAL_DRIVER_VERSION = "FT3383-2025.07.04-01" 全 ko
+	 * 0 命中）⇒ 按 blob 落串（core.h:130 的宏保持不动，改为未使用）。 */
+	memcpy(hardware_param.driver_version, "FT3683:2025.04.23-001", strlen("FT3683:2025.04.23-001"));
 	/* save lockdown type: u8 */
 	/* init lockdown_info/fw_version in fw_upgrade_work for the right data*/
 	fts_lockdown_info_read(hardware_param.lockdown_info);
@@ -4471,7 +5008,10 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     int pdata_size = sizeof(struct fts_ts_platform_data);
 
     FTS_FUNC_ENTER();
-    FTS_INFO("%s", FTS_DRIVER_VERSION);
+    /* _b582-INTA：族对齐 I→A（blob 0x578f '\0016[FTS_TS_A][%s:%d]: %s'，引用点
+     * fts_ts_probe+0x19c/0x1a0，**无门控**；%s 实参 = FTS_DRIVER_VERSION 串，
+     * blob 0x7754 的 x3 = .rodata.str1.1+0xff3d "Focaltech V3.4 20250724"）。 */
+    FTS_ALWAYS("%s", FTS_DRIVER_VERSION);
     ts_data->pdata = kzalloc(pdata_size, GFP_KERNEL);
     if (!ts_data->pdata) {
         FTS_ERROR("allocate memory for platform_data fail");
@@ -4530,7 +5070,12 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
 
     ret = fts_gpio_configure(ts_data);
     if (ret) {
-        FTS_ERROR("[DIS-TF-TOUCH] configure the gpios fail");
+        /* _b582-INTD（A2-1）：blob 同位消息 = .rodata.str1.1+0x4d25
+		 * b'\0016[FTS_TS_E][%s:%d]: failed init gpio'（引用点 0x861c，行 0x11d8=4568，
+		 * __func__ = 0xe50e "fts_ts_probe_entry"，FTS_ERROR 级 cbz 门）。
+		 * blob 全 ko 无 "[DIS-TF-TOUCH]" 串（0 命中），且无 "configure the gpios fail"
+		 * 字样 ⇒ 整串按 blob 收口（非仅删前缀）。 */
+        FTS_ERROR("failed init gpio");
         goto err_gpio_config;
     }
 
@@ -4579,9 +5124,12 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     }
 
 #ifdef TPDEBUG_IN_D
-    ts_data->tpdbg_dentry = debugfs_create_dir("tp_debug_1", NULL);
+    /* _b582-PROC：blob .rodata.str1.1 0x3024 = "tp_debug"（+0xdb8b "create tp_debug dir fail"），
+     * 树侧 "tp_debug_1" 为串面 EXTRA（debugfs 目录名非节点增删，按 blob 改名）。
+     * 6.18 fs/debugfs/inode.c:379 `if (IS_ERR(parent)) return parent;` ⇒ 即便同名失败也不崩。 */
+    ts_data->tpdbg_dentry = debugfs_create_dir("tp_debug", NULL);
     if (IS_ERR_OR_NULL(ts_data->tpdbg_dentry))
-		FTS_ERROR("create tp_debug_1 dir fail");
+		FTS_ERROR("create tp_debug dir fail");
 
     if (IS_ERR_OR_NULL(debugfs_create_file("switch_state", 0660,
 			ts_data->tpdbg_dentry, ts_data, &tpdbg_operations)))
@@ -4656,6 +5204,14 @@ if (ts_data->fts_tp_class == NULL) {
 
 	ts_data->charger_status = -1;
 
+	/* _b582-INTC：blob fts_ts_probe+0x12f0（0x88a8）**唯一**调用
+	 * fts_init_xiaomi_touchfeature_v3(ts_data)（= hardware_operation 表填充器）。
+	 * blob 次序：0x887c-0x8894 init_completion(&pm_completion)（done=0 + swait 名 "&x->wait"）、
+	 * 0x88a0 pm_suspend=false、0x88a4 charger_status=-1 之后紧接本调用，再 0x88b8-0x88f0
+	 * scp 参数填充、0x88f4 scp_tp_init。返值 blob 丢弃（0x88ac 起 w0 即被覆盖）⇒ 语句化调用。
+	 * blob 内 fts_fwupg_work（0x2f0ac 段）**无**该调用（INT-B 已按 blob 删除）⇒ 此处为唯一填充点。 */
+	fts_init_xiaomi_touchfeature_v3(ts_data);
+
 	/* _b573 scp 接线：blob 0x88b8-0x88f4 = 探针尾填 fts_scp_tp_param 缺省后 fts_scp_tp_init()。
 	 * blob 从 ts_data 0x434 读的一字全模块零写入（kzalloc 后恒 0），按 0 种子化。 */
 	fts_scp_tp_param.param0 = 2;
@@ -4665,11 +5221,22 @@ if (ts_data->fts_tp_class == NULL) {
 	fts_scp_tp_param.unknown_14[1] = 9;
 	fts_scp_tp_param.unknown_14[2] = 1;
 	fts_scp_tp_param.unknown_14[3] = 0;
+
+	/* _b582-INTD（A1）：blob ts_info 级打印补位 —— blob fts_ts_probe 0x88f0
+	 * `cmp w8,#3; b.hs 0x8aa4`（W 门 = FTS_LOG_INFO），0x8aa4/0x8aa8 = adrp/add
+	 * .rodata.str1.1 + 0x10ff5 = b'\0016[FTS_TS_I][%s:%d]: mtk_scp_touch_init in probe'，
+	 * 行号 w2 = 0x13df = 5087；printk 后 0x8abc `b 0x88f4` 回到 scp_tp_init 调用点。
+	 * 位置：scp 参数填充（0x88b8-0x88ec）之后、scp_tp_init（0x88f4）之前。
+	 * 端口固有差（记录，不搬函数）：blob 该 printk 的 __func__ 实参 = 0x1f55
+	 * "fts_ts_probe"（blob 侧 fts_ts_probe_entry 被内联进 fts_ts_probe），
+	 * 树侧本处在 fts_ts_probe_entry 体内 ⇒ 树侧 __func__ = "fts_ts_probe_entry"。 */
+	FTS_INFO("mtk_scp_touch_init in probe");
+
 	fts_scp_tp_init();
 
-	/*fts_init_xiaomi_touchfeature_v3 in fw_upgrade_work*/
-	/*fts_init_xiaomi_touchfeature_v3(ts_data);
-	fts_enable_touch_raw(1);*/
+	/* _b582-INTC：fts_enable_touch_raw(1) 的 blob 唯一调用点在 fts_fwupg_work（0x2f0ac 段，
+	 * INT-B 已按 blob 收口），树侧保持注释、不挪到 probe。 */
+	/*fts_enable_touch_raw(1);*/
 
 	FTS_FUNC_EXIT();
 	return 0;
@@ -4686,11 +5253,10 @@ err_power_init:
 err_gpio_config:
 	kfree_safe(ts_data->touch_buf);
 err_buffer_init:
-#if 1
-	unregister_xiaomi_input_dev(TOUCH_ID);
-#else
+	/* _b582-INPUT：blob fts_ts_probe+0x8440-0x8444 = ldr x0,[ts+0x18]==input_dev 后
+	 * 直接 input_unregister_device（blob 无 unregister_xiaomi_input_dev 类符号/串），
+	 * 与 fts_ts_remove_entry 同形。FTS_PEN_EN=0 时笔设备路径不生成（blob 无 pen）。 */
 	input_unregister_device(ts_data->input_dev);
-#endif
 #if FTS_PEN_EN
 	input_unregister_device(ts_data->pen_dev);
 #endif
@@ -4769,25 +5335,66 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
     return 0;
 }
 
-static int fts_ts_suspend(struct device *dev)
+static __attribute__((always_inline)) inline int fts_ts_suspend(struct device *dev)
 {
 	int ret = 0;
 	struct fts_ts_data *ts_data = fts_data;
-	FTS_FUNC_ENTER();
+	/* _b582-SLEEP：blob 忠实形态——blob 的 suspend 半首条打印是带实参的
+	 * "Enter, scptp_cur_state=%d"（0x26f0，L4809，实参 scp_tp_param.param0，门
+	 * debug>=3），不是 FTS_FUNC_ENTER 宏串（blob 该函数内无 "Enter" 宏串）。 */
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("Enter, scptp_cur_state=%d", fts_scp_tp_param.param0);
 	if (ts_data->suspended) {
-		FTS_INFO("Already in suspend state");
+		FTS_INFO("Already in suspend state");	/* blob 0x2658，L4811 */
 		return 0;
 	}
 	if (ts_data->fw_loading) {
-		FTS_INFO("fw upgrade in process, can't suspend");
+		FTS_INFO("fw upgrade in process, can't suspend");	/* blob 0x272c，L4815 */
 		return 0;
+	}
+	/* _b582-SLEEP：blob 0x2744 无条件 enable_temperature_detection_func(0)
+	 * （blob 只置 w0=0；导出者原型 (s8 touch_id, bool is_resume)，按 goodix_brl
+	 * 同形补 TOUCH_ID/false）。 */
+	enable_temperature_detection_func(TOUCH_ID, false);
+	/* _b582-SLEEP：blob 0x2750 起 palm_status（+0xbd8）块——掌面 ON->OFF：
+	 * debug>=3 打印（0x2cd8，L4823）+ update_palm_sensor_value_common(0)（0x2764）
+	 * + 写 0x9A=0（0x2774）；失败/成功打印同 fts_palm_sensor_write（0x2d74 L2556 /
+	 * 0x2790 L2558）。blob 该处另有 cbz x19（NULL）校验，因上方已解引用 +0xbd8
+	 * 属死码，树侧按 IS_ERR 单判（等效）。 */
+	if (ts_data->palm_status) {
+		if (fts_debug_log_level >= 3)
+			FTS_INFO("palm sensor ON, switch to OFF");
+		update_palm_sensor_value_common(0);
+		if (!IS_ERR(ts_data)) {
+			ret = fts_write_reg(0x9A, 0);
+			if (ret < 0) {
+				if (fts_debug_log_level)
+					FTS_ERROR("Set palm sensor switch failed!\n");
+			} else if (fts_debug_log_level >= 3) {
+				FTS_INFO("Set palm sensor switch: %d\n", 0);
+			}
+		}
+	}
+	/* _b582-SLEEP：blob 0x2964 gesture_cmd_delay（+0xbec）块——睡眠期手势变更被
+	 * fts_update_gesture_state 记成「延迟」，此处消费：打印（0x2cf4，L4829，
+	 * debug>=3）、按 gesture_status 重算 gesture_support（0x2980）、清延迟标志
+	 * （0x2988）。与 fts_update_gesture_state 的 suspended 分支成对。 */
+	if (ts_data->gesture_cmd_delay) {
+		if (fts_debug_log_level >= 3)
+			FTS_INFO("suspended gesture state:0x%02X, write cmd:0x%02X", ts_data->gesture_status, ts_data->gesture_cmd);
+		ts_data->gesture_support = ts_data->gesture_status != 0 ? ENABLE : DISABLE;
+		ts_data->gesture_cmd_delay = false;
 	}
 #ifdef FTS_XIAOMI_TOUCHFEATURE
 	ts_data->fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10);
 	ts_data->aod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_11);
 	ts_data->doubletap_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_14);
-	FTS_INFO("fod_status:%d, doubletap_status:%d, aod_status:%d", ts_data->fod_status, ts_data->doubletap_status, ts_data->aod_status);
-	if ((ts_data->fod_status != 0 && ts_data->fod_status != -1 && ts_data->fod_status != 100) || ts_data->doubletap_status || ts_data->aod_status) {
+	/* _b582-SLEEP：blob 0x29b8-0x29e0 首条件为 (fod 不在 {0,-1}) || dt || aod
+	 * （LLVM 减法技巧：w8=fod-1; cmn w8,#2; b.lo 即 fod∉{0,-1}），树侧原多一个
+	 * fod_status != 100；第二条件与 blob 同（三者全 0 -> gesture_support=0）。
+	 * 树侧仍镜像写入三个 status 字段（blob 用局部量，但输入面/唤醒面消费这些
+	 * 字段，保留写入）。 */
+	if ((ts_data->fod_status != 0 && ts_data->fod_status != -1) || ts_data->doubletap_status || ts_data->aod_status) {
 		ts_data->gesture_support = 1;
 	}
 	/*Fod_status is 0 when the fingerprint is closed after locking the screen*/
@@ -4796,86 +5403,116 @@ static int fts_ts_suspend(struct device *dev)
 	}
 #endif
 #ifdef FTS_TOUCHSCREEN_FOD
+	/* _b582-SLEEP：blob 0x29e4 在 FOD 块前重读 get_mode(0,10)（blob 该函数 4 次
+	 * driver_get_touch_mode_common 的第 4 次），CF 判定用新值；树侧原复用上面
+	 * 同一次读取值（旧值）。 */
+	ts_data->fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10);
 	if ((ts_data->fod_status == -1 || ts_data->fod_status == 100)) {
-		FTS_INFO("clear CF reg");
-		 ret = fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, false);
+		FTS_INFO("clear CF reg");	/* blob 0x2c78，L4848 */
+		 ret = fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, false);	/* blob 0x2a40 前 0x2a10 */
 		if (ret < 0)
-			FTS_ERROR("%s fts_fod_reg_write failed\n", __func__);
+			FTS_ERROR("%s fts_fod_reg_write failed\n", __func__);	/* blob 0x2c94，L4851 */
 	}
-	if ((ts_data->fod_status != -1 && ts_data->fod_status != 100 && ts_data->fod_status != 0)) {
-		FTS_INFO("write CF reg");
-		ret = fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, true);
+	/* _b582-SLEEP：blob write 支路条件只有两道判定（0x2a00：fod!=100 且 fod!=-1，
+	 * 含 fod==0 直落写支路），树侧原多一个 != 0；且该支路无任何打印（blob 串表
+	 * 无 "write CF reg"，写支路 0x2a38 直接进 fts_fod_reg_write）。 */
+	if ((ts_data->fod_status != -1 && ts_data->fod_status != 100)) {
+		ret = fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, true);	/* blob 0x2a40 */
 		if (ret < 0)
-			FTS_ERROR("%s fts_fod_reg_write failed\n", __func__);
-		fts_gesture_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);
+			FTS_ERROR("%s fts_fod_reg_write failed\n", __func__);	/* blob 0x2d14，L4856 */
+		fts_gesture_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);	/* blob 0x2a5c */
 		if (ret < 0)
-			FTS_ERROR("%s fts_fod_reg_write failed\n", __func__);
+			FTS_ERROR("%s fts_fod_reg_write failed\n", __func__);	/* blob 0x2d34，L4859 */
 	}
 #endif
-	fts_esdcheck_suspend(ts_data);
+	fts_esdcheck_suspend(ts_data);	/* blob 0x2a70 */
 #ifdef CONFIG_FACTORY_BUILD
 	ts_data->poweroff_on_sleep = true;
 #endif
 
-	FTS_INFO("gesture_support:%d  poweroff_on_sleep:%d ", ts_data->gesture_support, ts_data->poweroff_on_sleep);
+	/* _b582-SLEEP：blob 0x2c04 串带 %s（__func__）与行号 L4867（树侧旧串无 %s） */
+	FTS_INFO("%s : gesture_support:%d  poweroff_on_sleep:%d ", __func__, ts_data->gesture_support, ts_data->poweroff_on_sleep);
 	if (ts_data->gesture_support && !ts_data->poweroff_on_sleep)
-		fts_gesture_suspend(ts_data);
+		fts_gesture_suspend(ts_data);	/* blob 0x2b28 */
 	else {
-		fts_irq_disable();
-		FTS_INFO("make TP enter into sleep mode");
-		ret = fts_write_reg(FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP);
-		ts_data->poweroff_on_sleep = true;
+		fts_irq_disable();			/* blob 0x2a9c..0x2ad4（blob 侧内联） */
+		FTS_INFO("make TP enter into sleep mode");	/* blob 0x2c70，L4872 */
+		ret = fts_write_reg(FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP);	/* blob 0x2aec = (0xA5,3) */
+		ts_data->poweroff_on_sleep = true;	/* blob 0x2af4：写寄存器之后置位 */
 		if (ret < 0)
-			FTS_ERROR("set TP to sleep mode fail, ret=%d", ret);
+			FTS_ERROR("failed send sleep cmd, ret=%d", ret);	/* blob 0x2b08，L4876（树侧旧串不同） */
 	}
 #ifdef CONFIG_FACTORY_BUILD
 	FTS_INFO("[%s] factory disable power", __func__);
 	fts_power_source_ctrl(ts_data, DISABLE);
 #endif
-	ts_data->finger_in_fod = false;
 
-	/* _b573 scp 联动：blob 0x2b3c-0x2b88 = suspend 尾把手势移交 SCP
-	 * （10diff 复位先行；未关防误触且 param0>=2 时切 scp 通道） */
-	if (ts_data->gesture_status) {
-		fts_gesture_10diff_reg_write(0);
-		if (!fts_scp_tp_mistouch_close && fts_scp_tp_param.param0 >= 2) {
-			ret = fts_scp_tp_switch(1);
-			if (ret)
-				FTS_ERROR("scp_tp_switch fail, ret=%d", ret);
-		}
+	/* _b582-SLEEP：树侧原在此处有 ts_data->finger_in_fod = false;，blob 睡眠面
+	 * 无该写入（blob 该字段写入只在 fts_set_fod_downup 0x5d28 与 FOD 上报路径
+	 * 0xf68/0x147c）；而唤醒半的复位判据正是读 finger_in_fod/fod_finger_skip
+	 * （0x2610/0x2618），睡眠期清零会破坏该判据 ⇒ 按 blob 删除。
+	 * _b582-SLEEP：blob 0x2b2c-0x2b88 = suspend 尾把手势移交 SCP。按 blob 条件：
+	 * 防误触开(0x2b34) -> 仅 gesture_support(+0x2e4) 时 10diff 复位(0x2b48)；
+	 * 防误触关 -> param0>=2 且 gesture_support 时切 scp 通道(0x2b7c)。树侧原以
+	 * gesture_status(+0x829) 为门且结构为嵌套 if，与 blob 不符。 */
+	if (fts_scp_tp_mistouch_close) {
+		if (ts_data->gesture_support)
+			fts_gesture_10diff_reg_write(0);
+	} else if (fts_scp_tp_param.param0 >= 2 && ts_data->gesture_support) {
+		ret = fts_scp_tp_switch(1);
+		if (ret)
+			FTS_ERROR("scp_tp_switch fail, ret=%d", ret);	/* blob 0x2d54，L4887 */
+	}
+	/* _b582-SLEEP：blob 0x2b90-0x2ba0 param0<=1 时的 scptp_cur_state 报错
+	 * （树侧缺失；blob 门为 debug_log_level != 0，串尾带 \n）。 */
+	if (fts_scp_tp_param.param0 <= 1) {
+		if (fts_debug_log_level)
+			FTS_ERROR("scp_tp_switch fail, scptp_cur_state=%d\n", fts_scp_tp_param.param0);	/* blob 0x2c24，L4891 */
 	}
 
-	fts_release_all_finger();
-	ts_data->suspended = true;
+	fts_release_all_finger();	/* blob 0x2ba0 */
+	ts_data->suspended = true;	/* blob 0x2bac */
 	/*notify thp for suspend state*/
-	FTS_FUNC_EXIT();
+	/* _b582-SLEEP：blob 末条是 I 级串 "\0016[FTS_TS_I][%s:%d]: Exit"（0x2bb8，L4902，
+	 * 门 debug>=3）；树侧 FTS_FUNC_EXIT 为 V 级(>=5)串，此处按 blob 用 FTS_INFO。 */
+	FTS_INFO("Exit");
 	return 0;
 }
 
-static int fts_ts_resume(struct device *dev)
+static __attribute__((always_inline)) inline int fts_ts_resume(struct device *dev)
 {
 	/*u8 id = 0;*/
 	/*int i = 0;*/
+	int ret = 0;
 	struct fts_ts_data *ts_data = fts_data;
-	FTS_FUNC_ENTER();
+	/* _b582-SLEEP：与 suspend 半同形——首条打印为带实参的
+	 * "Enter, scptp_cur_state=%d"（blob 0x26a4，L4914，门 debug>=3），
+	 * 不是 FTS_FUNC_ENTER 宏串。 */
+	if (fts_debug_log_level >= 3)
+		FTS_INFO("Enter, scptp_cur_state=%d", fts_scp_tp_param.param0);
 	if (!ts_data->suspended) {
-		FTS_DEBUG("Already in awake state");
+		FTS_DEBUG("Already in awake state");	/* blob 0x26d8，L4916（blob 为 D 级，门 debug>=4） */
 		return 0;
 	}
 	/* _b573 scp 联动：blob 0x25d4-0x2608 = resume 先从 SCP 收回手势
 	 * （param0∈{2,3} 且（param0==3 或未关防误触）） */
 	if (fts_scp_tp_param.param0 >= 2 &&
 	    (fts_scp_tp_param.param0 == 3 || !fts_scp_tp_mistouch_close)) {
-		int ret = fts_scp_tp_switch(0);
+		ret = fts_scp_tp_switch(0);
 
 		if (ret)
-			FTS_ERROR("scp_tp_switch fail, ret=%d", ret);
+			FTS_ERROR("scp_tp_switch fail, ret=%d", ret);	/* blob 0x2688，L4925 */
 	}
-	ts_data->suspended = false;
+	ts_data->suspended = false;	/* blob 0x2608（在 scp 块之后） */
 #ifndef CONFIG_FACTORY_BUILD
 #ifdef FTS_TOUCHSCREEN_FOD
-	FTS_INFO("%s finger_in_fod:%d fod_finger_skip:%d\n", __func__, ts_data->finger_in_fod, ts_data->fod_finger_skip);
-	if (!ts_data->finger_in_fod && !ts_data->fod_finger_skip) {
+	/* _b582-SLEEP：blob 0x2610-0x263c 两分支互斥——finger_in_fod/fod_finger_skip
+	 * 命中则只打明细（0x27d8，L4933），否则 "resume reset"（0x2cd0，L4935）+
+	 * fts_reset_proc(40)/fts_recover_after_reset/fts_release_all_finger 三步复位。
+	 * 树侧原为「先无条件打明细再判 if」，与 blob 的分支位置不符。 */
+	if (ts_data->finger_in_fod || ts_data->fod_finger_skip) {
+		FTS_INFO("%s finger_in_fod:%d fod_finger_skip:%d\n", __func__, ts_data->finger_in_fod, ts_data->fod_finger_skip);
+	} else {
 		FTS_INFO("resume reset");
 		fts_reset_proc(40);
 		fts_recover_after_reset();
@@ -4894,19 +5531,41 @@ static int fts_ts_resume(struct device *dev)
 		fts_release_all_finger();
 #endif
 	}
-	fts_ex_mode_recovery(ts_data);
-	fts_esdcheck_resume(ts_data);
+	/* _b582-SLEEP：blob 0x27e4/0x27f4 唤醒必做且无条件——温度检测开（w0=1）
+	 * 与热区温度 force 重设 fts_set_thermal_temp(0,1)（树侧两处均缺失）。 */
+	enable_temperature_detection_func(TOUCH_ID, true);
+	fts_set_thermal_temp(0, true);
+	fts_ex_mode_recovery(ts_data);	/* blob 0x27fc */
+	fts_esdcheck_resume(ts_data);	/* blob 0x2804 */
+	/* _b582-SLEEP：blob 0x2808 palm_status（+0xbd8）块——掌面 OFF->ON：写 0x9A=5
+	 * （失败/成功打印 0x285c L2556 / 0x2838 L2558），块尾 debug>=3 再补
+	 * "palm sensor OFF, switch to ON"（0x2bd0，L4961）。blob 该处 cbz x19 校验同
+	 * suspend 半属死码，树侧按 IS_ERR 单判。 */
+	if (ts_data->palm_status) {
+		if (!IS_ERR(ts_data)) {
+			ret = fts_write_reg(0x9A, 5);
+			if (ret < 0) {
+				if (fts_debug_log_level)
+					FTS_ERROR("Set palm sensor switch failed!\n");
+			} else if (fts_debug_log_level >= 3) {
+				FTS_INFO("Set palm sensor switch: %d\n", 1);
+			}
+		}
+		if (fts_debug_log_level >= 3)
+			FTS_INFO("palm sensor OFF, switch to ON");
+	}
 	/* enable charger mode */
 	if (ts_data->charger_status)
-		fts_write_reg(FTS_REG_CHARGER_MODE_EN, true);
+		fts_charger_on(ts_data, true);	/* blob 0x2890（树侧原直写 0x8B 寄存器，blob 调 fts_charger_on） */
 	if (ts_data->gesture_support && !ts_data->poweroff_on_sleep)
-		fts_gesture_resume(ts_data);
-	fts_irq_enable();
-	ts_data->poweroff_on_sleep = false;
+		fts_gesture_resume(ts_data);	/* blob 0x28a8 */
+	fts_irq_enable();			/* blob 0x28b8..0x28ec（blob 侧内联） */
+	ts_data->poweroff_on_sleep = false;	/* blob 0x28f8（早于 fts_gesture_reg_write 调用点） */
 #ifdef FTS_TOUCHSCREEN_FOD
-	fts_gesture_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, false);
+	fts_gesture_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, false);	/* blob 0x28fc = (1,0) */
 #endif
-	FTS_FUNC_EXIT();
+	/* _b582-SLEEP：同上——blob 0x2944 "\0016[FTS_TS_I][%s:%d]: Exit"（L4974，门>=3） */
+	FTS_INFO("Exit");
 	return 0;
 }
 
@@ -4953,7 +5612,9 @@ static int fts_ts_probe(struct spi_device *spi)
     int ret = 0;
     struct fts_ts_data *ts_data = NULL;
 
-    FTS_INFO("Touch Screen(SPI BUS) driver probe...");
+    /* _b582-INTA：族对齐 I→A（blob 0x10fba '\0016[FTS_TS_A][%s:%d]: Touch Screen(SPI BUS)
+     * driver probe...'，引用点 fts_ts_probe+0x48（0x7600），**无门控**） */
+    FTS_ALWAYS("Touch Screen(SPI BUS) driver probe...");
 
     /* A-78 判型门（blob 同形；#222 原在 module init，initcall 期 pio gpiochip
      * 未注册 → gpio_request 恒 -517 双 fail-open 门空转）：移到 probe 顶端，
@@ -4968,7 +5629,9 @@ static int fts_ts_probe(struct spi_device *spi)
 
     		FTS_INFO("gpio_det1 = %d", gpio_det1);
     		if (gpio_det1 != 1) {
-    			FTS_INFO("TP is not focal!");
+    			/* _b582-INTA：HIT_NL 补尾 '\n'（blob 0x8367 '\0016[FTS_TS_I][%s:%d]: TP is not focal!\n'，
+    			 * intA_strref 逐字节命中；树侧原无 '\n'） */
+    			FTS_INFO("TP is not focal!\n");
     			return -ENODEV;
     		}
     	} else {
@@ -4989,7 +5652,10 @@ static int fts_ts_probe(struct spi_device *spi)
     spi->bits_per_word = 8;
     ret = spi_setup(spi);
     if (ret) {
-        FTS_ERROR("[DIS-TF-TOUCH] spi setup fail");
+        /* _b582-INTD（A2-2）：blob = .rodata.str1.1+0xe4ea
+		 * b'\0016[FTS_TS_E][%s:%d]: spi setup fail'（0x7638/0x764c，行 0x13a5=5029，
+		 * __func__ 0x1f55 "fts_ts_probe"）⇒ 删前缀。 */
+        FTS_ERROR("spi setup fail");
         return ret;
     }
 
@@ -5015,7 +5681,11 @@ static int fts_ts_probe(struct spi_device *spi)
 
     ret = fts_ts_probe_entry(ts_data);
     if (ret) {
-        FTS_ERROR("[DIS-TF-TOUCH] Touch Screen(SPI BUS) driver probe fail");
+        /* _b582-INTD（A2-3）：blob 同位消息 = .rodata.str1.1+0x4cde
+		 * b'\0016[FTS_TS_E][%s:%d]: Touch Screen(SPI BUS) driver spi probe out failed'
+		 * （0x84bc/0x84d0，行 0x13bf=5055，__func__ 0x1f55 "fts_ts_probe"）——
+		 * 与树原串不同文（非仅前缀差），按 blob 整串收口（blob 无 "probe fail" 字样）。 */
+        FTS_ERROR("Touch Screen(SPI BUS) driver spi probe out failed");
         kfree_safe(ts_data);
         return ret;
     }

@@ -61,8 +61,8 @@
 #define CSV_TP_NOISE_LIMIT "noise_data_limit"
 #define CSV_TP_SELFNOISE_LIMIT "noise_selfdata_limit"
 #define CSV_TP_TEST_CONFIG "test_config"
-#define CSV_TP_DIFF_SHIFT_MAX "diff_shift_max"
-#define CSV_TP_ADC_DUMP_MAX_MIN "adcdump_max_min_threshold"
+/* _b582-GXI：blob 全 ko 无 diff_shift_max / adcdump_max_min_threshold 两 CSV 键
+ * （对应 diff-shift 与 adcdump 两块 warsaw 独有面，连同其解析/判定/落盘一并按 blob 删除）。 */
 #define CSV_TP_FILE_VERSION "version"
 
 #define MAX_TEST_TIME_MS 15000
@@ -114,10 +114,6 @@
 #define MAX_ABS(a, b)			((ABS(a) > ABS(b))? a : b)
 #define MIN_ABS(a, b)			((ABS(a) > ABS(b))? b : a)
 #define MAX(a, b) ((a > b) ? a : b)
-
-//for diffshift
-static char g_limit_file_name[100];
-
 
 enum GTP_TEST_ITEMS {
 	GTP_CAP_TEST = 0,
@@ -352,10 +348,7 @@ struct goodix_ts_test {
 	char test_result[MAX_TEST_ITEMS];
 	char test_info[TS_RAWDATA_RESULT_MAX];
 	u8 frame_buf[8*1024];
-} *g_ts_test;
-
-static DEFINE_MUTEX(inspect_mutex);
-static DECLARE_COMPLETION(inspect_done);
+};
 
 static u8 g_test_config[4096];
 static int g_test_config_len;
@@ -407,99 +400,24 @@ static int ts_test_write(struct goodix_ts_test *ts_test, u32 addr, u8 *data, u32
 	return ts_test->ts->hw_ops->write(ts_test->ts, addr, data, len);
 }
 
+/* _b582-GXI：blob 无 ts_test_send_cmd 符号，且全 ko 无 "write cmd [0x%04X]"/"read ack
+ * [0x%04X]"/"can't receive cmd ack" 三串 ⇒ 厂商此 helper 为**裸转发**（rc 全内联）：
+ * blob goodix_capacitance_test 0x17c3c/0x18760/0x18834/0x18954/0x19340/0x19394、
+ * goodix_shortcircut_test 0x19de4/0x1a118 处均为 `ldr x8,[x8,#0x58](send_cmd); blr x8`
+ * 间接调用；ack 轮询/打印在其 blob 内联体中不存在（brl_send_cmd 自带轮询 + msleep(15)，
+ * b581 已对齐）。原树 warsaw 变体（自写 cmd_addr + 5 次 ack 轮询 + msleep(20) + 2 打印）
+ * 按 blob 收口。 */
 static int ts_test_send_cmd(struct goodix_ts_test *ts_test,
 		struct goodix_ts_cmd *cmd)
 {
-	u32 cmd_addr = ts_test->ts->ic_info.misc.cmd_addr;
-	int retry = 5;
-	u8 recv_buf[8] = {0};
-	int i;
-	u16 checksum = 0;
-
 	cmd->state = 0;
 	cmd->ack = 0;
-	for (i = 0; i < cmd->len; i++)
-		checksum += cmd->buf[i];
-	cmd->buf[cmd->len] = checksum & 0xFF;
-	cmd->buf[cmd->len + 1] = (checksum >> 8) & 0xFF;
-
-	ts_info("write cmd [0x%04X]: %*ph",
-		cmd_addr,
-		(cmd->len + 2) > 24 ? 24 : cmd->len + 2,
-		cmd->buf);
-
-	ts_test->ts->hw_ops->write(ts_test->ts, cmd_addr, cmd->buf, cmd->len + 2);
-	while (retry--) {
-		usleep_range(2000, 2100);
-		ts_test->ts->hw_ops->read(ts_test->ts, cmd_addr, recv_buf, sizeof(recv_buf));
-
-		ts_info("read ack [0x%04X]: %*ph",
-			cmd_addr,
-			(int)sizeof(recv_buf) > 24 ? 24 : (int)sizeof(recv_buf),
-			recv_buf);
-
-		if (recv_buf[1] == 0x80)
-			break;
-	}
-	if (retry < 0) {
-		ts_err("can't receive cmd ack:%x", recv_buf[1]);
-		return -1;
-	}
-	msleep(20);
-	return 0;
+	return ts_test->ts->hw_ops->send_cmd(ts_test->ts, cmd);
 }
 
 static int ts_test_irq_enable(struct goodix_ts_test *ts_test, bool flag)
 {
 	return ts_test->ts->hw_ops->irq_enable(ts_test->ts, flag);
-}
-
-static int ts_test_send_config(struct goodix_ts_test *ts_test, u8 *cfg, u32 len)
-{
-	struct goodix_ts_hw_ops *hw_ops = ts_test->ts->hw_ops;
-	u32 fw_buffer_addr = ts_test->ts->ic_info.misc.fw_buffer_addr;
-	u32 cmd_addr = ts_test->ts->ic_info.misc.cmd_addr;
-	u8 start_cmd[] = {0x00, 0x00, 0x04, 0x04, 0x08, 0x00};
-	u8 write_cmd[] = {0x00, 0x00, 0x04, 0x05, 0x09, 0x00};
-	u8 end_cmd[] = {0x00, 0x00, 0x04, 0x06, 0x0A, 0x00};
-	int retry;
-	u8 recv_buf[2];
-	int ret = 0;
-
-	hw_ops->write(ts_test->ts, cmd_addr, start_cmd, sizeof(start_cmd));
-	retry = 20;
-	while (retry--) {
-		usleep_range(5000, 5100);
-		hw_ops->read(ts_test->ts, cmd_addr, recv_buf, sizeof(recv_buf));
-		if (recv_buf[0] == 0x80 && recv_buf[1] == 0x80)
-			break;
-	}
-	if (retry < 0) {
-		ts_err("failed write cfg prepare cmd, %x %x", recv_buf[0], recv_buf[1]);
-		return -1;
-	}
-
-	hw_ops->write(ts_test->ts, fw_buffer_addr, cfg, len);
-	hw_ops->write(ts_test->ts, cmd_addr, write_cmd, sizeof(write_cmd));
-	retry = 40;
-	while (retry--) {
-		usleep_range(5000, 5100);
-		hw_ops->read(ts_test->ts, cmd_addr, recv_buf, sizeof(recv_buf));
-		if (recv_buf[0] == 0x80 && recv_buf[1] == 0x80)
-			break;
-	}
-	if (retry < 0) {
-		ts_err("failed send config data ready cmd, %x %x", recv_buf[0], recv_buf[1]);
-		ret = -1;
-	}
-
-	hw_ops->write(ts_test->ts, cmd_addr, end_cmd, sizeof(end_cmd));
-	if (ret == 0) {
-		msleep(100);
-		ts_info("success send config");
-	}
-
-	return ret;
 }
 
 static int ts_test_read_version(struct goodix_ts_test *ts_test, struct goodix_fw_version *version)
@@ -772,18 +690,13 @@ static int goodix_init_testlimits(struct goodix_ts_test *ts_test)
 	int freq_num = ts_core->ic_info.parm.mutual_freq_num;
 	char tmp_str[64] = {0};
 	int freq_cnt;
-	bool flag = false;
 
-	flag = goodix_get_ic_self_test_mode();
-
-	//工厂自检默认都会传文件名
-	if (flag) {
-		ts_info("use default limit file");
-		sprintf(limit_file, "%s_%d.csv", ts_core->board_data.limit_csv_name, ts_core->fw_version.sensor_id);
-	} else {
-		ts_info("use g_limit_file_name");
-		sprintf(limit_file, "%s_%d.csv", g_limit_file_name, ts_core->fw_version.sensor_id);
-	}
+	/* _b582-GXI：blob goodix_tptest_prepare 内联体 0x17230-0x172d8：limit_file 直接
+	 * `sprintf("%s_%d.csv", cd->board_data.limit_csv_name, cd->fw_version.sensor_id)`，
+	 * 无 goodix_get_ic_self_test_mode 门控、无 "use default limit file"/
+	 * "use g_limit_file_name" 两打印（blob 全 ko 无此二串、无 g_limit_file_name 全局）
+	 * ⇒ 原树 warsaw 分支按 blob 收口。 */
+	sprintf(limit_file, "%s_%d.csv", ts_core->board_data.limit_csv_name, ts_core->fw_version.sensor_id);
 	ts_info("limit_file_name:%s", limit_file);
 
 	ret = request_firmware(&firmware, limit_file, dev);
@@ -890,15 +803,8 @@ static int goodix_init_testlimits(struct goodix_ts_test *ts_test)
 		test_params->test_items[GTP_SELFNOISE_TEST] = true;
 	}
 
-	ret = parse_csvfile(temp_buf, firmware->size, CSV_TP_ADC_DUMP_MAX_MIN,
-			&test_params->adcdump_max_min_threshold, 1, 1);
-	if (ret < 0) {
-		ts_info("Can't find adcdump_max_min_threshold, use default val[%d]", 18);
-		test_params->adcdump_max_min_threshold = 18;
-	} else {
-		ts_info("parse_csvfile %s OK, val[%d]", CSV_TP_ADC_DUMP_MAX_MIN,
-				test_params->adcdump_max_min_threshold);
-	}
+	/* _b582-GXI：blob 无 adcdump_max_min_threshold CSV 解析（键串/两打印全 ko 无；
+	 * 与 goodix_check_chn_adc 及 <AdcDump*> 落盘同属 warsaw 独有 adcdump 面）→ 删除。 */
 
 	/* obtain short_params */
 	ret = parse_csvfile(temp_buf, firmware->size, CSV_TP_SHORT_THRESHOLD, (s32 *)data_buf, 1, 7);
@@ -935,31 +841,9 @@ static int goodix_init_testlimits(struct goodix_ts_test *ts_test)
 		}
 	}
 
-	test_params->test_items[GTP_DIFF_SHIFT_TEST] = false;
-	memset(test_params->diff_shift_freq, 0, sizeof(test_params->diff_shift_freq));
-	for (freq_cnt = 0, i = 0; i < freq_num; i++) {
-		memset(tmp_str, 0, sizeof(tmp_str));
-		sprintf(tmp_str, "%s%d", CSV_TP_DIFF_SHIFT_MAX, i);
-		ret = parse_csvfile(temp_buf, firmware->size, tmp_str,
-				test_params->diff_shift_max[i], rx, tx);
-		if (ret == -EINTR)
-			continue;
-
-		if (ret < 0){
-			ts_err("failed get freq diff shift max %d", i);
-			goto exit_free;
-		}
-
-		ts_info("parse_csvfile %s, freq %d OK", CSV_TP_DIFF_SHIFT_MAX, i);
-		test_params->diff_shift_freq[i] = 1;
-		freq_cnt++;
-	}
-	ret = 0;
-	if (freq_cnt) {
-		test_params->diff_shift_test_freq_cnt = freq_cnt;
-		test_params->test_items[GTP_DIFF_SHIFT_TEST] = true;
-		ts_info("%s: test freq num %d", CSV_TP_DIFF_SHIFT_MAX, freq_cnt);
-	}
+	/* _b582-GXI：blob 无 diff_shift_max CSV 解析（键串、"parse_csvfile %s, freq %d OK"、
+	 * "failed get freq diff shift max %d"、"%s: test freq num %d" 全 ko 无；
+	 * 连同 goodix_diff_shift_test_* / save_diff_shift_data 整族 warsaw 面按 blob 删除）。 */
 
 exit_free:
 	vfree(temp_buf);
@@ -994,9 +878,15 @@ static int goodix_tptest_prepare(struct goodix_ts_test *ts_test)
 	return 0;
 }
 
-/* _b571：blob 版（补 normal config 重发块）helper */
-static int ts_test_send_normal_config(struct goodix_ts_core *cd)
+/* _b582-GXI：blob 名为 ts_test_send_config —— goodix_tptest_finish 内联体的
+ * "no valid normal config found" 打印（blob 0x1f5ec-0x1f604，__func__ 串
+ * .rodata+0xb040 = "ts_test_send_config"，厂商源行 402）证明：厂商的
+ * ts_test_send_config 就是本 helper（normal config 重发）；而 cap_test_prepare 送测试
+ * cfg 走的是 hw_ops->send_config。原树误名 ts_test_send_normal_config（blob 无此串）
+ * → 正名；入参 ts_test*（blob: x19=ts_test，取 ts_test->ts 的 ic_configs[NORMAL]）。 */
+static int ts_test_send_config(struct goodix_ts_test *ts_test)
 {
+	struct goodix_ts_core *cd = ts_test->ts;
 	struct goodix_ic_config *cfg = cd->ic_configs[CONFIG_TYPE_NORMAL];
 
 	if (!cfg || cfg->len <= 0) {
@@ -1014,7 +904,7 @@ static void goodix_tptest_finish(struct goodix_ts_test *ts_test)
 
 	/* blob 0x1f4f0：测试用 cfg 发过就别把测试配置留在 IC 里，重发常规配置 */
 	if (ts_test->test_config.len >= 1) {
-		if (ts_test_send_normal_config(ts_test->ts))
+		if (ts_test_send_config(ts_test))
 			ts_err("Send normal config failed");
 	}
 
@@ -1529,119 +1419,6 @@ static int send_test_cmd(struct goodix_ts_test *ts_test, struct goodix_ts_cmd *c
 	return ret;
 }
 
-enum SHORT_ADC_CHK_FLG
-{
-    ADC_NEG_SAT_PASS = -2048,//means channel adc is ok
-    ADC_FOR_SAT_PASS = 2047,//means channel adc is ok
-    ADC_NO_USE1_FLG = 32767,//means channel adc not use
-    ADC_NO_USE2_FLG = -32768,//means channel adc not use
-};
-#define BLND_ADC_HARD_CHECK_ADDR          0x15100
-static int goodix_check_chn_adc(struct goodix_ts_test *ts_test)
-{
-	u8 p_buf[320];
-	int length = MAX_SEN_NUM_BRD * 2 * 3 + 2;
-	u16 byte_len = MAX_SEN_NUM_BRD * 2;
-	u8* p_negative_b;
-	u8* p_forward_b;
-	u8* p_adcdump_b;
-	int i;
-	const u8 data_len = MAX_SEN_NUM_BRD;
-	const u8 adc_grp_chn = 5;//fix
-	//five channels use one ADC unit 
-	u8 adc_mm_ng[30] = { 0 };
-	u8 adc_id = 0;
-	u8 adc_grp_t;
-	s16 tmp_val = 0;
-	s16 *adc_negative_sta = ts_test->adc_negative_sta;
-	s16 *adc_forward_sta = ts_test->adc_forward_sta;
-	s16 *adc_dump_mm = ts_test->adc_dump_mm;
-	int adcdump_max_min_threshold = ts_test->test_params.adcdump_max_min_threshold;
-
-	if (ts_test->ts->bus->ic_type != IC_TYPE_BERLIN_D)
-		return 0;
-
-	ts_test_read(ts_test, BLND_ADC_HARD_CHECK_ADDR, p_buf, length);
-
-	if (checksum_cmp(p_buf, length, CHECKSUM_MODE_U8_LE)) {
-		ts_err("adc dump data checksum error");
-		return -1;
-	}
-
-	ts_test->b_adc_mm_ng = 0;
-	ts_test->b_adc_negative_sta_ng = 0;
-	ts_test->b_adc_forward_sta_ng = 0;
-
-    //Negative Saturation byte:
-    p_negative_b = p_buf;
-    for (i = 0; i < byte_len; i += 2) {
-        tmp_val = p_negative_b[i] + (p_negative_b[i + 1] << 8);
-        adc_negative_sta[i / 2] = tmp_val;
-    }
-
-    //Forward Saturation byte :
-    p_forward_b = p_buf + byte_len;
-    for (i = 0; i < byte_len; i += 2) {
-        tmp_val = p_forward_b[i] + (p_forward_b[i + 1] << 8);
-        adc_forward_sta[i / 2] = tmp_val;
-    }
-
-    //ADC dump byte, max - min :
-    p_adcdump_b = p_buf + (byte_len * 2);
-    for (i = 0; i < byte_len; i += 2) {
-        tmp_val = p_adcdump_b[i] + (p_adcdump_b[i + 1] << 8);
-        adc_dump_mm[i / 2] = tmp_val;
-    }
-
-	for (i = 0; i < data_len; i++) {
-		tmp_val = adc_negative_sta[i];
-		if (tmp_val != ADC_NEG_SAT_PASS && tmp_val != ADC_NO_USE1_FLG) {
-			ts_test->b_adc_negative_sta_ng = 1;
-		}
-
-		tmp_val = adc_forward_sta[i];
-		if (tmp_val != ADC_FOR_SAT_PASS && tmp_val != ADC_NO_USE2_FLG) {
-			ts_test->b_adc_forward_sta_ng = 1;
-		}
-
-		tmp_val = adc_dump_mm[i];
-		if (tmp_val != ADC_NO_USE2_FLG) {
-			if (tmp_val == 0) {
-				ts_test->b_adc_mm_ng = 1;
-			}
-			if (tmp_val > adcdump_max_min_threshold) {
-				adc_mm_ng[adc_id]++;
-			}
-		}
-
-		if ((i != 0) && ((i + 1) % adc_grp_chn == 0))
-			adc_id++;
-	}
-
-	adc_grp_t = (data_len / adc_grp_chn);
-	for (adc_id = 0; adc_id < adc_grp_t && adc_id < 30; adc_id++) {
-		if (adc_mm_ng[adc_id] >= 2)
-			ts_test->b_adc_mm_ng = 1;
-	}
-
-	if (ts_test->b_adc_negative_sta_ng) {
-		ts_err("b_adc_negative_sta_ng error");
-		return -1;
-	}
-
-	if (ts_test->b_adc_forward_sta_ng) {
-		ts_err("b_adc_forward_sta_ng error");
-		return -1;
-	}
-
-	if (ts_test->b_adc_mm_ng) {
-		ts_err("b_adc_mm_ng error");
-		return -1;
-	}
-
-	return 0;
-}
-
 #define INSPECT_PARAM_CMD 0xAA
 #define SHORT_TEST_FINISH_FLAG 0x88
 #define SHORT_TEST_THRESHOLD_REG 0x20402
@@ -1726,16 +1503,13 @@ static void goodix_shortcircut_test(struct goodix_ts_test *ts_test)
 	ret = goodix_shortcircut_analysis(ts_test);
 	if (ret < 0) {
 		ts_test->test_result[GTP_SHORT_TEST] = GTP_PANEL_REASON;
-		ts_err("shortcircut analysis failed");
 		return;
 	}
-
-	ret = goodix_check_chn_adc(ts_test);
-	if (ret < 0) {
-		ts_test->test_result[GTP_SHORT_TEST] = GTP_PANEL_REASON;
-		ts_err("check chn adc failed");
-		return;
-	}
+	/* _b582-GXI：blob goodix_shortcircut_test 内联体的分析返回处（0x1bc0c
+	 * `tbz w20,#31`）失败只置位、**无** "shortcircut analysis failed" 打印；
+	 * goodix_check_chn_adc（adc dump 面）符号与全部 6 串（<AdcDump*> Value 档、
+	 * b_adc_*_ng、adc dump data checksum error、check chn adc failed）blob 全无
+	 * ⇒ 整个 adcdump 分支按 blob 删除，test_result 收口与 blob 同形。 */
 	ts_test->test_result[GTP_SHORT_TEST] = GTP_TEST_PASS;
 }
 
@@ -1760,9 +1534,13 @@ static int goodix_cap_test_prepare(struct goodix_ts_test *ts_test)
 	/* send test config if exist */
 	if (cfg->len > 0) {
 		ts_info("Test config exists and send it");
-			ret = ts_test_send_config(ts_test, (u8 *)cfg->data, (u32)cfg->len);
-			if (ret < 0) {
-				ts_err("Send test config failed, exit");
+		/* _b582-GXI：blob 0x17bc8-0x17bf8 = `x1=test_config.data; w2=len;
+		 * hw_ops->send_config(cd,...)`（[x8,#0x60] 间接调用），非 warsaw
+		 * 起/写/止命令序列（该序列 3 条打印串 blob 全无）。 */
+		ret = ts_test->ts->hw_ops->send_config(ts_test->ts,
+				(u8 *)cfg->data, (u32)cfg->len);
+		if (ret < 0) {
+			ts_err("Send test config failed, exit");
 			return ret;
 		}
 	}
@@ -2035,270 +1813,9 @@ static int goodix_cache_self_rawdata(struct goodix_ts_test *ts_test)
 	return ret;
 }
 
-enum TEST_STAGE {
-	TEST_STAGE_NONE = 0,
-	TEST_STAGE_PREPARE,
-	TEST_STAGE_OPEN_SHORT_S,
-	TEST_STAGE_OPEN_SHORT_E,
-	TEST_STAGE_MALLOC_FAIL,
-	TEST_STAGE_FINISH = 20,
-};
-
-int g_test_stage = 0;
-
-#define DATA_MODE_RAW  1
-#define DATA_MODE_DIFF 2
-static int goodix_switch_data_mode(struct goodix_ts_test *ts_test, int mode)
-{
-	struct goodix_ts_cmd temp_cmd;
-
-	if (ts_test->ts->bus->ic_type != IC_TYPE_BERLIN_D) {
-		temp_cmd.cmd = GOODIX_CMD_RAWDATA;
-		temp_cmd.len = 4;
-		return ts_test_send_cmd(ts_test, &temp_cmd);
-	}
-
-	if (mode == DATA_MODE_RAW)
-		temp_cmd.data[0] = 0x81;
-	else if (mode == DATA_MODE_DIFF)
-		temp_cmd.data[0] = 0x82;
-	else
-		return -EINVAL;
-
-	temp_cmd.cmd = 0x90;
-	temp_cmd.len = 5;
-	return ts_test_send_cmd(ts_test, &temp_cmd);
-}
-
-int goodix_diff_shift_test_start(struct goodix_ts_core *cd, int freq_index)
-{
-	int ret;
-	struct goodix_ts_cmd temp_cmd;
-	struct goodix_ts_test *ts_test = g_ts_test;
-
-	if (!ts_test) {
-		ts_err("test work does not init");
-		return -EINVAL;
-	}
-
-	if (ts_test->test_params.diff_shift_test_freq_cnt == 0 ||
-			!ts_test->test_params.diff_shift_freq[freq_index]) {
-		ts_err("freq %d diff shift test not enabled", freq_index);
-		return -EINVAL;
-	}
-
-	/* diff shift test prepare */
-	if (freq_index == 0) {
-		goodix_ts_esd_off(ts_test->ts);
-		ts_test_irq_enable(ts_test, false);
-		cd->is_inspecting = true;
-		if (g_test_config_len > 0) {
-			ts_info("send test config");
-			ts_test_send_config(ts_test, g_test_config, g_test_config_len);
-		}
-	}
-
-	// send diff data cmd
-	ret = goodix_switch_data_mode(ts_test, DATA_MODE_DIFF);
-	if (ret < 0) {
-		ts_err("switch diffdata mode failed, exit!");
-		return ret;
-	}
-	ts_info("start diff shift test on freq %d", freq_index);
-	// send switch to freq_index cmd
-	temp_cmd.cmd = 0x9C;
-	temp_cmd.data[0] = freq_index;
-	temp_cmd.len = 5;
-	ret = ts_test_send_cmd(ts_test, &temp_cmd);
-	if (ret < 0) {
-		ts_err("switch freq index:%d failed", freq_index);
-		return ret;
-	}
-	//  delay 10ms
-	msleep(10);
-	// send diff test start cmd
-	temp_cmd.cmd = 0x90;
-	temp_cmd.data[0] = 0x88;
-	temp_cmd.data[1] = 0x1;
-	temp_cmd.len = 6;
-	ret = ts_test_send_cmd(ts_test, &temp_cmd);
-	if (ret < 0) {
-		ts_err("send start diff test cmd failed");
-		return ret;
-	}
-	return 0;
-}
-
-static int goodix_diff_shift_result_check(struct goodix_ts_test *ts_test)
-{
-	int i;
-	int freq_index;
-	int error_node_count;
-	s16 val;
-	s32 sen_num = ts_test->test_params.sen_num;
-	s32 drv_num = ts_test->test_params.drv_num;
-	u32 data_size;
-
-	if (!ts_test->test_params.test_items[GTP_DIFF_SHIFT_TEST]) {
-		/* diff shift test not enable */
-		return 0;
-	}
-
-	ts_test->test_result[GTP_DIFF_SHIFT_TEST] = SYS_SOFTWARE_REASON;
-
-	data_size = sen_num * drv_num;
-	error_node_count = 0;
-	for (freq_index = 0; freq_index < MAX_SCAN_FREQ_NUM; freq_index++) {
-		if (!ts_test->test_params.diff_shift_freq[freq_index])
-			continue;
-
-		for (i = 0; i < data_size; i++) {
-			val = ts_test->diff_shift_noise[freq_index][i];
-			if (val > ts_test->test_params.diff_shift_max[freq_index][i]) {
-				ts_err("diff shift test freq %d, node %d = %d > %d",
-					freq_index, i, val, ts_test->test_params.diff_shift_max[freq_index][i]);
-				error_node_count++;
-			}
-		}
-	}
-
-	if (!error_node_count) {
-		ts_test->test_result[GTP_DIFF_SHIFT_TEST] = GTP_TEST_PASS;
-		ts_info("diff shift test pass");
-	} else {
-		ts_test->test_result[GTP_DIFF_SHIFT_TEST] = GTP_PANEL_REASON;
-		ts_info("diff shift test failed, fail node num %d", error_node_count);
-	}
-	return 0;
-}
-
-static bool final_result = false;
-
-int goodix_get_final_result(void)
-{
-	if (final_result) {
-		return GTP_RESULT_PASS;
-	} else {
-		return GTP_RESULT_FAIL;
-	}
-}
-
-
-int goodix_diff_shift_test_end(struct goodix_ts_core *cd, int freq_index)
-{
-	int ret, retry, i;
-	u8 val;
-	struct goodix_ts_cmd temp_cmd;
-	struct goodix_ts_test *ts_test = g_ts_test;
-	struct frame_head *frame_head;
-	u8 *frame_buf, *cur_ptr;
-	u32 sen_num, drv_num, data_size, data_addr, flag_addr;
-	int frame_len;
-	int freq_cnt;
-
-	if (!ts_test) {
-		ts_err("test work does not init");
-		return -EINVAL;
-	}
-
-	freq_cnt = ts_test->test_params.diff_shift_test_freq_cnt;
-	frame_buf = ts_test->frame_buf;
-	sen_num = ts_test->test_params.sen_num;
-	drv_num = ts_test->test_params.drv_num;
-	data_size = sen_num * drv_num;
-	data_addr = ts_test->test_params.noisedata_addr;
-
-	if (cd->bus->ic_type == IC_TYPE_BERLIN_D)
-		flag_addr = ts_test->ts->ic_info.misc.frame_data_addr;
-	else
-		flag_addr = ts_test->ts->ic_info.misc.touch_data_addr;
-	// clean data ready flag
-	val = 0;
-	ret = ts_test_write(ts_test, flag_addr, &val, 1);
-	if (ret < 0) {
-		ts_err("clean touch event failed, exit");
-		return -EAGAIN;
-	}
-
-	ts_info("try stop diff shift test on freq %d", freq_index);
-	// send cmd stop diff test
-	temp_cmd.cmd = 0x90;
-	temp_cmd.data[0] = 0x88;
-	temp_cmd.data[1] = 0x2;
-	temp_cmd.len = 6;
-	ret = ts_test_send_cmd(ts_test, &temp_cmd);
-	if (ret < 0) {
-		ts_err("send stop diff test cmd failed");
-		return ret;
-	}
-
-	// wait data ready
-	retry = 20;
-	while (retry--) {
-		usleep_range(5000, 5100);
-		ret = ts_test_read(ts_test, flag_addr, &val, 1);
-		if (!ret && (val & 0x80))
-			break;
-	}
-	if (retry < 0) {
-		ts_err("diff shift data is not ready val:0x%02x", val);
-		return -EAGAIN;
-	}
-
-	if (cd->bus->ic_type == IC_TYPE_BERLIN_D) {
-		frame_len = cd->ic_info.misc.frame_data_head_len +
-				cd->ic_info.misc.fw_attr_len +
-				cd->ic_info.misc.fw_log_len +
-				data_size * sizeof(s16) +
-				1024;
-		if (frame_len > sizeof(ts_test->frame_buf)) {
-			ts_info("frame_len exceed limit %d > %lu", frame_len, sizeof(ts_test->frame_buf));
-			return -EINVAL;
-		}
-		ret = ts_test_read(ts_test, flag_addr, frame_buf, frame_len);
-		if (ret < 0)
-			return ret;
-		if (checksum_cmp(frame_buf, cd->ic_info.misc.frame_data_head_len, CHECKSUM_MODE_U8_LE)) {
-			ts_err("frame head checksum error");
-			return -EINVAL;
-		}
-		frame_head = (struct frame_head *)frame_buf;
-		if (checksum_cmp(frame_buf, frame_head->cur_frame_len, CHECKSUM_MODE_U16_LE)) {
-			ts_err("frame body checksum error");
-			return -EINVAL;
-		}
-		cur_ptr = frame_buf;
-		cur_ptr += cd->ic_info.misc.frame_data_head_len;
-		cur_ptr += cd->ic_info.misc.fw_attr_len;
-		cur_ptr += cd->ic_info.misc.fw_log_len;
-		memcpy((u8 *)ts_test->diff_shift_noise[freq_index], cur_ptr + 8,
-				data_size * 2);
-	} else {
-		ret = ts_test_read(ts_test, data_addr,
-			(u8 *)ts_test->diff_shift_noise[freq_index], data_size * sizeof(s16));
-		if (ret < 0)
-			return ret;
-	}
-
-	goodix_rotate_abcd2cbad(drv_num, sen_num, ts_test->diff_shift_noise[freq_index]);
-	for (i = 0; i < data_size; i++)
-		ts_test->diff_shift_noise[freq_index][i] = ABS(ts_test->diff_shift_noise[freq_index][i]);
-
-	/* diff shift test finished */
-	if (freq_index == freq_cnt - 1) {
-		ts_test_reset(ts_test, 100);
-		ts_test_irq_enable(ts_test, true);
-		goodix_ts_esd_on(ts_test->ts);
-		cd->is_inspecting = false;
-		goodix_diff_shift_result_check(ts_test);
-		if (ts_test->test_result[GTP_DIFF_SHIFT_TEST] != GTP_TEST_PASS)
-			final_result = false;
-
-	}
-
-	return 0;
-}
-
+/* _b582-GXI：warsaw 的 goodix_switch_data_mode 唯一调用者（diff_shift_test_start）
+ * 已随 diff-shift 面删除；blob 侧该切换在各调用点内联（cap_test_prepare 0x17c10、
+ * cache_noisedata 0x18748），无该符号 → 按 blob 删除（消 unused-function）。 */
 static int goodix_cache_noisedata(struct goodix_ts_test *ts_test)
 {
 	int ret;
@@ -2384,10 +1901,8 @@ static int goodix_cache_noisedata(struct goodix_ts_test *ts_test)
 						cd->ic_info.misc.fw_log_len +
 						data_size * sizeof(s16) +
 						1024;
-				if (frame_len > sizeof(ts_test->frame_buf)) {
-					ts_info("frame_len exceed limit %d > %lu", frame_len, sizeof(ts_test->frame_buf));
-					return -EINVAL;
-				}
+				/* _b582-GXI：blob 无 "frame_len exceed limit %d > %lu" 串、
+				 * 无 frame_buf 容量比较（0x2000 常量在其内联体全无）→ 删除。 */
 				ret = ts_test_read(ts_test, flag_addr, frame_buf, frame_len);
 				if (ret < 0)
 					return ret;
@@ -2752,11 +2267,9 @@ static void goodix_capacitance_test(struct goodix_ts_test *ts_test)
 {
 	int ret;
 
-	if (!ts_test || !ts_test->ts) {
-		ts_err("ts_test or ts_test->ts is NULL, abort cap test");
-		return;
-	}
-
+	/* _b582-GXI：blob goodix_capacitance_test 0x17b20 起手即（按等级）打印
+	 * "cap_test begin"（0x1809c），无 ts_test/=NULL 校验打印（全 ko 无该串）
+	 * 无校验分支 → 按 blob 去 NULL 校验。 */
 	ts_info("---------------------- cap_test begin ----------------------");
 	ret = goodix_cap_test_prepare(ts_test);
 	if (ret < 0) {
@@ -3242,15 +2755,8 @@ static int goodix_save_header(struct goodix_ts_test *ts_test)
 			bytes += sprintf(&data[bytes], "<Item name=\"Self Rawdata Upper Limit Test\" result=\"NG\"/>\n");
 	}
 
-	if (ts_test->test_result[GTP_DIFF_SHIFT_TEST]) {
-		if (GTP_TEST_PASS == ts_test->test_result[GTP_DIFF_SHIFT_TEST])
-			bytes += sprintf(&data[bytes],
-					"<Item name=\"Diff shift test\" result=\"OK\"/>\n");
-		else
-			bytes += sprintf(&data[bytes],
-					"<Item name=\"Diff shift test\" result=\"NG\"/>\n");
-	}
-
+	/* _b582-GXI：blob 全 ko 无 "Diff shift test"/<DiffShift*> 串 → warsaw diff-shift
+	 * 条目（含 save_limits 段与 data_record 段）按 blob 删除。 */
 	if (ts_test->test_result[GTP_SHORT_TEST]) {
 		if (GTP_TEST_PASS == ts_test->test_result[GTP_SHORT_TEST])
 			bytes += sprintf(&data[bytes], "<Item name=\"Short Test\" result=\"OK\"/>\n");
@@ -3361,30 +2867,8 @@ static int goodix_save_limits(struct goodix_ts_test *ts_test)
 				bytes += sprintf(&data[bytes], "Chn2=\"Rx%d\" ShortResistor= \"%dKom\"/>\n", chn2 & 0x7f, r);
 		}
 
-		/* save adc dump result */
-		bytes += sprintf(&data[bytes], "<AdcDumpNegative>%s</AdcDumpNegative>\n", ts_test->b_adc_negative_sta_ng ? "NG" : "OK");
-		if (ts_test->b_adc_negative_sta_ng != 0) {
-			bytes += sprintf(&data[bytes], "<AdcDumpNegativeValue>");
-			for (i = 0; i < MAX_SEN_NUM_BRD; i++)
-				bytes += sprintf(&data[bytes], "%d,", ts_test->adc_negative_sta[i]);
-			bytes += sprintf(&data[bytes], "</AdcDumpNegativeValue>\n");
-		}
-
-		bytes += sprintf(&data[bytes], "<AdcDumpForward>%s</AdcDumpForward>\n", ts_test->b_adc_forward_sta_ng ? "NG" : "OK");
-		if (ts_test->b_adc_forward_sta_ng != 0) {
-			bytes += sprintf(&data[bytes], "<AdcDumpForwardValue>");
-			for (i = 0; i < MAX_SEN_NUM_BRD; i++)
-				bytes += sprintf(&data[bytes], "%d,", ts_test->adc_forward_sta[i]);
-			bytes += sprintf(&data[bytes], "</AdcDumpForwardValue>\n");
-		}
-
-		bytes += sprintf(&data[bytes], "<AdcDumpMM>%s</AdcDumpMM>\n", ts_test->b_adc_mm_ng ? "NG" : "OK");
-		if (ts_test->b_adc_mm_ng != 0) {
-			bytes += sprintf(&data[bytes], "<AdcDumpMMValue>");
-			for (i = 0; i < MAX_SEN_NUM_BRD; i++)
-				bytes += sprintf(&data[bytes], "%d,", ts_test->adc_dump_mm[i]);
-			bytes += sprintf(&data[bytes], "</AdcDumpMMValue>\n");
-		}
+		/* _b582-GXI：blob 全 ko 无 <AdcDumpNegative>/<AdcDumpForward>/<AdcDumpMM>
+		 * 及其 *Value 档标签 → warsaw adcdump 落盘段按 blob 删除。 */
 
 		bytes += sprintf(&data[bytes], "</Item>\n");
 		ret = fs_write(data, bytes);
@@ -3553,35 +3037,6 @@ static int goodix_save_limits(struct goodix_ts_test *ts_test)
 		bytes += sprintf(&data[bytes], "</Item>\n");
 	}
 
-	/* save diff shift test limit */
-	if (ts_test->test_result[GTP_DIFF_SHIFT_TEST]) {
-		bytes += sprintf(&data[bytes], "<Item name=\"Diff Shift Test Sets\">\n");
-
-		for (freq_index = 0; freq_index < MAX_SCAN_FREQ_NUM; freq_index++) {
-			if (!ts_test->test_params.diff_shift_freq[freq_index])
-				continue;
-
-			bytes += sprintf(&data[bytes], "<DiffShiftLimit%d>\n", freq_index);
-
-			for (i = 0; i < tx * rx; i++) {
-				bytes += sprintf(&data[bytes], "%d,",
-						ts_test->test_params.diff_shift_max[freq_index][i]);
-				if ((i + 1) % tx == 0)
-					bytes += sprintf(&data[bytes], "\n");
-			}
-
-			bytes += sprintf(&data[bytes], "</DiffShiftLimit%d>\n", freq_index);
-		}
-
-		bytes += sprintf(&data[bytes], "</Item>\n");
-		ret = fs_write(data, bytes);
-		if (ret < 0) {
-			ts_err("diff shift limit write failed");
-			goto save_end;
-		}
-		bytes = 0;
-	}
-
 	bytes += sprintf(&data[bytes], "</TestItems>\n");
 	ret = fs_write(data, bytes);
 	if (ret < 0)
@@ -3744,56 +3199,6 @@ save_end:
 	return ret;
 }
 
-static int goodix_save_diff_shift_data(struct goodix_ts_test *ts_test)
-{
-	int i;
-	int j;
-	int ret = 0;
-	int bytes = 0;
-	s16 stat_result[3];
-	char *data = NULL;
-	int tx = ts_test->test_params.drv_num;
-	int rx = ts_test->test_params.sen_num;
-	int len = tx * rx;
-
-	data = kzalloc(MAX_DATA_BUFFER, GFP_KERNEL);
-	if (!data) {
-		ts_err("alloc memory failed for ");
-		return -ENOMEM;
-	}
-
-	bytes += sprintf(&data[bytes], "<DiffShiftDataRecord>\n");
-	for (i = 0; i < MAX_SCAN_FREQ_NUM; i++) {
-		if (!ts_test->test_params.diff_shift_freq[i])
-			continue;
-		goodix_data_cal(ts_test->diff_shift_noise[i], len, stat_result);
-		bytes += sprintf(&data[bytes],
-			"<DataContent No.=\"%d\" DataCount=\"%d\" Maximum=\"%d\" Minimum=\"%d\" Average=\"%d\">\n",
-			i, len, stat_result[1], stat_result[2], stat_result[0]);
-		for (j = 0; j < len; j++) {
-			bytes += sprintf(&data[bytes], "%d,", ts_test->diff_shift_noise[i][j]);
-			if ((j + 1) % tx == 0)
-				bytes += sprintf(&data[bytes], "\n");
-		}
-		bytes += sprintf(&data[bytes], "</DataContent>\n");
-		ret = fs_write(data, bytes);
-		if (ret < 0) {
-			ts_err("diff shift data write fail.");
-			goto save_end;
-		}
-		bytes = 0;
-	}
-
-	bytes += sprintf(&data[bytes], "</DiffShiftDataRecord>\n");
-	ret = fs_write(data, bytes);
-	if (ret < 0)
-		ts_err("raw shift data write fail.");
-
-save_end:
-	kfree(data);
-	return ret;
-}
-
 static int goodix_save_special_deltadata(struct goodix_ts_test *ts_test)
 {
 	int j;
@@ -3871,12 +3276,6 @@ static int goodix_save_data(struct goodix_ts_test *ts_test)
 		ret = goodix_save_special_deltadata(ts_test);
 	}
 
-	if (ts_test->test_result[GTP_DIFF_SHIFT_TEST]) {
-		ret = goodix_save_diff_shift_data(ts_test);
-		if (ret < 0)
-			goto save_end;
-	}
-
 	bytes += sprintf(&data[bytes], "</DataRecord>\n");
 	ret = fs_write(data, bytes);
 	if (ret < 0)
@@ -3909,37 +3308,17 @@ static int goodix_save_tail(struct goodix_ts_test *ts_test)
 	return ret;
 }
 
-static void goodix_save_result_data(struct goodix_ts_test *ts_test)
-{
-	int ret;
-
-	/* save header */
-	ret = goodix_save_header(ts_test);
-	if (ret < 0)
-		return;
-
-	/* save limits */
-	ret = goodix_save_limits(ts_test);
-	if (ret < 0)
-		return;
-
-	/* save data */
-	ret = goodix_save_data(ts_test);
-	if (ret < 0)
-		return;
-
-	/* save tail */
-	ret = goodix_save_tail(ts_test);
-	if (ret < 0)
-		return;
-
-	fs_write(ts_test->test_info, strlen(ts_test->test_info));
-}
+/* _b582-GXI：blob 无 goodix_save_result_data 符号（static 单调用点被内联进
+ * goodix_put_test_result：blob 0x1c430 起直接是 save_header 的 kmalloc(28000)+
+ * "<?xml version=...\n" 组装，sprintf×80/seq_write×20/kmalloc_large×8/kfree×9 全在
+ * put_test_result 体内）→ 原树独立函数体就地展开到 put_test_result 尾部。 */
 #endif /* SAVE_IN_CSV*/
 
-static void goodix_put_test_result(struct goodix_ts_test *ts_test)
+static void goodix_put_test_result(struct goodix_ts_test *ts_test,
+		struct ts_rawdata_info *info)
 {
 	int i;
+	int ret;
 	bool have_bus_error = false;
 	bool have_panel_error = false;
 	char statistics_data[STATISTICS_DATA_LEN] = {0};
@@ -4050,125 +3429,89 @@ static void goodix_put_test_result(struct goodix_ts_test *ts_test)
 	goodix_strncat(ts_test->test_info, "\n",
 		TS_RAWDATA_RESULT_MAX);
 
-	ts_info("%s", ts_test->test_info);
+	/* _b582-GXI：blob 0x1c41c 把 test_info 搬进 info->result（+0x36b4,
+	 * w2=0x63=TS_RAWDATA_RESULT_MAX-1）后即进落盘流水；无 ts_info("%s", test_info)
+	 * （blob 全 ko 无 "6[GTP_I][%s:%d]: %s" 串）。 */
+	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
+
 #ifdef SAVE_IN_CSV
-	/* save result to file */
-	goodix_save_result_data(ts_test);
+	/* save header */
+	ret = goodix_save_header(ts_test);
+	if (ret < 0)
+		return;
+
+	/* save limits */
+	ret = goodix_save_limits(ts_test);
+	if (ret < 0)
+		return;
+
+	/* save data */
+	ret = goodix_save_data(ts_test);
+	if (ret < 0)
+		return;
+
+	/* save tail */
+	ret = goodix_save_tail(ts_test);
+	if (ret < 0)
+		return;
+
+	fs_write(ts_test->test_info, strlen(ts_test->test_info));
 #endif
 }
 
-int goodix_do_inspect_thread(void *arg)
+/* _b582-GXI：blob 的 inspect 入口 = static goodix_do_inspect(cd, info)
+ * （__func__ 串 "goodix_do_inspect"、源行 3261/3274/3278，被内联进
+ * auto_test_result_show = blob 0x201c8 体内 0x20440-0x20990）；blob 全模块无
+ * goodix_do_inspect_thread / goodix_inspect_run / kthread_run / complete /
+ * wait_for_completion / inspect_already_running / timeout 等 warsaw 包装层符号与串
+ * （框架侧零引用，core.c 侧已按同轮删除 test_stage/do_inspect 两 sysfs 节点）。
+ * 形制与 blob 逐点同：core_data or info 判空 → ts_err("core_data or info is NULL")；
+ * ts_test 用 kmalloc(sizeof, GFP_KERNEL|__GFP_ZERO)（goodix_get_rawdata 用 vzalloc，
+ * 两者本不同）；版本/键值/自定义/reset 四测试 → reset 无条件置 PANEL_REASON(0x20954)
+ * → capacitance → shortcircut(按 test_items) → put_test_result(ts_test, info) →
+ * tptest_finish → kfree。ret 语义与 blob 一致。 */
+static int goodix_do_inspect(struct goodix_ts_core *cd, struct ts_rawdata_info *info)
 {
 	int ret;
-	int i;
 	struct goodix_ts_test *ts_test;
-	struct goodix_ts_core *cd = arg;
 
-	if (!cd) {
-		ts_err("core_data is NULL");
-		complete(&inspect_done);
+	if (!cd || !info) {
+		ts_err("core_data or info is NULL");	/* vendor 源行 3261 */
 		return -ENODEV;
 	}
 
-	mutex_lock(&inspect_mutex);
-
-	if (!g_ts_test) {
-		g_ts_test = vzalloc(sizeof(*g_ts_test));
-		if (!g_ts_test) {
-			ts_err("Failed to alloc mem");
-			g_test_stage = TEST_STAGE_MALLOC_FAIL;
-			mutex_unlock(&inspect_mutex);
-			complete(&inspect_done);
-			return -ENOMEM;
-		}
-	} else {
-		memset(g_ts_test, 0, sizeof(*g_ts_test));
+	ts_test = kmalloc(sizeof(*ts_test), GFP_KERNEL | __GFP_ZERO);
+	if (!ts_test) {
+		ts_err("memory failed");
+		return -ENOMEM;
 	}
-	ts_test = g_ts_test;
-
-	cd->is_inspecting = true;
-	g_test_stage = TEST_STAGE_PREPARE;
 	ts_test->ts = cd;
 	ret = goodix_tptest_prepare(ts_test);
 	if (ret < 0) {
-		ts_err("[FAIL]-0F-software reason");
-		fs_write("[FAIL]-0F-software reason\n", strlen("[FAIL]-0F-software reason\n"));
-		goto exit_finish;
+		ts_err("Failed to prepare TP test, exit");	/* 3274 */
+		strncpy(info->result, "[FAIL]-0F-software reason\n",
+				TS_RAWDATA_RESULT_MAX - 1);
+		goto exit_free_ts;
 	}
-	ts_info("TP test prepare OK");
-	g_test_stage = TEST_STAGE_OPEN_SHORT_S;
+	ts_info("TP test prepare OK");	/* 3278 */
+
+	/* 以下 4 个测试函数在 blob 各自只被调用一次 ⇒ 内联（__func__ 串仍存） */
 	goodix_version_test(ts_test);
 	goodix_check_key_info_test(ts_test);
 	goodix_custom_info_test(ts_test);
 	goodix_reset_test(ts_test);
-	goodix_capacitance_test(ts_test); /* 1F 3F 6F 7F test */
+	ts_test->test_result[GTP_RESET_TEST] = GTP_PANEL_REASON;	/* 0x20954 */
+
+	goodix_capacitance_test(ts_test);
 	if (ts_test->test_params.test_items[GTP_SHORT_TEST])
-		goodix_shortcircut_test(ts_test); /* 5F test */
+		goodix_shortcircut_test(ts_test);
+
+	goodix_put_test_result(ts_test, info);
 	goodix_tptest_finish(ts_test);
-	g_test_stage = TEST_STAGE_OPEN_SHORT_E;
 
-	final_result = true;
-	for (i = 0; i < MAX_TEST_ITEMS; i++) {
-		if ((ts_test->test_result[i] > 0) &&
-				(ts_test->test_result[i] != GTP_TEST_PASS)) {
-			final_result = false;
-			break;
-		}
-	}
-
-exit_finish:
-	cd->is_inspecting = false;
-	mutex_unlock(&inspect_mutex);
-	complete(&inspect_done);
-#ifdef CONFIG_FACTORY_BUILD
-	ts_test_cmd_enable(true);
-#ifdef TOUCH_THP_SUPPORT
-	if (cd->enable_touch_raw)
-		goodix_htc_start_calibration();//only for THP is open
-#endif
-	msleep(300);
-#endif
+exit_free_ts:
+	kfree(ts_test);
 	return ret;
-}
-
-/* inspect timeout: normal ~3s, worst ~3.6s with flash_cmd retries */
-#define INSPECT_TIMEOUT msecs_to_jiffies(5000)
-
-int goodix_inspect_run(struct goodix_ts_core *cd, const char *name)
-{
-	int i;
-	unsigned long ret;
-	struct task_struct *inspect_thrd;
-
-	if (cd->is_inspecting) {
-		ts_err("inspect already running, skip");
-		return -EBUSY;
-	}
-
-	reinit_completion(&inspect_done);
-
-	/* create and run update thread */
-	memset(g_limit_file_name, 0, sizeof(g_limit_file_name));
-	for (i = 0; i < sizeof(g_limit_file_name); i++) {
-		if (name[i] == '\0' || name[i] == '\n' || name[i] == '\r')
-			break;
-		g_limit_file_name[i] = name[i];
-	}
-
-	inspect_thrd = kthread_run(goodix_do_inspect_thread,
-				cd, "goodix_do_inspect_thread");
-	if (IS_ERR_OR_NULL(inspect_thrd)) {
-		ts_err("Failed to create inspect thread:%ld",
-		       PTR_ERR(inspect_thrd));
-		return -EFAULT;
-	}
-	ret = wait_for_completion_timeout(&inspect_done, INSPECT_TIMEOUT);
-	if (!ret) {
-		ts_err("inspect thread timeout");
-		cd->is_inspecting = false;
-		return -ETIMEDOUT;
-	}
-	return 0;
 }
 
 /* #228（b581）donor inspect 遗留清除：blob 全模块无 show_result* 符号、
@@ -4211,12 +3554,7 @@ int goodix_get_rawdata(struct device *dev, struct ts_rawdata_info *info)
 	goodix_capacitance_test(ts_test); /* 1F 3F 6F 7F test */
 	if (ts_test->test_params.test_items[GTP_SHORT_TEST])
 		goodix_shortcircut_test(ts_test); /* 5F test */
-	goodix_put_test_result(ts_test);
-	/* #228（b581）blob L3385 之后：测试尾只有 put_test_result(ts_test, info)
-	 * （2 参，内部含一次 result 搬运 + tptest_finish），树侧 1 参版在此处补齐
-	 * 唯一一次搬运 + 无条件 tptest_finish（原树 `if (flag)` 门控 + 多一次
-	 * strncpy 属偏离，已按 blob 去掉） */
-	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
+	goodix_put_test_result(ts_test, info);
 	goodix_tptest_finish(ts_test);
 
 exit_finish:
@@ -4305,7 +3643,6 @@ static int auto_test_result_show(struct seq_file *m, void *v)
 {
 	struct goodix_ts_core *cd = m->private;	/* seq_file.private @+0x80 */
 	struct ts_rawdata_info *info;
-	struct goodix_ts_test *ts_test;
 	char *buf;
 	int ret;
 
@@ -4329,40 +3666,9 @@ static int auto_test_result_show(struct seq_file *m, void *v)
 		goto exit_free_info;	/* blob 0x20448 → 0x20990：仍旧走"输出并 return 0"尾 */
 	}
 
-	ts_test = kmalloc(sizeof(*ts_test), GFP_KERNEL | __GFP_ZERO);	/* 0x1d3880 */
-	if (!ts_test) {
-		ts_err("memory failed");
-		goto exit_free_info;
-	}
-	ts_test->ts = cd;
-	ret = goodix_tptest_prepare(ts_test);
-	if (ret < 0) {
-		ts_err("Failed to prepare TP test, exit");	/* 内联 goodix_do_inspect: 3274 */
-		strncpy(info->result, "[FAIL]-0F-software reason\n",
-				TS_RAWDATA_RESULT_MAX - 1);	/* .rodata+0x9d8 常量串 */
-		goto exit_free_ts;
-	}
-	ts_info("TP test prepare OK");	/* 内联 goodix_do_inspect: 3278 */
+	/* —— 测试段 = blob static goodix_do_inspect(cd, info)（0x20440-0x20990 内联体）—— */
+	goodix_do_inspect(cd, info);
 
-	/* —— 以下 4 个测试函数在 blob 中内联（__func__ 串见上），按树侧同名函数调用 —— */
-	goodix_version_test(ts_test);
-	goodix_check_key_info_test(ts_test);
-	goodix_custom_info_test(ts_test);
-	goodix_reset_test(ts_test);
-	ts_test->test_result[GTP_RESET_TEST] = GTP_PANEL_REASON;	/* 0x20954: [x22,#0x71]=2 */
-
-	goodix_capacitance_test(ts_test);
-	if (ts_test->test_params.test_items[GTP_SHORT_TEST])
-		goodix_shortcircut_test(ts_test);
-
-	goodix_put_test_result(ts_test);
-	/* blob 版为 goodix_put_test_result(ts_test, info)（2 参）；树侧 1 参，故此处补搬运，
-	 * 与树侧 goodix_get_rawdata() 的收尾写法一致。 */
-	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
-	goodix_tptest_finish(ts_test);
-
-exit_free_ts:
-	kfree(ts_test);
 exit_free_info:
 	/* —— 结果回写（blob: sprintf → fs_write 内联(seq_write) → kfree → end 日志 → return 0）—— */
 	ret = sprintf(buf, "test_result:%s\n", info->result);	/* .rodata.str1.1+0x5bdd */

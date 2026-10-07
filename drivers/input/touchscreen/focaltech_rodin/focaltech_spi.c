@@ -72,6 +72,7 @@
 static int fts_spi_transfer(u8 *tx_buf, u8 *rx_buf, u32 len)
 {
     int ret = 0;
+    int retry = 0;
     struct spi_device *spi = fts_data->spi;
     struct spi_message msg;
     struct spi_transfer xfer = {
@@ -90,11 +91,33 @@ static int fts_spi_transfer(u8 *tx_buf, u8 *rx_buf, u32 len)
 	}
 #endif
 
+    /* _b582-INTA：补树侧完全缺失的 `spi_sync retry:%d` 站点（blob fts_spi_transfer
+     * 0x2ff90-0x30054，3 次重试全展开）：
+     *   每失败一次 udelay(2000)（0x8312b0/0x10c7 = 2000us，__const_udelay），
+     *   重试计数 retry = 失败次数（1/2/3）；
+     *   全部失败 → E "spi_sync fail, ret:%d"（blob 0xe375，0x3009c，门 lv != 0）；
+     *   retry != 0 → W "spi_sync retry:%d"（blob 0x55d8，0x3003c，门 cmp w8,#2; b.hs
+     *   = FTS_LOG_WARNING，族 W，源码行 107）；返回最后一次 ret（w19）。
+     * 注：原树侧串面无空格 "spi_sync fail,ret:%d" 为字面量偏差，按 blob 补空格。 */
     ret = spi_sync(spi, &msg);
-    if (ret) {
-        FTS_ERROR("spi_sync fail,ret:%d", ret);
-        return ret;
+    if (ret < 0) {
+        udelay(2000);
+        retry = 1;
+        ret = spi_sync(spi, &msg);
+        if (ret < 0) {
+            udelay(2000);
+            retry = 2;
+            ret = spi_sync(spi, &msg);
+            if (ret < 0) {
+                udelay(2000);
+                retry = 3;
+                FTS_ERROR("spi_sync fail, ret:%d", ret);
+            }
+        }
     }
+
+    if (retry)
+        FTS_WARNING("spi_sync retry:%d", retry);
 
     return ret;
 }

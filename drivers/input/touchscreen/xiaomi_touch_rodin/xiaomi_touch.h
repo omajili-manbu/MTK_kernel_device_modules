@@ -425,11 +425,13 @@ void add_input_event_timeline_before_event_time_common(int type, u64 frame_count
 bool init_input_event_timeline(void);
 void release_input_event_timeline(void);
 void xiaomi_touch_evdev_remove(void);
-struct input_dev *register_xiaomi_input_dev(s8 touch_id, int max_x, int max_y, ic_product_code code);
-void unregister_xiaomi_input_dev(s8 touch_id);
-struct input_dev *register_xiaomi_stylus_input_dev(s8 touch_id, int max_x, int max_y, ic_product_code code);
-void unregister_xiaomi_stylus_input_dev(s8 touch_id);
-int report_touch_event(s8 touch_id, u8 event_count);
-dma_addr_t get_report_point_info_phy_addr(void);
-void nfc_to_touch_event(s8 touch_id,u8 val);
+/* _b582-INPUT：A-80① 输入设备层成对拆改——device.c 的 register/unregister_xiaomi_
+ * input_dev 族、report_touch_event/get_report_point_info_phy_addr（report-point 面）
+ * 在 blob（xiaomi_touch_rodin.ko）里**全无**（符号面 + 串面 + ioctl 面三重实证），
+ * 且 IC 侧（focaltech/goodix）皆自建 input_dev ⇒ 整层删除，声明随之移除。
+ * 注：blob 的 xiaomi_touch_dev_mmap 只处理 area 1/2/3（无 "mmap report point buf mmap"
+ * 串），ioctl 只处理 cmd 0..5（UPDATE_REPORT_POINT=6 无跳表项），见 _b582_input/。 */
+/* blob 2 参形态（blob 0x4fbc：w0=slot/w1=state；fts 3+1 处直调 + evdev 内联各一处） */
+void last_touch_events_collect_common(int slot, int state);
+/* _b582-INTB：nfc_to_touch_event 声明删除（详情见 xiaomi_touch_core.c 同名注释） */
 #endif

@@ -36,7 +36,10 @@
 /*****************************************************************************
 * Macro definitions using #define
 *****************************************************************************/
-#define FTS_DRIVER_VERSION                  "Focaltech V3.4 20211214"
+/* _b582-INTA：blob `.rodata.str1.1+0xff3d` = "Focaltech V3.4 20250724"（逐字节；
+ * 引用点 tools/_b582_intA/intA_strref.py：fts_ts_probe+0x19c/0x1a0 A 族 %s 站点、
+ * fts_debug_read+0x19c、fts_driver_info_show+0x3c），树侧原 "20211214" 为 donor 值。 */
+#define FTS_DRIVER_VERSION                  "Focaltech V3.4 20250724"
 
 #define BYTE_OFF_0(x)           (u8)((x) & 0xFF)
 #define BYTE_OFF_8(x)           (u8)(((x) >> 8) & 0xFF)
@@ -185,9 +188,37 @@ struct ts_ic_info {
 /*****************************************************************************
 * DEBUG function define here
 *****************************************************************************/
+/* _b582-LOG：切到 blob 忠实形态（focaltech_touch_rodin.ko 逐站点反汇编坐实，见
+ * tools/_b582_log/gates_raw.txt + b582_io.py）
+ * 门控变量 = 模块全局 debug_log_level（树侧同物异名 fts_debug_log_level：blob .data+0x0、
+ *   4B、初值 3 = FTS_LOG_INFO；blob 全模块唯一写点 = fts_log_level_control 0x4f1c）。
+ *   核心日志一律 pr_info ⇒ 串面前缀首字节 '\0016' = KERN_INFO（树侧原为 pr_err/'\0013'）。
+ * 展开形态（与 blob 串面逐字节一致，含无尾随 '\n'）：
+ *   FTS_ALWAYS  : "\0016[FTS_TS_A][%s:%d]: " fmt                （无门控）
+ *   FTS_ERROR   : "\0016[FTS_TS_E][%s:%d]: " fmt  if (lv)      （cbz/cbnz ⇒ lv != 0）
+ *   FTS_WARNING : "\0016[FTS_TS_W][%s:%d]: " fmt  if (lv >= 2) （cmp #2; b.hs）
+ *   FTS_INFO    : "\0016[FTS_TS_I][%s:%d]: " fmt  if (lv >= 3) （cmp #3; b.hs）
+ *   FTS_DEBUG   : "\0016[FTS_TS_D][%s:%d]: " fmt  if (lv >= 4) （cmp #4; b.hs）
+ *   FTS_FUNC_ENTER/EXIT : "\0016[FTS_TS_V][%s:%d]: Enter|Exit"  if (lv >= 5)（cmp #5; b.hs）
+ * 已去：`[TP-Driver][时:分:秒.毫秒]` 前缀与 ktime_get_real_ts64/rtc_time64_to_tm 调用；
+ *   blob 无尾随 '\n'（kernel 对无 '\n' 的 printk 记录自行补行），故一律不追加 '\n'。
+ * 判据串内容一字不动，只改前缀与门控（宏名/调用签名不变）。 */
 #if FTS_DEBUG_EN
-#define FTS_FUNC_ENTER() pr_info("[FTS_TS]%s: Enter\n", __func__)
-#define FTS_FUNC_EXIT() pr_info("[FTS_TS]%s: Exit(%d)\n", __func__, __LINE__)
+#define FTS_FUNC_ENTER() \
+	do { \
+		if (fts_debug_log_level >= FTS_LOG_VERBOSE) \
+			pr_info("[FTS_TS_V][%s:%d]: Enter", __func__, __LINE__); \
+	} while (0)
+#define FTS_FUNC_EXIT() \
+	do { \
+		if (fts_debug_log_level >= FTS_LOG_VERBOSE) \
+			pr_info("[FTS_TS_V][%s:%d]: Exit", __func__, __LINE__); \
+	} while (0)
+#define FTS_DEBUG(fmt, args...) \
+	do { \
+		if (fts_debug_log_level >= FTS_LOG_DEBUG) \
+			pr_info("[FTS_TS_D][%s:%d]: " fmt, __func__, __LINE__, ##args); \
+	} while (0)
 #else /* #if FTS_DEBUG_EN*/
 #define FTS_DEBUG(fmt, args...)
 #define FTS_FUNC_ENTER()
@@ -195,26 +226,48 @@ struct ts_ic_info {
 #endif
 
 extern enum FTS_LOG_LEVEL fts_debug_log_level;
-#define FTS_DEBUG(fmt, args...) {if (fts_debug_log_level > FTS_LOG_INFO) pr_info("[FTS_TS/D]%s:" fmt "\n", __func__, ##args);}
 #define FTS_INFO(fmt, args...) \
 do { \
-	struct rtc_time tm; \
-	struct timespec64 tv; \
-	unsigned long local_time; \
-	ktime_get_real_ts64(&tv); \
-	local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60)); \
-	rtc_time64_to_tm(local_time, &tm); \
-	pr_err("[TP-Driver][%02d:%02d:%02d.%03zu] [FTS_TS/I] %s %d: " fmt, tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_nsec/1000000, __func__, __LINE__, ##args); \
+	if (fts_debug_log_level >= FTS_LOG_INFO) \
+		pr_info("[FTS_TS_I][%s:%d]: " fmt, __func__, __LINE__, ##args); \
 } while(0)
 
 #define FTS_ERROR(fmt, args...) \
 do { \
-	struct rtc_time tm; \
-	struct timespec64 tv; \
-	unsigned long local_time; \
-	ktime_get_real_ts64(&tv); \
-	local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60)); \
-	rtc_time64_to_tm(local_time, &tm); \
-	pr_err("[TP-Driver][%02d:%02d:%02d.%03zu] [FTS_TS/E] %s %d: " fmt, tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_nsec/1000000, __func__, __LINE__, ##args); \
+	if (fts_debug_log_level) \
+		pr_info("[FTS_TS_E][%s:%d]: " fmt, __func__, __LINE__, ##args); \
+} while(0)
+
+/* _b582-INTA：补 blob 的 A/W 两族（只加，不动上面已对齐的 I/E/D/V 块；宏名=调用点族名）。
+ * 证据（tools/_b582_log/evid_b582.txt §[1] 串面 + gates_raw.txt §按族汇总：
+ *   FTS_TS_A n=2 {'NONE': 1, 'b.lo #5': 1}、FTS_TS_W n=1 {'b.hs #2': 1}）：
+ *   FTS_TS_A   : "\0016[FTS_TS_A][%s:%d]: " fmt               （无门控）
+ *                blob `.rodata.str1.1` 0x578f（"%s"）/0x10fba（"Touch Screen(SPI BUS)
+ *                driver probe..."）。
+ *   FTS_TS_W   : "\0016[FTS_TS_W][%s:%d]: " fmt  if (lv >= 2)  （cmp #2; b.hs）
+ *                blob 0x55d8 "spi_sync retry:%d"（fts_spi_transfer+0x17c）、
+ *                0x1170b "not support mode!"（fts_set_cur_value+0x3cc）。
+ * 与 FTS_INFO/E/D/V 同形：前缀首字节 '\0016' = KERN_INFO；一律不追加 '\n'。 */
+#define FTS_ALWAYS(fmt, args...) \
+do { \
+	pr_info("[FTS_TS_A][%s:%d]: " fmt, __func__, __LINE__, ##args); \
+} while(0)
+
+#define FTS_WARNING(fmt, args...) \
+do { \
+	if (fts_debug_log_level >= FTS_LOG_WARNING) \
+		pr_info("[FTS_TS_W][%s:%d]: " fmt, __func__, __LINE__, ##args); \
+} while(0)
+
+/* _b582-INTA：V 族的「任意 fmt」形态（与既有 FTS_FUNC_ENTER/EXIT 同族同门控，
+ * 只补格式串版）。证据：tree 侧 D→V 三站点（core.c show_raw 的 TX%d ~ TX%d ×2、
+ * fts_read_framedata 的 frame size: %d, frame data index: %d）在 blob 里全部是
+ * FTS_TS_V 且门控 = cmp w8,#0x5; b.hs/b.lo（0x68c4/0x6b80/0x668c，>= VERBOSE）；
+ * 串：0x56ea '\0016[FTS_TS_V][%s:%d]: TX%d ~ TX%d (cnt:%llu, frame_no:%hu):\n%s'、
+ * 0xaea4 '\0016[FTS_TS_V][%s:%d]: frame size: %d, frame data index: %d'。 */
+#define FTS_VERBOSE(fmt, args...) \
+do { \
+	if (fts_debug_log_level >= FTS_LOG_VERBOSE) \
+		pr_info("[FTS_TS_V][%s:%d]: " fmt, __func__, __LINE__, ##args); \
 } while(0)
 #endif /* __LINUX_FOCALTECH_COMMON_H__ */

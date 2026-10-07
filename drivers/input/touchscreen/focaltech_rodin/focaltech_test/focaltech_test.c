@@ -70,12 +70,16 @@ int fts_abs(int value)
 
 void *fts_malloc(size_t size)
 {
-    return kzalloc(size, GFP_KERNEL);
+    /* _b582-TEST：blob 忠实形态——分配一律 vzalloc（blob fts_malloc 0x10f7c: bl vzalloc；
+     * 6.6 的 vzalloc 只取 size，6.18 宏化后同义）。清零由 vzalloc 保证，调用侧不再补 memset。 */
+    return vzalloc(size);
 }
 
 void fts_free_proc(void *p)
 {
-    return kfree(p);
+    /* _b582-TEST：blob fts_free_proc 0x10f9c: bl vfree —— 与 fts_malloc 的 vzalloc 成对，
+     * 半对（kfree 释放 vzalloc 区）立即 UAF/BUG。 */
+    return vfree(p);
 }
 
 void print_buffer(int *buffer, int length, int line_num)
@@ -99,7 +103,10 @@ void print_buffer(int *buffer, int length, int line_num)
 
     tmpline = line_num ? line_num : length;
     tmplen = tmpline * 6 + 128;
-    tmpbuf = kzalloc(tmplen, GFP_KERNEL);
+    /* _b582-TEST：blob print_buffer 0x11024 是 __kmalloc(GFP_KERNEL)（非 kzalloc；
+     * 6.6 名下 __kmalloc，6.18 开 CONFIG_MEM_ALLOC_PROFILING ⇒ __kmalloc_noprof），
+     * 树侧按同名类落 kmalloc。 */
+    tmpbuf = kmalloc(tmplen, GFP_KERNEL);
 
     for (i = 0; i < length; i = i + tmpline) {
         cnt = 0;
@@ -221,7 +228,7 @@ int fts_test_write(u8 addr, u8 *writebuf, int writelen)
 
     data = fts_malloc(BYTES_PER_TIME + 1);
     if (!data) {
-        FTS_TEST_ERROR("malloc memory for bus write data fail");
+        FTS_TEST_ERROR("malloc bus write data memory failed");   /* _b582-INTB：blob 串面 */
         return -ENOMEM;
     }
 
@@ -749,7 +756,7 @@ int get_cb_sc(int byte_num, int *cb_buf, enum byte_mode mode)
 
     cb = (u8 *)fts_malloc(byte_num * sizeof(u8));
     if (cb == NULL) {
-        FTS_TEST_SAVE_ERR("malloc memory for cb buffer fail\n");
+        FTS_TEST_SAVE_ERR("malloc cb buffer memory failed\n");   /* _b582-INTB：blob 串面（含尾 \n） */
         return -ENOMEM;
     }
 
@@ -1262,7 +1269,7 @@ static int fts_test_save_test_data(char *file_name, char *data_buf, int len)
     filp_close(pfile, NULL);
     FTS_TEST_FUNC_EXIT();
 #else
-    FTS_TEST_ERROR("not factory && userdebug version, skip save!");
+    /* _b582-INTB：blob 无该串（全 ko 0 命中）——donor 告警在本机（非 factory 构建）按 blob 静默 */
 #endif //CONFIG_FACTORY_BUILD && USER_DEBUG_BUILD
     return 0;
 }	
@@ -1284,30 +1291,10 @@ void fts_test_save_fail_result(
 #endif
 
 
-static int fts_test_malloc_free_data_txt(struct fts_test *tdata, bool allocate)
-{
-#if TXT_SUPPORT
-    if (true == allocate) {
-        tdata->testresult = vmalloc(TXT_BUFFER_LEN);
-        if (NULL == tdata->testresult) {
-            FTS_TEST_ERROR("tdata->testresult malloc fail\n");
-            return -ENOMEM;
-        }
-
-        tdata->testresult_len = 0;
-        FTS_TEST_SAVE_INFO("FW version:0x%02x\n", tdata->fw_ver);
-        FTS_TEST_SAVE_INFO("tx_num:%d, rx_num:%d, key_num:%d\n",
-                           tdata->node.tx_num, tdata->node.rx_num,
-                           tdata->node.key_num);
-    } else {
-        if (tdata->testresult) {
-            vfree(tdata->testresult);
-            tdata->testresult = NULL;
-        }
-    }
-#endif
-    return 0;
-}
+/* _b582-INTB：A-80③ 链删除——fts_test_malloc_free_data_txt 在 blob 全 ko 无符号
+ * （两个 ko 均 0 命中；testresult 全模块无分配、无 vmalloc(0x64000) 除 csv），
+ * 原 TXT 分配/释放链按 blob 删除（结构体成员 testresult/testresult_len 保留，
+ * 系 0xbe0/0xbe8 布局锚点，值恒 NULL）。 */
 
 #if CSV_SUPPORT
 static int fts_test_get_item_count_scap_csv(int index)
@@ -1348,7 +1335,9 @@ static int fts_test_get_item_count_scap_csv(int index)
 }
 #endif
 
-static void fts_test_save_data_csv(struct fts_test *tdata)
+/* _b582-INTB：blob 将两 csv 保存件内联进 fts_test_main_exit（0x15264-0x159e4 一体现形，
+ * 无独立符号）⇒ always_inline 对齐（单调用点静态件，确定性内联） */
+static __attribute__((always_inline)) inline void fts_test_save_data_csv(struct fts_test *tdata)
 {
 #if CSV_SUPPORT
     int i = 0;
@@ -1373,7 +1362,7 @@ static void fts_test_save_data_csv(struct fts_test *tdata)
     /* _b571：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
     csv_buffer = tdata->csv_data_buffer;
     if (!csv_buffer) {
-        FTS_TEST_ERROR("csv_buffer malloc fail\n");
+        FTS_TEST_ERROR("tdata/csv_file_buf is null");   /* _b582-INTB：blob 串面（无尾 \n，0x414） */
         return ;
     }
 
@@ -1512,11 +1501,13 @@ csv_save_err:
         line2_buffer = NULL;
     }
 
-    /* _b571：blob 语义——缓冲常驻不释放（fts_free_test_memory 统一 vfree） */
+    /* _b571/_b582-TEST：blob 语义——csv 缓冲常驻不在此释放；由 fts_test_exit
+     * 按 blob 16704 vfree(fts_ftest->csv_data_buffer) 统一收口（原 fts_free_test_memory
+     * 是 donor 件，其唯一调用方 tp_selftest_write 已随 tp_selftest_v0 节点删除）。 */
 #endif
 }
 
-static void fts_test_save_data_csv_private(struct fts_test *tdata)
+static __attribute__((always_inline)) inline void fts_test_save_data_csv_private(struct fts_test *tdata)
 {
 #if CSV_SUPPORT
     char *csv_buffer = NULL;
@@ -1526,7 +1517,7 @@ static void fts_test_save_data_csv_private(struct fts_test *tdata)
     /* _b571：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
     csv_buffer = tdata->csv_data_buffer;
     if (!csv_buffer) {
-        FTS_TEST_ERROR("csv_buffer malloc fail\n");
+        FTS_TEST_ERROR("tdata/csv_file_buf is null");   /* _b582-INTB：blob 串面（无尾 \n，0x414） */
         return;
     }
 
@@ -1541,29 +1532,14 @@ static void fts_test_save_data_csv_private(struct fts_test *tdata)
                               csv_buffer, csv_length);
 #endif
 
-    /* _b571：blob 语义——缓冲常驻不释放（fts_free_test_memory 统一 vfree） */
+    /* _b571/_b582-TEST：blob 语义——csv 缓冲常驻不在此释放；由 fts_test_exit
+     * 按 blob 16704 vfree(fts_ftest->csv_data_buffer) 统一收口（原 fts_free_test_memory
+     * 是 donor 件，其唯一调用方 tp_selftest_write 已随 tp_selftest_v0 节点删除）。 */
 #endif
 }
 
-static void fts_test_save_result_txt(struct fts_test *tdata)
-{
-#if TXT_SUPPORT
-    if (!tdata || !tdata->testresult) {
-        FTS_TEST_ERROR("test result is null");
-        return;
-    }
-
-    FTS_TEST_INFO("test result length in txt:%d", tdata->testresult_len);
-    fts_test_save_test_data(FTS_TXT_FILE_NAME, tdata->testresult,
-                            tdata->testresult_len);
-
-#if defined(TEST_SAVE_FAIL_RESULT) && TEST_SAVE_FAIL_RESULT
-    fts_test_save_fail_result(tdata, "testresult_fail", ".txt",
-                              tdata->testresult, tdata->testresult_len);
-#endif
-
-#endif
-}
+/* _b582-INTB：fts_test_save_result_txt 按 blob 删除（blob 无该符号；
+ * "test result is null"/"test result length in txt" 串 0 命中）。 */
 
 /*****************************************************************************
 * Name: fts_test_save_data
@@ -1588,7 +1564,16 @@ void fts_test_save_data(char *name, int code, int *data, int datacnt,
         return;
     }
 
-    snprintf(info->name, TEST_ITEM_NAME_MAX - 1, "%s", name);
+    /* _b582-INTB：blob 形态（0x14c4c strlen → csel min(len,30) → memcpy 0x14c68 → strb 尾 NUL）：
+     * 30 字节截断语义；TEST_ITEM_NAME_MAX-2 = 30 与 blob 常数 0x1e 一致 */
+    {
+        size_t name_len = strlen(name);
+
+        if (name_len > TEST_ITEM_NAME_MAX - 2)
+            name_len = TEST_ITEM_NAME_MAX - 2;
+        memcpy(info->name, name, name_len);
+        info->name[name_len] = '\0';
+    }
     info->code = code;
     info->mc_sc = mc_sc;
     info->key_support = key;
@@ -1608,7 +1593,7 @@ void fts_test_save_data(char *name, int code, int *data, int datacnt,
     FTS_TEST_DBG("name:%s,len:%d", name, datalen);
     info->data = fts_malloc(datalen * sizeof(int));
     if (!info->data) {
-        FTS_TEST_ERROR("malloc memory for item(%d) data fail", td->item_count);
+        FTS_TEST_ERROR("malloc item(%d) data memory failed", td->item_count);   /* _b582-INTB：blob 串面 */
         info->datalen = 0;
         return;
     }
@@ -2072,12 +2057,6 @@ int fts_test_main_init(void)
     /* default enable all test item */
     fts_test_init_item(tdata);
 
-    ret = fts_test_malloc_free_data_txt(tdata, true);
-    if (ret < 0) {
-        FTS_TEST_ERROR("allocate memory for test data(txt) fail");
-        return ret;
-    }
-
     /* allocate test data buffer */
     tdata->buffer_length = (tdata->node.tx_num + 1) * tdata->node.rx_num;
     tdata->buffer_length *= sizeof(int) * 2;
@@ -2102,10 +2081,10 @@ int fts_test_main_exit(void)
         fts_test_save_data_csv_private(tdata);
     else
         fts_test_save_data_csv(tdata);
-    fts_test_save_result_txt(tdata);
+    /* _b582-INTB：fts_test_save_result_txt / malloc_free_data_txt(false) 按 blob 删除
+     * （blob main_exit 0x15264 起：csv 两分支 + malloc_free_thr/free_data/buffer 收口） */
 
     /* free memory */
-    fts_test_malloc_free_data_txt(tdata, false);
     fts_test_malloc_free_thr(tdata, false);
 
     /* free test data */
@@ -2119,21 +2098,6 @@ int fts_test_main_exit(void)
 }
 
 
-static void fts_free_test_memory(void)
-{
-	struct fts_test *tdata = fts_ftest;
-	FTS_TEST_FUNC_ENTER();
-	/* free memory */
-	fts_test_malloc_free_data_txt(tdata, false);
-	fts_test_malloc_free_thr(tdata, false);
-	/* free test data */
-	fts_test_free_data(tdata);
-	/* free test data buffer */
-	fts_free(tdata->buffer);
-	vfree(tdata->csv_data_buffer);
-	tdata->csv_data_buffer = NULL;
-	FTS_TEST_FUNC_EXIT();
-}
 
 /*
  * fts_test_get_testparams - get test parameter from ini
@@ -2171,7 +2135,7 @@ static int fts_test_start(void)
 static int fts_test_entry(char *ini_file_name)
 {
     int ret = 0;
-    struct fts_test *tdata = fts_ftest;
+    /* _b582-INTB：原 `struct fts_test *tdata` 仅服务于 ini_ver 打印（已按 blob 删除） */
 
     /* test initialize */
     ret = fts_test_main_init();
@@ -2187,16 +2151,14 @@ static int fts_test_entry(char *ini_file_name)
         fts_ftest->result = false;
         goto test_err;
     }
-    FTS_TEST_SAVE_INFO("ini_file_name:%s, ini version:%s\n", ini_file_name, tdata->ini.ini_ver);
+    FTS_TEST_SAVE_INFO("ini_file_name:%s\n", ini_file_name);   /* _b582-INTB：blob 串面无 ', ini version' 段 */
 
     /* Start testing according to the test configuration */
     if (true == fts_test_start()) {
-        FTS_TEST_INFO("Tp test pass");
-        FTS_TEST_SAVE_INFO("\n\n=======Tp test pass.\n");
+        FTS_TEST_SAVE_INFO("\n\n=======Tp test pass.\n");   /* _b582-INTB：blob 无 "Tp test pass" 日志（0 命中） */
         fts_ftest->result = true;
     } else {
-        FTS_TEST_ERROR("Tp test failure");
-        FTS_TEST_SAVE_INFO("\n\n=======Tp test failure.\n");
+        FTS_TEST_SAVE_INFO("\n\n=======Tp test failure.\n");   /* _b582-INTB：blob 无 "Tp test failure" 日志（0 命中） */
         fts_ftest->result = false;
 #if defined(TEST_SAVE_FAIL_RESULT) && TEST_SAVE_FAIL_RESULT
         do_gettimeofday(&(fts_ftest->tv));
@@ -2305,9 +2267,7 @@ static struct attribute_group fts_test_attribute_group = {
     .attrs = fts_test_attributes
 };
 
-int tp_selftest_result;
 /* ==================== _b571 缺件重建：fts_test_csv proc（blob 机器码）==================== */
-static struct proc_dir_entry *fts_proccsv_entry;
 
 static int fts_csv_show(struct seq_file *m, void *v)
 {
@@ -2347,222 +2307,6 @@ static const struct proc_ops fts_proccsv_fops = {
 	.proc_read = seq_read,
 	.proc_lseek = seq_lseek,
 	.proc_release = single_release,
-};
-
-static int tp_selftest_open(struct inode *inode, struct file *file)
-{
-	return 0;
-}
-static ssize_t tp_selftest_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
-{
-	char tmp[5];
-	int cnt;
-	if (*pos != 0)
-		return 0;
-	cnt = snprintf(tmp, sizeof(tp_selftest_result), "%d\n", tp_selftest_result);
-	if (copy_to_user(buf, tmp, strlen(tmp)))
-		return -EFAULT;
-	*pos += cnt;
-	return cnt;
-}
-ssize_t tp_selftest_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
-{
-	char tmp[6];
-	int ret;
-	struct fts_test *tdata = fts_ftest;
-	struct fts_ts_data *ts_data = fts_data;
-	struct input_dev *input_dev;
-	char *ini_file_name = "Conf_MultipleTest_CSOT.ini";
-
-	tp_selftest_result = SELFTEST_INVALID;
-	if (ts_data->suspended) {
-		FTS_INFO("In suspend, no test, return now");
-		return -EINVAL;
-	}
-	input_dev = ts_data->input_dev;
-	if (!tdata || !tdata->func || count > sizeof(tmp)) {
-		ret = -EINVAL;
-		goto out;
-	}
-	if (copy_from_user(tmp, buf, count)) {
-		ret = -EFAULT;
-		goto out;
-	}
-	mutex_lock(&input_dev->mutex);
-	fts_irq_disable();
-	/* test initialize */
-	ret = fts_test_main_init();
-	if (ret < 0) {
-		FTS_TEST_ERROR("fts_test_main_init error.");
-		goto test_err;
-	}
-	ret = fts_test_get_testparams(ini_file_name);
-	if (ret < 0) {
-		FTS_TEST_ERROR("get testparam fail");
-		goto test_err;
-	}
-	if (!strncmp(tmp, "short", 5) && tdata->func->short_test) {
-		tp_selftest_result = tdata->func->short_test();
-	} else if (!strncmp(tmp, "open", 4) && tdata->func->open_test) {
-		tp_selftest_result = tdata->func->open_test();
-	} else if (!strncmp(tmp, "i2c", 3)) {
-        tp_selftest_result = tdata->func->spi_test();
-    }
-	ret = tp_selftest_result;
-    if (ret == SELFTEST_PASS) {
-        FTS_TEST_INFO("tp selftest pass");
-    } else if (ret == SELFTEST_FAIL) {
-        FTS_TEST_ERROR("tp selftest fail");
-    } else if (ret == SELFTEST_INVALID) {
-        FTS_TEST_ERROR("tp selftest invalid");
-    } else {
-        FTS_TEST_ERROR("tp selftest error");
-    }
-
-	fts_test_main_exit();
-	fts_free_test_memory();
-	enter_work_mode();
-test_err:
-	fts_irq_enable();
-	mutex_unlock(&input_dev->mutex);
-out:
-	if (ret >= 0)
-		ret = count;
-	return ret;
-}
-int tp_selftest_release(struct inode *inode, struct file *file)
-{
-	return 0;
-}
-/*
-static const struct file_operations tp_selftest_fops = {
-	.open = tp_selftest_open,
-	.read = tp_selftest_read,
-	.write = tp_selftest_write,
-	.release = tp_selftest_release,
-};
-*/
-
-static const struct proc_ops tp_selftest_fops = {
-	.proc_open = tp_selftest_open,
-	.proc_read = tp_selftest_read,
-	.proc_write = tp_selftest_write,
-	.proc_release = tp_selftest_release,
-};
-static int32_t datadump_show(struct seq_file *m, void *v)
-{
-	int ret = 0, i = 0, j = 0;
-	int *rawdata = NULL;
-	int *differ_data = NULL;
-	struct fts_test *tdata = fts_ftest;
-	struct fts_ts_data *ts_data = fts_data;
-	struct input_dev *input_dev;
-	input_dev = ts_data->input_dev;
-	FTS_TEST_FUNC_ENTER();
-	if (ts_data->suspended) {
-		FTS_INFO("In suspend, no test, return now");
-		ret = -EINVAL;
-		goto out;
-	}
-	rawdata = vmalloc(PAGE_SIZE * 2);
-	if (!rawdata) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	memset(rawdata, 0, PAGE_SIZE * 2);
-	differ_data = vmalloc(PAGE_SIZE * 2);
-	if (!differ_data) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	memset(differ_data, 0, PAGE_SIZE * 2);
-	mutex_lock(&input_dev->mutex);
-	fts_irq_disable();
-	/* before enter factory mode, disable auto calibration */
-	ret = fts_test_write_reg(0xEE, 0x01);
-	if (ret) {
-		FTS_TEST_ERROR("write data auto cal fail\n");
-		ret = -EFAULT;
-		goto out;
-	}
-	ret = fts_test_init_basicinfo(tdata);
-	if (ret < 0) {
-		FTS_TEST_ERROR("test init basicinfo fail");
-		ret = -EFAULT;
-		goto out;
-	}
-	/*********************GET RAWDATA*********************/
-	if (tdata->func->data_dump) {
-		ret = tdata->func->data_dump(rawdata, differ_data);
-		if (ret) {
-			FTS_TEST_ERROR("get rawdata error");
-			ret = -EFAULT;
-			goto out;
-		}
-	}
-	FTS_TEST_INFO("tx num:%d,rx num:%d\n", tdata->node.tx_num, tdata->node.rx_num);
-	seq_puts(m, "\nRAW DATA\n");
-	for (i = 0; (i < tdata->node.tx_num) && (i < TX_NUM_MAX); i++) {
-		for (j = 0; (j < tdata->node.rx_num) && (j < RX_NUM_MAX); j++) {
-			seq_printf(m, "%6d", rawdata[tdata->node.rx_num * i + j]);
-			if (j == (tdata->node.rx_num - 1))
-				seq_puts(m, "\n");
-		}
-	}
-	seq_puts(m, "\nDIFF DATA\n");
-	for (i = 0; (i < tdata->node.tx_num) && (i < TX_NUM_MAX); i++) {
-		for (j = 0; (j < tdata->node.rx_num) && (j < RX_NUM_MAX); j++) {
-			seq_printf(m, "%6d", differ_data[tdata->node.rx_num * i + j]);
-			if (j == (tdata->node.rx_num - 1))
-				seq_puts(m, "\n");
-		}
-	}
-	seq_puts(m, "\n\n");
-	ret = 0;
-out:
-	enter_work_mode();
-	fts_irq_enable();
-	mutex_unlock(&input_dev->mutex);
-	if (rawdata) {
-		vfree(rawdata);
-		rawdata = NULL;
-	}
-	if (differ_data) {
-		vfree(differ_data);
-		differ_data = NULL;
-	}
-	FTS_TEST_FUNC_EXIT();
-	return ret;
-}
-static void *datadump_start(struct seq_file *m, loff_t *pos)
-{
-	return *pos < 1 ? (void *)1 : NULL;
-}
-static void *datadump_next(struct seq_file *m, void *v, loff_t *pos)
-{
-	++*pos;
-	return NULL;
-}
-static void datadump_stop(struct seq_file *m, void *v)
-{
-}
-const struct seq_operations tp_datadump_seq_ops = {
-	.start = datadump_start,
-	.next = datadump_next,
-	.stop = datadump_stop,
-	.show = datadump_show,
-};
-static int32_t tp_datadump_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &tp_datadump_seq_ops);
-}
-
-static const struct proc_ops tp_datadump_fops = {
-	/*.proc_owner = THIS_MODULE,*/
-	.proc_open = tp_datadump_open,
-	.proc_read = seq_read,
-	.proc_lseek = seq_lseek,
-	.proc_release = seq_release,
 };
 
 int fts_ic_data_collect(char *buf, int *length)
@@ -2631,7 +2375,7 @@ int fts_ic_data_collect(char *buf, int *length)
 		}
 	}
 
-	FTS_TEST_INFO("tx num:%d,rx num:%d\n", tdata->node.tx_num, tdata->node.rx_num);
+	/* _b582-INTB：blob 无 "tx num:%d,rx num:%d" 串（0 命中）⇒ 按 blob 静默 */
 	cnt += snprintf(buf + cnt, buf_size - cnt, "\nRAW DATA\n");
 	for (i = 0; (i < tdata->node.tx_num) && (i < TX_NUM_MAX); i++) {
 		for (j = 0; (j < tdata->node.rx_num) && (j < RX_NUM_MAX); j++) {
@@ -2683,7 +2427,9 @@ static int fts_test_func_init(struct fts_ts_data *ts_data)
         return -ENODATA;
     }
 
-    fts_ftest = kzalloc(sizeof(*fts_ftest), GFP_KERNEL);
+    /* _b582-TEST：blob fts_test_init 0x16430 vzalloc(0x139378)；sizeof(struct fts_test)
+     * = 0x139378 远超 kmalloc 上限，必须 vzalloc（kzalloc 在此走 large 面、order 过大易失败）。 */
+    fts_ftest = vzalloc(sizeof(*fts_ftest));
     if (fts_ftest == NULL) {
         FTS_TEST_ERROR("malloc memory for test fail");
         return -ENOMEM;
@@ -2712,7 +2458,6 @@ static int fts_test_func_init(struct fts_ts_data *ts_data)
 int fts_test_init(struct fts_ts_data *ts_data)
 {
 	int ret = 0;
-	struct ftxxxx_proc *proc = &ts_data->proc;
 	FTS_TEST_FUNC_ENTER();
 	/* get test function, must be the first step */
 	ret = fts_test_func_init(ts_data);
@@ -2725,13 +2470,9 @@ int fts_test_init(struct fts_ts_data *ts_data)
 		FTS_TEST_ERROR("sysfs(test) create fail");
 		sysfs_remove_group(&ts_data->dev->kobj, &fts_test_attribute_group);
 	} else
-		FTS_TEST_DBG("sysfs(test) create successfully");
-	proc->tp_selftest_proc = proc_create("tp_selftest_v0", 0644, NULL, &tp_selftest_fops);
-	if (proc->tp_selftest_proc == NULL)
-		FTS_TEST_ERROR("tp_selftest_v0 proc create failed.");
-	proc->tp_data_dump_proc = proc_create("tp_data_dump_v0", 0444, NULL, &tp_datadump_fops);
-	if (proc->tp_data_dump_proc == NULL)
-		FTS_TEST_ERROR("tp_data_dump_v0 proc create failed.");
+		FTS_TEST_DBG("sysfs(test) create successfully");	/* _b582-TEST：blob fts_test_init 全程只有一次 proc 创建（proc_create_data("fts_test_csv",
+	 * 0777, NULL, &fts_proccsv_fops, fts_ftest)，blob 0x16648），全 ko 串面 0 命中
+	 * "tp_selftest_v0"/"tp_data_dump_v0"（⑥-b 实证）⇒ donor 的两个 proc 节点删除。 */
 	/* _b581：A-74 续行④ 归位（blob fts_test_init 0x1658c-0x165d0 实证）：
 	 *   csv_data_buffer = vmalloc(0x64000)（失败打 "csv_file_buf malloc fail"）
 	 *   -> memset(buf, 0, 0x64000) -> fts_ftest->result(0xbf8) = 0
@@ -2747,25 +2488,37 @@ int fts_test_init(struct fts_ts_data *ts_data)
 		fts_ftest->result = 0;			/* blob: str wzr,[x20,#0xbf8] */
 	}
 	/* _b571：blob fts_test_init 16630 实证（name "fts_test_csv", 0777, data=fts_ftest） */
-	fts_proccsv_entry = proc_create_data("fts_test_csv", 0777, NULL, &fts_proccsv_fops, fts_ftest);
-	if (fts_proccsv_entry == NULL)
-		FTS_TEST_ERROR("create proc_csv entry fail");
+	/* _b582-TEST：blob 把该 proc 句柄存在 fts_ftest+0x3d0（0x16650 str x0,[x8,#0x3d0]、
+	 * fts_test_exit 0x166f8 ldr x0,[x21,#0x3d0] → proc_remove），树侧原用文件级 global
+	 * fts_proccsv_entry ⇒ 归位到结构体成员（同址同生命周期，删 global）。 */
+	fts_ftest->proc_entry = proc_create_data("fts_test_csv", 0777, NULL, &fts_proccsv_fops, fts_ftest);
+	if (fts_ftest->proc_entry == NULL)
+		FTS_ERROR("create proc_csv entry fail");   /* _b582-INTB：blob 该站点用核心宏（6[FTS_TS_E][%s:%d]） */
 	FTS_TEST_FUNC_EXIT();
 	return ret;
 }
 
 int fts_test_exit(struct fts_ts_data *ts_data)
 {
-	struct ftxxxx_proc *proc = &ts_data->proc;
 	FTS_TEST_FUNC_ENTER();
-	if (proc->tp_selftest_proc)
-		proc_remove(proc->tp_selftest_proc);
-	if (proc->tp_data_dump_proc)
-		proc_remove(proc->tp_data_dump_proc);
-	proc->tp_selftest_proc = NULL;
-	proc->tp_data_dump_proc = NULL;
+	/* _b582-TEST：blob fts_test_exit 166e4-16748 逐条对齐——
+	 *   ① sysfs_remove_group(ts_data->dev, fts_test_attribute_group)（0x166f0）
+	 *   ② proc_remove(fts_ftest->proc_entry @0x3d0)（0x166f8）= "fts_test_csv"
+	 *   ③ vfree(fts_ftest->csv_data_buffer @0xb8) + 置 NULL（0x16704-0x16708）
+	 *   ④ vfree(fts_ftest) + 置 NULL（0x16714-0x16718）
+	 * 原树的两个 donor proc_remove（tp_selftest_v0/tp_data_dump_v0）删除；
+	 * 释放一律 vfree（与 vzalloc 成对）。 */
 	sysfs_remove_group(&ts_data->dev->kobj, &fts_test_attribute_group);
-	fts_free(fts_ftest);
+	if (fts_ftest) {
+		proc_remove(fts_ftest->proc_entry);
+		fts_ftest->proc_entry = NULL;
+		if (fts_ftest->csv_data_buffer) {
+			vfree(fts_ftest->csv_data_buffer);
+			fts_ftest->csv_data_buffer = NULL;
+		}
+		vfree(fts_ftest);
+		fts_ftest = NULL;
+	}
 	FTS_TEST_FUNC_EXIT();
 	return 0;
 }

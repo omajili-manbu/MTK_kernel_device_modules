@@ -413,9 +413,19 @@ static int brl_send_cmd(struct goodix_ts_core *cd,
 	struct goodix_ic_info_misc *misc = &cd->ic_info.misc;
 	struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
 
-	if (cd->is_inspecting) {
-		ts_err("doing inspect, skip cmd");
-		return -EINVAL;
+	/* _b582-GXI：原树此处是 warsaw 的 `if (cd->is_inspecting) ts_err("doing inspect,
+	 * skip cmd")` 门 —— blob 无该串、也无 is_inspecting 读写点（切掉 warsaw inspect
+	 * 包装层后全树已无 is_inspecting=true 赋值点，该门为死面）⇒ 按 blob 删除。 */
+	/* _b582-INTC：blob brl_send_cmd 0x4608-0x4644 = 占该位的 **scp-tp 面**门，逐条：
+	 *   0x4608 ldr w8,[scp_tp_param] —— .bss+0x5ad0 struct scp_tp_params 首字段 param0
+	 *          （状态机：3 = SCP 已接管工作态，见 goodix_scp_tp.c 结构体段注）
+	 *   0x4614 cmp w8,#3 / 0x4618 b.ne → 非 3 走原流程（0x4648 起）
+	 *   0x4628 ldrb w3,[x19,#0x3] = struct goodix_ts_cmd.cmd（第 4 字节）
+	 *   0x462c-0x4640 ts_err("[scp-tp]: SCP working, skip cmd(0x%x)", cmd->cmd)
+	 *   0x4644 b 0x47d8（mov w23,wzr）⇒ **return 0**，不写 cmd、不轮询 ack */
+	if (scp_tp_param.param0 == 3) {
+		ts_err("[scp-tp]: SCP working, skip cmd(0x%x)", cmd->cmd);
+		return 0;
 	}
 
 	if (misc->cmd_addr == 0x0000) {
@@ -1524,6 +1534,29 @@ static int goodix_touch_handler(struct goodix_ts_core *cd,
 	return 0;
 }
 
+/* _b582-GXI：blob 独有 static get_debug_data_size（__func__ 串 .rodata+0x7ad8、
+ * 打印 "debug_data_size:%d" 6[GTP_V]，源行 1487；0x6608-0x6654 内联于 brl_event_handler）：
+ *   size = 2 缺省；goodix_core_data 非空时 size = ic_info.parm.drv_num *
+ *          ic_info.parm.sen_num * 2（blob [x9+0x48]/[x9+0x49]，6.6 偏移）；
+ *   if (cd->debug_data_size < (size | 1)) cd->debug_data_size = size + 0xb2;
+ *   ts_verbose("debug_data_size:%d", cd->debug_data_size) 后返回该值。
+ * blob 判空为 `goodix_core_data && &goodix_core_data->ic_info.misc`（对 ic_info @+0x2c
+ * 取址判空，恒真，属厂商源残留写法），此处按等价语义只判全局非空。 */
+static int get_debug_data_size(struct goodix_ts_core *cd)
+{
+	int size = 2;
+
+	if (goodix_core_data)
+		size = goodix_core_data->ic_info.parm.drv_num *
+			goodix_core_data->ic_info.parm.sen_num * 2;
+
+	if (cd->debug_data_size < (size | 1))
+		cd->debug_data_size = size + 0xb2;
+
+	ts_verbose("debug_data_size:%d", cd->debug_data_size);
+	return cd->debug_data_size;
+}
+
 static int brl_event_handler(struct goodix_ts_core *cd,
 			struct goodix_ts_event *ts_event)
 {
@@ -1549,16 +1582,12 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 #ifdef GOODIX_DEBUG_SPI
 		TOUCH_TRACE_FRAME_CNT_BEGIN(frame_cnt, frame_cnt - 1);
 #endif
-#ifdef TOUCH_DUMP_TIC_SUPPORT
-		tp_frame->dump_type = cd->dump_type;
-		if (cd->dump_type == DUMP_ON) {
-			ret = hw_ops->read(cd, misc->frame_data_addr, tp_frame->thp_frame, GOODIX_THP_FRAME_DUMP_SIZE);
-		} else {
-			ret = hw_ops->read(cd, misc->frame_data_addr, tp_frame->thp_frame, GOODIX_THP_FRAME_SIZE);
-		}
-#else
-		ret = hw_ops->read(cd, misc->frame_data_addr, tp_frame->thp_frame, GOODIX_THP_FRAME_SIZE);
-#endif /* TOUCH_DUMP_TIC_SUPPORT */
+		/* _b582-GXI：blob brl_event_handler 0x6334-0x636c 先无条件读
+		 * GOODIX_THP_FRAME_SIZE(2500)（无 dump 分叉）；0x65f4-0x6684 在事件命中后
+		 * 写 dump_type，仅 DUMP_ON 再按 get_debug_data_size(cd) 读回帧。
+		 * 原树 warsaw 序（前置 4096 分叉读）按 blob 收口。 */
+		ret = hw_ops->read(cd, misc->frame_data_addr, tp_frame->thp_frame,
+				GOODIX_THP_FRAME_SIZE);
 		if (ret) {
 			ts_err("failed get frame data");
 #ifdef GOODIX_DEBUG_SPI
@@ -1568,7 +1597,8 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 		}
 		frame_ptr = (u8 *)&tp_frame->thp_frame;
 		event_status = frame_ptr[0];
-		// ts_info("frame_head %*ph", IQR_FRAME_HEAD_LEN, frame_ptr);
+		/* blob 0x652c（V 级，vendor 源行 1528；树原为注释行） */
+		ts_verbose("frame_head %*ph", IQR_FRAME_HEAD_LEN, frame_ptr);
 
 		if (event_status & GOODIX_FRAME_EVENT) {
 			if (cd->sync_mode == SYNC)
@@ -1578,6 +1608,24 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 			ts_event->event_type = EVENT_FRAME;
 			tp_frame->frame_cnt = frame_cnt;
 			tp_frame->fod_pressed = cd->fod_finger;
+			tp_frame->dump_type = cd->dump_type;	/* blob 0x65f4-0x65f8 */
+#ifdef TOUCH_DUMP_TIC_SUPPORT
+			if (cd->dump_type == DUMP_ON) {
+				/* blob 0x6600-0x6688：size = get_debug_data_size(cd)
+				 * （drv*sen*2 并回写 cd->debug_data_size），
+				 * 读失败 = "failed get frame data"（行 1543）。 */
+				ret = hw_ops->read(cd, misc->frame_data_addr,
+						tp_frame->thp_frame,
+						get_debug_data_size(cd));
+				if (ret) {
+					ts_err("failed get frame data");
+#ifdef GOODIX_DEBUG_SPI
+					TOUCH_TRACE_FRAME_CNT_END();
+#endif
+					return -EINVAL;
+				}
+			}
+#endif /* TOUCH_DUMP_TIC_SUPPORT */
 			notify_raw_data_update_common(TOUCH_ID);
 			rtc_time64_to_tm(ts.tv_sec, &tm);
 			frame_cnt++;
@@ -1613,7 +1661,9 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 
 	large_touch_status = pre_buf[2];
 	event_status = pre_buf[0];
-	ts_debug("touch_head %*ph", IRQ_EVENT_HEAD_LEN, pre_buf);
+	/* _b582-GXI：blob brl_event_handler 0x67b4 = 6[GTP_V]（ts_verbose），树原 D 级
+	 * 为 warsaw 残项（blob 全 ko 无 6[GTP_D][%s:%d]: touch_head %*ph 串）。 */
+	ts_verbose("touch_head %*ph", IRQ_EVENT_HEAD_LEN, pre_buf);
 
 #ifdef TOUCH_FOD_SUPPORT
 	if (event_status & GOODIX_POWERON_FOD_EVENT) {

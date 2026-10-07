@@ -316,69 +316,9 @@ struct kobject *goodix_get_default_kobj(void)
 	return kobj;
 }
 
-extern int g_test_stage;
-static ssize_t goodix_ts_test_stage_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d", g_test_stage);
-}
-
-
-static ssize_t goodix_ts_test_stage_store(struct device *dev,
-			struct device_attribute *attr, const char *buf, size_t count)
-{
-	if (!buf || count <= 0)
-		return -EINVAL;
-	sscanf(buf, "%d", &g_test_stage);
-	return count;
-}
-
-int goodix_inspect_run(struct goodix_ts_core *cd, const char *name);
-int goodix_diff_shift_test_start(struct goodix_ts_core *cd, int freq_index);
-int goodix_diff_shift_test_end(struct goodix_ts_core *cd, int freq_index);
-static ssize_t goodix_ts_do_inspect_store(struct device *dev,
-			struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct goodix_ts_core *core_data = dev_get_drvdata(dev);
-
-	ts_info("set inspect limit name: %s", buf);
-	goodix_inspect_run(core_data, buf);
-	return count;
-}
-
-static ssize_t goodix_ts_diff_shift_start_store(struct device *dev,
-			struct device_attribute *attr, const char *buf, size_t count)
-{
-	int ret;
-	int freq_index = 255;
-	struct goodix_ts_core *core_data = dev_get_drvdata(dev);
-
-	if (!buf || count <= 0)
-		return -EINVAL;
-	sscanf(buf, "%d", &freq_index);
-
-	ret = goodix_diff_shift_test_start(core_data, freq_index);
-	if (ret)
-		return ret;
-	return count;
-}
-
-static ssize_t goodix_ts_diff_shift_end_store(struct device *dev,
-			struct device_attribute *attr, const char *buf, size_t count)
-{
-	int ret;
-	int freq_index = 255;
-	struct goodix_ts_core *core_data = dev_get_drvdata(dev);
-
-	if (!buf || count <= 0)
-		return -EINVAL;
-	sscanf(buf, "%d", &freq_index);
-
-	ret = goodix_diff_shift_test_end(core_data, freq_index);
-	if (ret)
-		return ret;
-	return count;
-}
+/* _b582-GXI：blob 全 ko 无 test_stage/do_inspect/diff_shift_start/diff_shift_end 四
+ * 个 sysfs 节点名串，也无 g_test_stage 全局 ⇒ warsaw diff-shift 测试面入口按 blob
+ * 删除（框架侧零引用；inspect 侧对应函数同轮删除）。 */
 
 /* show driver infomation */
 static ssize_t goodix_ts_driver_info_show(struct device *dev,
@@ -1075,16 +1015,6 @@ static DEVICE_ATTR(fod_enable, 0664, goodix_ts_fod_show, goodix_ts_fod_store);
 static DEVICE_ATTR(scan_freq_index, 0220, NULL, goodix_ts_scan_freq_index_store);
 #endif
 
-//for diffshift
-static DEVICE_ATTR(test_stage, 0664,
-		goodix_ts_test_stage_show, goodix_ts_test_stage_store);
-static DEVICE_ATTR(do_inspect, 0220,
-		NULL, goodix_ts_do_inspect_store);
-static DEVICE_ATTR(diff_shift_start, 0220,
-		NULL, goodix_ts_diff_shift_start_store);
-static DEVICE_ATTR(diff_shift_end, 0220,
-		NULL, goodix_ts_diff_shift_end_store);
-
 static struct attribute *sysfs_attrs[] = {
 	&dev_attr_driver_info.attr,
 	&dev_attr_chip_info.attr,
@@ -1103,10 +1033,6 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_scan_freq_index.attr,
 #endif
 	&dev_attr_scp_debug.attr,
-	&dev_attr_test_stage.attr,
-	&dev_attr_do_inspect.attr,
-	&dev_attr_diff_shift_start.attr,
-	&dev_attr_diff_shift_end.attr,
 	NULL,
 };
 
@@ -4580,6 +4506,13 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	int ret;
 
 	ts_info("goodix_ts_probe IN THP");
+	/* _b582-INTC：blob 该串唯一引用点 = .init.text init_module+0xe4（disr L47124，
+	 * reloc .rodata.str1.1+0x16b4，门 `cmp w8,#4; b.hs` = ts_debug 级），位于 DET1
+	 * （面板 gpio 639，"TP is not goodix!" 判非）的 goodix 分支内、goodix_spi_bus_init
+	 * 之前（0x4c-0x58）。树侧 DET1 门由 A-78 移至 goodix_spi_probe（initcall 期
+	 * gpiochip 未注册），该门通过才 platform_device_register ⇒ 本探测是 DET1==1 之后
+	 * goodix 侧首个入口，条件等价（残留：所属函数 init_module vs goodix_ts_probe）。 */
+	ts_debug("TP is goodix, panel is CSOT.");
 	bus_interface = pdev->dev.platform_data;
 	if (!bus_interface) {
 		ts_err("Invalid touch device");
@@ -4590,7 +4523,12 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	core_data = devm_kzalloc(&pdev->dev,
 			sizeof(struct goodix_ts_core), GFP_KERNEL);
 	if (!core_data) {
-		ts_err("Failed to allocate memory for core data");
+		/* _b582-INTD（A4-1）：blob = .rodata.str1.1+0xb85
+		 * b'\0016[GTP_E][%s:%d]: allocate core data memory failed'
+		 * （goodix_core_rodin.disr goodix_ts_probe 0xd314/0xd328，行 0x1049=4169，
+		 * __func__ "goodix_ts_probe"；与 0xd2f8 "Invalid touch device"（行 4161）
+		 * 同段相邻 ⇒ 同位置换文，非仅前缀/词序差） */
+		ts_err("allocate core data memory failed");
 		core_module_prob_sate = CORE_MODULE_PROB_FAILED;
 		return -ENOMEM;
 	}
@@ -4730,6 +4668,14 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	scp_tp_param.unknown_0c = 32;
 	scp_tp_param.unknown_14[2] = 0;
 	scp_tp_param.unknown_14[3] = 2500;
+
+	/* _b582-INTD（A4-2）：blob goodix_ts_probe 0xe040 `cmp w12,#3; b.hs 0xe15c`（ts_info 级），
+	 * 0xe15c/0xe160 = adrp/add .rodata.str1.1+0x2db2 =
+	 * b'\0016[GTP_I][%s:%d]: mtk_scp_touch_init in probe'（行 0x10dc=4316，
+	 * __func__ 0x6fe0 "goodix_ts_probe"），printk 后 0xe174 `b 0xe044` 回到
+	 * scp_tp_init 调用点 ⇒ 位置：scp_tp_param 填充之后、scp_tp_init 之前。 */
+	ts_info("mtk_scp_touch_init in probe");
+
 	scp_tp_init();
 
 	return 0;

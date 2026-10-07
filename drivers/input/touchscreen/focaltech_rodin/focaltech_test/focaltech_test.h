@@ -712,7 +712,10 @@ int fts_test_malloc_free_thr(struct fts_test *tdata, bool allocate);
 } while(0)
 
 #define CSV_SUPPORT             1
-#define TXT_SUPPORT             1
+/* _b582-INTB：blob 实证 TXT_SUPPORT=0——show_data 为 4B 空体、无 testresult 分配、
+ * fts_test_save_result_txt/fts_test_malloc_free_data_txt 无符号（空体被内联丢弃）；
+ * SAVE_* 宏的 append 面保留（blob 同形：testresult 恒 NULL ⇒ 死面不执行）。 */
+#define TXT_SUPPORT             0
 
 #define FTS_TEST_DBG(fmt, args...) pr_info("[FTS_TS][TEST]%s:" fmt "\n",  __func__, ##args)
 #define FTS_TEST_FUNC_ENTER() pr_info("[FTS_TS][TEST]%s: Enter\n", __func__)
@@ -720,17 +723,20 @@ int fts_test_malloc_free_thr(struct fts_test *tdata, bool allocate);
 #define FTS_TEST_INFO(fmt, args...) pr_err("[FTS_TS/I][TEST]%s:"fmt"\n", __func__, ##args)
 #define FTS_TEST_ERROR(fmt, args...) pr_err("[FTS_TS/E][TEST]%s:"fmt"\n", __func__, ##args)
 
+/* _b582-INTB：blob 形态 = append + pr_info(I 级)（show_data_mc_sc 0x14990-0x149d8 /
+ * ft5672_rawshift_pic_test 0x2af54-0x2afb4 逐指令实证：先 append 后 pr_info） */
 #define FTS_TEST_SAVE_INFO(fmt, args...) do { \
-    if (fts_ftest->testresult) { \
+    if (fts_ftest && fts_ftest->testresult) { \
         fts_ftest->testresult_len += snprintf( \
         fts_ftest->testresult + fts_ftest->testresult_len, \
         TXT_BUFFER_LEN, \
         fmt, ##args);\
     } \
+    pr_info("[FTS_TS/I][TEST]%s:"fmt"\n", __func__, ##args);\
 } while (0)
 
 #define FTS_TEST_SAVE_ERR(fmt, args...)  do { \
-    if (fts_ftest->testresult && (fts_ftest->testresult_len < TXT_BUFFER_LEN)) { \
+    if (fts_ftest && fts_ftest->testresult && (fts_ftest->testresult_len < TXT_BUFFER_LEN)) { \
         fts_ftest->testresult_len += snprintf( \
         fts_ftest->testresult + fts_ftest->testresult_len, \
         TXT_BUFFER_LEN, \

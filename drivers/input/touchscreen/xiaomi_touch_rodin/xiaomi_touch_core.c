@@ -964,18 +964,9 @@ static void xiaomi_unregister_power_supply_event(void)
 	power_supply_unreg_notifier(&xiaomi_touch.power_supply_notifier);
 }
 
-void nfc_to_touch_event(s8 touch_id,u8 val){
-	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);
-	LOG_INFO("enter touch_id =%d val = %d",touch_id, val);
-	if(!xiaomi_touch_driver_param) {
-		LOG_INFO("Touch panel  id %d hasn't register, return!",touch_id);
-		return;
-	}
-	if(xiaomi_touch_driver_param->hardware_operation.set_nfc_to_touch_event)
-		xiaomi_touch_driver_param->hardware_operation.set_nfc_to_touch_event(val);
-	else
-		LOG_INFO("Non-filp models do not support this function");
-}
+/* _b582-INTB：A-80① 死面——nfc_to_touch_event 在 blob 三 ko 中 nfc 串/符号 0 命中
+ * （strings -a/nm 复核）；全树 0 调用者；6.6 ops 表（216B=27 槽，_b581_goodix 逐槽解码）
+ * 无该槽位 ⇒ 整函数删除；结构体成员 set_nfc_to_touch_event 保留（值为 NULL，勿改结构体）。 */
 
 static int xiaomi_touch_probe(struct platform_device *pdev)
 {
