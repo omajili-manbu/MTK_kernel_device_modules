@@ -1382,7 +1382,7 @@ static int goodix_parse_dt_resolution(struct device_node *node,
 		return ret;
 	}
 
-	ret = of_property_read_u32(node, "goodix,support-super-resolution",
+	ret = of_property_read_u32(node, "goodix,super-resolution-factor",
 				&board_data->super_resolution_factor);
 	if (ret < 0) {
 		ts_err("Failed get super-resolution-factor property");
@@ -4739,26 +4739,35 @@ static struct platform_driver goodix_ts_driver = {
 	.id_table = ts_core_ids,
 };
 
-//#define PANEL_ID_DET1 (344+139)
-//#define PANEL_ID_DET2 (344+140)
+/* blob 同形：出厂 init_module 读全局 gpio 639/640 判面板供应商
+ * （pio 基号 500 + 偏移 139/140，6.18 基号同 500）。DET1=1: CSOT+goodix9916R，
+ * DET2=1: TIANMA+focal FT3683；各看各脚，非我即退（读脚失败 fail-open） */
+#define PANEL_ID_DET1 639
+#define PANEL_ID_DET2 640
 static int __init goodix_ts_core_init(void)
 {
 	int ret;
-	//int gpio_139 = 0;
-	//int gpio_140 = 0;
+	int gpio_det1 = 1;
 
-	//gpio_direction_input(PANEL_ID_DET1);
-	//gpio_139 = gpio_get_value(PANEL_ID_DET1);
-	//gpio_direction_input(PANEL_ID_DET2);
-	//gpio_140 = gpio_get_value(PANEL_ID_DET2);
-	//ts_info("gpio_139 = %d, gpio_140 = %d", gpio_139, gpio_140);
-	// [gpio_139,gpio_140] = [1,0] is 1st csot & goodix9916r
-	// [gpio_139,gpio_140] = [0,1] is 2rd tianma & focal3683
-	// default panel select 1st supply
-	//if (gpio_139 == 0 && gpio_140 == 1) {
-	//	ts_info("panel is tianma, ic is focal, return");
-	//	return 0;
-	//}
+	ret = gpio_request(PANEL_ID_DET1, "goodix-det1");
+	if (!ret) {
+		ret = gpio_direction_input(PANEL_ID_DET1);
+		if (!ret) {
+			gpio_det1 = gpio_get_value(PANEL_ID_DET1);
+		} else {
+			ts_err("det1 direction_input failed:%d, fail-open", ret);
+			ret = 0;
+		}
+	} else {
+		ts_err("det1 request failed:%d, fail-open", ret);
+		ret = 0;
+	}
+	ts_info("gpio_det1 = %d", gpio_det1);
+	if (gpio_det1 != 1) {
+		ts_info("TP is not goodix!");
+		return 0;
+	}
+	ts_debug("TP is goodix, panel is CSOT.");
 	ts_info("Core layer init:%s", GOODIX_DRIVER_VERSION);
 #ifdef CONFIG_TOUCHSCREEN_GOODIX_BRL_SPI
 	ret = goodix_spi_bus_init();

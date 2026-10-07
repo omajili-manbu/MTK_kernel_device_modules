@@ -2003,10 +2003,9 @@ static int fts_pinctrl_select_spimode(struct fts_ts_data *ts)
 static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 {
 	int ret = 0;
-	if (IS_ERR_OR_NULL(ts_data->avdd)) {
-		FTS_ERROR("avdd is invalid");
-		return -EINVAL;
-	}
+
+	/* blob 同形：无 avdd 硬性 bail（本机 DTB 无 focaltech,avdd-name，avdd 落
+	 * dummy；真实 avdd 控制在下方 avdd-gpio） */
 	FTS_FUNC_ENTER();
 	if (enable) {
 		if (ts_data->power_disabled) {
@@ -2026,11 +2025,24 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 				if (ret)
 					FTS_ERROR("enable avdd regulator failed,ret=%d", ret);
 			}
+			/* blob simplify 同形：avdd GPIO 承重（gpio_to_desc + gpiod_direction_output_raw） */
+			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
+				struct gpio_desc *avdd_desc =
+					gpio_to_desc(ts_data->pdata->avdd_gpio);
+
+				if (avdd_desc) {
+					ret = gpiod_direction_output_raw(avdd_desc, 1);
+					if (ret)
+						FTS_ERROR("enable avdd gpio failed,ret=%d", ret);
+				}
+			}
+			FTS_INFO("successs to enable avdd");
 			if (!IS_ERR_OR_NULL(ts_data->iovdd)) {
 				ret = regulator_enable(ts_data->iovdd);
 				if (ret)
 					FTS_ERROR("enable iovdd regulator failed,ret=%d", ret);
 			}
+			FTS_INFO("successs to enable iovdd");
 			if (!IS_ERR_OR_NULL(ts_data->iovdd_source)) {
 				ret = regulator_enable(ts_data->iovdd_source);
 				if (ret)
@@ -2041,7 +2053,6 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 				if (ret)
 					FTS_ERROR("enable avdd_source regulator failed,ret=%d", ret);
 			}
-			FTS_INFO("successs to enable avdd && iovdd\n");
 			ts_data->power_disabled = false;
 		}
 	} else {
@@ -2052,6 +2063,14 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 			msleep(20);
 			gpio_direction_output(ts_data->pdata->reset_gpio, 0);
 			msleep(1);
+			/* blob simplify 同形：disable 拉低 avdd GPIO */
+			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
+				struct gpio_desc *avdd_desc =
+					gpio_to_desc(ts_data->pdata->avdd_gpio);
+
+				if (avdd_desc)
+					gpiod_direction_output_raw(avdd_desc, 0);
+			}
 			if (!IS_ERR_OR_NULL(ts_data->avdd)) {
 				ret = regulator_disable(ts_data->avdd);
 				if (ret)
@@ -2394,6 +2413,13 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
     } else
         pdata->avdd_source_reg_name = name;
 
+    /* blob 同形：avdd 由 GPIO 承重，出厂 parse_dt 先读 focaltech,avdd-gpio 再读 iovdd name */
+    pdata->avdd_gpio = of_get_named_gpio(np, "focaltech,avdd-gpio", 0);
+    if (gpio_is_valid(pdata->avdd_gpio))
+        FTS_INFO("get avdd-gpio[%d] from dt", pdata->avdd_gpio);
+    else
+        FTS_ERROR("can't find avdd-gpio, use other power supply");
+
     ret = of_property_read_string(np, "focaltech,iovdd-name", &name);
     if (ret < 0) {
         FTS_ERROR("focaltech,iovdd-name undefined");
@@ -2403,8 +2429,8 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
 
     ret = of_property_read_string(np, "focaltech,avdd-name", &name);
     if (ret < 0) {
-        FTS_ERROR("focaltech,avdd-name undefined");
-        pdata->avdd_reg_name = NULL;
+        FTS_INFO("focaltech,avdd-name undefined, fallback to dummy avdd regulator");
+        pdata->avdd_reg_name = "avdd";
     } else
         pdata->avdd_reg_name = name;
 
@@ -5125,8 +5151,11 @@ static const struct spi_device_id fts_ts_id[] = {
     {FTS_DRIVER_NAME, 0},
     {},
 };
+/* blob 同形：出厂 fts ko of 别名仅 xiaomi,touch-spi（全 ko 无 focaltech,fts 串），
+ * DTB SPI 面板唯一节点 compatible=xiaomi,touch-spi；无对应 spi_device_id 条目
+ * 的 __spi_register_driver 静态检查 warning 与出厂一致（基线噪音，保留） */
 static const struct of_device_id fts_dt_match[] = {
-    {.compatible = "focaltech,fts", },
+    {.compatible = "xiaomi,touch-spi", },
     {},
 };
 MODULE_DEVICE_TABLE(of, fts_dt_match);
@@ -5146,13 +5175,41 @@ static struct spi_driver fts_ts_driver = {
     .id_table = fts_ts_id,
 };
 
-#define PANEL_ID_DET1 (344+139)
-#define PANEL_ID_DET2 (344+140)
+/* blob 同形：出厂 init_module 读全局 gpio 639/640 判面板供应商
+ * （pio 基号 500 + 偏移 139/140；6.18 pio 基号同为 500，#221 boot
+ *   goodix 读 avdd-gpio 亦得全局 585 双侧互证）。DET1=1: CSOT+goodix9916R，
+ *   DET2=1: TIANMA+focal FT3683 */
+#define PANEL_ID_DET1 639
+#define PANEL_ID_DET2 640
 
 static int __init fts_ts_init(void)
 {
 	int ret = 0;
+	int gpio_det1 = 1;
+
 	FTS_FUNC_ENTER();
+	/* blob 同形判型门：出厂 init_module 读 DET2（全局 640），非 1 不注册；
+	 * 读脚失败 fail-open（保持注册，防死触摸） */
+	ret = gpio_request(PANEL_ID_DET2, "fts-det1");
+	if (!ret) {
+		ret = gpio_direction_input(PANEL_ID_DET2);
+		if (!ret) {
+			gpio_det1 = gpio_get_value(PANEL_ID_DET2);
+		} else {
+			FTS_ERROR("det1 direction_input failed:%d, fail-open", ret);
+			ret = 0;
+		}
+	} else {
+		FTS_ERROR("det1 request failed:%d, fail-open", ret);
+		ret = 0;
+	}
+	FTS_INFO("gpio_det1 = %d", gpio_det1);
+	if (gpio_det1 != 1) {
+		FTS_INFO("TP is not focal!");
+		FTS_FUNC_EXIT();
+		return 0;
+	}
+	FTS_DEBUG("TP is focaltech, panel is TIMMA.");
 	ret = spi_register_driver(&fts_ts_driver);
 	if (ret != 0)
 		FTS_ERROR("Focaltech touch screen driver init failed!");
