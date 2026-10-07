@@ -503,6 +503,8 @@ struct fts_ts_data {
         struct pinctrl_state *pins_suspend;
         struct pinctrl_state *pins_release;
 	struct pinctrl_state *pinctrl_state_spimode;
+	struct pinctrl_state *pinctrl_state_cs_spimode;	/* blob："Set pinctrl_cs_spi_mode sucesses." 对应态 */
+	struct pinctrl_state *pinctrl_state_cs_gpiomode;	/* blob："Set pinctrl_cs_gpio_mode sucesses." 对应态 */
 	struct pinctrl_state *pinctrl_touch_mode_ap;	/* blob 0xb40：touch_mode_ap */
 	struct pinctrl_state *pinctrl_touch_mode_scp;	/* blob 0xb48：touch_mode_scp */
 	/* rodin blob 成员（donor ft3383 代缺，blob 反汇编实证） */

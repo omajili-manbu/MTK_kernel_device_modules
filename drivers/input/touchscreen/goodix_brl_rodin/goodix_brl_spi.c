@@ -232,12 +232,41 @@ static void goodix_pdev_release(struct device *dev)
 	kfree(goodix_pdev);
 }
 
+/* blob 同形：判型门读全局 gpio 639（DET1；pio 基号 500 + 偏移 139）。
+ * A-78 由 module init 移到 probe 顶端（initcall 期 gpiochip 未注册） */
+#define PANEL_ID_DET1 639
+
 static int goodix_spi_probe(struct spi_device *spi)
 {
 	int ret = 0;
 	struct device_node *dp = spi->dev.of_node;
 
 	ts_info("goodix spi probe in");
+
+	/* A-78 判型门（blob 同形；#222 原在 module init，initcall 期 pio gpiochip
+	 * 未注册 → gpio_request 恒 -517 双 fail-open 门空转）：移到 probe 顶端，
+	 * gpio 已就绪、读真实值。DET1=全局 639；非 1 → "TP is not goodix!" 并
+	 * return -ENODEV（让总线把 spi1.0 让给 focaltech）；读脚失败（-517 等）
+	 * fail-open 继续，如实打印错误码 */
+	ret = gpio_request(PANEL_ID_DET1, "goodix-det1");
+	if (!ret) {
+		ret = gpio_direction_input(PANEL_ID_DET1);
+		if (!ret) {
+			int gpio_det1 = gpio_get_value(PANEL_ID_DET1);
+
+			ts_info("gpio_det1 = %d", gpio_det1);
+			if (gpio_det1 != 1) {
+				ts_info("TP is not goodix!");
+				return -ENODEV;
+			}
+		} else {
+			ts_err("gpio%d direction_input failed:%d, fail-open",
+				PANEL_ID_DET1, ret);
+		}
+	} else {
+		ts_err("gpio%d request failed:%d, fail-open", PANEL_ID_DET1, ret);
+	}
+	ret = 0;
 #ifdef TOUCH_TRUSTED_SUPPORT
 	goodix_set_spi_device(spi);
 #endif // TOUCH_TRUSTED_SUPPORT

@@ -679,6 +679,7 @@ struct goodix_ts_core {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pin_sta_active;
 	struct pinctrl_state *pin_sta_suspend;
+	struct pinctrl_state *pin_sta_spi_mode;	/* blob 0x4a0：pmx_gt_spi_mode（主 SPI 三组引脚） */
 	struct pinctrl_state *pin_sta_touch_mode_ap;	/* blob 0x4b0：touch_mode_ap */
 	struct pinctrl_state *pin_sta_touch_mode_scp;	/* blob 0x4b8：touch_mode_scp */
 	struct pinctrl_state *pin_sta_boot;

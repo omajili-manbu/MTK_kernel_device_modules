@@ -1994,6 +1994,15 @@ static int goodix_ts_pinctrl_init(struct goodix_ts_core *core_data)
 		goto exit_pinctrl_put;
 	}
 
+	/* A-78 blob 同形：pmx_gt_spi_mode（主 SPI 三组引脚）查找；blob 中该查找
+	 * 为致命（-19 即整函数失败），树侧按规格降为容忍、不阻断 probe */
+	core_data->pin_sta_spi_mode = pinctrl_lookup_state(core_data->pinctrl,
+				"pmx_gt_spi_mode");
+	if (IS_ERR_OR_NULL(core_data->pin_sta_spi_mode)) {
+		r = PTR_ERR(core_data->pin_sta_spi_mode);
+		ts_err("Failed to get pinctrl state:%s, r:%d", "pmx_gt_spi_mode", r);
+		core_data->pin_sta_spi_mode = NULL;
+	}
 	ts_info("success get pinctrl state");
 
 	return 0;
@@ -4581,6 +4590,17 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		if (ret < 0)
 			ts_err("Failed to select active pinstate, r:%d", ret);
 	}
+	/* A-78 blob 同形（blob goodix_ts_probe 0xde6c：active 之后 select
+	 * pmx_gt_spi_mode，失败打印 "Failed to select %s pinstate %d"）：
+	 * 主 SPI 三组引脚 mux 进 SPI 功能态，位于第一次 SPI 事务
+	 * （dev_confirm）之前；失败容忍不阻断 probe */
+	if (!ret && core_data->pinctrl && core_data->pin_sta_spi_mode) {
+		ret = pinctrl_select_state(core_data->pinctrl,
+					core_data->pin_sta_spi_mode);
+		if (ret < 0)
+			ts_err("Failed to select %s pinstate %d",
+					"pmx_gt_spi_mode", ret);
+	}
 
 	ts_err("begin goodix_ts_power_on");
 	ret = goodix_ts_power_on(core_data);
@@ -4739,35 +4759,10 @@ static struct platform_driver goodix_ts_driver = {
 	.id_table = ts_core_ids,
 };
 
-/* blob 同形：出厂 init_module 读全局 gpio 639/640 判面板供应商
- * （pio 基号 500 + 偏移 139/140，6.18 基号同 500）。DET1=1: CSOT+goodix9916R，
- * DET2=1: TIANMA+focal FT3683；各看各脚，非我即退（读脚失败 fail-open） */
-#define PANEL_ID_DET1 639
-#define PANEL_ID_DET2 640
 static int __init goodix_ts_core_init(void)
 {
 	int ret;
-	int gpio_det1 = 1;
 
-	ret = gpio_request(PANEL_ID_DET1, "goodix-det1");
-	if (!ret) {
-		ret = gpio_direction_input(PANEL_ID_DET1);
-		if (!ret) {
-			gpio_det1 = gpio_get_value(PANEL_ID_DET1);
-		} else {
-			ts_err("det1 direction_input failed:%d, fail-open", ret);
-			ret = 0;
-		}
-	} else {
-		ts_err("det1 request failed:%d, fail-open", ret);
-		ret = 0;
-	}
-	ts_info("gpio_det1 = %d", gpio_det1);
-	if (gpio_det1 != 1) {
-		ts_info("TP is not goodix!");
-		return 0;
-	}
-	ts_debug("TP is goodix, panel is CSOT.");
 	ts_info("Core layer init:%s", GOODIX_DRIVER_VERSION);
 #ifdef CONFIG_TOUCHSCREEN_GOODIX_BRL_SPI
 	ret = goodix_spi_bus_init();

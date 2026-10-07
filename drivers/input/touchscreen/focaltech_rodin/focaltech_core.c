@@ -1902,12 +1902,25 @@ static int fts_pinctrl_init(struct fts_ts_data *ts)
 		FTS_INFO("Pin state[release] not found %d, no need for pmx_ts_release", ret);
 	}
 
-	ts->pinctrl_state_spimode = pinctrl_lookup_state(ts->pinctrl, "pmx_ts_spi_mode");
+	ts->pinctrl_state_spimode = pinctrl_lookup_state(ts->pinctrl, "pmx_gt_spi_mode");
 	if (IS_ERR_OR_NULL(ts->pinctrl_state_spimode)) {
 		ret = PTR_ERR(ts->pinctrl_state_spimode);
 		/*FTS_ERROR("Can not lookup pinctrl_spi_mode pinstate %d\n", ret);*/
-		FTS_INFO("Can not lookup pinctrl_spi_mode pinstate %d, no need for pmx_ts_spi_mode", ret);
+		ts->pinctrl_state_spimode = NULL;
+		FTS_INFO("Can not lookup pmx_gt_spi_mode pinstate %d, no need for pmx_gt_spi_mode", ret);
 		/* goto err_pinctrl_lookup; */
+	}
+	ts->pinctrl_state_cs_spimode = pinctrl_lookup_state(ts->pinctrl, "pmx_gt_cs_spi_mode");
+	if (IS_ERR_OR_NULL(ts->pinctrl_state_cs_spimode)) {
+		ret = PTR_ERR(ts->pinctrl_state_cs_spimode);
+		ts->pinctrl_state_cs_spimode = NULL;
+		FTS_INFO("Can not lookup pmx_gt_cs_spi_mode pinstate %d, no need for pmx_gt_cs_spi_mode", ret);
+	}
+	ts->pinctrl_state_cs_gpiomode = pinctrl_lookup_state(ts->pinctrl, "pmx_gt_cs_gpio_mode");
+	if (IS_ERR_OR_NULL(ts->pinctrl_state_cs_gpiomode)) {
+		ret = PTR_ERR(ts->pinctrl_state_cs_gpiomode);
+		ts->pinctrl_state_cs_gpiomode = NULL;
+		FTS_INFO("Can not lookup pmx_gt_cs_gpio_mode pinstate %d, no need for pmx_gt_cs_gpio_mode", ret);
 	}
 	ts->pinctrl_touch_mode_ap = pinctrl_lookup_state(ts->pinctrl, "touch_mode_ap");
 	if (IS_ERR_OR_NULL(ts->pinctrl_touch_mode_ap)) {
@@ -1945,6 +1958,8 @@ err_pinctrl_get:
 	ts->pins_suspend = NULL;
 	ts->pins_active = NULL;
 	ts->pinctrl_state_spimode = NULL;
+	ts->pinctrl_state_cs_spimode = NULL;
+	ts->pinctrl_state_cs_gpiomode = NULL;
 	ts->pinctrl_dvdd_enable = NULL;
 	ts->pinctrl_dvdd_disable = NULL;
 	return ret;
@@ -2053,6 +2068,22 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 				if (ret)
 					FTS_ERROR("enable avdd_source regulator failed,ret=%d", ret);
 			}
+			/* A-78 blob 同形：主 SPI 三组引脚 + CS 脚 mux 进 SPI 功能态
+			 * （pmx_gt_spi_mode / pmx_gt_cs_spi_mode）；出厂日志顺序在 iovdd 之后 */
+			if (ts_data->pinctrl && ts_data->pinctrl_state_spimode) {
+				ret = pinctrl_select_state(ts_data->pinctrl,
+							   ts_data->pinctrl_state_spimode);
+				if (ret)
+					FTS_ERROR("Set pinctrl_spi_mode error:%d", ret);
+			}
+			if (ts_data->pinctrl && ts_data->pinctrl_state_cs_spimode) {
+				ret = pinctrl_select_state(ts_data->pinctrl,
+							   ts_data->pinctrl_state_cs_spimode);
+				if (ret)
+					FTS_ERROR("Set pinctrl_cs_spi_mode error:%d", ret);
+				else
+					FTS_INFO("Set pinctrl_cs_spi_mode sucesses.");
+			}
 			ts_data->power_disabled = false;
 		}
 	} else {
@@ -2098,6 +2129,15 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 				ret = regulator_disable(ts_data->avdd_source);
 				if (ret)
 					FTS_ERROR("disable avdd_source regulator failed,ret=%d", ret);
+			}
+			/* A-78 blob 同形：disable 尾部把 CS 交还 GPIO（pmx_gt_cs_gpio_mode） */
+			if (ts_data->pinctrl && ts_data->pinctrl_state_cs_gpiomode) {
+				ret = pinctrl_select_state(ts_data->pinctrl,
+							   ts_data->pinctrl_state_cs_gpiomode);
+				if (ret)
+					FTS_ERROR("Set pinctrl_cs_gpio_mode error:%d", ret);
+				else
+					FTS_INFO("Set pinctrl_cs_gpio_mode sucesses.");
 			}
 			ts_data->power_disabled = true;
 		}
@@ -5062,12 +5102,44 @@ static const struct dev_pm_ops fts_dev_pm_ops = {
 /*****************************************************************************
 * TP Driver
 *****************************************************************************/
+/* blob 同形：判型门读全局 gpio 639/640（pio 基号 500 + 偏移 139/140；
+ * 6.18 pio 基号同为 500，#221 boot goodix 读 avdd-gpio 亦得全局 585
+ * 双侧互证）。DET1=1: CSOT+goodix9916R（goodix 读 639），
+ * DET2=1: TIANMA+focal FT3683（fts 读 640）。A-78：改在 probe 顶端读 */
+#define PANEL_ID_DET1 639
+#define PANEL_ID_DET2 640
+
 static int fts_ts_probe(struct spi_device *spi)
 {
     int ret = 0;
     struct fts_ts_data *ts_data = NULL;
 
     FTS_INFO("Touch Screen(SPI BUS) driver probe...");
+
+    /* A-78 判型门（blob 同形；#222 原在 module init，initcall 期 pio gpiochip
+     * 未注册 → gpio_request 恒 -517 双 fail-open 门空转）：移到 probe 顶端，
+     * gpio 已就绪、读真实值。DET2=全局 640（pio 基号 500 + 偏移 140）；
+     * 非 1 → "TP is not focal!" 并 return -ENODEV（让总线把 spi1.0 让给
+     * goodix）；读脚失败（-517 等）fail-open 继续，如实打印错误码 */
+    ret = gpio_request(PANEL_ID_DET2, "fts-det1");
+    if (!ret) {
+    	ret = gpio_direction_input(PANEL_ID_DET2);
+    	if (!ret) {
+    		int gpio_det1 = gpio_get_value(PANEL_ID_DET2);
+
+    		FTS_INFO("gpio_det1 = %d", gpio_det1);
+    		if (gpio_det1 != 1) {
+    			FTS_INFO("TP is not focal!");
+    			return -ENODEV;
+    		}
+    	} else {
+    		FTS_ERROR("gpio%d direction_input failed:%d, fail-open",
+    			  PANEL_ID_DET2, ret);
+    	}
+    } else {
+    	FTS_ERROR("gpio%d request failed:%d, fail-open", PANEL_ID_DET2, ret);
+    }
+    ret = 0;
 
 #if (FTS_CHIP_TYPE == _FT8719) || (FTS_CHIP_TYPE == _FT8615) || (FTS_CHIP_TYPE == _FT8006P) || (FTS_CHIP_TYPE == _FT7120)
     spi->mode = SPI_MODE_1;
@@ -5175,41 +5247,10 @@ static struct spi_driver fts_ts_driver = {
     .id_table = fts_ts_id,
 };
 
-/* blob 同形：出厂 init_module 读全局 gpio 639/640 判面板供应商
- * （pio 基号 500 + 偏移 139/140；6.18 pio 基号同为 500，#221 boot
- *   goodix 读 avdd-gpio 亦得全局 585 双侧互证）。DET1=1: CSOT+goodix9916R，
- *   DET2=1: TIANMA+focal FT3683 */
-#define PANEL_ID_DET1 639
-#define PANEL_ID_DET2 640
-
 static int __init fts_ts_init(void)
 {
 	int ret = 0;
-	int gpio_det1 = 1;
-
 	FTS_FUNC_ENTER();
-	/* blob 同形判型门：出厂 init_module 读 DET2（全局 640），非 1 不注册；
-	 * 读脚失败 fail-open（保持注册，防死触摸） */
-	ret = gpio_request(PANEL_ID_DET2, "fts-det1");
-	if (!ret) {
-		ret = gpio_direction_input(PANEL_ID_DET2);
-		if (!ret) {
-			gpio_det1 = gpio_get_value(PANEL_ID_DET2);
-		} else {
-			FTS_ERROR("det1 direction_input failed:%d, fail-open", ret);
-			ret = 0;
-		}
-	} else {
-		FTS_ERROR("det1 request failed:%d, fail-open", ret);
-		ret = 0;
-	}
-	FTS_INFO("gpio_det1 = %d", gpio_det1);
-	if (gpio_det1 != 1) {
-		FTS_INFO("TP is not focal!");
-		FTS_FUNC_EXIT();
-		return 0;
-	}
-	FTS_DEBUG("TP is focaltech, panel is TIMMA.");
 	ret = spi_register_driver(&fts_ts_driver);
 	if (ret != 0)
 		FTS_ERROR("Focaltech touch screen driver init failed!");
