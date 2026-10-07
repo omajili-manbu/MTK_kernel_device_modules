@@ -667,11 +667,10 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			return -1;
 		}
 
-			/* filter the log print, only print log when HAVE FINGER/NO FINGER status change*/
-		if (common_data.cmd == SET_CUR_VALUE && common_data.mode != DATA_MODE_153 && common_data.mode != DATA_MODE_177) {
-			/* print the other log*/
-			LOG_INFO("touch_id: %d, cmd: %d, mode: %d, data_buf[0]: %d", common_data.touch_id, common_data.cmd, common_data.mode, common_data.data_buf[0]);
-		}
+		/* _b580-A74①（站点2-a）：blob 0xa13c→0xa374 只按 current_log_level>=3 门控，
+		 * 形参 (cmd=[sp+1], mode=[sp+2])，串 "cmd: %d, mode: %d"（0x1743）；
+		 * 树侧原为 donor 的 cmd==SET_CUR_VALUE / mode∉{153,177} 过滤 + 4 参串。 */
+		LOG_INFO("cmd: %d, mode: %d", common_data.cmd, common_data.mode);
 		mutex_lock(&ioctl_operation_mutex);
 		switch (common_data.cmd) {
 		case SET_THP_IC_CUR_VALUE:
@@ -685,7 +684,10 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 					update_get_ic_current_value(&common_data);
 					copy_size = copy_to_user((void __user *)arg, &common_data, user_size);
 					if (copy_size) {
-						LOG_ERROR("%d copy to user failed! value %d", common_data.cmd, copy_size);
+						/* _b580-A74①（站点2-d）：blob 0xa448 串 = "copy to user failed,
+						 * %d copy to user! value %d"（0x3b3d），形参 (cmd, copy_size)；
+						 * 树侧原为 donor 串 "%d copy to user failed! value %d"（blob 面无此串）。 */
+						LOG_ERROR("copy to user failed, %d copy to user! value %d", common_data.cmd, copy_size);
 						mutex_unlock(&ioctl_operation_mutex);
 						return -1;
 					}
@@ -696,12 +698,13 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			}
 			break;
 		case SET_CMD_FOR_DRIVER:
-			if (common_data.mode == DATA_MODE_26) {
-				if (common_data.touch_id == 0)
-					update_palm_sensor_value_common(common_data.data_buf[0]);
-				else if (common_data.touch_id == 1)
-					update_palm_sensor_value_second_panel(common_data.data_buf[0]);
-			}
+			/* _b580-A74①（站点2-b）：blob 0xa2c4-0xa2d8 只判 mode==26 后无条件下发
+			 * update_palm_sensor_value_common(data_buf[0])（无 touch_id 分派、无 second_panel
+			 * 分支：update_palm_sensor_value_second_panel 是 blob def 面不存在的树侧 EXTRA）。
+			 * 注：palm 值在 blob/树内均为单一全局（blob palm_value@bss+0x8b48），
+			 * touch_id==1 分派只在 panel1 注册时才可达（rodin 单面板不可达）。 */
+			if (common_data.mode == DATA_MODE_26)
+				update_palm_sensor_value_common(common_data.data_buf[0]);
 			mutex_unlock(&ioctl_operation_mutex);
 			return 0;
 		case SET_CMD_FOR_THP:
@@ -722,7 +725,9 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			xiaomi_touch_get_mode_value(&common_data);
 			copy_size = copy_to_user((void __user *)arg, &common_data, user_size);
 			if (copy_size)
-				LOG_ERROR("%d copy to user failed! value %d", common_data.cmd, copy_size);
+				/* _b580-A74①（站点2-d）：blob 0xa190/0x280 串 = "copy data failed,
+				 * %d copy to user! value %d"（0x40ef），形参 (cmd, copy_size)。 */
+				LOG_ERROR("copy data failed, %d copy to user! value %d", common_data.cmd, copy_size);
 			break;
 		case RESET_MODE:
 			xiaomi_touch_reset_mode(&common_data);
@@ -731,7 +736,9 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			xiaomi_touch_get_mode_all(&common_data);
 			copy_size = copy_to_user((void __user *)arg, &common_data, user_size);
 			if (copy_size)
-				LOG_ERROR("%d copy to user failed! value %d", common_data.cmd, copy_size);
+				/* _b580-A74①（站点2-d）：blob 0xa250/0x289 串 = "copy data failed,
+				 * %d copy to user! value %d"（0x40ef），形参 (cmd, copy_size)。 */
+				LOG_ERROR("copy data failed, %d copy to user! value %d", common_data.cmd, copy_size);
 			break;
 		case SET_LONG_VALUE:
 			xiaomi_touch_set_mode_long_value(&common_data);
@@ -741,7 +748,11 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			mutex_unlock(&ioctl_operation_mutex);
 			return -EINVAL;
 		}
-		if ((common_data.mode > DATA_MODE_19 && common_data.mode < DATA_MODE_200) || common_data.mode == DATA_MODE_66) {
+		/* _b580-A74①（站点2-c）：blob 0xa3a0-0xa3ac 只判 [20,199] 区间
+		 * （sub w8,w2,#0x14 / cmp w8,#0xb3），无 donor 的 `|| mode == DATA_MODE_66`；
+		 * blob 全镜像无 1004(#0x3ec) 立即数比较（grep 仅命中分支目标偏移）。
+		 * 推送形参 w1 = [sp+1] = 用户 common_data.cmd（blob 0xa3b0 ldrb w1,[sp,#0x1]）。 */
+		if (common_data.mode > DATA_MODE_19 && common_data.mode < DATA_MODE_200) {
 			add_common_data_to_buf_common(common_data.touch_id, common_data.cmd, common_data.mode, common_data.data_len, common_data.data_buf);
 		}
 	}

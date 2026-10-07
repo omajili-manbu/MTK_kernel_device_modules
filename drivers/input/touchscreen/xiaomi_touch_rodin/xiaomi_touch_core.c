@@ -191,6 +191,22 @@ void add_common_data_to_buf_common(s8 touch_id, enum common_data_cmd cmd, enum c
 	if (!xiaomi_touch_data)
 		return;
 
+	/* _b580-A74①（站点1-容量）：blob 原件对 length 无源码级上界——6.6 blob 仅靠 FORTIFY 的
+	 * __memcpy_chk 运行时兜底（判据 = blob add_common_data_to_buf_common 0x7a0/0x7c4：
+	 * memcpy 前 cmp x22(=length*4), #0x401；越界走 0x8e4 __warn_printk/fortify_panic 路径）。
+	 * 6.18 pahole 实测 common_data_t.data_buf = CMD_DATA_BUF_SIZE(256) 个 s32（sizeof=1032），
+	 * 而无界 data_len 的来源是 xiaomi_touch_mode ioctl(SET_CMD_FOR_THP / 尾推) 与
+	 * store_touch_thp_ic_cmd 文本解析（皆用户值）⇒ 越界可横穿 common_data_buf[10] 之后的
+	 * common_data_buf_lock(10408)/poll_data(10456)/event_wq(10464)/suspend_work(10480)…
+	 * 【安全偏离】此处按目标容量夹取（blob 原为 FORTIFY 告警/panic）：合法路径
+	 * 0 <= length <= 256 语义完全不变。 */
+	if (length < 0)
+		length = 0;
+	else if (length > CMD_DATA_BUF_SIZE) {
+		LOG_ERROR("common data length %d overflow, clamp to %d", length, CMD_DATA_BUF_SIZE);
+		length = CMD_DATA_BUF_SIZE;
+	}
+
 	LOG_DEBUG("add touch id %d common mode: %d to buffer:%d", touch_id, mode, atomic_read(&xiaomi_touch_data->common_data_buf_index));
 	mutex_lock(&xiaomi_touch_data->common_data_buf_lock);
 	common_data = &xiaomi_touch_data->common_data_buf[atomic_read(&xiaomi_touch_data->common_data_buf_index)];
@@ -255,13 +271,13 @@ int get_bms_temp_common(void)
 	union power_supply_propval prop;
 	int ret;
 
-	battery = power_supply_get_by_name("battery");
+	/* _b580-A74①（站点3-a）：blob 0xc08 只查 "bms" 一个名字（串面 0x1cdc="bms"），
+	 * 失败串 "can't find bms battery"（0x2c9e）；树侧原为 donor popsicle 的
+	 * "battery"→"bms" 二级回退 + 串 "can't find bms and battery"（blob 无此串）。 */
+	battery = power_supply_get_by_name("bms");
 	if (!battery) {
-		battery = power_supply_get_by_name("bms");
-		if (!battery) {
-			LOG_INFO("can't find bms and battery");
-			return -INVAILD_TEMPERATURE;
-		}
+		LOG_INFO("can't find bms battery");
+		return -INVAILD_TEMPERATURE;
 	}
 
 	ret = power_supply_get_property(battery, POWER_SUPPLY_PROP_TEMP, &prop);
@@ -295,7 +311,6 @@ static int xiaomi_touch_temp_thread_func(void *data)
 	int cur_temp0, cur_temp = 0;
 	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(touch_id_for_temperature);
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(0);
-	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param_1 = NULL;
 
 	LOG_INFO("enter");
 	if (!xiaomi_touch_data || !xiaomi_touch_driver_param ||
@@ -308,23 +323,24 @@ static int xiaomi_touch_temp_thread_func(void *data)
 					atomic_read(&xiaomi_touch_data->temp_detect_ready[1])));
 			cur_temp0 = get_bms_temp_common();
 			cur_temp = (cur_temp0 + 5) / 10; // Rounding, in degrees Celsius
-			if (abs(cur_temp0) < INVAILD_TEMPERATURE &&
-				abs(cur_temp - last_temp) >= TEMPERATURE_CHAGNE_VALUE) {
-				if (atomic_read(&xiaomi_touch_data->temp_detect_ready[0]) &&
-					xiaomi_touch_driver_param->hardware_operation.set_thermal_temp) {
-						xiaomi_touch_driver_param->hardware_operation.set_thermal_temp(cur_temp, false);
+			/* _b580-A74①（站点3-b/c）：blob 0x1960-0x19d4 = 单面板形态——外层只判
+			 * driver_param[0].set_thermal_temp 非空（0x1960 ldr x8,[x25,#0x228] +
+			 * 0x1964 cbz x8 → 整块跳过；6.18 pahole = driver_param+0x288，树侧实测同）；
+			 * 内层判有效温度 |temp0| < 1000 与 2℃ 温差；set_thermal_temp → common-data
+			 * 推送 → last_temp 更新三件同块（blob 0x1990 / 0x19b0 / 0x19c8）。
+			 * blob 体内无 ready[] 门、无 panel1 分支（树侧原为 donor 的 ready[0] 门 +
+			 * driver_param_1 双面板块），此处按 blob 收口；wait_event 条件仍保留
+			 * ready[0]||ready[1]（blob 只测 ready[0]，见报告“保留偏差点”）。 */
+			if (xiaomi_touch_driver_param->hardware_operation.set_thermal_temp) {
+				if (abs(cur_temp0) < INVAILD_TEMPERATURE &&
+					abs(cur_temp - last_temp) >= TEMPERATURE_CHAGNE_VALUE) {
+					xiaomi_touch_driver_param->hardware_operation.set_thermal_temp(cur_temp, false);
+					/* blob 0x19b0-0x19c4：add_common_data_to_buf_common(0, SET_CUR_VALUE,
+					 * 1094 = DATA_MODE_1000+94 = DATA_MODE_156, 1, &cur_temp)
+					 * （blob 形参 w0=0/w1=0/w2=#0x446/w3=1/x4=&cur_temp@[x29,#-0xc]）。 */
+					add_common_data_to_buf_common(0, SET_CUR_VALUE, DATA_MODE_1000 + 94, 1, &cur_temp);
+					last_temp = cur_temp;
 				}
-				if (atomic_read(&xiaomi_touch_data->temp_detect_ready[1])) {
-					xiaomi_touch_driver_param_1 = get_xiaomi_touch_driver_param(1);
-					if (xiaomi_touch_driver_param_1) {
-						if (xiaomi_touch_driver_param_1->hardware_operation.set_thermal_temp) {
-							xiaomi_touch_driver_param_1->hardware_operation.set_thermal_temp(cur_temp, false);
-						}
-					} else {
-						LOG_INFO("xiaomi_touch_driver_param_1 not exist");
-					}
-				}
-				last_temp = cur_temp;
 			}
 
 			/*

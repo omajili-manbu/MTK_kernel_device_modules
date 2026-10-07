@@ -33,6 +33,7 @@
 #endif
 
 #include "goodix_ts_core.h"
+#include <linux/vseq.h>
 /* b567：warsaw 骨架用旧枚举名（Touch_Mode_NUM=42/Touch_Aod_Enable=11/...），
  * rodin blob = popsicle DATA_MODE 体系（数值两代一致：fod=10/aod=11/doubletap=14）。
  * 模式数组维度随 blob 45 通道（driver_update_touch_mode_common 按 mask 位拷贝）。 */
@@ -4787,7 +4788,12 @@ static void __exit goodix_ts_core_exit(void)
 #endif
 }
 
-late_initcall(goodix_ts_core_init);
+/* _b580：触控框架 probe 时序倒挂修复（vseq 化），与 focaltech_rodin 同因。
+ * 原厂本单元 = goodix_core.ko，6.6 装载位 vendor_dlkm modules.load 行 212
+ * （框架 211 之后、focaltech 213 之前）。按 vseq.h 层级对应改写：.ko 语境下
+ * late_initcall 折叠为 module_init，vseq_*_initcall 全族同义、级别仅用于
+ * 单元内排序（本单元单入口），故 1:1 保留 late 形态；重放按 seq 1254 排。 */
+vseq_late_initcall(goodix_ts_core_init);
 module_exit(goodix_ts_core_exit);
 
 MODULE_DESCRIPTION("Goodix Touchscreen Core Module");

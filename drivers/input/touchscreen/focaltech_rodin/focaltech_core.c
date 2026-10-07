@@ -43,6 +43,7 @@
 
 #include <linux/power_supply.h>
 #include <uapi/linux/sched/types.h>
+#include <linux/vseq.h>
 
 /*****************************************************************************
 * Private constant and macro definitions using #define
@@ -5263,7 +5264,15 @@ static void __exit fts_ts_exit(void)
     spi_unregister_driver(&fts_ts_driver);
 }
 
-module_init(fts_ts_init);
+/* _b580：触控框架 probe 时序倒挂修复（vseq 化）。原厂本单元 = focaltech_touch.ko，
+ * 6.6 装载位 vendor_dlkm modules.load 行 213（框架 xiaomi_touch 行 211 之后），
+ * 框架 probe 先跑、IC probe 后补 register_touch_panel_common。=y 内建后
+ * module_init 落 device_initcall 波（真机 0.3876s，probe 0.97-1.31s），反超框架
+ * 的 vseq 重放（5.4805s）：IC 先注册的活态被框架 probe 的 memset 整块清零，
+ * 内嵌 timer 函数指针归零 -> 6.4308s timer.c WARN_ON_ONCE(!fn) panic。
+ * 改入 .vseq.entries，重放波按 seq 1255 在框架 1253 之后收尾（.ko 语境
+ * module_init = vseq_module_init，单入口单元，层级无内序影响）。 */
+vseq_module_init(fts_ts_init);
 /*late_initcall(fts_ts_init);*/
 module_exit(fts_ts_exit);
 

@@ -375,6 +375,14 @@ CREATE_ATTR(palm_sensor, {
 		if (xiaomi_touch_driver_param && xiaomi_touch_driver_param->hardware_operation.palm_sensor_write)
 			xiaomi_touch_driver_param->hardware_operation.palm_sensor_write(!!input);
 
+		/* _b580-A74①（站点5）：blob 0x8398-0x83d0 第二段 = 对 touch_id 1 再取一次
+		 * driver_param（blob 取 [x+0x1b0] = palm_sensor_write；6.18 pahole =
+		 * driver_param+0x1e0，树侧编译偏移实测 0x1e0）并以同一布尔值直通；
+		 * 两段顺序在 common-data 推送（0x83d4-0x83e8，mode=26 len=1）之前。 */
+		xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(1);
+		if (xiaomi_touch_driver_param && xiaomi_touch_driver_param->hardware_operation.palm_sensor_write)
+			xiaomi_touch_driver_param->hardware_operation.palm_sensor_write(!!input);
+
 		add_common_data_to_buf_common(TOUCH_ID, SET_CUR_VALUE, DATA_MODE_26, 1, &input);
 		LOG_INFO("value:%d", input);
 		return count;
@@ -386,96 +394,96 @@ CREATE_ATTR(touch_thp_ic_cmd, {
 		return 0;
 	},
 	{
+		/* _b580-A74①（站点1）：blob 0x89c0-0x8c5c 全形重建（三处代差：
+		 *   ① 解析 = blob 内联十进制解析 0x8a10-0x8a98（数字累乘入 input[i]；','/' ' 分隔；
+		 *      前一字符为数字才推进槽位；首字符非数字/分隔即止），**无** kstrtoint/strsep/
+		 *      kzalloc+kfree（树侧 donor 形态的四处调用全部消失）；
+		 *   ② 出口 = blob 只做 common-data 推送（0x8ba4 / 0x8be4 两处
+		 *      add_common_data_to_buf_common），**不**直调 htc_ic_setModeValue/getModeValue、
+		 *      也**不**填 thp_ic_cmd_data_common_data；
+		 *   ③ 校验/分支/串按 blob：unsupport cmd!!(390) / input format is error!!(396) /
+		 *      data format is error!!(418) / data mode is error!!(409) 四串四分支。
+		 * 推送形参来源：touch_id 恒 0（blob mov w0,wzr）、cmd=input[0]、mode=input[1]、
+		 * data=&input[2]；长度 = para_cnt-3（IC_MODE_44 支）/ input[3]（非 44 支）。 */
 		s32 input[CMD_DATA_BUF_SIZE];
 		int i = 0;
 		int para_cnt = 0;
-		int retval;
-		u8 *databuf = (u8 *)&thp_ic_cmd_data_common_data.data_buf[1];
-		xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(TOUCH_ID);
-		char *token;
-		char *p;
-		char *strbuf;
+		int prev_digit = 0;
+		int overflow = 0;
+		unsigned char c;
+		size_t n = 0;
+		ssize_t ret = count;
 
 		mutex_lock(&thp_ic_mutex);
 
 		memset(input, 0x00, sizeof(int) * CMD_DATA_BUF_SIZE);
-		strbuf = (unsigned char *)kzalloc(count + 1, GFP_KERNEL);
-		memcpy(strbuf, buf, count);
-		strbuf[count] = '\0';
 
-		p = strbuf;
-		token = strbuf;
-		while(token != NULL){
-			token = strsep(&p, ", ");
-			if (token != NULL) {
-				retval = kstrtoint(token, 0, &input[i]);
-				if (retval || (i == CMD_DATA_BUF_SIZE - 1)) {
-					LOG_ERROR("input[%d] value format error, retval = %d; or value count %d overflow, please check", i, retval, i);
+		/* blob 0x8a48-0x8a98 解析循环；上界用 count（6.18 kernfs
+		 * fs/kernfs/file.c:337 `buf[len] = '\0'` 保证串终止 ⇒ blob 的"读到 NUL 为止"
+		 * 与本写法逐字符等价，且不再依赖跨出 count 的读）。
+		 * 【安全偏离】blob 对槽位 i >= CMD_DATA_BUF_SIZE 走 brk #0x5512 陷阱
+		 * （0x8a5c cmp w8,#0x100 + 0x8c50），此处改为 overflow→format 检查拒绝；
+		 * 合法输入 i <= 255 语义不变。 */
+		for (n = 0; n < count; n++) {
+			c = (unsigned char)buf[n];
+			if (c >= '0' && c <= '9') {
+				if (i >= CMD_DATA_BUF_SIZE) {
+					overflow = 1;
 					break;
 				}
-				++i;
+				input[i] = input[i] * 10 + (c - '0');
+				if (!prev_digit)
+					++para_cnt;
+				prev_digit = 1;
+			} else if (c == ',' || c == ' ') {
+				if (prev_digit)
+					++i;
+				prev_digit = 0;
+			} else {
+				break;
 			}
 		}
-		para_cnt = i;
-		for (i = 0; i < para_cnt; ++i) {
-			LOG_DEBUG("input[%d] = 0x%x", i, input[i]);
-		}
 
-		LOG_INFO("user_cmd:%d, mode:%d, addr:%d, data_len:%d", input[0], input[1], input[2], input[para_cnt - 1]);
+		LOG_INFO("user_cmd:%d, mode:%d, data:%d, data_len:%d", input[0], input[1], input[2], input[3]);
 
 		if (input[0] != SET_THP_IC_CUR_VALUE && input[0] != GET_THP_IC_CUR_VALUE) {
 			LOG_ERROR("unsupport cmd!!");
-			mutex_unlock(&thp_ic_mutex);
-			return -1;
+			ret = -1;
+			goto out;
 		}
 
-		if (para_cnt < 4 || para_cnt > CMD_DATA_BUF_SIZE) {
+		if (para_cnt < 4 || para_cnt > CMD_DATA_BUF_SIZE || overflow) {
 			LOG_ERROR("input format is error!!");
-			mutex_unlock(&thp_ic_mutex);
-			return -1;
+			ret = -1;
+			goto out;
 		}
 
-		memset(&thp_ic_cmd_data_common_data, 0x00, sizeof(common_data_t));
-		thp_ic_cmd_data_common_data.cmd = (u8)input[0];
-		thp_ic_cmd_data_common_data.mode = (u16)input[1];
-		thp_ic_cmd_data_common_data.data_buf[0] = input[2];
-		
-		if (thp_ic_cmd_data_common_data.mode == IC_MODE_44) {
-			/* transport mode, databuf for send to driver is [s32 addr][u8 data0][u8 data1]... */
-			for (i = 3; i < para_cnt - 1; ++i) {
-				*databuf = (u8)input[i];
-				databuf++;
+		if (input[1] == IC_MODE_44) {
+			/* 传输模式：仅 cmd=SET_THP_IC_CUR_VALUE 推送，且 data_len 必须 == 载荷个数 */
+			if (input[0] == SET_THP_IC_CUR_VALUE) {
+				if ((para_cnt - 3) == input[para_cnt - 1])
+					add_common_data_to_buf_common(TOUCH_ID, input[0], input[1], para_cnt - 3, &input[2]);
+				else {
+					LOG_ERROR("data format is error!!");
+					ret = -1;
+				}
 			}
-			if (thp_ic_cmd_data_common_data.cmd == SET_THP_IC_CUR_VALUE) 
-				thp_ic_cmd_data_common_data.data_len = ((para_cnt - 3) <=  (input[para_cnt - 1])) ? (para_cnt - 3) : input[para_cnt - 1];
-			else if (thp_ic_cmd_data_common_data.cmd == GET_THP_IC_CUR_VALUE)
-				thp_ic_cmd_data_common_data.data_len = input[para_cnt - 1];
+		} else if (input[1] < 0) {
+			/* blob 0x8b28（tbnz w2,#0x1f）：负 mode 放行（不推送、不报错，ret=count） */
 		} else {
-			/* non-transport mode, databuf for send to driver is [s32 value0][s32 value1]...*/
-			for (i = 2; i < para_cnt - 1; ++i) {
-				thp_ic_cmd_data_common_data.data_buf[i-2] = input[i];
-			}
-			thp_ic_cmd_data_common_data.data_len = input[para_cnt - 1];
-		}
-
-		LOG_INFO("user_cmd:%d, mode:%d, addr:%d, data_len:%d", thp_ic_cmd_data_common_data.cmd,
-							thp_ic_cmd_data_common_data.mode,
-							thp_ic_cmd_data_common_data.data_buf[0],
-							thp_ic_cmd_data_common_data.data_len);
-
-		if (thp_ic_cmd_data_common_data.cmd == SET_THP_IC_CUR_VALUE) {
-			if (xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue) {
-				xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue(&thp_ic_cmd_data_common_data);
-			}
-		} else if (thp_ic_cmd_data_common_data.cmd == GET_THP_IC_CUR_VALUE) {
-			if (xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue) {
-				xiaomi_touch_driver_param->hardware_operation.htc_ic_getModeValue(&thp_ic_cmd_data_common_data);
+			if (para_cnt > 4 || (para_cnt - 3) == input[para_cnt - 1]) {
+				LOG_ERROR("data mode is error!!");
+				ret = -1;
+			} else if (input[1] == IC_MODE_49 || input[3] == 2) {
+				add_common_data_to_buf_common(TOUCH_ID, input[0], input[1], input[3], &input[2]);
+			} else {
+				LOG_ERROR("data mode is error!!");
+				ret = -1;
 			}
 		}
-
-		kfree(strbuf);
+out:
 		mutex_unlock(&thp_ic_mutex);
-		return count;
+		return ret;
 	});
 
 void update_get_ic_current_value(common_data_t *common_data) {
