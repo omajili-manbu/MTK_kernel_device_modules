@@ -108,7 +108,8 @@ static ssize_t xiaomi_touch_dev_write(struct file *file, const char __user *buf,
 	}
 	copy_size = copy_from_user(temp_buf, (void __user *)buf, count);
 	if (copy_size) {
-		LOG_ERROR("copy from user failed! copy size %d", copy_size);
+		/* _b581-XT③：blob xiaomi_touch_dev_write 串 = "copy data failed! copy size %d"（0x16ab）。 */
+		LOG_ERROR("copy data failed! copy size %d", copy_size);
 		return count;
 	}
 	if (count == 32 && !strncmp("thp_time", temp_buf, 8)) {
@@ -303,6 +304,9 @@ static long xiaomi_touch_dev_ioctl(struct file *file, unsigned int cmd, unsigned
 		}
 		return -1;
 	case COMMON_DATA_CMD:
+		/* _b581-XT③：blob 0x6e10-0x6e28 有 LOG_DEBUG("user_cmd: %d")（0x2bd7，
+		 * 形参 w3=0 —— 编译器已知本 case 即 user_cmd==COMMON_DATA_CMD(0)）。 */
+		LOG_DEBUG("user_cmd: %d", user_cmd);
 		return xiaomi_touch_mode(client_private_data, user_size, arg);
 	default:
 		LOG_ERROR("unrecognize user cmd, magic number is %d, cmd is %d, size is %d, return!", user_magic_number, user_cmd, user_size);
@@ -335,13 +339,13 @@ int xiaomi_touch_operation_init(xiaomi_touch_t *temp_xiaomi_touch)
 {
 	int ret = 0;
 	if (!temp_xiaomi_touch) {
-		LOG_ERROR("xiaomi touch is NULL, return!");
+		LOG_ERROR("[Probe Failed] xiaomi touch is NULL, return!");
 		return -1;
 	}
 	ret = misc_register(&misc_dev);
 	xiaomi_touch = temp_xiaomi_touch;
 	if (ret)
-		LOG_ERROR("create misc device err:%d\n", ret);
+		LOG_ERROR("[Probe Failed] create misc device err:%d\n", ret);
 	return ret;
 }
 

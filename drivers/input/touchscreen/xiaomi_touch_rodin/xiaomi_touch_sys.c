@@ -55,7 +55,6 @@ static int stylus_connect_status_value = 0;
 static int doze_analysis_result;
 static int is_enable_touchraw = 1;
 static int palm_value;
-static int palm_value_1;
 static int weak_doubletap_value;
 static u64 ic_buffer_addr;
 static int touch_finger_status = 0;
@@ -147,18 +146,10 @@ int update_palm_sensor_value_common(int value)
 }
 EXPORT_SYMBOL(update_palm_sensor_value_common);
 
-int update_palm_sensor_value_second_panel(int value)
-{
-	mutex_lock(&palm_mutex);
-	if (value != palm_value_1) {
-		LOG_ERROR("value:%d", value);
-		palm_value_1 = value;
-		sysfs_notify(&xiaomi_touch_dev->kobj, NULL, "palm_sensor_1");
-	}
-
-	mutex_unlock(&palm_mutex);
-	return 0;
-}
+/* _b581-XT③：update_palm_sensor_value_second_panel / palm_value_1 为 donor 残留——
+ * blob def/dynsym 面均无该符号（blob 仅 update_palm_sensor_value_common @0x754c +
+ * 单一全局 palm_value@bss+0x8b48），且树内已无调用者（mode.c SET_CMD_FOR_DRIVER 已按 blob
+ * 收口为单面板调用）；rodin 无 panel1 的 palm_sensor_1 节点。按 blob 删除，不动导出面。 */
 
 int update_weak_doubletap_value(int value)
 {
@@ -635,21 +626,23 @@ CREATE_ATTR(touch_log_level, {
 	},
 	{
 		int input;
-		s8 touch_id = 0;
-		xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = NULL;
+		xiaomi_touch_driver_param_t *xiaomi_touch_driver_param =
+			get_xiaomi_touch_driver_param(TOUCH_ID);
 
+		/* _b581-XT①（站点1）：blob @0x8dac 形态 =
+		 *   p = get_xiaomi_touch_driver_param(0)           （单次取参数，w0=0=TOUCH_ID）
+		 *   sscanf(buf, "%d %d"(0x2c11), &input@sp+4, &vendor_input 全局@.data+0x528)
+		 *   current_log_level = input                      （str w8→current_log_level）
+		 *   if (p && p->ops[+0x1f0]=touch_log_level_control_v2) op(vendor_input)
+		 * 树侧原为双面板 for 循环（get_xiaomi_touch_driver_param×2）+ 先试
+		 * touch_log_level_control(vendor_input>=MI_TP_LOG_DEBUG?true:false)、
+		 * 失败再试 v2——blob 无 touch_log_level_control 调用点，按 blob 收口。 */
 		if (sscanf(buf, "%d %d", &input, &vendor_input) < 0)
 			return -EINVAL;
 		current_log_level = input;
-		for (touch_id = 0; touch_id < MAX_TOUCH_PANEL_COUNT; touch_id++) {
-			xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);
-			if (xiaomi_touch_driver_param == NULL)
-				continue;
-			if (xiaomi_touch_driver_param->hardware_operation.touch_log_level_control)
-				xiaomi_touch_driver_param->hardware_operation.touch_log_level_control(vendor_input >= MI_TP_LOG_DEBUG ? true : false);
-			else if (xiaomi_touch_driver_param->hardware_operation.touch_log_level_control_v2)
-				xiaomi_touch_driver_param->hardware_operation.touch_log_level_control_v2(vendor_input);
-		}
+		if (xiaomi_touch_driver_param &&
+				xiaomi_touch_driver_param->hardware_operation.touch_log_level_control_v2)
+			xiaomi_touch_driver_param->hardware_operation.touch_log_level_control_v2(vendor_input);
 		return count;
 	});
 
@@ -689,20 +682,20 @@ int xiaomi_touch_sys_init(void)
 	xiaomi_touch_class = class_create("touch");
 
 	if (!xiaomi_touch_class) {
-		LOG_ERROR("create device class err");
+		LOG_ERROR("[Probe Failed] create device class err");
 		return -1;
 	}
 
 	xiaomi_touch_dev = device_create(xiaomi_touch_class, NULL, 'T', NULL, "touch_dev");
 	if (!xiaomi_touch_dev) {
-		LOG_ERROR("create device dev err");
+		LOG_ERROR("[Probe Failed] create device dev err");
 		return -1;
 	}
 
 	xiaomi_touch_attrs.attrs = touch_attr_group;
 	ret = sysfs_create_group(&xiaomi_touch_dev->kobj, &xiaomi_touch_attrs);
 	if (ret)
-		LOG_ERROR("ERROR: Cannot create sysfs structure!:%d", ret);
+		LOG_ERROR("[Probe Failed] Cannot create sysfs structure!:%d", ret);
 
 	return ret;
 }

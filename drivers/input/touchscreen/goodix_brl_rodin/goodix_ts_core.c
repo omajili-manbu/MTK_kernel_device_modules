@@ -48,7 +48,10 @@
 #define PINCTRL_STATE_SUSPEND		"pmx_ts_suspend"
 #define PINCTRL_STATE_BOOT			"pmx_ts_boot"
 
-#define HTC_PROJECT_CFG_NAME		"warsaw_gtp_thp_config.ini"
+/* #228（b581）blob .rodata.str1.1+0x315 = "rodin_gtp_thp_config.ini"
+ * （引用点：goodix_start_later_init L19681 处 memcpy 进 hardware_param；
+ * 原树 warsaw 名为偏离） */
+#define HTC_PROJECT_CFG_NAME		"rodin_gtp_thp_config.ini"
 
 #ifdef CONFIG_TOUCH_BOOST
 #define EVENT_INPUT 0x1
@@ -857,6 +860,10 @@ static ssize_t goodix_ts_debug_log_store(struct device *dev,
 	/* _b573 scp 联动：blob 0xc2d4-0xc2e4 = !mistouch_close 时把日志等级同步给 SCP */
 	if (!goodix_scp_tp_mistouch_close)
 		scp_tp_ipi_send(6, debug_log_level, 0, 0);
+	/* #228（b581）blob goodix_ts_debug_log_store 打印点 L849/L853/L861：
+	 * L861 = ts_info("scp set log level = %d")（__func__="goodix_ts_debug_log_store"），
+	 * 树侧原缺该打印（callcmp only-blob _printk:1） */
+	ts_info("scp set log level = %d", debug_log_level);
 	return count;
 }
 
@@ -1752,8 +1759,10 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 		goodix_sched_sethigh(current);
 
 		core_data->irq_priority_high = true;
-		ts_info("set goodix_irq priority high, cpu affinity: %d",
-			current->nr_cpus_allowed);
+		/* #228（b581）blob goodix_ts_threadirq_func 厂商源行 1777 的打印串为
+		 * "set goodix_irq priority"（.rodata.str1.1+0xc13e，无参数）；
+		 * 树侧多出的 "cpu affinity: %d" 形式为偏离，按 blob 收口 */
+		ts_info("set goodix_irq priority");
 	}
 
 	ts_esd->irq_status = true;
@@ -1805,12 +1814,13 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 			lpm_disable_for_dev(false, EVENT_INPUT);
 #endif
 			cpu_latency_qos_remove_request(&core_data->pm_qos_req_irq);
-			pm_relax(core_data->bus->dev);
-			return IRQ_HANDLED;
+				pm_relax(core_data->bus->dev);
+				return IRQ_HANDLED;
+			}
+			/* #228（b581）blob 无 "gesture_ist not cancel, ret=%d, continu"
+			 * 串（strcmp only-tree），此路径静默继续，按 blob 去掉 */
 		}
-		ts_info("gesture_ist not cancel, ret=%d, continu", ret);
-	}
-	mutex_unlock(&goodix_modules.mutex);
+		mutex_unlock(&goodix_modules.mutex);
 
 	/* read touch data from touch device */
 	ret = hw_ops->event_handler(core_data, ts_event);
@@ -1828,9 +1838,9 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 		if (ts_event->event_type == EVENT_REQUEST) {
 			goodix_ts_request_handle(core_data, ts_event);
 		}
-	} else {
-		ts_info("event_handler failed, ret=%d", ret);
 	}
+	/* #228（b581）blob 无 "event_handler failed, ret=%d" 串（strcmp only-tree），
+	 * 该失败路径静默，按 blob 去掉打印 */
 
 	ts_event->retry = 0;
 #ifdef CONFIG_TOUCH_BOOST
@@ -1895,14 +1905,16 @@ static int goodix_ts_power_init(struct goodix_ts_core *core_data)
 			core_data->avdd = NULL;
 			return ret;
 		}
-        //avdd voltage set at pineapple-regulators.dtsi, L14B
-		/*
-		ret = regulator_set_voltage(core_data->avdd, 3200000, 3200000);
+		/* #228（b581）blob 反汇编复原：goodix_ts_power_init 内联在
+		 * goodix_ts_probe+0x850/+0x87c，确有 regulator_set_voltage(avdd,
+		 * 3300000, 3300000)（0xd83c 立即数 0x325aa0 = 3,300,000），失败打
+		 * "set avdd voltage failed"（厂商源行 1842）后 return ret；
+		 * 原树整块注释掉属行为偏离，按 blob 落地 */
+		ret = regulator_set_voltage(core_data->avdd, 3300000, 3300000);
 		if (ret < 0) {
 			ts_err("set avdd voltage failed");
 			return ret;
 		}
-		*/
 	} else {
 		ts_info("Avdd name is NULL");
 	}
@@ -1915,17 +1927,21 @@ static int goodix_ts_power_init(struct goodix_ts_core *core_data)
 			ts_err("Failed to get regulator iovdd:%d", ret);
 			core_data->iovdd = NULL;
 		}
-		//iovdd voltage set at pineapple-regulators.dtsi, L12B
-		/*
+		/* #228（b581）同上按 blob 复原：goodix_ts_probe+0xa0c 立即数
+		 * 0x1b7740 = 1,800,000；失败打 "set iovdd voltage failed"
+		 * （厂商源行 1859）后 return ret。注意 blob 在 iovdd 取失败
+		 * （IS_ERR_OR_NULL）时不提前返回，仍以 NULL 调用 set_voltage
+		 * （regulator_set_voltage 对 NULL 内部即返 0）——与树同形保留 */
 		ret = regulator_set_voltage(core_data->iovdd, 1800000, 1800000);
 		if (ret < 0) {
 			ts_err("set iovdd voltage failed");
 			return ret;
 		}
-		*/
 	} else {
 		ts_info("iovdd name is NULL");
 	}
+	/* #228（b581）blob 0xda24 行 1865 ts_info("iovdd end.")：树缺，补齐 */
+	ts_info("iovdd end.");
 
 	return ret;
 }
@@ -1964,45 +1980,44 @@ static int goodix_ts_pinctrl_init(struct goodix_ts_core *core_data)
 		ts_err("Failed to get pinctrl state:%s, r:%d",
 				PINCTRL_STATE_SUSPEND, r);
 		core_data->pin_sta_suspend = NULL;
-	core_data->pin_sta_touch_mode_ap = pinctrl_lookup_state(core_data->pinctrl,
-				"touch_mode_ap");
-	if (IS_ERR_OR_NULL(core_data->pin_sta_touch_mode_ap)) {
-		r = PTR_ERR(core_data->pin_sta_touch_mode_ap);
-		ts_err("Failed to get touch_mode_ap pinstate, r=%d", r);
-		core_data->pin_sta_touch_mode_ap = NULL;
-	}
-	core_data->pin_sta_touch_mode_scp = pinctrl_lookup_state(core_data->pinctrl,
-				"touch_mode_scp");
-	if (IS_ERR_OR_NULL(core_data->pin_sta_touch_mode_scp)) {
-		r = PTR_ERR(core_data->pin_sta_touch_mode_scp);
-		ts_err("Failed to get touch_mode_scp pinstate, r=%d", r);
-		core_data->pin_sta_touch_mode_scp = NULL;
-	}
-	core_data->pin_sta_touch_mode_ap = pinctrl_lookup_state(core_data->pinctrl,
-				"touch_mode_ap");
-	if (IS_ERR_OR_NULL(core_data->pin_sta_touch_mode_ap)) {
-		r = PTR_ERR(core_data->pin_sta_touch_mode_ap);
-		ts_err("Failed to get touch_mode_ap pinstate, r=%d", r);
-		core_data->pin_sta_touch_mode_ap = NULL;
-	}
-	core_data->pin_sta_touch_mode_scp = pinctrl_lookup_state(core_data->pinctrl,
-				"touch_mode_scp");
-	if (IS_ERR_OR_NULL(core_data->pin_sta_touch_mode_scp)) {
-		r = PTR_ERR(core_data->pin_sta_touch_mode_scp);
-		ts_err("Failed to get touch_mode_scp pinstate, r=%d", r);
-		core_data->pin_sta_touch_mode_scp = NULL;
-	}
 		goto exit_pinctrl_put;
 	}
 
-	/* A-78 blob 同形：pmx_gt_spi_mode（主 SPI 三组引脚）查找；blob 中该查找
-	 * 为致命（-19 即整函数失败），树侧按规格降为容忍、不阻断 probe */
+	/* #228（b581）blob goodix_ts_pinctrl_init 0xe4ec 逐点复原：共 5 次
+	 * lookup（active/suspend/touch_mode_ap/touch_mode_scp/pmx_gt_spi_mode），
+	 * 五次失败全部走 exit_pinctrl_put（devm_pinctrl_put + 返回 r）＝致命。
+	 * 原树此处的 ap/scp 块重复了两遍（7 次 lookup）且失败降为容忍，属偏离，
+	 * 按 blob 收口：单份、致命；错误串统一为
+	 * "Failed to get pinctrl state:%s, r:%d"（0xe698 格式串 0x70a3，
+	 * x3=状态名），仅 pmx_gt_spi_mode 用 "Failed to get %s, r: %d"
+	 * （0xe754 区、厂商源行 1933） */
+	core_data->pin_sta_touch_mode_ap = pinctrl_lookup_state(core_data->pinctrl,
+				"touch_mode_ap");
+	if (IS_ERR_OR_NULL(core_data->pin_sta_touch_mode_ap)) {
+		r = PTR_ERR(core_data->pin_sta_touch_mode_ap);
+		ts_err("Failed to get pinctrl state:%s, r:%d", "touch_mode_ap", r);
+		core_data->pin_sta_touch_mode_ap = NULL;
+		goto exit_pinctrl_put;
+	}
+	core_data->pin_sta_touch_mode_scp = pinctrl_lookup_state(core_data->pinctrl,
+				"touch_mode_scp");
+	if (IS_ERR_OR_NULL(core_data->pin_sta_touch_mode_scp)) {
+		r = PTR_ERR(core_data->pin_sta_touch_mode_scp);
+		ts_err("Failed to get pinctrl state:%s, r:%d", "touch_mode_scp", r);
+		core_data->pin_sta_touch_mode_scp = NULL;
+		goto exit_pinctrl_put;
+	}
+
+	/* #228（b581）pmx_gt_spi_mode（主 SPI 三组引脚）：blob 0xe5a0 lookup →
+	 * 0xe668 失败即 0xe678 devm_pinctrl_put，属致命；格式串 "Failed to get
+	 * %s, r: %d"，厂商源行 1933 */
 	core_data->pin_sta_spi_mode = pinctrl_lookup_state(core_data->pinctrl,
 				"pmx_gt_spi_mode");
 	if (IS_ERR_OR_NULL(core_data->pin_sta_spi_mode)) {
 		r = PTR_ERR(core_data->pin_sta_spi_mode);
-		ts_err("Failed to get pinctrl state:%s, r:%d", "pmx_gt_spi_mode", r);
+		ts_err("Failed to get %s, r: %d", "pmx_gt_spi_mode", r);
 		core_data->pin_sta_spi_mode = NULL;
+		goto exit_pinctrl_put;
 	}
 	ts_info("success get pinctrl state");
 
@@ -2553,7 +2568,7 @@ static int goodix_htc_ic_setModeValue(common_data_t *common_data)
 	int ret = 0;
 	bool flag = false;
 
-	ts_info("setModeValue in, cmd = %d, mode = %d, addr = 0x%x", common_data->cmd, common_data->mode, addr);
+	ts_debug("setModeValue in, cmd = %d, mode = %d, addr = 0x%x", common_data->cmd, common_data->mode, addr);	/* #228：blob 等级 D */
 	if (!goodix_core_data) {
 		ts_err("not inited");
 		return -EFAULT;
@@ -2579,7 +2594,7 @@ static int goodix_htc_ic_setModeValue(common_data_t *common_data)
 		ts_err("failed write addr(%x) data 0x%*ph", addr,
 			data_len, data_buf);
 	}
-	ts_info("setModeValue out, cmd = %d, mode = %d, value:0x%*ph", common_data->cmd, common_data->mode, data_len, data_buf);
+	ts_debug("setModeValue out, cmd = %d, mode = %d, value:0x%*ph", common_data->cmd, common_data->mode, data_len, data_buf);	/* #228：blob 等级 D */
 	return 0;
 }
 
@@ -2902,11 +2917,12 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 	}
 	mutex_unlock(&goodix_modules.mutex);
 
-out:
-	core_data->work_status = TP_NORMAL;
-	enable_temperature_detection_func(TOUCH_ID, true);
-	goodix_set_thermal_temp(0, true);
-
+	out:
+		core_data->work_status = TP_NORMAL;
+		enable_temperature_detection_func(TOUCH_ID, true);
+		/* #228（b581）blob goodix_resume_suspend 无 goodix_set_thermal_temp 调用
+		 * （callcmp only-tree 项），按 blob 去掉 */
+	
 #if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
 	goodix_reset_ic_dump_state(core_data);
 #endif /* TOUCH_THP_SUPPORT */ /* TOUCH_DUMP_TIC_SUPPORT */
@@ -3476,9 +3492,49 @@ static int goodix_get_limit_csv_version(char *buf)
 static bool ic_self_test_flag = false;
 bool goodix_get_ic_self_test_mode(void)
 {
+	/* #228（b581）blob goodix_get_ic_self_test_mode @0xa4d0：读 .bss+0x1b11
+	 * 后 ts_debug("enter ic_self_test_flag %d")（厂商源行 3228，level D 门限
+	 * debug>=4），树侧原缺此打印 */
+	ts_debug("enter ic_self_test_flag %d", ic_self_test_flag);
 	return ic_self_test_flag;
 }
 //END:fix echo open/short > proc/tp_selftest can not open csv
+
+/* #228（b581）按 blob goodix_ic_self_test 内联体重建：blob 0xf328-0xf3e8 的
+ * __func__ 串为 "goodix_short_open_test"（.rodata.str1.1+0x8c70，树侧原缺该函数），
+ * 语义 = vzalloc(sizeof(struct ts_rawdata_info)==14104) → goodix_get_rawdata(dev, info)
+ * → 判 info->result[1]=='P'（即 "[PASS]" 前缀）→ PASS/FAIL 打印 → resultInfo → vfree。
+ * 返回值：PASS=GTP_RESULT_PASS(2)；"[FAIL]"=GTP_RESULT_FAIL(1)；alloc/get_rawdata
+ * 失败=0（GTP_RESULT_INVALID，blob f360/f370 mov w25,wzr）。 */
+static int goodix_short_open_test(struct goodix_ts_core *cd)
+{
+	struct ts_rawdata_info *info;
+	int ret = 0;
+
+	info = vzalloc(sizeof(*info));
+	if (!info) {
+		ts_err("alloc rawdata info memory failed");	/* 厂商源行 3198 */
+		return ret;
+	}
+
+	if (goodix_get_rawdata(cd->bus->dev, info)) {
+		ts_err("Factory_test FAIL");			/* 厂商源行 3203 */
+		vfree(info);
+		return ret;
+	}
+
+	if (info->result[1] == 'P') {	/* blob 0xf3b4: ldrb [info+0x36b5] == 0x50 */
+		ts_info("test PASS!");				/* 厂商源行 3209 */
+		ret = GTP_RESULT_PASS;
+	} else {
+		ts_err("test FAILED!");				/* 厂商源行 3212 */
+		ret = GTP_RESULT_FAIL;
+	}
+	ts_info("resultInfo: %s", info->result);		/* 厂商源行 3217 */
+	vfree(info);
+
+	return ret;
+}
 
 static int goodix_ic_self_test(char *type, int *result)
 {
@@ -3495,8 +3551,10 @@ static int goodix_ic_self_test(char *type, int *result)
 	ts_debug("enter ic_self_test_flag %d", ic_self_test_flag);
 
 	if (!strncmp("short", type, 5) || !strncmp("open", type, 4)) {
-		retval = goodix_do_inspect_thread(goodix_core_data);
-		retval = goodix_get_final_result();
+		/* #228（b581）blob 0xf328 起为 goodix_short_open_test 内联体
+		 * （vzalloc info → goodix_get_rawdata → "[PASS]" 判定），
+		 * 原树走 donor 的 do_inspect_thread + get_final_result（blob 无此二符号） */
+		retval = goodix_short_open_test(goodix_core_data);
 #if IS_ENABLED(CONFIG_MIEV)
 		if (retval != GTP_RESULT_PASS) {
 			if (!strncmp("open", type, 4))
@@ -4148,31 +4206,19 @@ static int goodix_log_level_control(int value)
 	return value;
 }
 
-#define GOODIX_TEMPCMD_LEN	0x05
+/* #228（b581）ops 槽 set_thermal_temp 收口：blob .text+0x11c30
+ * goodix_set_thermal_temp 全函数体仅 8 字节 ——
+ *   11c30: mov w0, wzr
+ *   11c34: ret
+ * 即 stock（rodin 6.6）该回调为**空实现**：不发 GOODIX_TEMPCMD、不取 bms 温度、
+ * 不上报 THP_TEMPERATURE_STATUS；且 blob 全模块无 "temp: %d"/"failed send temp cmd"
+ * 串（strcmp：both only-tree），blob goodix_resume_suspend 亦无对本函数的调用。
+ * 原树 warsaw 变体的实现（get_bms_temp_common + add_common_data_to_buf_common +
+ * hw_ops->send_cmd(GOODIX_TEMPCMD)）会让 IC 收到 stock 未发的温度命令，
+ * 按 blob 收口为空实现（该槽位仍按 blob 挂 goodix_set_thermal_temp，见 ops 表）。 */
 static int goodix_set_thermal_temp(int temp, bool force)
 {
-	int ret = 0;
-	int temp0 = 0;
-	struct goodix_ts_cmd cmd;
-
-	if (force) {
-		temp0 = get_bms_temp_common();
-		if (abs(temp0) >= INVAILD_TEMPERATURE)
-			return -1;
-
-		temp = (temp0 + 5) / 10; // Rounding, in degrees Celsius
-		add_common_data_to_buf_common(0, SET_CUR_VALUE, THP_TEMPERATURE_STATUS, 1, &temp);
-	}
-	ts_info("temp: %d", temp);
-	cmd.cmd = GOODIX_TEMPCMD;
-	cmd.len = GOODIX_TEMPCMD_LEN;
-	cmd.data[0] = temp;
-	ret = goodix_core_data->hw_ops->send_cmd(goodix_core_data, &cmd);
-	if (ret) {
-		ts_err("failed send temp cmd");
-	}
-
-	return ret;
+	return 0;
 }
 
 #endif
@@ -4333,10 +4379,17 @@ static int goodix_start_later_init(struct goodix_ts_core *ts_core)
 	else
 		ts_info("success get valid ic config");
 
-upgrade:
+	upgrade:
+		/* #228（b581）blob 厂商源行 4003（goodix_start_later_init，升级段起手）：
+		 * 先取一次 ic info，失败即打 "failed to get ic info, try to upgrade"
+		 * 并置 FORCE 升级位（仅 blob 有该打印，callcmp only-blob _printk:1） */
+		if (cd->hw_ops->get_ic_info(cd, &cd->ic_info) < 0) {
+			ts_err("failed to get ic info, try to upgrade");
+			update_flag |= UPDATE_MODE_FORCE;
+		}
 
-	/* setp 3: init fw struct add try do fw upgrade */
-	ret = goodix_fw_update_init(cd);
+		/* setp 3: init fw struct add try do fw upgrade */
+		ret = goodix_fw_update_init(cd);
 	if (ret) {
 		ts_err("failed init fw update module");
 		goto err_out;
@@ -4360,14 +4413,16 @@ upgrade:
 		ts_err("invalid fw version, abort");
 		goto uninit_fw;
 	}
-	ret = hw_ops->get_ic_info(cd, &cd->ic_info);
-	if (ret) {
-#if IS_ENABLED(CONFIG_MIEV)
-		xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_TRANSFER_ERR, 0, "TpTransferErr", "goodix");
-#endif
-		ts_err("invalid ic info, abort");
-		goto uninit_fw;
-	}
+		ret = hw_ops->get_ic_info(cd, &cd->ic_info);
+		if (ret) {
+			/* #228（b581）blob 该路径（goodix_fw_update_init 内联体
+			 * L28185 "invalid ic info, abort"）**无** TpTransferErr
+			 * mievent 上报；blob goodix_start_later_init 仅 1 次
+			 * mievent str（TpFirmwareLoadFail，L3997 处）。
+			 * 原树多一次上报（callcmp only-tree），按 blob 去掉 */
+			ts_err("invalid ic info, abort");
+			goto uninit_fw;
+		}
 
 	/* the recomend way to update ic config is throuth ISP,
 	 * if not we will send config with interactive mode
@@ -4432,7 +4487,13 @@ upgrade:
 	memcpy(hardware_param.config_file_name, HTC_PROJECT_CFG_NAME, strlen(HTC_PROJECT_CFG_NAME));
 	memset(hardware_param.driver_version, 0, 64);
 	memcpy(hardware_param.driver_version, GOODIX_DRIVER_VERSION, strlen(GOODIX_DRIVER_VERSION));
-	goodix_lockdown_info_read(hardware_param.lockdown_info);
+	/* #228（b581）blob 0xed04-0xed44：逐字节从 core_data->lockdown_info
+	 * （blob core_data+0x610，8B）拷进 hardware_param.lockdown_info
+	 * （blob .bss+0x2b4d）——是内联拷贝循环而非 goodix_lockdown_info_read()
+	 * 调用（该 helper 在 blob 仅作 ops 槽 ic_get_lockdown_info 的地址存放）；
+	 * 框架侧 register 时也会经该回调回填 driver_param->hardware_param. */
+	for (i = 0; i < GOODIX_LOCKDOWN_SIZE; i++)
+		hardware_param.lockdown_info[i] = goodix_core_data->lockdown_info[i];
 	goodix_fw_version_info_read(hardware_param.fw_version);
 
 	memset(&hardware_operation, 0, sizeof(hardware_operation_t));
@@ -4569,16 +4630,20 @@ static int goodix_ts_probe(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_MIEV)
 		xiaomi_touch_mievent_report_int_common(TOUCH_EVENT_PARAM_ERR, 0, "TpParamParseFail", "goodix", ERROR_GPIO_REQUEST);
 #endif
-		ts_err("[DIS-TF-TOUCH] failed init gpio");
+		ts_err("failed init gpio");
 		goto err_out;
 	}
 
+	/* #228（b581）blob 厂商源行 4213 ts_err("begin goodix_ts_power_init")
+	 * （树缺），失败串 4219 为 "fail to init power(regulator)"（树原写
+	 * "failed init power"）——按 blob 收口 */
+	ts_err("begin goodix_ts_power_init");
 	ret = goodix_ts_power_init(core_data);
 	if (ret) {
 #if IS_ENABLED(CONFIG_MIEV)
 		xiaomi_touch_mievent_report_int_common(TOUCH_EVENT_PARAM_ERR, 0, "TpParamParseFail", "goodix", ERROR_REGULATOR_INIT);
 #endif
-		ts_err("failed init power");
+		ts_err("fail to init power(regulator)");
 		goto err_out;
 	}
 	ts_err("end goodix_ts_power_init");
@@ -4590,12 +4655,12 @@ static int goodix_ts_probe(struct platform_device *pdev)
 					core_data->pin_sta_active);
 		if (ret < 0)
 			ts_err("Failed to select active pinstate, r:%d", ret);
-	}
-	/* A-78 blob 同形（blob goodix_ts_probe 0xde6c：active 之后 select
-	 * pmx_gt_spi_mode，失败打印 "Failed to select %s pinstate %d"）：
-	 * 主 SPI 三组引脚 mux 进 SPI 功能态，位于第一次 SPI 事务
-	 * （dev_confirm）之前；失败容忍不阻断 probe */
-	if (!ret && core_data->pinctrl && core_data->pin_sta_spi_mode) {
+		/* #228（b581）blob goodix_ts_probe 0xde6c：active 之后**无条件**
+		 * select pmx_gt_spi_mode（blob 无 pin_sta_spi_mode NULL 判据，
+		 * NULL 时 select 内部返 -EINVAL 并打印），失败打印
+		 * "Failed to select %s pinstate %d"（厂商源行 4235），不阻断
+		 * probe。主 SPI 三组引脚 mux 进 SPI 功能态，位于第一次 SPI
+		 * 事务（dev_confirm）之前 */
 		ret = pinctrl_select_state(core_data->pinctrl,
 					core_data->pin_sta_spi_mode);
 		if (ret < 0)
@@ -4612,6 +4677,8 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		ts_err("failed power on");
 		goto err_out;
 	}
+	/* #228（b581）blob 厂商源行 4248 ts_err("end goodix_ts_power_on")（树缺） */
+	ts_err("end goodix_ts_power_on");
 
 	/* confirm it's goodix touch dev or not */
 	ret = core_data->hw_ops->dev_confirm(core_data);
@@ -4647,7 +4714,8 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	/* Try start a thread to get config-bin info */
 	ret = goodix_start_later_init(core_data);
 	if (ret) {
-		ts_err("[DIS-TF-TOUCH] Failed start cfg_bin_proc, %d", ret);
+		/* #228（b581）blob 厂商源行 4284 无 "[DIS-TF-TOUCH] " 前缀 */
+		ts_err("Failed start cfg_bin_proc, %d", ret);
 		goto err_out;
 	}
 

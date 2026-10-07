@@ -213,8 +213,9 @@ struct ftxxxx_proc {
 };
 
 struct fts_ts_platform_data {
-        const char *iovdd_source_reg_name;
-        const char *avdd_source_reg_name;
+        /* _b581：A-74③ 收口——blob 无 iovdd_source/avdd_source 属性与成员
+         * （fts_parse_dt 的 of_property_read_string 仅 avdd-name/iovdd-name 2 处，
+         *  fts_power_source_init 的 regulator_get 仅字面量 "avdd"/"iovdd"），已删。 */
         const char *iovdd_reg_name;
         const char *avdd_reg_name;
         u32 irq_gpio;
@@ -494,8 +495,8 @@ struct fts_ts_data {
         int bus_type;
 	struct regulator *iovdd;
 	struct regulator *avdd;
-        struct regulator *iovdd_source;
-        struct regulator *avdd_source;
+	/* _b581：blob 全 ko 只向 +0xae0/+0xae8 写/读这两个稳压器指针（regulator_*
+	 * 各 2 次）；原 iovdd_source/avdd_source 成员为 donor 多余件，已删。 */
 	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];
 #if FTS_PINCTRL_EN
         struct pinctrl *pinctrl;

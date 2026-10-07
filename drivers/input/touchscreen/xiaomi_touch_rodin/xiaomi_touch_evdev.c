@@ -18,8 +18,6 @@
 #define CHANNEL_COUNT    10
 #define APP_NAME_SIZE    64
 
-#define MAX_NAME_LENGTH (32)
-#define DEFAULT_INPUT_DEVICE_NAME "unknown input device"
 
 #pragma pack(1)
 typedef struct input_event_time_line {
@@ -49,9 +47,11 @@ enum touch_state {
 	EVENT_UP,
 };
 
+/* _b581-XT③：blob last_touch_events 的 touch_event 步长 24B
+ * （blob 0x5010 mov w8,#0x18；slot@+8/state@+0xc/timespec64@+0x10），无 name 字段；
+ * 树侧原为 donor 的 {slot,name[32],state,time}。 */
 struct touch_event {
 	u32 slot;
-	char name[MAX_NAME_LENGTH];
 	enum touch_state state;
 	struct timespec64 touch_time;
 };
@@ -82,12 +82,8 @@ void last_touch_events_collect_common(struct input_handle *handle, unsigned int 
 		if (slot >= MAX_TOUCH_ID || event_state[slot] == state)
 			return;
 		event_state[slot] = state;
-		if (handle->dev->name != NULL) {
-			strncpy(last_touch_events.touch_event_buf[last_touch_events.head].name, handle->dev->name, MAX_NAME_LENGTH);
-		} else {
-			strncpy(last_touch_events.touch_event_buf[last_touch_events.head].name, DEFAULT_INPUT_DEVICE_NAME, MAX_NAME_LENGTH);
-		}
-		last_touch_events.touch_event_buf[last_touch_events.head].name[MAX_NAME_LENGTH - 1] = '\0';
+		/* _b581-XT③：blob 体内无任何 strncpy/默认名写入（blob 无 strncpy 调用点）；
+		 * 树侧 donor 的 handle->dev->name 拷贝与 DEFAULT_INPUT_DEVICE_NAME 一并删除。 */
 		last_touch_events.touch_event_buf[last_touch_events.head].state = !!state ? EVENT_DOWN : EVENT_UP;
 		last_touch_events.touch_event_buf[last_touch_events.head].slot = slot;
 		ktime_get_real_ts64(&last_touch_events.touch_event_buf[last_touch_events.head].touch_time);
@@ -151,10 +147,12 @@ static int32_t event_show(struct seq_file *m, void *v)
 	if (event_info->state == EVENT_INIT)
 		return 0;
 	rtc_time64_to_tm(event_info->touch_time.tv_sec, &tm);
-	seq_printf(m, "%d-%02d-%02d %02d:%02d:%02d.%09lu UTC Finger %s (%2d) %s\n",
+	/* _b581-XT③：blob event_show 串 = "%d-%02d-%02d %02d:%02d:%02d.%09lu UTC Finger (%2d) %s\n"
+	 * （无设备名 %s；与 24B touch_event 结构自洽）。 */
+	seq_printf(m, "%d-%02d-%02d %02d:%02d:%02d.%09lu UTC Finger (%2d) %s\n",
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 		tm.tm_hour, tm.tm_min, tm.tm_sec, event_info->touch_time.tv_nsec,
-		event_info->name, event_info->slot,
+		event_info->slot,
 		event_info->state == EVENT_DOWN ? "P" : "R");
 	return 0;
 }
@@ -385,7 +383,7 @@ int xiaomi_touch_evdev_init(xiaomi_touch_t *_xiaomi_touch)
 	if (!last_touch_events_pde) {
 		last_touch_events_pde = proc_create_seq("last_touch_events", 0644, NULL, &last_touch_events_seq_ops);
 		if (!last_touch_events_pde) {
-			LOG_ERROR("last_touch_events_proc create has error, exit!");
+			LOG_ERROR("[Probe Failed] last_touch_events_proc create has error, exit!");
 			return -1;
 		}
 		memset(&last_touch_events, 0, sizeof(struct last_touch_event));

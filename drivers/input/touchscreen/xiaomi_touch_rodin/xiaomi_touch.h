@@ -30,7 +30,9 @@
 
 #include "xiaomi_touch_type_common.h"
 
-#define XIAOMI_TOUCH_VERSION    "2024.08.30-01"
+/* _b581-XT③：blob 串表内版本号 = "2025.07.24-01"（.rodata.str1.1，被
+ * xiaomi_touch_probe / proc_tp_write 等引用），树侧原为 donor 串 "2024.08.30-01"。 */
+#define XIAOMI_TOUCH_VERSION    "2025.07.24-01"
 
 #define BTN_INFO 0x152
 
@@ -346,7 +348,6 @@ int update_fod_press_status_common(int value);
 #endif
 struct class *get_xiaomi_touch_class_common(void);
 int update_palm_sensor_value_common(int value);
-int update_palm_sensor_value_second_panel(int value);
 int update_weak_doubletap_value(int value);
 int update_abnormal_event(u16 type, u16 code, u16 value);
 void *get_raw_data_base_common(s8 touch_id);

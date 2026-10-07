@@ -984,7 +984,7 @@ start_update:
 	do {
 		ret = goodix_update_prepare(fwu_ctrl);
 		if (ret) {
-			ts_err("[DIS-TF-TOUCH] failed prepare ISP, retry %d",
+			ts_err("failed prepare ISP, retry %d",
 				FW_UPDATE_RETRY - retry0);
 		}
 	} while (ret && --retry0 > 0);
@@ -1002,7 +1002,7 @@ start_update:
 		goto start_update;
 	}
 	if (ret)
-		ts_err("[DIS-TF-TOUCH] flash fw data enter error, ret:%d", ret);
+		ts_err("flash fw data enter error, ret:%d", ret);
 	else
 		ts_info("flash fw data success, need check version");
 
@@ -1255,7 +1255,7 @@ static int goodix_request_firmware(struct firmware_data *fw_data,
 		msleep(200);
 	}
 	if (retry < 0) {
-		ts_err("[DIS-TF-TOUCH] Firmware image [%s] not available,errno:%d", name, r);
+		ts_err("Firmware image [%s] not available,errno:%d", name, r);
 		return r;
 	}
 
@@ -1301,7 +1301,7 @@ static int goodix_fw_update_thread(void *data)
 			goto out;
 		}
 	} else {
-		ts_err("[DIS-TF-TOUCH] unknown update mode 0x%x", fwu_ctrl->mode);
+		ts_err("unknown update mode 0x%x", fwu_ctrl->mode);
 		r = -EINVAL;
 		goto out;
 	}

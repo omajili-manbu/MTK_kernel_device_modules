@@ -34,6 +34,11 @@ typedef struct xiaomi_touch_proc_data {
 
 static struct proc_dir_entry *tp_pde[MAX_TOUCH_PANEL_COUNT][PROC_COUNT_FOR_PANEL];
 static int self_test_result[MAX_TOUCH_PANEL_COUNT];
+/* _b581-XT③：blob 有 tp_proc_mutex[]（串 "&tp_proc_mutex[touch_id]"），
+ * xiaomi_touch_create_proc 末尾 __mutex_init、proc_open 首处 mutex_lock、
+ * proc_release 末处 mutex_unlock（见 blob 各函数调用集）。
+ * 数组不能走 DEFINE_MUTEX（宏内含结构体指定初始化），与 blob 一致在 create_proc 内 init。 */
+static struct mutex tp_proc_mutex[MAX_TOUCH_PANEL_COUNT];
 
 static int proc_open(struct inode *inode, struct file *file)
 {
@@ -49,9 +54,12 @@ static int proc_open(struct inode *inode, struct file *file)
 	if (IS_TOUCH_ID_INVALID(touch_id))
 		return -EFAULT;
 
+	/* blob proc_open 第一处调用即 mutex_lock(&tp_proc_mutex[touch_id]) */
+	mutex_lock(&tp_proc_mutex[touch_id]);
 	xiaomi_touch_proc_data = kvzalloc_retry(sizeof(xiaomi_touch_proc_data_t), 3);
 	if (!xiaomi_touch_proc_data) {
-		LOG_ERROR("alloc tp proc data memory error");
+		LOG_ERROR("alloc tp proc data memory failed");
+		mutex_unlock(&tp_proc_mutex[touch_id]);
 		return -EFAULT;
 	}
 
@@ -64,14 +72,16 @@ static int proc_open(struct inode *inode, struct file *file)
 		LOG_DEBUG("alloc dump data memory");
 		xiaomi_touch_proc_data->tp_proc_result_buf = kvzalloc_retry(DUMP_DATA_BUF_SIZE, 3);
 		if (!xiaomi_touch_proc_data->tp_proc_result_buf) {
-			LOG_ERROR("alloc tp proc dump memory error");
+			LOG_ERROR("alloc tp proc dump memory failed");
+			mutex_unlock(&tp_proc_mutex[touch_id]);
 			return -1;
 		}
 	} else {
 		LOG_DEBUG("alloc proc data memory");
 		xiaomi_touch_proc_data->tp_proc_result_buf = kvzalloc_retry(NORMAL_DATA_BUF_SIZE, 3);
 		if (!xiaomi_touch_proc_data->tp_proc_result_buf) {
-			LOG_ERROR("alloc tp proc data memory error");
+			LOG_ERROR("alloc tp proc data memory failed");
+			mutex_unlock(&tp_proc_mutex[touch_id]);
 			return -1;
 		}
 	}
@@ -94,19 +104,17 @@ static int proc_release(struct inode *inode, struct file *file)
 	if (IS_TOUCH_ID_INVALID(touch_id))
 		return -EFAULT;
 
+	/* _b581-XT③：blob proc_release 只有 1 处 kvzalloc_free + 1 处 mutex_unlock，
+	 * 树侧原为 donor 的重复 free 块（对同一 buf 二次 kvzalloc_free）。 */
 	if (xiaomi_touch_proc_data->tp_proc_result_buf) {
 		LOG_DEBUG("free proc data buf memory");
 		kvzalloc_free(xiaomi_touch_proc_data->tp_proc_result_buf);
 		xiaomi_touch_proc_data->tp_proc_result_buf = NULL;
 	}
 
-	if (xiaomi_touch_proc_data) {
-		LOG_DEBUG("free proc data buf memory");
-		kvzalloc_free(xiaomi_touch_proc_data->tp_proc_result_buf);
-		xiaomi_touch_proc_data = NULL;
-	}
-
 	LOG_DEBUG("release %s", name);
+	/* blob proc_release 末处 mutex_unlock(&tp_proc_mutex[touch_id]) */
+	mutex_unlock(&tp_proc_mutex[touch_id]);
 	return 0;
 }
 
@@ -136,7 +144,8 @@ static ssize_t proc_tp_read(struct file *file, char __user *buf, size_t count, l
 		goto copy_data_to_user;
 	}
 
-	LOG_DEBUG("open proc tp node name is %s", name);
+	/* _b581-XT③：blob proc_tp_read 该串为 MI_TP_I（LOG_INFO）；proc_tp_write 同名串为 D。 */
+	LOG_INFO("open proc tp node name is %s", name);
 	if (!strncmp("tp_fw_version", name, 10)) {
 		LOG_DEBUG("read tp_fw_version");
 		if (xiaomi_touch_driver_param->hardware_operation.ic_get_fw_version)
@@ -144,19 +153,17 @@ static ssize_t proc_tp_read(struct file *file, char __user *buf, size_t count, l
 		n += snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n, "fw version: %s\n", xiaomi_touch_driver_param->hardware_param.fw_version);
 		n += snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n, "driver version: %s\n", xiaomi_touch_driver_param->hardware_param.driver_version);
 		n += snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n, "hal version: %s\n", xiaomi_touch_driver_param->hal_version);
-		if (xiaomi_touch_driver_param->hardware_operation.get_limit_csv_version) {
-			xiaomi_touch_driver_param->hardware_operation.get_limit_csv_version(xiaomi_touch_driver_param->limit_csv_version);
-			n += snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n, "limit version: %s\n", xiaomi_touch_driver_param->limit_csv_version);
-		}
+		/* _b581-XT③：blob proc_tp_read 的 tp_fw_version 分支只有 fw/driver/hal/
+		 * xiaomi-touch 四条（无 "limit version: %s" 串，tree-only donor），删除该打印。 */
 		n += snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n, "xiaomi-touch version: %s\n", XIAOMI_TOUCH_VERSION);
 		xiaomi_touch_proc_data->tp_proc_result_length = n;
 	} else if (!strncmp("tp_lockdown_info", name, 16)) {
 		u8 *lockdown_info = xiaomi_touch_driver_param->hardware_param.lockdown_info;
 		LOG_DEBUG("read tp_lockdown_info");
 		if (xiaomi_touch_driver_param->hardware_operation.ic_get_lockdown_info) {
+			/* _b581-XT③：blob 无 "read tp_lockdown_info error" 串（tree-only donor），
+			 * ret<0 分支删除，仅保留 ic_get_lockdown_info 调用。 */
 			ret = xiaomi_touch_driver_param->hardware_operation.ic_get_lockdown_info(lockdown_info);
-			if (ret < 0)
-				LOG_ERROR("read tp_lockdown_info error");
 			n = snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n,
 					"0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X\n",
 					lockdown_info[0], lockdown_info[1], lockdown_info[2], lockdown_info[3],
@@ -166,7 +173,8 @@ static ssize_t proc_tp_read(struct file *file, char __user *buf, size_t count, l
 		}
 		xiaomi_touch_proc_data->tp_proc_result_length = n;
 	} else if (!strncmp("tp_selftest", name, 11)) {
-		LOG_DEBUG("read tp_selftest result %d", self_test_result[touch_id]);
+		/* _b581-XT③：blob proc_tp_read 该串为 MI_TP_I（"read tp_selftest result %d"）。 */
+		LOG_INFO("read tp_selftest result %d", self_test_result[touch_id]);
 		n = snprintf(xiaomi_touch_proc_data->tp_proc_result_buf + n, NORMAL_DATA_BUF_SIZE - n, "%d\n", self_test_result[touch_id]);
 		xiaomi_touch_proc_data->tp_proc_result_length = n;
 	} else if (!strncmp("tp_data_dump", name, 12)) {
@@ -264,21 +272,14 @@ static const struct proc_ops proc_tp_ops = {
 static struct proc_dir_entry *create_proc_node(char *name, const struct proc_ops *proc_ops, xiaomi_touch_driver_param_t *xiaomi_touch_driver_param)
 {
 	struct proc_dir_entry *pde = proc_create_data(name, 0644, NULL, proc_ops, xiaomi_touch_driver_param);
-	kuid_t uid;
-	kgid_t gid;
 
+	/* _b581-XT③：blob create_proc_node 只有 proc_create_data + NULL 检查
+	 * （0x5a10 处 ldr x8,[x1,#0xb0] → d_iname 用法同），无 proc_set_user /
+	 * make_kuid/make_kgid（树侧 donor 附加，会改 /proc 节点属主，按 blob 删除）。 */
 	if (!pde) {
 		LOG_ERROR("proc_create_data has error, exit!");
 		return NULL;
 	}
-
-	uid = make_kuid(current_user_ns(), 1000);
-	if (!uid_valid(uid))
-		uid = KUIDT_INIT(1000);
-	gid = make_kgid(current_user_ns(), 1000);
-	if (!gid_valid(gid))
-		gid = KGIDT_INIT(1000);
-	proc_set_user(pde, uid, gid);
 
 	return pde;
 }
@@ -320,6 +321,9 @@ int xiaomi_touch_create_proc(xiaomi_touch_driver_param_t *xiaomi_touch_driver_pa
 	snprintf(proc_name, 64, "tp_data_dump%s", name_suffix);
 	tp_pde[touch_id][3] = create_proc_node(proc_name, &proc_tp_ops, xiaomi_touch_driver_param);
 
+	/* _b581-XT③：blob xiaomi_touch_create_proc 末尾有一处 __mutex_init
+	 * （唯一实参 = &tp_proc_mutex[touch_id]，lockdep 名 "&tp_proc_mutex[touch_id]"）。 */
+	mutex_init(&tp_proc_mutex[touch_id]);
 
 	return 0;
 }

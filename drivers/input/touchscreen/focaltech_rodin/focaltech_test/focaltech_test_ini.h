@@ -438,6 +438,9 @@ struct fts_test_fail_buf {
 #define FTS_TEST_OFF_BLACK		0x12d7f4
 #define FTS_TEST_OFF_DIFFER	0x1335b4
 #define FTS_TEST_SIZE		0x139378
+/* _b581：A-74 续行④ —— CSV 文本缓冲尺寸（blob fts_test_init 0x1658c 立即数
+ * 0x64000 = 409600；vmalloc 与 memset 同长） */
+#define FTS_TEST_CSV_BUF_SIZE	0x64000
 
 struct fts_test {
     struct fts_ts_data *ts_data;
@@ -466,7 +469,14 @@ struct fts_test {
     int basic_thr_count;              /* 0x98 */
     u8 reserved_9c[4];                /* 0x9c..0x9f */
     int *node_valid;                  /* 0xa0 blob 实证（compare_* 检查面/fts_test_malloc_free_thr 分配面/ini_init_test） */
-    u8 reserved_a8[0x18];             /* 0xa8..0xbf */
+    u8 reserved_a8[0x10];             /* 0xa8..0xb7 */
+    /* _b581：A-74 续行④ 归位 —— blob 的 CSV 文本缓冲在 struct fts_test+0xb8：
+     *   fts_test_init 0x1658c-0x165c0: vmalloc(0x64000) -> str x0,[fts_ftest,#0xb8]
+     *   -> memset(buf,0,0x64000)（失败打 "malloc csv_file_buf fail"）
+     *   fts_csv_show   0x18844: ldr x0,[x1,#0xb8]（"tdata/csv_file_buf is null" 自名）
+     * 原树侧放在 +0xbf0（donor 位），与该处 vmalloc/show 字段不是同一处；此处按 blob
+     * 前移至 0xa8 保留洞的尾 8 字节（其余偏移不变，struct 尺寸不变）。 */
+    char *csv_data_buffer;            /* 0xb8 blob 实证（0x1659c str / 0x18844 ldr） */
     int csv_item_cnt;                 /* 0xc0 */
     int csv_item_sraw;                /* 0xc4 */
     int csv_item_scb;                 /* 0xc8 */
@@ -487,7 +497,9 @@ struct fts_test {
     struct fts_test_data testdata;    /* 0x3d8 (0x808) */
     char *testresult;                 /* 0xbe0 */
     int testresult_len;               /* 0xbe8 */
-    char *csv_data_buffer;            /* 0xbf0 */
+    /* _b581：0xbf0..0xbf7 = donor 的 csv 指针位；blob 该 8 字节无对应成员
+     * （blob 的 csv 缓冲在 +0xb8），保留为洞以免破坏其后全部锚点偏移。 */
+    u64 reserved_bf0[1];              /* 0xbf0..0xbf7 blob 无此成员（u64 保 8B 对齐） */
     int result;                       /* 0xbf8 */
     int rawshift_pic_code;            /* 0xbfc 2=PASS 3=NG */
     int rawshift_pic_black_result;    /* 0xc00 */
@@ -553,6 +565,9 @@ _Static_assert(sizeof(struct fts_test) == FTS_TEST_SIZE, "fts_test total 0x13937
 _Static_assert(__builtin_offsetof(struct fts_test, node_valid_sc) == 0x90, "node_valid_sc@0x90");
 _Static_assert(__builtin_offsetof(struct fts_test, basic_thr_count) == 0x98, "basic_thr_count@0x98");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_cnt) == 0xc0, "csv_item_cnt@0xc0");
+/* _b581：A-74 续行④ 判据——blob 的 csv 文本缓冲在 +0xb8（fts_test_init 0x1659c
+ * str / fts_csv_show 0x18844 ldr），与树侧同名字段必须同址；0xbf0 只许是洞。 */
+_Static_assert(__builtin_offsetof(struct fts_test, csv_data_buffer) == 0xb8, "csv_data_buffer@0xb8 (blob 0x1659c/0x18844)");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_sraw) == 0xc4, "csv_item_sraw@0xc4");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_scb) == 0xc8, "csv_item_scb@0xc8");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_af_noise) == 0xd4, "csv_item_af_noise@0xd4");

@@ -122,7 +122,9 @@ u8 xiaomi_get_gesture_type_common(s8 touch_id)
 				!touch_mode[touch_id][DATA_MODE_17][GET_CUR_VALUE])
 			tmp_value |= GESTURE_SINGLETAP_EVENT;
 	}
-	LOG_INFO("touch_id = %d, gesture type:%2x\n", touch_id, tmp_value);
+	/* _b581-XT③：blob xiaomi_get_gesture_type_common 串 = "gesture type:%2x\n"
+	 * （0x198f），无 touch_id 形参（树侧 donor 多带 1 参）。 */
+	LOG_INFO("gesture type:%2x\n", tmp_value);
 	return tmp_value;
 }
 EXPORT_SYMBOL(xiaomi_get_gesture_type_common);
@@ -224,7 +226,8 @@ static void xiaomi_touch_cmd_update_work(struct work_struct *work)
 	}
 
 	if (mode_update_flag & ((1 << DATA_MODE_0) | (1 << DATA_MODE_8) | (1 << DATA_MODE_7))) {
-		LOG_INFO("mode_update_flag: 0x%02llX", mode_update_flag);
+		/* _b581-XT③：blob xiaomi_touch_cmd_update_work 串 = "mode_update_flag: 0x%02lX"（0x2122）。 */
+		LOG_INFO("mode_update_flag: 0x%02lX", (long)mode_update_flag);
 		schedule_work(&grid_update_work[touch_id]);
 	}
 
@@ -417,7 +420,8 @@ static void xiaomi_touch_set_mode_long_value(common_data_t *common_data)
 
 	if (mode == DATA_MODE_15) {
 		if (touch_mode[common_data->touch_id][DATA_MODE_0][GET_CUR_VALUE]) {
-			LOG_ERROR("in gamemode,will set by cmd game update update");
+			/* _b581-XT③：blob 无 "in gamemode,will set by cmd game update update" 串
+			 * （tree-only donor）。 */
 			return;
 		}
 
@@ -466,7 +470,8 @@ static void xiaomi_touch_reset_mode(common_data_t *common_data)
 		return;
 	}
 
-	LOG_INFO("touch id:%d, mode:%d", common_data->touch_id, mode);
+	/* _b581-XT③：blob xiaomi_touch_reset_mode 串 = "mode: %d reset!"（0x31df，I 级）。 */
+	LOG_INFO("mode: %d reset!", mode);
 	if (mode < DATA_MODE_45 && mode > 0) {
 		touch_mode[common_data->touch_id][mode][SET_CUR_VALUE] =
 			touch_mode[common_data->touch_id][mode][GET_DEF_VALUE];
@@ -497,24 +502,26 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 	s8 touch_id = common_data->touch_id;
 	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(touch_id);
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);
-	bool is_tddi = xiaomi_touch_driver_param && xiaomi_touch_data &&
-                   xiaomi_touch_driver_param->hardware_operation.get_tddi_status &&
-                   xiaomi_touch_driver_param->hardware_operation.get_tddi_status();
+	/* _b581-XT③：blob 体内只有 2 处间接调用（ops+0x178 set_mode_value / ops+0x1f0
+	 * touch_log_level_control_v2），无 get_tddi_status——树侧 donor 的 is_tddi
+	 * （只为已删的 DATA_MODE_35 分支服务）一并删除。 */
 
 	if (mode < 0 || val < 0 || !xiaomi_touch_driver_param || !xiaomi_touch_data) {
 		LOG_ERROR("error param. mode %d, value %d, xiaomi_touch_driver_param %p, xiaomi_touch_data %p",
 			mode, val, xiaomi_touch_driver_param, xiaomi_touch_data);
 		return;
 	}
-	if (mode != DATA_MODE_153 && mode != DATA_MODE_169 && mode != DATA_MODE_177)
-		LOG_INFO("touch_id:%d, mode:%d,val:%d", touch_id, mode, val);
+	/* _b581-XT③：blob 0xa574-0xa604 = 无排除表、无 touch_id 形参的单条
+	 * LOG_INFO("mode:%d,val:%d", mode, val)（w3=w22=mode, w4=w20=val，行号 488）。
+	 * 树侧原为 donor 的 153/169/177 排除 + 3 参串 "touch_id:%d, mode:%d,val:%d"。 */
+	LOG_INFO("mode:%d,val:%d", mode, val);
 
-	if (mode >= DATA_MODE_45) {
-		if (mode == DATA_MODE_57) {
-			if (xiaomi_touch_driver_param->hardware_operation.set_mode_value)
-				xiaomi_touch_driver_param->hardware_operation.set_mode_value(mode, &val);
-			return;
-		}
+	/* _b581-XT③：blob 0xa57c `cmp w22,#0x23`（=35=DATA_MODE_35）→ mode>=35 一律走
+	 * IC op set_mode_value(mode, common_data->data_buf)（blob 0xa584 取 ops+0x178，
+	 * 无 DATA_MODE_57 特例）；树侧原为 donor 的 `mode>=DATA_MODE_45` + 57 特例。
+	 * 同时 blob 的 touch_mode 表 = 35 模式/面板（步长 24 = 6 int/模式，见 0xa618
+	 * 0x348/0x18），与 35 门限自洽。 */
+	if (mode >= DATA_MODE_35) {
 		if (xiaomi_touch_driver_param->hardware_operation.set_mode_value)
 			xiaomi_touch_driver_param->hardware_operation.set_mode_value(mode, common_data->data_buf);
 		return;
@@ -532,34 +539,34 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 		}
 		break;
 	case DATA_MODE_14:
+		/* blob 0xa81c 块（jump table mode 14）：串 "Touch_Doubletap_Mode value [%d]"
+		 * （0x3bd6，行号 514），形参 w3=val。 */
 		touch_mode[touch_id][mode][GET_CUR_VALUE] = val;
-		LOG_INFO("DATA_MODE_14 value [%d]", val);
+		LOG_INFO("Touch_Doubletap_Mode value [%d]", val);
 		queue_work(xiaomi_touch_data->event_wq, &switch_mode_work[touch_id]);
 		break;
 	case DATA_MODE_11:
+		/* blob 0xa7c8（mode 11）：串 "Touch_Aod_Enable value [%d]"（0x1769）。 */
 		touch_mode[touch_id][mode][GET_CUR_VALUE] = val;
-		LOG_INFO("DATA_MODE_11 value [%d]", val);
+		LOG_INFO("Touch_Aod_Enable value [%d]", val);
 		queue_work(xiaomi_touch_data->event_wq, &switch_mode_work[touch_id]);
 		break;
 	case DATA_MODE_10:
+		/* blob 0xa688（mode 10）：串 "Touch_Fod_Enable value [%d]"（0x38fb）。 */
 		touch_mode[touch_id][mode][GET_CUR_VALUE] = val;
-		LOG_INFO("DATA_MODE_10 value [%d]", val);
+		LOG_INFO("Touch_Fod_Enable value [%d]", val);
 		queue_work(xiaomi_touch_data->event_wq, &switch_mode_work[touch_id]);
 		break;
 	case DATA_MODE_16:
+		/* blob 0xa870（mode 16）：串 "Touch_FodIcon_Enable value [%d]"（0x1d0，行号 524）。 */
 		touch_mode[touch_id][mode][GET_CUR_VALUE] = val;
-		LOG_INFO("DATA_MODE_16 value [%d]", val);
+		LOG_INFO("Touch_FodIcon_Enable value [%d]", val);
 		queue_work(xiaomi_touch_data->event_wq, &switch_mode_work[touch_id]);
 		break;
-	case DATA_MODE_35:
-		if (is_tddi) {
-			LOG_INFO("Surport TDDI , DATA_MODE_35 value [%d]", val);
-			if (xiaomi_touch_driver_param->hardware_operation.set_mode_value)
-				xiaomi_touch_driver_param->hardware_operation.set_mode_value(mode, common_data->data_buf);
-		} else {
-			LOG_INFO("NOT Surport TDDI ,not send DATA_MODE_35 value [%d]", val);
-		}
-		break;
+	/* _b581-XT③：blob jump table `cmp w22,#0x1f; b.hi 0xa79c`——
+	 * mode 32..34 与 0/2/3/4/5/7/8 同走 cmd_update 队列，mode 35.. 已被上面的
+	 * `mode>=DATA_MODE_35` 提前返回，故树侧 donor 的 case DATA_MODE_35
+	 * （串 "Surport/NOT Surport TDDI..."，blob 面无此二串）为不可达残留，删除。 */
 #ifdef FLIP_STATE
 	case DATA_MODE_30:
 		LOG_INFO("DATA_MODE_30 value [%d]", val);
@@ -567,8 +574,9 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 		break;
 #endif
 	case DATA_MODE_17:
+		/* blob 0xa6dc（mode 17）：串 "Touch_Nonui_Mode value [%d]"（0x1ec2，行号 529）。 */
 		touch_mode[touch_id][mode][GET_CUR_VALUE] = val;
-		LOG_INFO("DATA_MODE_17 value [%d]", val);
+		LOG_INFO("Touch_Nonui_Mode value [%d]", val);
 		queue_work(xiaomi_touch_data->event_wq, &switch_mode_work[touch_id]);
 		break;
 	case DATA_MODE_18:
@@ -614,16 +622,9 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 		value = val > 0 ? XIAOMI_TOUCH_ENABLE_SENSOR : XIAOMI_TOUCH_DISABLE_SENSOR;
 		add_common_data_to_buf_common(touch_id, SET_CUR_VALUE, DATA_MODE_27, 1, &value);
 		break;
-	case DATA_MODE_25:
-	    LOG_INFO("DATA_MODE_25: %d", val);
-		if (xiaomi_touch_driver_param->hardware_operation.set_mode_value)
-			xiaomi_touch_driver_param->hardware_operation.set_mode_value(mode, &val);
-		break;
-	case DATA_MODE_41:
-		LOG_INFO("DATA_MODE_41: %d", val);
-		if (xiaomi_touch_driver_param->hardware_operation.set_mode_value)
-			xiaomi_touch_driver_param->hardware_operation.set_mode_value(mode, &val);
-		break;
+	/* _b581-XT③：blob jump table mode 25 → 0xa79c default（"don't not support mode"），
+	 * 且 mode>=35 由前置 op 路径处理；树侧 donor 的 case DATA_MODE_25 / DATA_MODE_41
+	 * （各自带 "DATA_MODE_25: %d" / "DATA_MODE_41: %d" 串，blob 面无）删除。 */
 #ifdef TOUCH_MULTI_PANEL_NOTIFIER_SUPPORT
 	case DATA_MODE_44:
 		touch_mode[touch_id][mode][GET_CUR_VALUE] = val;
@@ -677,6 +678,13 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			if (xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue) {
 				xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue(&common_data);
 			}
+			/* _b581-XT③：blob cmd==8 的块 = 0xa314（ops+0x1f8=htc_ic_setModeValue）
+			 * 后接 0xa3a0-0xa3c8：`sub w8,w2(mode),#0x14; cmp w8,#0xb3; b.hi` →
+			 * mode ∈ [20,199] 时追加 add_common_data_to_buf_common(touch_id, cmd,
+			 * mode, data_len, data_buf)（x4=&data_buf）。树侧原缺该追加（少 1 调用点）。 */
+			if (common_data.mode >= 20 && common_data.mode <= 199)
+				add_common_data_to_buf_common(common_data.touch_id, common_data.cmd,
+						common_data.mode, common_data.data_len, common_data.data_buf);
 			break;
 		case GET_THP_IC_CUR_VALUE:
 			if (xiaomi_touch_driver_param->hardware_operation.htc_ic_getModeValue &&
@@ -692,6 +700,8 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 						return -1;
 					}
 			} else {
+				/* _b581-XT③（纠错）：blob 0xb05 确有串 "get thp ic cur value has error"
+				 * （xiami_touch_mode 内，0xa278 ops+0x200 失败支路）。 */
 				LOG_ERROR("get thp ic cur value has error");
 				mutex_unlock(&ioctl_operation_mutex);
 				return -1;

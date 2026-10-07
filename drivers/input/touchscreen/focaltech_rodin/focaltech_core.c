@@ -88,7 +88,8 @@ static int fts_ts_resume(struct device *dev);
 #ifdef FTS_XIAOMI_TOUCHFEATURE
 int fts_ic_data_collect(char *buf, int *length);
 int fts_read_and_report_foddata(struct fts_ts_data *data);
-static void fts_game_mode_recovery(struct fts_ts_data *ts_data);
+/* _b581：A-74 续行② —— blob 无 fts_game_mode_recovery 符号（donor 桩，仅打
+ * "this is null !!!!!"），已随 fts_tp_state_recovery 接线收口删除。 */
 static void fts_charger_status_recovery(struct fts_ts_data *ts_data);
 static void fts_fod_status_recovery(struct fts_ts_data *ts_data);
 static void fts_report_rate_recovery(struct fts_ts_data *ts_data);
@@ -307,19 +308,20 @@ void fts_tp_state_recovery(struct fts_ts_data *ts_data)
 	FTS_FUNC_ENTER();
 	/* wait tp stable */
 	fts_wait_tp_to_valid();
-	/* recover TP charger state 0x8B */
+	/* recover TP charger state 0x8B（blob 0x364：fts_charger_on(ts_data, charger_status!=0)） */
 	fts_charger_status_recovery(ts_data);
-	/* recover TP glove state 0xC0 */
-	/* recover TP cover state 0xC1 */
-	/*fts_ex_mode_recovery(ts_data);*/
+	/* recover TP glove state 0xC0 / cover state 0xC1 */
 	/* recover TP gesture state 0xD0 */
 	fts_gesture_recovery(ts_data);
+	/* _b581：A-74 续行② 接线 —— blob 0x37c..0x3ac：current_fps(+0xbf4)==135 时
+	 * 重推 thp SET_REPORT_RATE_TYPE(0x13) 双字（135）。树侧 current_fps 同址同义。 */
+	if (ts_data->current_fps == 135)
+		fts_thp_ic_write_interfaces(SET_REPORT_RATE_TYPE,
+					    &ts_data->current_fps, 2);
 	/* recover TP report_rate state 0x92 */
 	fts_report_rate_recovery(ts_data);
 #ifdef FTS_XIAOMI_TOUCHFEATURE
-	/* _b571：blob 0x3b8-0x3fc 段——镜像 GET_CUR 复位为 GET_DEF + 刷新。
-	 * （blob 段尾的 game idle refresh 0x8e 重开由既有
-	 *  fts_game_idle_high_refresh_recovery 覆盖，不重复插入） */
+	/* _b571：blob 0x3b8-0x3fc 段——镜像 GET_CUR 复位为 GET_DEF + 刷新。 */
 	{
 		int __i;
 		int __modes[] = { DATA_MODE_0, DATA_MODE_7, DATA_MODE_8 };
@@ -328,9 +330,10 @@ void fts_tp_state_recovery(struct fts_ts_data *ts_data)
 				fts_touch_mode[__modes[__i]][GET_DEF_VALUE];
 	}
 	fts_update_touchmode_data(ts_data);
-	/* recover TP game mode state */
-	fts_game_mode_recovery(ts_data);
-	/* recover TP idle refresh state 0x8E */
+	/* _b581：A-74 续行② 收口——blob 该函数无 fts_game_mode_recovery 调用（blob 亦无
+	 * 此符号），原 donor 桩（仅打 "this is null !!!!!"）删除；game idle 0x8E 与 fod 0xCF
+	 * 的重推分别由 fts_game_idle_high_refresh_recovery / fts_fod_status_recovery 承担
+	 * （对应 blob 0x3e0-0x3fc 与 0x478-0x4c4）。 */
 	fts_game_idle_high_refresh_recovery(ts_data);
 	/* recover TP fod state 0xCF */
 	fts_fod_status_recovery(ts_data);
@@ -448,31 +451,20 @@ void fts_hid2std(void)
         }
     }
 }
-static void fts_recover_sleep_from_gesture(struct fts_ts_data *data)
-{
-	int ret = 0;
-
-	FTS_FUNC_ENTER();
-	fts_irq_disable();
-	if (fts_data->irq_wake) {
-		disable_irq_wake(fts_data->irq);
-		fts_data->irq_wake = false;
-    }
-	ret = fts_write_reg(FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP);
-	if (ret < 0)
-		FTS_ERROR("set TP to sleep mode fail, ret=%d", ret);
-	FTS_FUNC_EXIT();
-}
+/* _b581：A-74② 收口——blob 无 fts_recover_sleep_from_gesture 符号（全 ko 零
+ * fts_recover_sleep_from_gesture/零 fts_irq_disable+write_reg(SLEEP) 组合）；其
+ * 「手势→睡眠」语义由 blob fts_resume_suspend 的 suspend 半（树侧 fts_ts_suspend
+ * 内 FTS_REG_POWER_MODE_SLEEP 段）承担。原 donor recover 对已随 switch_mode
+ * blob 化删除，避免不可达死码。 */
 static void fts_recover_gesture_from_sleep(struct fts_ts_data *data)
 {
 	FTS_FUNC_ENTER();
 	fts_reset_proc(50);
 	fts_tp_state_recovery(data);
 	fts_irq_enable();
-	if (!fts_data->irq_wake) {
-		enable_irq_wake(fts_data->irq);
-		fts_data->irq_wake = true;
-	}
+	/* _b581：blob 0x3f60..0x3fb0 内联本函数处无 irq_wake 处理（blob 全 ko 的
+	 * irq_set_irq_wake 仅 4 处：focal_select_touchmode×2 / fts_gesture_suspend /
+	 * fts_gesture_resume），故删去 donor 的 enable_irq_wake 块。 */
 	FTS_FUNC_EXIT();
 }
 
@@ -2016,134 +2008,144 @@ static int fts_pinctrl_select_spimode(struct fts_ts_data *ts)
 
 #endif /* FTS_PINCTRL_EN */
 
-static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
+/* _b581：A-74③／续① 全形复核落码 —— blob fts_power_source_ctrl_simplify
+ * (0x6bf8, 796B) 逐点还原：
+ *   enable : avdd reg_enable(+0xae8) -> avdd_gpio 置 1(gpio_to_desc+
+ *            gpiod_direction_output_raw) -> usleep_range(3000,3100) ->
+ *            iovdd reg_enable(+0xae0) -> power_disabled=false
+ *   disable: iovdd reg_disable -> usleep_range(3000,3100) -> avdd reg_disable ->
+ *            avdd_gpio 置 0 + FTS_INFO("disable avdd gpio") -> power_disabled=true
+ * blob 该函数体内 print 串与行号见 .rodata.str1.1 反解（L1969/1971/1981/1983/
+ * 1995/1997/2007/2009/2011 与 6.6 dmesg "successs to enable avdd/iovdd:1971/1983" 互证）。
+ * 无 *_source 稳压器、无 dvdd pinctrl（+0xb20/+0xb28 在 blob 全 ko 只被 init 写、
+ * 零读 —— 死字段），故树侧一律不接。 */
+static int fts_power_source_ctrl_simplify(struct fts_ts_data *ts_data, int enable)
 {
 	int ret = 0;
 
-	/* blob 同形：无 avdd 硬性 bail（本机 DTB 无 focaltech,avdd-name，avdd 落
-	 * dummy；真实 avdd 控制在下方 avdd-gpio） */
-	FTS_FUNC_ENTER();
+	FTS_FUNC_ENTER();					/* blob L1963 */
 	if (enable) {
 		if (ts_data->power_disabled) {
-			FTS_DEBUG("regulator enable !");
-			gpio_direction_output(ts_data->pdata->reset_gpio, 0);
-			msleep(1);
-			if (ts_data->pinctrl && ts_data->pinctrl_dvdd_enable) {
-				ret = pinctrl_select_state(ts_data->pinctrl,
-				ts_data->pinctrl_dvdd_enable);
-				if (ret)
-					FTS_ERROR("%s: Failed to enable dvdd, error= %d\n", __func__, ret);
-				else
-					FTS_INFO("%s: successs to enable dvdd\n", __func__);
-			}
 			if (!IS_ERR_OR_NULL(ts_data->avdd)) {
 				ret = regulator_enable(ts_data->avdd);
 				if (ret)
-					FTS_ERROR("enable avdd regulator failed,ret=%d", ret);
-			}
-			/* blob simplify 同形：avdd GPIO 承重（gpio_to_desc + gpiod_direction_output_raw） */
-			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
-				struct gpio_desc *avdd_desc =
-					gpio_to_desc(ts_data->pdata->avdd_gpio);
-
-				if (avdd_desc) {
-					ret = gpiod_direction_output_raw(avdd_desc, 1);
-					if (ret)
-						FTS_ERROR("enable avdd gpio failed,ret=%d", ret);
-				}
-			}
-			FTS_INFO("successs to enable avdd");
-			if (!IS_ERR_OR_NULL(ts_data->iovdd)) {
-				ret = regulator_enable(ts_data->iovdd);
-				if (ret)
-					FTS_ERROR("enable iovdd regulator failed,ret=%d", ret);
-			}
-			FTS_INFO("successs to enable iovdd");
-			if (!IS_ERR_OR_NULL(ts_data->iovdd_source)) {
-				ret = regulator_enable(ts_data->iovdd_source);
-				if (ret)
-					FTS_ERROR("enable iovdd_source regulator failed,ret=%d", ret);
-			}
-			if (!IS_ERR_OR_NULL(ts_data->avdd_source)) {
-				ret = regulator_enable(ts_data->avdd_source);
-				if (ret)
-					FTS_ERROR("enable avdd_source regulator failed,ret=%d", ret);
-			}
-			/* A-78 blob 同形：主 SPI 三组引脚 + CS 脚 mux 进 SPI 功能态
-			 * （pmx_gt_spi_mode / pmx_gt_cs_spi_mode）；出厂日志顺序在 iovdd 之后 */
-			if (ts_data->pinctrl && ts_data->pinctrl_state_spimode) {
-				ret = pinctrl_select_state(ts_data->pinctrl,
-							   ts_data->pinctrl_state_spimode);
-				if (ret)
-					FTS_ERROR("Set pinctrl_spi_mode error:%d", ret);
-			}
-			if (ts_data->pinctrl && ts_data->pinctrl_state_cs_spimode) {
-				ret = pinctrl_select_state(ts_data->pinctrl,
-							   ts_data->pinctrl_state_cs_spimode);
-				if (ret)
-					FTS_ERROR("Set pinctrl_cs_spi_mode error:%d", ret);
+					FTS_ERROR("enable avdd regulator failed,ret=%d", ret);	/* L1969 */
 				else
-					FTS_INFO("Set pinctrl_cs_spi_mode sucesses.");
+					FTS_INFO("successs to enable avdd");			/* L1971 */
 			}
-			ts_data->power_disabled = false;
-		}
-	} else {
-		if (!ts_data->power_disabled) {
-			FTS_DEBUG("regulator disable !");
-			// for Preventing AVDD overvoltage during RST low
-			fts_write_reg(SET_ID_G_HOST_RST_FLAG, 0x01);
-			msleep(20);
-			gpio_direction_output(ts_data->pdata->reset_gpio, 0);
-			msleep(1);
-			/* blob simplify 同形：disable 拉低 avdd GPIO */
 			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
 				struct gpio_desc *avdd_desc =
 					gpio_to_desc(ts_data->pdata->avdd_gpio);
 
 				if (avdd_desc)
-					gpiod_direction_output_raw(avdd_desc, 0);
+					gpiod_direction_output_raw(avdd_desc, 1);
 			}
-			if (!IS_ERR_OR_NULL(ts_data->avdd)) {
-				ret = regulator_disable(ts_data->avdd);
+			usleep_range(3000, 3100);		/* blob usleep_range_state(3000,3100,2) */
+			if (!IS_ERR_OR_NULL(ts_data->iovdd)) {
+				ret = regulator_enable(ts_data->iovdd);
 				if (ret)
-					FTS_ERROR("disable avdd regulator failed,ret=%d", ret);
+					FTS_ERROR("enable iovdd regulator failed,ret=%d", ret);	/* L1981 */
+				else
+					FTS_INFO("successs to enable iovdd");			/* L1983 */
+			} else {
+				/* blob 0x6cf8：iovdd 指针为空/err 时的 else 打印（L1986） */
+				FTS_ERROR("failed to get iovdd regulator");
 			}
-			if (ts_data->pinctrl && ts_data->pinctrl_dvdd_disable) {
-				ret = pinctrl_select_state(ts_data->pinctrl, ts_data->pinctrl_dvdd_disable);
-				if (ret) {
-					FTS_ERROR("%s: Failed to disable dvdd, error= %d\n",
-							__func__, ret);
-				} else
-					FTS_INFO("%s: successs to disable dvdd\n", __func__);
-			}
+			ts_data->power_disabled = false;
+		}
+	} else {
+		if (!ts_data->power_disabled) {
 			if (!IS_ERR_OR_NULL(ts_data->iovdd)) {
 				ret = regulator_disable(ts_data->iovdd);
 				if (ret)
-					FTS_ERROR("disable iovdd regulator failed,ret=%d", ret);
-			}
-			if (!IS_ERR_OR_NULL(ts_data->iovdd_source)) {
-				ret = regulator_disable(ts_data->iovdd_source);
-				if (ret)
-					FTS_ERROR("disable iovdd_source regulator failed,ret=%d", ret);
-			}
-			if (!IS_ERR_OR_NULL(ts_data->avdd_source)) {
-				ret = regulator_disable(ts_data->avdd_source);
-				if (ret)
-					FTS_ERROR("disable avdd_source regulator failed,ret=%d", ret);
-			}
-			/* A-78 blob 同形：disable 尾部把 CS 交还 GPIO（pmx_gt_cs_gpio_mode） */
-			if (ts_data->pinctrl && ts_data->pinctrl_state_cs_gpiomode) {
-				ret = pinctrl_select_state(ts_data->pinctrl,
-							   ts_data->pinctrl_state_cs_gpiomode);
-				if (ret)
-					FTS_ERROR("Set pinctrl_cs_gpio_mode error:%d", ret);
+					FTS_ERROR("disable iovdd regulator failed,ret=%d", ret);	/* L1995 */
 				else
-					FTS_INFO("Set pinctrl_cs_gpio_mode sucesses.");
+					FTS_INFO("%s: successs to disable iovdd", __func__);	/* L1997 */
+			}
+			usleep_range(3000, 3100);
+			if (!IS_ERR_OR_NULL(ts_data->avdd)) {
+				ret = regulator_disable(ts_data->avdd);
+				if (ret)
+					FTS_ERROR("disable avdd regulator failed,ret=%d", ret);	/* L2007 */
+				else
+					FTS_INFO("successs to disable avdd");			/* L2009 */
+			}
+			if (gpio_is_valid(ts_data->pdata->avdd_gpio)) {
+				struct gpio_desc *avdd_desc =
+					gpio_to_desc(ts_data->pdata->avdd_gpio);
+
+				if (avdd_desc) {
+					gpiod_direction_output_raw(avdd_desc, 0);
+					FTS_INFO("disable avdd gpio");			/* L2011 */
+				}
 			}
 			ts_data->power_disabled = true;
 		}
 	}
 	FTS_FUNC_EXIT();
+	return ret;
+}
+
+/* _b581：A-74③／续① —— blob fts_power_source_ctrl (0x9850, 240B) 逐点还原：
+ *   enable : FTS_INFO("regulator enable !")(L2026) -> reset_gpio=0 ->
+ *            usleep(2000,2100) -> simplify(ENABLE)(0x98c0) -> usleep(500,510) ->
+ *            pinctrl cs_spi_mode(+0xaf8/+0xb38, 失败复位 ret 为 0)(L2036/2038)
+ *   disable: write_reg(SET_ID_G_HOST_RST_FLAG=0xB6, 1) + msleep(20)【无条件，先于
+ *            power_disabled 判定】-> if(!power_disabled): FTS_INFO("regulator
+ *            disable !")(L2047) -> reset_gpio=0 -> usleep(2000,2100) ->
+ *            pinctrl cs_gpio_mode(+0xaf8/+0xb30)(L2055/2057) -> simplify(DISABLE)
+ *            （返回值不复用，函数返回 cs 段的 ret）
+ * 树侧原实现把 enable/disable 链全部内联并多接 dvdd pinctrl 与 *_source 稳压器；
+ * 按 blob 收口后本函数 print 数=8、pinctrl_select_state=2、usleep_range_state=3。 */
+static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
+{
+	int ret = 0;
+
+	FTS_FUNC_ENTER();					/* blob L2023 */
+	if (enable) {
+		if (ts_data->power_disabled) {
+			FTS_INFO("regulator enable !");		/* L2026 */
+			gpio_direction_output(ts_data->pdata->reset_gpio, 0);
+			usleep_range(2000, 2100);
+			ret = fts_power_source_ctrl_simplify(ts_data, ENABLE);
+			usleep_range(500, 510);
+			if (ts_data->pinctrl && ts_data->pinctrl_state_cs_spimode) {
+				ret = pinctrl_select_state(ts_data->pinctrl,
+							   ts_data->pinctrl_state_cs_spimode);
+				if (ret < 0)
+					FTS_ERROR("Set pinctrl_cs_spi_mode error:%d", ret);	/* L2036 */
+				else
+					FTS_INFO("Set pinctrl_cs_spi_mode sucesses.");		/* L2038 */
+			} else {
+				ret = 0;
+			}
+		} else {
+			ret = 0;
+		}
+	} else {
+		/* blob 0x9934：disable 先无条件写 RST_FLAG 并 msleep(20)（返回值不判） */
+		fts_write_reg(SET_ID_G_HOST_RST_FLAG, 0x01);
+		msleep(20);
+		if (!ts_data->power_disabled) {
+			FTS_INFO("regulator disable !");	/* L2047 */
+			gpio_direction_output(ts_data->pdata->reset_gpio, 0);
+			usleep_range(2000, 2100);
+			if (ts_data->pinctrl && ts_data->pinctrl_state_cs_gpiomode) {
+				ret = pinctrl_select_state(ts_data->pinctrl,
+							   ts_data->pinctrl_state_cs_gpiomode);
+				if (ret < 0)
+					FTS_ERROR("Set pinctrl_cs_gpio_mode error:%d", ret);	/* L2055 */
+				else
+					FTS_INFO("Set pinctrl_cs_gpio_mode sucesses.");		/* L2057 */
+			} else {
+				ret = 0;
+			}
+			fts_power_source_ctrl_simplify(ts_data, DISABLE);
+		} else {
+			ret = 0;
+		}
+	}
+	FTS_FUNC_EXIT();					/* blob L2064 */
 	return ret;
 }
 
@@ -2160,93 +2162,51 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 static int fts_power_source_init(struct fts_ts_data *ts_data)
 {
     int ret = 0;
-    struct fts_ts_platform_data *pdata = ts_data->pdata;
 
     FTS_FUNC_ENTER();
-    /* avdd */
-    if (pdata->avdd_reg_name != NULL && *pdata->avdd_reg_name != 0) {
-        ts_data->avdd = regulator_get(ts_data->dev, pdata->avdd_reg_name);
-        if (IS_ERR_OR_NULL(ts_data->avdd)) {
-            ret = PTR_ERR(ts_data->avdd);
+    /* _b581：A-74③ 全形复核 —— blob fts_power_source_init (0x8dd4) 只用两个字面量
+     * 稳压器名：regulator_get(dev, "avdd")（0x8e00 直接取 .rodata 串，非 pdata 成员）
+     * 与 regulator_get(dev, "iovdd")（0x8e90）。6.6 出厂 dmesg 互证：
+     *   [FTS_TS_I][fts_parse_dt:2328]: iovdd name from dt: iovdd_focal
+     *   focaltech_ts spi1.0: supply avdd not found, using dummy regulator
+     * （即运行期用的就是字面量 "avdd"；"iovdd" 命中 DTB 同节点的 iovdd-supply=
+     *  &mt6368_vtp，故无 dummy 告警）。blob 无 iovdd_source/avdd_source 参与
+     * （regulator_* 各 2 次），树侧同步删除。 */
+    ts_data->avdd = regulator_get(ts_data->dev, "avdd");
+    if (IS_ERR_OR_NULL(ts_data->avdd)) {
+        ret = PTR_ERR(ts_data->avdd);
+        ts_data->avdd = NULL;
+        FTS_ERROR("get avdd regulator failed,ret=%d", ret);
+        return ret;
+    }
+
+    if (regulator_count_voltages(ts_data->avdd) > 0) {
+        ret = regulator_set_voltage(ts_data->avdd, FTS_VTG_MIN_UV,
+                                    FTS_VTG_MAX_UV);
+        if (ret) {
+            FTS_ERROR("avdd regulator set_vtg failed ret=%d", ret);
+            regulator_put(ts_data->avdd);
             ts_data->avdd = NULL;
-            FTS_ERROR("get avdd regulator failed,ret=%d", ret);
             return ret;
         }
-
-        if (regulator_count_voltages(ts_data->avdd) > 0) {
-            ret = regulator_set_voltage(ts_data->avdd, FTS_VTG_MIN_UV,
-                                        FTS_VTG_MAX_UV);
-            if (ret) {
-                FTS_ERROR("avdd regulator set_vtg failed ret=%d", ret);
-                regulator_put(ts_data->avdd);
-                ts_data->avdd = NULL;
-                return ret;
-            }
-        }
     }
-    /* iovdd */
-    if (pdata->iovdd_reg_name != NULL && *pdata->iovdd_reg_name != 0) {
-        ts_data->iovdd = regulator_get(ts_data->dev, pdata->iovdd_reg_name);
-        if (IS_ERR_OR_NULL(ts_data->iovdd)) {
-            ret = PTR_ERR(ts_data->iovdd);
+
+    ts_data->iovdd = regulator_get(ts_data->dev, "iovdd");
+    if (IS_ERR_OR_NULL(ts_data->iovdd)) {
+        ret = PTR_ERR(ts_data->iovdd);
+        ts_data->iovdd = NULL;
+        FTS_ERROR("get iovdd regulator failed,ret=%d", ret);
+        return ret;
+    }
+
+    if (regulator_count_voltages(ts_data->iovdd) > 0) {
+        ret = regulator_set_voltage(ts_data->iovdd, FTS_I2C_VTG_MIN_UV,
+                                    FTS_I2C_VTG_MAX_UV);
+        if (ret) {
+            FTS_ERROR("iovdd regulator set_vtg failed ret=%d", ret);
+            regulator_put(ts_data->iovdd);
             ts_data->iovdd = NULL;
-            FTS_ERROR("get iovdd regulator failed,ret=%d", ret);
             return ret;
-        }
-
-        if (regulator_count_voltages(ts_data->iovdd) > 0) {
-            ret = regulator_set_voltage(ts_data->iovdd, FTS_I2C_VTG_MIN_UV,
-                                        FTS_I2C_VTG_MAX_UV);
-            if (ret) {
-                FTS_ERROR("iovdd regulator set_vtg failed ret=%d", ret);
-                regulator_put(ts_data->iovdd);
-                ts_data->iovdd = NULL;
-                return ret;
-            }
-        }
-    }
-
-    /* front supply for iovdd, not nessesary */
-    if (pdata->iovdd_source_reg_name != NULL && *pdata->iovdd_source_reg_name != 0) {
-        ts_data->iovdd_source = regulator_get(ts_data->dev, pdata->iovdd_source_reg_name);
-        if (IS_ERR_OR_NULL(ts_data->iovdd_source)) {
-            ret = PTR_ERR(ts_data->iovdd_source);
-            FTS_ERROR("get iovdd_source regulator failed,ret=%d", ret);
-            ts_data->iovdd_source = NULL;
-            return ret;
-        }
-
-        if (regulator_count_voltages(ts_data->iovdd_source) > 0) {
-            ret = regulator_set_voltage(ts_data->iovdd_source, 2704000,
-                                        3296000);
-            if (ret) {
-                FTS_ERROR("iovdd_source regulator set_vtg failed ret=%d", ret);
-                regulator_put(ts_data->iovdd_source);
-                ts_data->iovdd_source = NULL;
-                return ret;
-            }
-        }
-    }
-
-	/* front supply for avdd, not nessesary */
-    if (pdata->avdd_source_reg_name != NULL && *pdata->avdd_source_reg_name != 0) {
-        ts_data->avdd_source = regulator_get(ts_data->dev, pdata->avdd_source_reg_name);
-        if (IS_ERR_OR_NULL(ts_data->avdd_source)) {
-            ret = PTR_ERR(ts_data->avdd_source);
-            FTS_ERROR("get avdd_source regulator failed,ret=%d", ret);
-            ts_data->avdd_source = NULL;
-            return ret;
-        }
-
-        if (regulator_count_voltages(ts_data->avdd_source) > 0) {
-            ret = regulator_set_voltage(ts_data->avdd_source, 3400000,
-                                        3400000);
-            if (ret) {
-                FTS_ERROR("avdd_source regulator set_vtg failed ret=%d", ret);
-                regulator_put(ts_data->avdd_source);
-                ts_data->avdd_source = NULL;
-                return ret;
-            }
         }
     }
 
@@ -2266,13 +2226,22 @@ static int fts_power_source_init(struct fts_ts_data *ts_data)
     return ret;
 }
 
-static int fts_power_source_exit(struct fts_ts_data *ts_data)
+/* _b581：A-74④ 续行 —— blob fts_power_source_exit (0x9744) 是 2 形参
+ * (ts_data, flag)：pinctrl release 段后按 flag 分派 —— flag!=0 → fts_power_source_ctrl
+ * (DISABLE)（全链：RST_FLAG/msleep/reset gpio/cs pinctrl），flag==0 →
+ * fts_power_source_ctrl_simplify(DISABLE)（只动稳压器与 avdd-gpio）。
+ * blob 调用点：fts_ts_probe +0x87a0 w1=1（probe 失败路径）、fts_ts_remove +0x8be8
+ * w1=0（remove 路径），树侧同步补 flag。 */
+static int fts_power_source_exit(struct fts_ts_data *ts_data, int flag)
 {
 #if FTS_PINCTRL_EN
     fts_pinctrl_select_release(ts_data);
 #endif
 
-    fts_power_source_ctrl(ts_data, DISABLE);
+    if (flag)
+        fts_power_source_ctrl(ts_data, DISABLE);
+    else
+        fts_power_source_ctrl_simplify(ts_data, DISABLE);
 
     if (!IS_ERR_OR_NULL(ts_data->avdd)) {
         if (regulator_count_voltages(ts_data->avdd) > 0)
@@ -2284,18 +2253,6 @@ static int fts_power_source_exit(struct fts_ts_data *ts_data)
         if (regulator_count_voltages(ts_data->iovdd) > 0)
             regulator_set_voltage(ts_data->iovdd, 0, FTS_I2C_VTG_MAX_UV);
         regulator_put(ts_data->iovdd);
-    }
-
-    if (!IS_ERR_OR_NULL(ts_data->iovdd_source)) {
-        if (regulator_count_voltages(ts_data->iovdd_source) > 0)
-            regulator_set_voltage(ts_data->iovdd_source, 0, FTS_VTG_MAX_UV);
-        regulator_put(ts_data->iovdd_source);
-    }
-
-    if (!IS_ERR_OR_NULL(ts_data->avdd_source)) {
-        if (regulator_count_voltages(ts_data->avdd_source) > 0)
-            regulator_set_voltage(ts_data->avdd_source, 0, 3400000);
-        regulator_put(ts_data->avdd_source);
     }
 
     return 0;
@@ -2439,43 +2396,10 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
                  pdata->key_x_coords[2], pdata->key_y_coords[2]);
     }
 
-    /* regulator info */
-    ret = of_property_read_string(np, "focaltech,iovdd_source-name", &name);
-    if (ret < 0) {
-        FTS_ERROR("focaltech,iovdd_source-name undefined");
-        pdata->iovdd_source_reg_name = NULL;
-    } else
-        pdata->iovdd_source_reg_name = name;
-
-    ret = of_property_read_string(np, "focaltech,avdd_source-name", &name);
-    if (ret < 0) {
-        FTS_ERROR("focaltech,avdd_source-name undefined");
-        pdata->avdd_source_reg_name = NULL;
-    } else
-        pdata->avdd_source_reg_name = name;
-
-    /* blob 同形：avdd 由 GPIO 承重，出厂 parse_dt 先读 focaltech,avdd-gpio 再读 iovdd name */
-    pdata->avdd_gpio = of_get_named_gpio(np, "focaltech,avdd-gpio", 0);
-    if (gpio_is_valid(pdata->avdd_gpio))
-        FTS_INFO("get avdd-gpio[%d] from dt", pdata->avdd_gpio);
-    else
-        FTS_ERROR("can't find avdd-gpio, use other power supply");
-
-    ret = of_property_read_string(np, "focaltech,iovdd-name", &name);
-    if (ret < 0) {
-        FTS_ERROR("focaltech,iovdd-name undefined");
-        pdata->iovdd_reg_name = NULL;
-    } else
-        pdata->iovdd_reg_name = name;
-
-    ret = of_property_read_string(np, "focaltech,avdd-name", &name);
-    if (ret < 0) {
-        FTS_INFO("focaltech,avdd-name undefined, fallback to dummy avdd regulator");
-        pdata->avdd_reg_name = "avdd";
-    } else
-        pdata->avdd_reg_name = name;
-
-    /* reset, irq gpio info */
+    /* _b581：A-74④ 电源链组织对齐 —— blob fts_ts_probe 内联 fts_parse_dt 的调用
+     * 次序为 reset-gpio(0x79b8) → irq-gpio(0x79d0) → avdd-gpio(0x79e8) →
+     * avdd-name(0x7a3c) → iovdd-name(0x7aa8)；blob 全 ko 无 iovdd_source/avdd_source
+     * 属性读取（of_property_read_string 仅 2 处），故删去树侧 2 个 *_source-name 读。 */
     pdata->reset_gpio = of_get_named_gpio(np, "focaltech,reset-gpio", 0);
     if (pdata->reset_gpio < 0)
         FTS_ERROR("Unable to get reset_gpio");
@@ -2483,8 +2407,27 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
     pdata->irq_gpio = of_get_named_gpio(np, "focaltech,irq-gpio", 0);
     if (pdata->irq_gpio < 0)
         FTS_ERROR("Unable to get irq_gpio");
-	else
-		pdata->irq_gpio_flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
+    /* _b581：blob parse_dt 不写 pdata->irq_gpio_flags（blob 只在 fts_irq_registration
+     * 0x96e0 写 0x2002），故此处不再赋值以免与 blob 面不一致。 */
+
+    /* blob 同形：avdd 由 GPIO 承重，出厂 parse_dt 先读 focaltech,avdd-gpio 再读 name */
+    pdata->avdd_gpio = of_get_named_gpio(np, "focaltech,avdd-gpio", 0);
+    if (gpio_is_valid(pdata->avdd_gpio))
+        FTS_INFO("get avdd-gpio[%d] from dt", pdata->avdd_gpio);
+    else
+        FTS_ERROR("can't find avdd-gpio, use other power supply");
+
+    ret = of_property_read_string(np, "focaltech,avdd-name", &name);
+    if (ret == 0)
+        FTS_INFO("avdd name from dt: %s", name);	/* blob L2322 串（0xf694） */
+    pdata->avdd_reg_name = (ret == 0) ? name : "avdd";
+    /* 注：blob 该成员是 pdata 内 char[40]（0x7a7c 长度上限 0x27 + 0x7a90 strncpy）；
+     * 树侧保留 const char* 语义等价（值仅用于本行打印，init 用字面量）。 */
+
+    ret = of_property_read_string(np, "focaltech,iovdd-name", &name);
+    if (ret == 0)
+        FTS_INFO("iovdd name from dt: %s", name);	/* blob L2328 串（0x8bb3） */
+    pdata->iovdd_reg_name = (ret == 0) ? name : "iovdd";
 
     ret = of_property_read_u32(np, "focaltech,super-resolution-factors", &temp_val);
     if (ret < 0) {
@@ -2602,7 +2545,11 @@ hardware_operation_t hardware_operation;
 hardware_param_t hardware_param;
 /*static struct xiaomi_touch_interface xiaomi_touch_interfaces;*/
 
-static void fts_update_gesture_state(struct fts_ts_data *ts_data, int bit, bool enable)
+/* _b581：A-74② 计数对齐——blob 该函数为独立符号、且 fts_ic_switch_mode 内正好
+ * 2 处 bl 直调（AOD / DoubleTap，0x3e84 / 0x3ee0），编译器未内联；树侧 2 处调用点
+ * 会被 LLVM 内联（改前 5 处调用点全部内联成 .text+0x5c34 副本），故显式禁止内联，
+ * 使调用面与 blob 一致（blob 该函数体仅 2 条 _printk，本就「小函数不内联」的形态）。 */
+static noinline void fts_update_gesture_state(struct fts_ts_data *ts_data, int bit, bool enable)
 {
 	u8 cmd_shift = 0;
 	if (bit == GESTURE_DOUBLETAP)
@@ -3144,7 +3091,6 @@ static void fts_ic_switch_mode(u8 _gesture_type)
 	struct fts_ts_data *ts_data = fts_data;
 	int value = 0;
 	static u8 last_gesture_type = 0;
-	static u8 last_sensor_tap_status = 0;
 
 #if IS_ENABLED(CONFIG_MITEE_TUI_SUPPORT)
 	if (atomic_read(&ts_data->tui_process)) {
@@ -3164,85 +3110,54 @@ static void fts_ic_switch_mode(u8 _gesture_type)
 		fts_scp_tp_ipi_send(5, scp_gesture_type,
 				driver_get_touch_mode_common(TOUCH_ID, Touch_Nonui_Mode), 0);
 	}
-	ts_data->fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10);
-	ts_data->aod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_11);
-	ts_data->doubletap_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_14);
-	ts_data->sensor_tap_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_44);
-	FTS_INFO("fod_status:%d, doubletap_status:%d, aod_status:%d, sensor_tap_status:%d", ts_data->fod_status, ts_data->doubletap_status, ts_data->aod_status, ts_data->sensor_tap_status);
-
+	/* _b581：A-74② 结构代差收口 —— blob 0x3db0..0x4150 为「逐模式取值驱动」形态：
+	 * 每个手势位各自取门控值(AOD=DATA_MODE_11 / DoubleClick=DATA_MODE_14 /
+	 * FOD=DATA_MODE_10)，仅在状态位翻转时更新手势位；无 sensor_tap(WEAK_DOUBLETAP)
+	 * 分支、无 suspended 态分支（睡眠面由 resume/suspend 承担，blob 该函数零
+	 * fts_recover_* 调用）。取门控值发生的次数与 blob 一致（4 次：17/11/14/10）。 */
 	if ((_gesture_type & GESTURE_SINGLETAP_EVENT) || (last_gesture_type & GESTURE_SINGLETAP_EVENT)) { /* DATA_MODE_11 */
-		value = _gesture_type & GESTURE_SINGLETAP_EVENT;
+		value = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_11);
+		FTS_INFO("Mode:AOD  aod_status = %d", value);	/* blob L2410 */
 		if ((_gesture_type & GESTURE_SINGLETAP_EVENT) ^ (last_gesture_type & GESTURE_SINGLETAP_EVENT)) {/* when aod gesture state change */
-			FTS_DEBUG("need to update aod status, value = %d", value);
+			FTS_DEBUG("need to update aod status");	/* blob L2412 */
 			fts_update_gesture_state(ts_data, GESTURE_AOD, value != 0 ? true : false);
 		}
 	}
 
 	if ((_gesture_type & GESTURE_DOUBLETAP_EVENT) || (last_gesture_type & GESTURE_DOUBLETAP_EVENT)) { /* DATA_MODE_14 */
-		value = _gesture_type & GESTURE_DOUBLETAP_EVENT;
+		value = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_14);
+		FTS_INFO("Mode:DoubleClick  double_status = %d", value);	/* blob L2419 */
 		if ((_gesture_type & GESTURE_DOUBLETAP_EVENT) ^ (last_gesture_type & GESTURE_DOUBLETAP_EVENT)) {/* when double tap gesture state change */
-			FTS_DEBUG("need to update double tap status");
+			FTS_DEBUG("need to update double tap status");		/* blob L2422 */
 			fts_update_gesture_state(fts_data, GESTURE_DOUBLETAP, value != 0 ? true : false);
-			/* when doubletap turn off, turn off sehsor tap */
-			if (ts_data->sensor_tap_status && value == 0) {
-				FTS_INFO("turn off sensor tap status");
-				ts_data->sensor_tap_status = 0;
-				fts_update_gesture_state(fts_data, GESTURE_WEAK_DOUBLETAP, false);
-				last_sensor_tap_status = ts_data->sensor_tap_status;
-			}
-		}
-	}
-
-	if (ts_data->sensor_tap_status ^ last_sensor_tap_status) {/* when sensor tap gesture state change */
-		FTS_DEBUG("need to update sensor tap status");
-		/* only enable sensor tap when doubletap enabled */
-		if (ts_data->doubletap_status) {
-			fts_update_gesture_state(fts_data, GESTURE_WEAK_DOUBLETAP, ts_data->sensor_tap_status != 0 ? true : false);
-			last_sensor_tap_status = ts_data->sensor_tap_status;
-		} else {
-			if (!ts_data->sensor_tap_status) {
-				fts_update_gesture_state(fts_data, GESTURE_WEAK_DOUBLETAP, false);
-				last_sensor_tap_status = ts_data->sensor_tap_status;
-			} else {
-				FTS_INFO("skip update sensor tap status");
-				return;
-			}
 		}
 	}
 
 	if ((_gesture_type & GESTURE_LONGPRESS_EVENT) || (last_gesture_type & GESTURE_LONGPRESS_EVENT)) { /* Touch_Fod_Mode */
-		value = _gesture_type & GESTURE_LONGPRESS_EVENT;
-		if ((_gesture_type & GESTURE_LONGPRESS_EVENT) ^ (last_gesture_type & GESTURE_LONGPRESS_EVENT)) {/* when FOD state change */
-			FTS_DEBUG("need to update fod status");
-			fts_update_gesture_state(ts_data, GESTURE_FOD, value != 0 ? true : false);
-		}
-	}
-
-	/* change IC status when suspended */
-	if (ts_data->suspended) {
-		// sleep -> gesture
-		if (ts_data->poweroff_on_sleep && ts_data->gesture_support) {
-			fts_recover_gesture_from_sleep(ts_data);
-			ts_data->poweroff_on_sleep = false;
-			/* _b573 scp 联动：blob 0x3fc8-0x3ff4 = 从睡眠恢复手势后未关防误触且
-			 * param0∈{2,4} 时切 scp 手势通道 */
-			if (!fts_scp_tp_mistouch_close &&
-			    (fts_scp_tp_param.param0 == 2 || fts_scp_tp_param.param0 == 4)) {
-				FTS_INFO("sleep_to_gesture, switch to scp");
-				fts_scp_tp_switch(1);
-			}
-		} else if (!ts_data->poweroff_on_sleep && !ts_data->gesture_support) {
-		// gesture -> sleep
-			fts_recover_sleep_from_gesture(ts_data);
-			ts_data->poweroff_on_sleep = true;
-		} else if (!ts_data->poweroff_on_sleep && ts_data->gesture_support) {
-		// gesture -> gesture
-			fts_write_reg(FTS_GESTURE_CTRL, ts_data->gesture_cmd);
-			if (ts_data->fod_status) {
-				if (ts_data->gesture_status & (1 << GESTURE_FOD))
-					fts_fod_recovery();
-				else
-					fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, false);
+		value = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10);
+		FTS_INFO("Mode:FOD  fod_status = %d", value);	/* blob L2429 */
+		/* blob 0x3f0c：仅本拍按下（cur bit0）才动 FOD 电源/恢复面 */
+		if (_gesture_type & GESTURE_LONGPRESS_EVENT) {
+			ts_data->gesture_support = ENABLE;	/* blob 0x3f1c strb #1 -> +0x2e4 */
+			if (!ts_data->finger_in_fod && !value) {
+				/* blob 0x3f28：finger 不在 FOD 且门控值 0 -> 关 FOD 寄存器 */
+				fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, false);
+			} else if (value == 1) {
+				/* blob 0x3f4c：值==1 且处于 poweroff_on_sleep -> 整机重挂
+				 * （0x3f60 起内联 fts_recover_gesture_from_sleep）+ scp 通道切换 */
+				if (ts_data->poweroff_on_sleep) {
+					fts_recover_gesture_from_sleep(ts_data);
+					ts_data->poweroff_on_sleep = false;
+					if (!fts_scp_tp_mistouch_close &&
+					    (fts_scp_tp_param.param0 == 2 || fts_scp_tp_param.param0 == 4)) {
+						FTS_INFO("sleep_to_gesture, switch to scp");	/* blob L2447 */
+						fts_scp_tp_switch(1);
+					}
+				} else {
+					fts_fod_recovery();	/* blob 0x3ffc */
+				}
+			} else if (value == 2) {
+				fts_fod_recovery();		/* blob 0x4000 */
 			}
 		}
 	}
@@ -3250,157 +3165,84 @@ static void fts_ic_switch_mode(u8 _gesture_type)
 	last_gesture_type = _gesture_type;
 }
 
+/*
+ * _b581：A-74 续行② 接线 —— blob fts_game_mode_update (0x4154..0x44a0) 为「薄封装」：
+ *   1) !mode_update_flag            -> FTS_INFO("no need update mode value") 直接返回（L2465）
+ *   2) enable_touch_raw(+0xc88) 置位 -> thp SET_GAME_MODE_EN_TYPE(0x99) 单字 + 打印
+ *      （L2473/2474）-> thp SET_REPORT_RATE_TYPE(0x13) 双字推 current_fps(+0xbf4) -> 返回
+ *   3) is_expert_mode(+0xbea) = !!(flag & (1<<DATA_MODE_6))；置位时打 "Enter Mode:Expert_Mode"
+ *      （L2485）
+ *   4) mode_value[0]==1 -> 打 "Mode:Game_Mode  Game_Mode_status = 1"（L2488）+ 内联
+ *      fts_switch_report_rate(true)：current_fps=240 + thp 0x13 双字（L2803/2818 串）
+ *      否则 current_fps=135 + thp 0x13 双字（L2803/2809 串）
+ *   5) 镜像 clamp：mode_value[0..DATA_MODE_8] -> fts_touch_mode[k][SET_CUR]（0x42c4..0x4498）
+ *   6) fts_update_touchmode_data()（0x449c，本函数唯一调用点）
+ * 树侧原 donor 实现把 C1 命令组装/0x8d/0x8c 下发内联在本函数 —— 与
+ * fts_update_touchmode_data 完全重复（该项即「未接 fts_update_touchmode_data」），
+ * 按 blob 整体收口为薄封装，避免同一次 mode 更新重复下发。
+ */
 static void fts_game_mode_update(long mode_update_flag, int mode_value[DATA_MODE_45])
 {
-	/* _b571：blob 0x42c4-0x4494 段——框架下发的 mode_value 写入驱动本地镜像
-	 * （SET_CUR 槽）并按镜像 [GET_MIN,GET_MAX] clamp */
-	{
-		int __i;
-		for (__i = 0; __i <= DATA_MODE_8 && __i < FTS_TOUCH_MODE_MAX; __i++) {
-			int __v = mode_value[__i];
-			fts_touch_mode[__i][SET_CUR_VALUE] = __v;
-			if (__v > fts_touch_mode[__i][GET_MAX_VALUE])
-				fts_touch_mode[__i][SET_CUR_VALUE] = fts_touch_mode[__i][GET_MAX_VALUE];
-			else if (__v < fts_touch_mode[__i][GET_MIN_VALUE])
-				fts_touch_mode[__i][SET_CUR_VALUE] = fts_touch_mode[__i][GET_MIN_VALUE];
-		}
-	}
-
-	int mode = 0;
-	s32 temp_value = 0;
+	int temp_value = 0;
 	int ret = 0;
-	u8 cmd[7] = {0xC1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-	int i = 0;
+	int __i;
 
 	if (!mode_update_flag) {
-		FTS_INFO("no need update mode value");
-		return;
-	}
-	if (fts_data && fts_data->suspended) {
-		FTS_INFO("tp is suspend, skip game_mode_update: mode_update_flag = %ld", mode_update_flag);
+		FTS_INFO("no need update mode value");		/* blob L2465 */
 		return;
 	}
 
-#if defined(CONFIG_PM) && FTS_PATCH_COMERR_PM
-	if (fts_data && fts_data->pm_suspend) {
-		FTS_ERROR("SYSTEM is in suspend mode, don't set touch mode data");
-		return;
-	}
-#endif
-
-	pm_stay_awake(fts_data->dev);
-	mutex_lock(&fts_data->cmd_update_mutex);
-
-
-#ifdef TOUCH_THP_SUPPORT
-	if (fts_data->enable_touch_raw) {
-		temp_value = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_0);
-		FTS_INFO("game mode status: %s   %d", temp_value ? "ON" : "OFF", temp_value);
+	if (fts_data->enable_touch_raw) {			/* blob ldrb [ts+0xc88] */
+		temp_value = mode_value[DATA_MODE_0];
 		ret = fts_thp_ic_write_interfaces(SET_GAME_MODE_EN_TYPE, &temp_value, 1);
-		if (ret < 0) {
-			FTS_ERROR("failed to send game mode: %d, addr:%d, ret=%d", temp_value, SET_GAME_MODE_EN_TYPE, ret);
-		}
-		mutex_unlock(&fts_data->cmd_update_mutex);
-		pm_relax(fts_data->dev);
+		if (ret < 0)
+			FTS_ERROR("failed to send game mode: %d", temp_value);	/* L2474 */
+		else
+			FTS_INFO("game mode status: %s   %d",
+				 temp_value ? "ON" : "OFF", temp_value);	/* L2473 */
+		fts_thp_ic_write_interfaces(SET_REPORT_RATE_TYPE,
+					    &fts_data->current_fps, 2);
 		return;
 	}
-#endif
 
-	// addr:0xC1, cmd 7, mode 0~6
-	for (i = 0; i <= DATA_MODE_6; i++) {
-		switch (i) {
-		case DATA_MODE_0:
-			temp_value = mode_value[DATA_MODE_0];
-			cmd[1] = (u8)(temp_value);
-			FTS_INFO("DATA_MODE_0, value=%d, cmd=%d", temp_value, cmd[1]);
-			break;
-		case DATA_MODE_1:
-			temp_value = mode_value[DATA_MODE_1];
-			cmd[2] = (u8)(temp_value ? 30 : 3);
-			FTS_INFO("DATA_MODE_1, value=%d, cmd=%d", temp_value, cmd[2]);
-			break;
-		case DATA_MODE_2:
-			temp_value = mode_value[DATA_MODE_2];
-			cmd[4] = (u8)(*(fts_data->pdata->touch_range_array + temp_value - 1));
-			FTS_INFO("DATA_MODE_2, value=%d, cmd=%d", temp_value, cmd[4]);
-			break;
-		case DATA_MODE_3:
-			temp_value = mode_value[DATA_MODE_3];
-			cmd[3] = (u8)(*(fts_data->pdata->touch_range_array + temp_value - 1));
-			FTS_INFO("DATA_MODE_3, value=%d, cmd=%d", temp_value, cmd[3]);
-			break;
-		case DATA_MODE_4:
-			temp_value = mode_value[DATA_MODE_4];
-			cmd[5] = (u8)(*(fts_data->pdata->touch_range_array + temp_value - 1));
-			FTS_INFO("DATA_MODE_4, value=%d, cmd=%d", temp_value, cmd[5]);
-			break;
-		case DATA_MODE_5:
-			temp_value = mode_value[DATA_MODE_5];
-			cmd[6] = (u8)(*(fts_data->pdata->touch_range_array + temp_value - 1));
-			FTS_INFO("DATA_MODE_5, value=%d, cmd=%d", temp_value, cmd[6]);
-			break;
-		case DATA_MODE_6:
-			temp_value = mode_value[DATA_MODE_0];
-			cmd[1] = (u8)(temp_value);
-			temp_value = mode_value[DATA_MODE_1];
-			cmd[2] = (u8)(temp_value ? 30 : 3);
-			if (mode_update_flag & (1 << DATA_MODE_6)) {
-				temp_value = mode_value[DATA_MODE_6];
-				cmd[3] = (u8)(*(fts_data->pdata->touch_expert_array + (temp_value - 1) * 4));
-				cmd[4] = (u8)(*(fts_data->pdata->touch_expert_array + (temp_value - 1) * 4 + 1));
-				cmd[5] = (u8)(*(fts_data->pdata->touch_expert_array + (temp_value - 1) * 4 + 2));
-				cmd[6] = (u8)(*(fts_data->pdata->touch_expert_array + (temp_value - 1) * 4 + 3));
-				FTS_INFO("DATA_MODE_6, value=%d, cmd=%*ph", temp_value, 7, cmd);
-			}
-			break;
-		default:
-			FTS_ERROR("not support mode, mode(%d)", i);
-			break;
-		}
-	}
-	ret = fts_write(cmd, sizeof(cmd));
-	if (ret < 0) {
-		FTS_ERROR("write game mode parameter failed\n");
+	fts_data->is_expert_mode =
+		(mode_update_flag & (1L << DATA_MODE_6)) ? true : false;	/* blob +0xbea */
+	if (fts_data->is_expert_mode)
+		FTS_INFO("Enter Mode:Expert_Mode");		/* blob L2485 */
+
+	if (mode_value[DATA_MODE_0] == 1) {
+		FTS_INFO("Mode:Game_Mode  Game_Mode_status = 1");	/* blob L2488 */
+		/* blob 0x4244..0x4288 = 内联 fts_switch_report_rate(ts_data, true) */
+		fts_data->current_fps = 240;			/* blob 0xbf4 */
+		FTS_INFO("on: %d, set Report_Rate_status:%s", 1, "240HZ");	/* L2803 */
+		ret = fts_thp_ic_write_interfaces(SET_REPORT_RATE_TYPE,
+						  &fts_data->current_fps, 2);
+		if (ret < 0)
+			FTS_ERROR("failed send report rate cmd to switch Report_Rate to 240HZ, ret=%d",
+				  ret);				/* L2818 */
 	} else {
-		FTS_INFO("update game mode cmd: %02X,%02X,%02X,%02X,%02X,%02X,%02X",
-				cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]);
-	}
-	// addr:0x8d, mode:7
-	if (mode_update_flag & (1 << DATA_MODE_7)) {
-		temp_value = mode_value[DATA_MODE_7];
-		ret = fts_write_reg(FTS_REG_EDGE_FILTER_LEVEL, temp_value);
-		if (ret < 0) {
-			FTS_ERROR("write DATA_MODE_7 mode:%d reg failed", mode);
-		} else {
-			FTS_INFO("write DATA_MODE_7 value: %d, addr:0x%02X",
-				temp_value, FTS_REG_EDGE_FILTER_LEVEL);
-		}
-	}
-	// addr:0x8c mode 8
-	if (mode_update_flag & (1 << DATA_MODE_8)) {
-		temp_value = mode_value[DATA_MODE_8];
-		if (PANEL_ORIENTATION_DEGREE_90 == temp_value) {
-			if (!!mode_value[DATA_MODE_0])
-				temp_value = GAME_ORIENTATION_90;
-			else
-				temp_value = NORMAL_ORIENTATION_90;
-		} else if (PANEL_ORIENTATION_DEGREE_270 == temp_value) {
-			if (!!mode_value[DATA_MODE_0]) 
-				temp_value = GAME_ORIENTATION_270;
-			else
-				temp_value = NORMAL_ORIENTATION_270;
-		} else
-			temp_value = ORIENTATION_0_OR_180;
-		ret = fts_write_reg(FTS_REG_ORIENTATION, temp_value);
-		if (ret < 0) {
-			FTS_ERROR("write DATA_MODE_8 mode:%d reg failed", mode);
-		}
-		FTS_INFO("DATA_MODE_8 change to %d(addr:%02x), gamemode:%d", 
-						temp_value, FTS_REG_ORIENTATION, !!mode_value[DATA_MODE_0]);
+		fts_data->current_fps = 135;
+		FTS_INFO("on: %d, set Report_Rate_status:%s", 0, "135HZ");	/* L2803 */
+		ret = fts_thp_ic_write_interfaces(SET_REPORT_RATE_TYPE,
+						  &fts_data->current_fps, 2);
+		if (ret < 0)
+			FTS_ERROR("failed send report rate cmd to switch Report_Rate to 135HZ, ret=%d",
+				  ret);				/* L2809 */
 	}
 
-	mutex_unlock(&fts_data->cmd_update_mutex);
-	pm_relax(fts_data->dev);
+	/* blob 0x42c4..0x4498：mode_value[0..DATA_MODE_8] 写 SET_CUR 槽 + 按镜像
+	 * [GET_MIN,GET_MAX] clamp（9 组，stride 0x18） */
+	for (__i = 0; __i <= DATA_MODE_8 && __i < FTS_TOUCH_MODE_MAX; __i++) {
+		int __v = mode_value[__i];
+
+		fts_touch_mode[__i][SET_CUR_VALUE] = __v;
+		if (__v > fts_touch_mode[__i][GET_MAX_VALUE])
+			fts_touch_mode[__i][SET_CUR_VALUE] = fts_touch_mode[__i][GET_MAX_VALUE];
+		else if (__v < fts_touch_mode[__i][GET_MIN_VALUE])
+			fts_touch_mode[__i][SET_CUR_VALUE] = fts_touch_mode[__i][GET_MIN_VALUE];
+	}
+
+	fts_update_touchmode_data(fts_data);			/* blob 0x449c（唯一调用点） */
 }
 
 int fts_enable_touch_raw(int en)
@@ -3498,7 +3340,10 @@ static void fts_charger_status_recovery(struct fts_ts_data *ts_data)
 
 static void fts_game_idle_high_refresh_recovery(struct fts_ts_data *ts_data)
 {
-	if (driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_0)) {
+	/* _b581：A-74 续行② 面 —— blob 0x3e0 读 [ts_data+0xbe8]（gamemode 标志，
+	 * 由 fts_update_touchmode_data 0x58fc 写入，6.18 同址成员 gamemode_enabled），
+	 * 非 framework 判存；0x8E 的重开条件按 blob 用本地镜像标志。 */
+	if (ts_data->gamemode_enabled) {
 		FTS_DEBUG("%s, gamemode enabled, recover game_idle_high_refresh\n", __func__);
 		fts_write_reg(0x8E, true);
 	}
@@ -3526,14 +3371,7 @@ static void fts_fod_status_recovery(struct fts_ts_data *ts_data)
 	}
 }
 
-static void fts_game_mode_recovery(struct fts_ts_data *ts_data)
-{
-	/*use default value*/
-	// touch_mode[DATA_MODE_0][GET_CUR_VALUE] = touch_mode[DATA_MODE_0][GET_DEF_VALUE];
-	// touch_mode[DATA_MODE_8][GET_CUR_VALUE] = touch_mode[DATA_MODE_8][GET_DEF_VALUE];
-	// touch_mode[DATA_MODE_7][GET_CUR_VALUE] = touch_mode[DATA_MODE_7][GET_DEF_VALUE];
-	FTS_ERROR("this is null !!!!!");
-}
+/* _b581：donor 桩 fts_game_mode_recovery 已删（blob 无此符号、无调用点）。 */
 
 static void fts_init_touchmode_data(struct fts_ts_data *ts_data)
 {
@@ -4839,7 +4677,7 @@ if (ts_data->fts_tp_class == NULL) {
 err_irq_req:
 #if FTS_POWER_SOURCE_CUST_EN
 err_power_init:
-	fts_power_source_exit(ts_data);
+	fts_power_source_exit(ts_data, 1);	/* blob fts_ts_probe+0x87a0 w1=1 */
 #endif
 	if (gpio_is_valid(ts_data->pdata->reset_gpio))
 		gpio_free(ts_data->pdata->reset_gpio);
@@ -4919,7 +4757,7 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
         gpio_free(ts_data->pdata->irq_gpio);
 
 #if FTS_POWER_SOURCE_CUST_EN
-    fts_power_source_exit(ts_data);
+    fts_power_source_exit(ts_data, 0);	/* blob fts_ts_remove+0x8be8 w1=0 */
 #endif
 
     kfree_safe(ts_data->touch_buf);

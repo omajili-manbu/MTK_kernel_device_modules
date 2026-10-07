@@ -449,7 +449,10 @@ static int brl_send_cmd(struct goodix_ts_core *cd,
 			ts_debug("cmd ack data %*ph",
 				(int)sizeof(cmd_ack), cmd_ack.buf);
 			if (cmd_ack.ack == CMD_ACK_OK) {
-				usleep_range(4000, 4100);
+				/* #228（b581）blob brl_send_cmd 0x4720 b.eq → 0x47d0：
+				 * ACK OK 路径是 msleep(15)（w0=15）后 ret=0 返回，
+				 * 全函数无 usleep_range(4000,4100)；树侧 4ms 为偏离 */
+				msleep(15);
 				return 0;
 			}
 			if (cmd_ack.ack == CMD_ACK_BUSY ||
@@ -1194,8 +1197,8 @@ static void print_ic_info(struct goodix_ic_info *ic_info)
 		misc->panel_x);
 	ts_debug("panel_y:                       %d",
 		misc->panel_y);
-	ts_info("panel_max_x:                   %d", other->screen_max_x);
-	ts_info("panel_max_y:                   %d", other->screen_max_y);
+	ts_debug("panel_max_x:                   %d", other->screen_max_x);	/* #228：blob 等级 D */
+	ts_debug("panel_max_y:                   %d", other->screen_max_y);	/* #228：blob 等级 D */
 	ts_debug("mutual_rawdata_addr:           0x%04X",
 		misc->mutual_rawdata_addr);
 	ts_debug("mutual_diffdata_addr:          0x%04X",
@@ -1583,7 +1586,7 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 #endif
 			return 0;
 		} else {
-			ts_err("invalid event type: %d", event_status);
+			ts_debug("invalid event type: %d", event_status);	/* #228：blob 等级 D（levelcmp） */
 #ifdef GOODIX_DEBUG_SPI
 			TOUCH_TRACE_FRAME_CNT_END();
 #endif

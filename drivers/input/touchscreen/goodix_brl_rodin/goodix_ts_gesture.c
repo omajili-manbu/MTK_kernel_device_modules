@@ -153,7 +153,7 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 		fody = gesture_data[10] | (gesture_data[11] << 8);
 		fodx *= cd->board_data.super_resolution_factor;
 		fody *= cd->board_data.super_resolution_factor;
-		ts_info("gesture coordinate fodx: %d, fody: %d, fod_id: %d, overlay_area: %d",
+		ts_debug("gesture coordinate fodx: %d, fody: %d, fod_id: %d, overlay_area: %d",	/* #228：blob 等级 D */
 					fodx, fody, fod_id, overlay_area);
 #ifdef TYPE_B_PROTOCOL
 		input_mt_slot(cd->input_dev, fod_id);
@@ -265,8 +265,19 @@ int gsx_gesture_before_suspend(struct goodix_ts_core *cd)
 		ts_info("enter gesture mode");
 
 	cd->work_status = TP_GESTURE;
-	hw_ops->irq_enable(cd, true);
-	enable_irq_wake(cd->irq);
+	/* #228（b581）blob gsx_gesture_before_suspend @0x16c1c：
+	 *   16c90 ldrb w8,[scp_tp_mistouch_close]; 16c98 str w9(=1),[x19,#0x680]
+	 *   16c9c cbz  w8, 0x16ce0（直接 return）
+	 * → irq_enable + irq_set_irq_wake 被 goodix_scp_tp_mistouch_close **非零**
+	 *   门控（SCP 接管误触时不重复开 AP 手势中断/唤醒源），并先打
+	 *   "enable AP gesture irq"（厂商源行 309，blob .rodata.str1.1+0x1294）；
+	 *   原树无条件执行且缺该打印，按 blob 收口。
+	 *   6.18 等价：enable_irq_wake() 即 irq_set_irq_wake(irq, 1)。 */
+	if (goodix_scp_tp_mistouch_close) {
+		ts_info("enable AP gesture irq");
+		hw_ops->irq_enable(cd, true);
+		enable_irq_wake(cd->irq);
+	}
 
 	return EVT_CANCEL_SUSPEND;
 }

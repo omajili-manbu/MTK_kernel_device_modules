@@ -36,7 +36,9 @@
 
 // #define GOODIX_DEBUG_SPI
 
-#define GOODIX_DRIVER_VERSION			"gt9916-2025.8.19-01"
+/* #228（b581）blob .rodata.str1.1+0x8aa0 = "gt9916-2025.07.24-01"（rodin 变体），
+ * 原树 warsaw 值 "gt9916-2025.8.19-01" 属偏离，按 blob 收口 */
+#define GOODIX_DRIVER_VERSION			"gt9916-2025.07.24-01"
 
 #define GOODIX_CORE_DRIVER_NAME			"goodix_ts"
 #define GOODIX_PEN_DRIVER_NAME			"goodix_ts,pen"
@@ -55,16 +57,18 @@
 #define GOODIX_RETRY_5					5
 #define GOODIX_RETRY_10					10
 
-#define TS_DEFAULT_FIRMWARE			"goodix_firmware_warsaw.bin"
+/* #228（b581）blob .rodata+0x8e0 = "goodix_firmware.bin"、.rodata+0x909 =
+ * "goodix_cfg_group.bin"（blob 无 "_warsaw"/"_1" 变体串），原树 warsaw 命名
+ * 为偏离，按 blob 收口；TS_DEFAULT_FIRMWARE_1/CFG_BIN_1 为未引用宏，保留 */
+#define TS_DEFAULT_FIRMWARE			"goodix_firmware.bin"
 #define TS_DEFAULT_FIRMWARE_1			"goodix_firmware_1.bin"
-#define TS_DEFAULT_CFG_BIN 			"goodix_cfg_group_warsaw.bin"
+#define TS_DEFAULT_CFG_BIN 			"goodix_cfg_group.bin"
 #define TS_DEFAULT_CFG_BIN_1 			"goodix_cfg_group_1.bin"
 
-#ifdef CONFIG_TOUCH_FACTORY_BUILD
+/* #228（b581）blob .rodata+0x932 只含 "goodix_test_limits"（无 "_aftersale"），
+ * 且 CONFIG_TOUCH_FACTORY_BUILD/CONFIG_FACTORY_BUILD 在本构建（含 stock 6.6）
+ * 均未定义 —— 原树 #else 分支取的 "_aftersale" 是偏离，按 blob 固定该默认值 */
 #define TS_DEFAULT_LIMIT_CSV 			"goodix_test_limits"
-#else
-#define TS_DEFAULT_LIMIT_CSV 			"goodix_test_limits_aftersale"
-#endif
 
 #define GOODIX_LOCKDOWN_SIZE		8
 #define TS_LOCKDOWN_REG				0x10030

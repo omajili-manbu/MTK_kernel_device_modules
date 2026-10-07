@@ -87,7 +87,7 @@ int netlink_init(void)
 	nl_sk = netlink_kernel_create(&init_net, NETLINK_TEST, &netlink_cfg);
 
 	if (!nl_sk) {
-		LOG_ERROR("create netlink socket error\n");
+		LOG_ERROR("[Probe Failed] create netlink socket error\n");
 		return 1;
 	}
 
@@ -276,13 +276,13 @@ int get_bms_temp_common(void)
 	 * "battery"→"bms" 二级回退 + 串 "can't find bms and battery"（blob 无此串）。 */
 	battery = power_supply_get_by_name("bms");
 	if (!battery) {
-		LOG_INFO("can't find bms battery");
+		LOG_INFO("can't find bms battery\n");
 		return -INVAILD_TEMPERATURE;
 	}
 
 	ret = power_supply_get_property(battery, POWER_SUPPLY_PROP_TEMP, &prop);
 	if (ret) {
-		LOG_INFO("can't read battery temp");
+		LOG_INFO("can't read battery temp\n");
 		return -INVAILD_TEMPERATURE;
 	}
 
@@ -318,9 +318,13 @@ static int xiaomi_touch_temp_thread_func(void *data)
 		return -1;
 
 	while (!kthread_should_stop()) {
+		/* _b581-XT③：blob 0x1874-0x18c4 的 wait 条件只有一处 32 位原子读
+		 * （ldr w8,[x21,#0x2a20] ×2 处 = temp_detect_ready[0]），无 ready[1] 项；
+		 * 树侧原为 donor 的 ready[0]||ready[1]。rodin 为单面板（TOUCH_ID=0，
+		 * enable_temperature_detection_func 也只被 touch_id=0 分支触达），
+		 * 按 blob 收口为只测 ready[0]。 */
 		wait_event_interruptible(xiaomi_touch_data->temp_detect_wait_queue,
-				(atomic_read(&xiaomi_touch_data->temp_detect_ready[0]) ||
-					atomic_read(&xiaomi_touch_data->temp_detect_ready[1])));
+				atomic_read(&xiaomi_touch_data->temp_detect_ready[0]));
 			cur_temp0 = get_bms_temp_common();
 			cur_temp = (cur_temp0 + 5) / 10; // Rounding, in degrees Celsius
 			/* _b580-A74①（站点3-b/c）：blob 0x1960-0x19d4 = 单面板形态——外层只判
@@ -376,32 +380,19 @@ void enable_temperature_detection_func(s8 touch_id, bool is_resume)
 
 	if (is_resume) {
 		atomic_set(&xiaomi_touch_data->temp_detect_ready[touch_id], 1);
-		LOG_INFO("start detect temperature");
+		/* _b581-XT③：blob 该两处串为 MI_TP_D（LOG_DEBUG），树侧原为 LOG_INFO。 */
+		LOG_DEBUG("start detect temperature");
 	} else {
 		atomic_set(&xiaomi_touch_data->temp_detect_ready[touch_id], 0);
-		LOG_INFO("stop detect temperature");
+		LOG_DEBUG("stop detect temperature");
 	}
 
 	wake_up_interruptible(&xiaomi_touch_data->temp_detect_wait_queue);
 }
 
-static void set_thermal_temp_force(s8 touch_id)
-{
-	int temp0 = 0, temp = 0;
-	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(touch_id);
-	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);
-
-	if (!xiaomi_touch_data || !xiaomi_touch_driver_param ||
-			!xiaomi_touch_driver_param->hardware_operation.set_thermal_temp)
-		return;
-
-	temp0 = get_bms_temp_common();
-	if (abs(temp0) >= INVAILD_TEMPERATURE)
-		return;
-
-	temp = (temp0 + 5) / 10; // Rounding, in degrees Celsius
-	xiaomi_touch_driver_param->hardware_operation.set_thermal_temp(temp, false);
-}
+	/* _b581-XT④a：原 donor 的 set_thermal_temp_force() 已删除——blob symtab/调用面
+	 * 均无该符号（blob 全模块 0 调用者；resume_work 体内亦无 power_supply_get_by_name
+	 * 内联），树侧仅被 resume_work 调用（本次按 blob 一并删除）。 */
 
 int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_t *hardware_param, hardware_operation_t *hardware_operation)
 {
@@ -488,7 +479,8 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	/* alloc poll data memory */
 	xiaomi_touch_data->poll_data = kzalloc_retry(sizeof(htc_ic_polldata_t), 3);
 	if (!xiaomi_touch_data->poll_data) {
-		LOG_ERROR("alloc poll data memory is failed!");
+		/* _b581-XT③：blob 串 = "alloc poll data memory failed!"（0x3733）。 */
+		LOG_ERROR("alloc poll data memory failed!");
 		return -1;
 	}
 
@@ -551,6 +543,9 @@ void unregister_touch_panel_common(s8 touch_id)
 	xiaomi_touch_data_t *xiaomi_touch_data = NULL;
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = NULL;
 	if (!(xiaomi_touch.panel_register_mask & (1 << touch_id))) {
+		/* _b581-XT③（纠错）：blob 0x1817 该直检串确为 "touch id %d didn't register,
+		 * break unregister!"（blob 串表内存在；"panel in touch id %d hasn't register"
+		 * 是 get_xiaomi_touch_data/_driver_param 内联副本的串，非本处）。 */
 		LOG_ERROR("touch id %d didn't register, break unregister!", touch_id);
 		return;
 	}
@@ -586,8 +581,9 @@ void unregister_touch_panel_common(s8 touch_id)
 	LOG_INFO("current panel_register_mask is %d", xiaomi_touch.panel_register_mask);
 	/* free temp detect thread */
 	if(xiaomi_touch_temp_thread != NULL) {
+		/* _b581-XT③：blob 0x1dbc 只有一处 4 字节清零 str wzr,[x23,#0x2a20]
+		 * = temp_detect_ready[0]（无 ready[1] 槽；ready[1] 为 donor 残留）。 */
 		atomic_set(&xiaomi_touch_data->temp_detect_ready[0], 0);
-		atomic_set(&xiaomi_touch_data->temp_detect_ready[1], 0);
 		// kthread_stop(xiaomi_touch_temp_thread); /* Optimize restart time */
 		LOG_INFO("stop detect temperature");
 	}
@@ -623,12 +619,14 @@ static void xiaomi_touch_resume_work(struct work_struct *work)
 		LOG_ERROR("touch id %d is resume, stop resume", touch_id);
 		return;
 	}
-	XIAOMI_TOUCH_UTC_PRINT("");
-
+	/* _b581-XT④a：blob 0x25f4-0x282c 体内无 XIAOMI_TOUCH_UTC_PRINT
+	 * （blob 全模块 ktime_get_real_ts64 只出现在 last_touch_events_collect_common/
+	 * xiaomitouch_input_event；无 time64_to_tm 调用点）、无 enable_temperature_detection_func
+	 * 调用（blob 该符号仅导出给 IC 侧）、无 set_thermal_temp_force（blob symtab 无此符号）。
+	 * 树侧三处为 donor 附加，按 blob 删除。 */
 	if (xiaomi_touch_driver_param->hardware_operation.ic_resume_suspend) {
 		xiaomi_touch_driver_param->hardware_operation.ic_resume_suspend(true, xiaomi_get_gesture_type_common(touch_id));
 	}
-	enable_temperature_detection_func(touch_id, true);
 #ifdef TOUCH_MULTI_PANEL_NOTIFIER_SUPPORT
 	/* save all panel status */
 	save_panel_notifier_status(touch_id, panel_status, XIAOMI_TOUCH_RESUME);
@@ -650,7 +648,6 @@ static void xiaomi_touch_resume_work(struct work_struct *work)
 		if (xiaomi_touch_driver_param->hardware_operation.ic_set_charge_state) {
 			xiaomi_touch_driver_param->hardware_operation.ic_set_charge_state(xiaomi_touch.charging_status);
 		}
-	set_thermal_temp_force(touch_id);
 	xiaomi_touch_data->is_suspend = false;
 	/* other resume to do */
 
@@ -672,11 +669,11 @@ static void xiaomi_touch_suspend_work(struct work_struct *work)
 		LOG_ERROR("touch id %d is suspend, stop suspend", touch_id);
 		return;
 	}
-	XIAOMI_TOUCH_UTC_PRINT("");
+	/* _b581-XT④a：blob suspend_work 无 XIAOMI_TOUCH_UTC_PRINT / 无
+	 * enable_temperature_detection_func（同 resume_work，见上注）。 */
 	if (xiaomi_touch_driver_param->hardware_operation.ic_resume_suspend) {
 		xiaomi_touch_driver_param->hardware_operation.ic_resume_suspend(false, xiaomi_get_gesture_type_common(touch_id));
 	}
-	enable_temperature_detection_func(touch_id,false);
 
 	//enable fod under lock screen interact scene
 	if (xiaomi_touch_driver_param->hardware_operation.get_tddi_status &&
@@ -735,29 +732,52 @@ static __maybe_unused void xiaomi_touch_suspend_tddi(s8 touch_id)
 	/* other suspend to do */
 }
 
-/* blob @0x4834 xiaomi_drm_panel_notifier_callback：mi_disp 回调形态
- * (nb, action, data)。action 1=MI_DISP_DPMS_EVENT / 2=EARLY_EVENT；
- * state 经 mi_disp_notifier.data 解引用；state==0(ON)+DPMS → resume，
- * EARLY → suspend（tddi 细分支由 suspend/resume work 自身处理，blob 同构）。 */
+/* _b581-XT④b：blob @0x4834 xiaomi_drm_panel_notifier_callback 还原
+ *   d = container_of(nb, xiaomi_touch_data_t, disp_nb); touch_id = d->touch_id(s8)
+ *   if (!v || !((struct mi_disp_notifier *)v)->data || IS_TOUCH_ID_INVALID(touch_id))
+ *           return NOTIFY_DONE;                       (blob 0x4858-0x4884)
+ *   code = *(int *)evt->data;                          (blob 0x4888 ldr w21,[x8])
+ *   LOG_INFO("notifier tp event:%lu, code:%d.", action, code)   (blob 0x48d8, 行号 639)
+ *   action==2(EARLY)：code>5 或 code∉{1,2,5} → return；
+ *           LOG_INFO("touchpanel suspend by %s", code==5 ? "blank" : "doze")
+ *                                                     (blob 0x4900-0x4980, 行号 641)
+ *   action==1(DPMS)：code!=0 → return；LOG_INFO("touchpanel resume")   (行号 644)
+ *   其它 action → return；schedule_resume_suspend_work_common(touch_id, action != 2)
+ *                                                     (blob 0x4928-0x4934)
+ * 树侧原为 donor 形态：action/state 解引用 + 串 "action:%lu, state:%d"，
+ * 且 EARLY 分支无 code 掩码、无 doze/blank 文案。 */
 static int xiaomi_drm_panel_notifier_callback(struct notifier_block *nb,
 		unsigned long action, void *v)
 {
 	xiaomi_touch_data_t *xiaomi_touch_data =
 		container_of(nb, xiaomi_touch_data_t, disp_nb);
-	long touch_id = xiaomi_touch_data->touch_id;
-	int state = -1;
+	s8 touch_id = xiaomi_touch_data->touch_id;
+	struct mi_disp_notifier *evt = (struct mi_disp_notifier *)v;
+	int code = -1;
 
-	if (v) {
-		struct mi_disp_notifier *evt = v;
-		if (evt->data)
-			state = *(int *)evt->data;
+	if (!v || !evt->data || IS_TOUCH_ID_INVALID(touch_id))
+		return NOTIFY_DONE;
+
+	code = *(int *)evt->data;
+	LOG_INFO("notifier tp event:%lu, code:%d.", action, code);
+
+	if (action == MI_DISP_DPMS_EARLY_EVENT) {
+		if (code > MI_DISP_DPMS_POWERDOWN ||
+				!((1 << code) & ((1 << MI_DISP_DPMS_LP1) |
+						(1 << MI_DISP_DPMS_LP2) |
+						(1 << MI_DISP_DPMS_POWERDOWN))))
+			return NOTIFY_DONE;
+		LOG_INFO("touchpanel suspend by %s",
+				code == MI_DISP_DPMS_POWERDOWN ? "blank" : "doze");
+	} else if (action == MI_DISP_DPMS_EVENT) {
+		if (code != MI_DISP_DPMS_ON)
+			return NOTIFY_DONE;
+		LOG_INFO("touchpanel resume");
+	} else {
+		return NOTIFY_DONE;
 	}
-	LOG_INFO("action:%lu, state:%d", action, state);
-	if (action == MI_DISP_DPMS_EVENT && state == 0) {
-		schedule_resume_suspend_work_common((s8)touch_id, true);
-	} else if (action == MI_DISP_DPMS_EARLY_EVENT) {
-		schedule_resume_suspend_work_common((s8)touch_id, false);
-	}
+
+	schedule_resume_suspend_work_common(touch_id, action != MI_DISP_DPMS_EARLY_EVENT);
 	return NOTIFY_DONE;
 }
 
@@ -769,7 +789,6 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 	struct device_node *node;
 	int count = 0;
 	int i = 0;
-	long touch_id = -1;
 #if defined(TOUCH_PLATFORM_XRING)
 	char *property_name = "dsi-panel";
 #else
@@ -804,7 +823,9 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 		LOG_ERROR("Failed to register for panel events");
 		return;
 	}
-	LOG_INFO("panel notifier registered (mi_disp), touch_id %ld", touch_id);
+	/* _b581-XT③：blob @0x2390 该函数末只有上面这条 E 级串，无
+	 * "panel notifier registered (mi_disp), touch_id %ld"（树侧 donor 附加，删除；
+	 * 连带删除仅供该串使用的 long touch_id 变量）。 */
 }
 #endif
 
@@ -931,7 +952,7 @@ static void xiaomi_register_power_supply_event(xiaomi_touch_t *xiaomi_touch)
 	xiaomi_touch->power_supply_notifier.notifier_call = xiaomi_power_supply_notifier_callback;
 	retval = power_supply_reg_notifier(&xiaomi_touch->power_supply_notifier);
 	if (retval < 0) {
-		LOG_ERROR("error:%d\n", retval);
+		LOG_ERROR("[Probe Failed] error:%d\n", retval);
 		return;
 	}
 	INIT_WORK(&xiaomi_touch->power_supply_work, xiaomi_power_supply_work);
@@ -1026,11 +1047,13 @@ void xiaomi_touch_mievent_report_int_common(unsigned int code, int panel_id,
 {
 	struct misight_mievent *event;
 
-	printk(KERN_INFO "[MI_TP_I][%s:%d]: code:%d,fault_name:%s,panel_id:%d,vendor_name:%s,error_code:%ld",
+	/* _b581-XT③：blob 该串带尾 \n（+0x1ec2 区，形参同） */
+	printk(KERN_INFO "[MI_TP_I][%s:%d]: code:%d,fault_name:%s,panel_id:%d,vendor_name:%s,error_code:%ld\n",
 	       __func__, __LINE__, code, fault_name, panel_id, vendor_name, error_code);
 	event = cdev_tevent_alloc(code);
 	if (!event) {
-		printk(KERN_ERR "[MI_TP_E][%s:%d]: misight event is error", __func__, __LINE__);
+		/* _b581-XT③：blob 该串为 KERN_INFO(\x016) + 尾 \n（树侧原 KERN_ERR 无 \n）。 */
+		printk(KERN_INFO "[MI_TP_E][%s:%d]: misight event is error\n", __func__, __LINE__);
 		return;
 	}
 	cdev_tevent_add_int(event, "panel_id", panel_id);
@@ -1047,11 +1070,13 @@ void xiaomi_touch_mievent_report_str_common(unsigned int code, int panel_id,
 {
 	struct misight_mievent *event;
 
-	printk(KERN_INFO "[MI_TP_I][%s:%d]: code:%d,fault_name:%s,panel_id:%d,vendor_name:%s",
+	/* _b581-XT③：blob 该串带尾 \n */
+	printk(KERN_INFO "[MI_TP_I][%s:%d]: code:%d,fault_name:%s,panel_id:%d,vendor_name:%s\n",
 	       __func__, __LINE__, code, fault_name, panel_id, vendor_name);
 	event = cdev_tevent_alloc(code);
 	if (!event) {
-		printk(KERN_ERR "[MI_TP_E][%s:%d]: misight event is error", __func__, __LINE__);
+		/* _b581-XT③：blob 该串为 KERN_INFO(\x016) + 尾 \n（树侧原 KERN_ERR 无 \n）。 */
+		printk(KERN_INFO "[MI_TP_E][%s:%d]: misight event is error\n", __func__, __LINE__);
 		return;
 	}
 	cdev_tevent_add_int(event, "panel_id", panel_id);

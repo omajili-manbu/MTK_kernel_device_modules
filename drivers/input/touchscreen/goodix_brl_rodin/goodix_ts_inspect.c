@@ -3069,37 +3069,24 @@ static void goodix_data_statistics(s16 *data, size_t data_size, char *result, si
 }
 
 #ifdef SAVE_IN_CSV
-static u8 *g_test_result_buf;
-static u32 g_test_result_size;
+/* #228（b581）fs_write 语义串台收口：blob 的 fs_write 是「写 auto_test seq 文件」的
+ * 内联 static（__func__="fs_write"，错误行 2410，串 "6[GTP_E][%s:%d]: seq file is NULL"
+ * @.rodata.str1.1+0xd15b）：blob goodix_save_self_data 内联体依次
+ *   L2410 seq file is NULL → _printk；L2990 尾 → seq_write
+ * 即 { if (!g_seq) { ts_err("seq file is NULL"); return -EINVAL; } return seq_write(g_seq, buf, size); }
+ * 且 blob 全模块无 "test result too much"／无 SAVE_IN_CSV 环形缓冲（B0 串）。
+ * 树侧原 fs_write 走 vmalloc(DEFAULT_SEQ_FILE_SIZE) 缓冲（warsaw 变体），
+ * 而 auto_test 路径已用 auto_test_seq_write 直写 seq —— 两条写路径分叉导致
+ * 测试输出进不了 proc。按 blob 收口为单一 seq 写入口。 */
+static struct seq_file *g_auto_test_seq;	/* blob .bss+0x5970 */
+
 static int fs_write(const void* buf, size_t size)
 {
-	if (!g_test_result_buf) {
-		g_test_result_buf = vmalloc(DEFAULT_SEQ_FILE_SIZE);
-		if (!g_test_result_buf)
-			return -ENOMEM;
-		g_test_result_size = 0;
-	}
-
-	if (size > DEFAULT_SEQ_FILE_SIZE - g_test_result_size) {
-		ts_err("test result too much");
+	if (!g_auto_test_seq) {
+		ts_err("seq file is NULL");	/* blob .rodata.str1.1+0xd15b，厂商源行 2410 */
 		return -EINVAL;
 	}
-
-	memcpy(g_test_result_buf + g_test_result_size, buf, size);
-	g_test_result_size += size;
-
-	return 0;
-}
-
-static int deinit_test_result_buf(void)
-{
-	g_test_result_size = 0;
-	if (!g_test_result_buf)
-		return 0;
-
-	vfree(g_test_result_buf);
-	g_test_result_buf = NULL;
-	return 0;
+	return seq_write(g_auto_test_seq, buf, size);
 }
 
 static int goodix_save_test_config(struct goodix_ts_test *ts_test)
@@ -4184,96 +4171,21 @@ int goodix_inspect_run(struct goodix_ts_core *cd, const char *name)
 	return 0;
 }
 
-static int show_result_all_show(struct seq_file *m, void *v)
-{
-	int ret;
-
-	mutex_lock(&inspect_mutex);
-
-	if (!g_ts_test) {
-		mutex_unlock(&inspect_mutex);
-		ts_info("no test result, please retry");
-		return -EAGAIN;
-	}
-
-	/* check diff shift test result */
-	goodix_diff_shift_result_check(g_ts_test);
-	goodix_put_test_result(g_ts_test);
-	ret = seq_write(m, g_test_result_buf, g_test_result_size);
-	deinit_test_result_buf();
-
-	vfree(g_ts_test);
-	g_ts_test = NULL;
-
-	mutex_unlock(&inspect_mutex);
-	return ret;
-}
-
-static int show_result_all_open(struct inode *inode, struct file *file)
-{
-	return single_open_size(file, show_result_all_show,
-			pde_data(inode), DEFAULT_SEQ_FILE_SIZE);
-}
-
-static int show_result_show(struct seq_file *m, void *v)
-{
-	struct goodix_ts_test *ts_test;
-
-	if (!g_ts_test) {
-		ts_info("no test result, please retry");
-		return -EAGAIN;
-	}
-	ts_test = g_ts_test;
-	//send config to touch ic
-	goodix_tptest_finish(ts_test);
-	seq_printf(m, "%s\n", final_result ? "PASS" : "FAIL");
-	return 0;
-}
-
-static int show_result_open(struct inode *inode, struct file *file)
-{
-	return single_open_size(file, show_result_show,
-			pde_data(inode), PAGE_SIZE);
-}
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
-static const struct proc_ops show_result_all = {
-	.proc_open = show_result_all_open,
-	.proc_read = seq_read,
-	.proc_lseek = seq_lseek,
-	.proc_release = single_release,
-};
-
-static const struct proc_ops show_result = {
-	.proc_open = show_result_open,
-	.proc_read = seq_read,
-	.proc_lseek = seq_lseek,
-	.proc_release = single_release,
-};
-#else
-static const struct file_operations show_result_all = {
-	.open = show_result_all_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
-static const struct file_operations show_result = {
-	.open = show_result_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
+/* #228（b581）donor inspect 遗留清除：blob 全模块无 show_result* 符号、
+ * 无 "no test result, please retry"／"PASS"／"FAIL" 输出体（B0 串），
+ * 且 inspect_module_init 仅建 goodix_ts/auto_test 一个 proc（v571 已定案）。
+ * 原 show_result_all_show/show_result_show/show_result_*_open 及两套 ops 表
+ * 为 warsaw donor 残留（无任何引用点），按 blob 删除。 */
 
 int goodix_get_rawdata(struct device *dev, struct ts_rawdata_info *info)
 {
 	int ret;
 	struct goodix_ts_test *ts_test = NULL;
-	bool flag = false;
 
-	flag = goodix_get_ic_self_test_mode();
-
+	/* #228（b581）blob goodix_get_rawdata 打印序列 L3365 "tp self test start"
+	 * 起手，**不调用** goodix_get_ic_self_test_mode()（tree 原多一次该调用：
+	 * callcmp only-tree get_ic_self_test_mode/strncpy×2），也不做第二次
+	 * info->result 搬运（blob 只有 put_test_result 内一次 strncpy×1）。 */
 	ts_info("tp self test start");
 
 	if (!dev || !info) {
@@ -4294,17 +4206,18 @@ int goodix_get_rawdata(struct device *dev, struct ts_rawdata_info *info)
 		strncpy(info->result, "[FAIL]-0F-software reason\n", TS_RAWDATA_RESULT_MAX - 1);
 		goto exit_finish;
 	}
-	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
 	ts_info("TP test prepare OK");
 
 	goodix_capacitance_test(ts_test); /* 1F 3F 6F 7F test */
 	if (ts_test->test_params.test_items[GTP_SHORT_TEST])
 		goodix_shortcircut_test(ts_test); /* 5F test */
 	goodix_put_test_result(ts_test);
-	if (flag) {
-		strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
-		goodix_tptest_finish(ts_test);
-	}
+	/* #228（b581）blob L3385 之后：测试尾只有 put_test_result(ts_test, info)
+	 * （2 参，内部含一次 result 搬运 + tptest_finish），树侧 1 参版在此处补齐
+	 * 唯一一次搬运 + 无条件 tptest_finish（原树 `if (flag)` 门控 + 多一次
+	 * strncpy 属偏离，已按 blob 去掉） */
+	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
+	goodix_tptest_finish(ts_test);
 
 exit_finish:
 	vfree(ts_test);
@@ -4315,20 +4228,10 @@ exit_finish:
 }
 
 /* ==================== _b571 缺件重建：auto_test proc（blob 机器码）==================== */
-static struct seq_file *g_auto_test_seq;	/* blob .bss+0x5970 [TODO-VERIFY-1] */
+/* #228（b581）g_auto_test_seq 定义上移到 fs_write 前（fs_write 即 blob 的
+ * fs_write 语义体）；原 auto_test_seq_write() 与之同体，按 blob 去重删除。 */
 
 static int auto_test_result_show(struct seq_file *m, void *v);	/* 前向声明：open 引用它 */
-
-/* blob 内联 static int fs_write(const void *buf, size_t size)（__func__="fs_write"，错误行 2410）
- * —— 选树侧无重名语义体，故拟名 auto_test_seq_write()。[TODO-VERIFY-2] 名称 */
-static int auto_test_seq_write(const void *buf, size_t size)
-{
-	if (!g_auto_test_seq) {
-		ts_err("seq file is NULL");	/* .rodata.str1.1+0xd15b，line 2410，tag "fs_write" */
-		return -EINVAL;
-	}
-	return seq_write(g_auto_test_seq, buf, size);
-}
 
 /*
  * auto_test_open —— blob 0x20194（48B）
@@ -4463,7 +4366,7 @@ exit_free_ts:
 exit_free_info:
 	/* —— 结果回写（blob: sprintf → fs_write 内联(seq_write) → kfree → end 日志 → return 0）—— */
 	ret = sprintf(buf, "test_result:%s\n", info->result);	/* .rodata.str1.1+0x5bdd */
-	ret = auto_test_seq_write(buf, ret);	/* blob 内联 fs_write() */
+	ret = fs_write(buf, ret);	/* #228：blob 内联 fs_write()（seq 直写，原 auto_test_seq_write 已并入） */
 	if (ret < 0) {
 		ts_err("fs_write failed");			/* line 3329 */
 		ts_info("test_result:%s", info->result);	/* line 3331 [TODO-VERIFY-5] 位置 */

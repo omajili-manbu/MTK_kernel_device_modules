@@ -2732,6 +2732,20 @@ int fts_test_init(struct fts_ts_data *ts_data)
 	proc->tp_data_dump_proc = proc_create("tp_data_dump_v0", 0444, NULL, &tp_datadump_fops);
 	if (proc->tp_data_dump_proc == NULL)
 		FTS_TEST_ERROR("tp_data_dump_v0 proc create failed.");
+	/* _b581：A-74 续行④ 归位（blob fts_test_init 0x1658c-0x165d0 实证）：
+	 *   csv_data_buffer = vmalloc(0x64000)（失败打 "csv_file_buf malloc fail"）
+	 *   -> memset(buf, 0, 0x64000) -> fts_ftest->result(0xbf8) = 0
+	 * 树侧原缺此段（csv 字段只有 vfree 无 alloc 点）→ fts_csv_show 恒返
+	 * "tdata/csv_file_buf is null"，csv proc 为死面；按 blob 补齐。 */
+	if (fts_ftest) {
+		fts_ftest->csv_data_buffer = vmalloc(FTS_TEST_CSV_BUF_SIZE);
+		if (!fts_ftest->csv_data_buffer) {
+			FTS_TEST_ERROR("csv_file_buf malloc fail");	/* blob .rodata.str1.1 串 */
+		} else {
+			memset(fts_ftest->csv_data_buffer, 0, FTS_TEST_CSV_BUF_SIZE);
+		}
+		fts_ftest->result = 0;			/* blob: str wzr,[x20,#0xbf8] */
+	}
 	/* _b571：blob fts_test_init 16630 实证（name "fts_test_csv", 0777, data=fts_ftest） */
 	fts_proccsv_entry = proc_create_data("fts_test_csv", 0777, NULL, &fts_proccsv_fops, fts_ftest);
 	if (fts_proccsv_entry == NULL)

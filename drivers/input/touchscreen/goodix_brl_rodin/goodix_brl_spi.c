@@ -282,7 +282,7 @@ static int goodix_spi_probe(struct spi_device *spi)
 	spi->rt = true;
 	ret = spi_setup(spi);
 	if (ret) {
-		ts_err("[DIS-TF-TOUCH] failed set spi mode, %d", ret);
+		ts_err("failed set spi mode, %d", ret);
 		return ret;
 	}
 
@@ -335,7 +335,7 @@ static int goodix_spi_probe(struct spi_device *spi)
 	 */
 	ret = platform_device_register(goodix_pdev);
 	if (ret) {
-		ts_err("[DIS-TF-TOUCH] failed register goodix platform device, %d", ret);
+		ts_err("failed register goodix platform device, %d", ret);
 		goto err_pdev;
 	}
 	gf_spi_dp = dp;
