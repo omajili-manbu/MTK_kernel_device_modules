@@ -3431,8 +3431,15 @@ static int fts_touch_doze_analysis(int value)
 	int result = 0;
 	//struct force_update_flag force_burn;
 
-	if (fts_data->suspended) {
-		FTS_INFO("%s touch in suspend, return\n", __func__);
+	/* _b584-B4②：blob 0xE044..0xE064 入口门两条件短路合一 ——
+	 * !fts_data（0xE048 LDR X8=fts_data; 0xE04C CBZ X8 直达打印站 loc_E064）||
+	 * (value != 7（0xE054 CMP W0,#7; B.EQ→loc_E090 跳表，value==7 豁免 suspend 门）&&
+	 * fts_data->suspended（0xE05C LDRB W9,[X8,#0x2D9]; 0xE060 CBZ→跳表））；
+	 * 两路共用打印站 loc_E064（I 门 cmp #3; b.cs → loc_E0C8 _printk，W2=0xCB4）
+	 * 后 loc_E074 W19=0 → 返回 result=0。 */
+	if (!fts_data || (value != 7 && fts_data->suspended)) {
+		/* _b584-B4③：串尾 = blob .rodata.str1.1+0x13e 实测句点结尾、无 \n。 */
+		FTS_INFO("%s touch in suspend, return.", __func__);
 		return result;
 	}
 	switch(value) {
@@ -3451,7 +3458,10 @@ static int fts_touch_doze_analysis(int value)
 			fts_irq_disable();
 			free_irq(fts_data->irq, fts_data);
 			if(!request_threaded_irq(fts_data->irq, NULL, fts_irq_handler, IRQF_TRIGGER_FALLING | IRQF_ONESHOT, FTS_DRIVER_NAME, fts_data)) {
-				FTS_INFO("%s Request irq successfully\n", __func__);
+				/* _b584-B4③：串尾 = blob .rodata.str1.1+0x7849 实测句点结尾、无 \n
+			 * （blob 站 loc_E33C，W2=0xCCA；其后 fts_irq_enable 内联 vs 树函数调用
+			 * = A-84④ ①类，明令不动）。 */
+			FTS_INFO("%s Request irq successfully.", __func__);
 				fts_irq_enable();
 			}
 			break;
@@ -3470,8 +3480,29 @@ static int fts_touch_doze_analysis(int value)
 			 * schedule_resume_suspend_work_common(0, 1)。 */
 			schedule_resume_suspend_work_common(TOUCH_ID, true);
 			break;
+		case POWER_ON:
+			/* _b584-B4①：blob 0xE264（跳表 case 8 = POWER_ON）——
+			 * fts_power_source_ctrl_simplify(fts_data, 1)（0xE264 MOV X0,X8
+			 * =fts_data / 0xE268 W1=#1）；返回值存 result（0xE270 MOV W19,W0），
+			 * ret!=0 且 lv!=0 走 E "failed power on"（0xE284 fmt=.rodata.str1.1
+			 * +0xdabe、W2=0xCDA；错误门 0xE27C LDR lv + 0xE280 CBZ→返回 = E 族
+			 * lv!=0 门形）。fts_power_source_ctrl_simplify 本体零改动（A-74③
+			 * 已按 blob 全形在树）。 */
+			result = fts_power_source_ctrl_simplify(fts_data, 1);
+			if (result)
+				FTS_ERROR("failed power on");
+			break;
+		case POWER_OFF:
+			/* _b584-B4①：blob 0xE2A0（跳表 case 9 = POWER_OFF）——同形，
+			 * W1=WZR；E "failed power off"（0xE2C0 fmt=+0x2ed7、W2=0xCE0）。 */
+			result = fts_power_source_ctrl_simplify(fts_data, 0);
+			if (result)
+				FTS_ERROR("failed power off");
+			break;
 		default:
-			FTS_INFO("%s don't support touch doze analysis\n", __func__);
+			/* _b584-B4③：串尾 = blob .rodata.str1.1+0xd19a 实测句点结尾、无 \n
+			 * （blob 站 def_E0B0→loc_E0DC，W2=0xCE4）。 */
+			FTS_INFO("%s don't support touch doze analysis.", __func__);
 			break;
 	}
 
@@ -5023,6 +5054,12 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 	 * +0x3b5c/0x3b60 → fts_init_xiaomi_touchfeature_v3 loc_CB60（cmp w9,#3; b.cs I 门，
 	 * 行 0x1147；位置 = hardware_operation 表填完与 dump_type/enable 触点之间）⇒ 同位补打印 */
 	FTS_INFO("enable thp");
+	/* _b584-B4④：blob fts_init_xiaomi_touchfeature_v3 loc_C9A0 —— 两门路径
+	 * （I 门冷块回跳 + 直落）汇合点 = 无条件写：0xC9B8 STRB #1,[fts_data+0xC88]
+	 * enable_touch_raw=true 在前、0xC9BC STR WZR,[+0xD18] dump_type=0 在后。
+	 * 语义 = 预置武装：dump_type=0（DUMP_OFF）时 fts_htc_dump_tic 按
+	 * !enable||!dump_type 早退（blob 0xF614/0xF61C 双 CBZ），写入惰性不生效。 */
+	fts_data->enable_touch_raw = true;
 #ifdef TOUCH_DUMP_TIC_SUPPORT
 	fts_data->dump_type = DUMP_OFF;
 #endif /* TOUCH_DUMP_TIC_SUPPORT */
