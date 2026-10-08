@@ -281,6 +281,10 @@ int fts_write_reg(u8 addr, u8 value)
 {
     u8 writebuf[2] = { 0 };
 
+    /* _b584a-B1#2：blob '\x016[FTS_TS_D][%s:%d]: addr: 0x%x, value: %d' +0x8116（无尾
+     * '\n'），唯一引用 .rela.text +0x30134/0x30138 → fts_write_reg loc_39130（cmp w8,#4
+     * b.cs D 门，行 0x109；实参 = 入参 addr/value，先打印后写）⇒ 函数头补打印 */
+    FTS_DEBUG("addr: 0x%x, value: %d", addr, value);
     writebuf[0] = addr;
     writebuf[1] = value;
     return fts_write(writebuf, 2);

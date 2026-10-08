@@ -1405,8 +1405,19 @@ static int fts_htc_dump_tic(struct fts_ts_data *ts_data, struct tp_frame *tp_fra
 	int ret;
 
 	tp_frame->dump_type = ts_data->dump_type;
+	/* _b584a-B1#6：blob '\x016[FTS_TS_V][%s:%d]: enable_touch_raw:%d, dump_type:%d'
+	 * +0x787b，唯一引用 .rela.text +0x6b20/0x6b24 → fts_irq_handler loc_FB1C（__func__ =
+	 * "fts_htc_dump_tic"，blob 内联宿主；cmp w10,#5; b.cs V 门，行 0x505；实参 =
+	 * ldrb [ts+0xc88] / ldr [ts+0xd18] = enable_touch_raw/dump_type；位置 = dump_type
+	 * 存储后 memset 前）⇒ 同位同参补打印（FTS_VERBOSE = cmp#5 同门） */
+	FTS_VERBOSE("enable_touch_raw:%d, dump_type:%d", ts_data->enable_touch_raw,
+			ts_data->dump_type);
 	memset(tp_frame->thp_dbg_buf, 0, sizeof(struct ST_RepotDbgBufThp));
 	if (!ts_data->enable_touch_raw || !ts_data->dump_type) {
+		/* _b584a-B1#7：blob '\x016[FTS_TS_V][%s:%d]: not support' +0xb5a6，唯一引用
+		 * .rela.text +0x6b64/0x6b68 → fts_irq_handler loc_FB68（__func__ = "fts_htc_dump_tic"；
+		 * cmp w8,#5; b.cs V 门，行 0x509，无变参；语义 = !enable||!dump_type 早退分支）⇒ 同位补打印 */
+		FTS_VERBOSE("not support");
 		return 0;
 	}
 	ts_data->touch_addr = FTS_DEBUG_DATA_ADDR;
@@ -4125,22 +4136,27 @@ int fts_thp_ic_write_interfaces(u8 addr, s32* value, int value_len)
     int input = value[0];
     writebuf[0] = addr;
     if (htc_ic_mode == IC_MODE_44) {
+        /* _b584a-B1#4/#5：活分支回 blob 形（原 = 旧本地变体）。blob
+         * '\x016[FTS_TS_I][%s:%d]: open_data:input_data[index:%d]:%d\n' +0x7787 与
+         * '\x016[FTS_TS_I][%s:%d]: open_data:writebuf[index:%d]:%x\n' +0xeb6c，唯一引用对
+         * .rela.text +0x9ec/0x9f0、+0x984/0x988 → fts_thp_ic_write_interfaces
+         * loc_99F0/loc_99D4（cmp #3 I 门，行 0xF32/0xF35，实参 (i, value[i] 32 位) /
+         * (index, writebuf[index])；converhex 内联其 D before/after 两条）。树侧 #if 0
+         * 死拷贝分支体与 blob 逐语句同形 ⇒ 移植之；删 EXTRA 三串（"open_data before/after"、
+         * "mode:3045"，blob 全 ko 0 命中）。 */
         int i = 0;
-        int index = 1;
-        unsigned char *input_data=(char *)&value[1];
-        writebuf[0] = value[0] & 0xFF;
+        int index = 0;
+        unsigned int* input_data = value;
         /*analy_open_data(value,input_data);*/
+        /*input_data = value;*/
         for (i = 0; i < value_len; i++) {
-            FTS_INFO("open_data before:input_data[index:%d]:%x\n", i, input_data[i]);
-            //converhex(hex, input_data[i]);
-            writebuf[index]=(input_data[i]) & 0xFF;
-            FTS_INFO("open_data after:writebuf[index:%d]:%x\n", index, writebuf[index]);
+            FTS_INFO("open_data:input_data[index:%d]:%d\n", i, input_data[i]);
+            converhex(hex, input_data[i]);
+            writebuf[index] = hex[0];
+            FTS_INFO("open_data:writebuf[index:%d]:%x\n", index, writebuf[index]);
             ++index;
         }
-        for (i = 0; i < value_len+1; i++) {
-            FTS_INFO("mode:3045, writebuf[i:%d]:%x", i, writebuf[i]);
-        }
-        return fts_write(writebuf, value_len + 1);
+        return fts_write(writebuf, value_len);
     } else {
         /*input = integer_conver(value);*/
         converhex(hex, input);
@@ -4978,6 +4994,10 @@ void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data)
 	hardware_operation.set_thermal_temp = fts_set_thermal_temp;
 	hardware_operation.touch_dfs_test = fts_touch_dfs_test;
 
+	/* _b584a-B1#3：blob '\x016[FTS_TS_I][%s:%d]: enable thp' +0x9b3d，唯一引用 .rela.text
+	 * +0x3b5c/0x3b60 → fts_init_xiaomi_touchfeature_v3 loc_CB60（cmp w9,#3; b.cs I 门，
+	 * 行 0x1147；位置 = hardware_operation 表填完与 dump_type/enable 触点之间）⇒ 同位补打印 */
+	FTS_INFO("enable thp");
 #ifdef TOUCH_DUMP_TIC_SUPPORT
 	fts_data->dump_type = DUMP_OFF;
 #endif /* TOUCH_DUMP_TIC_SUPPORT */
@@ -5630,6 +5650,12 @@ static int fts_ts_probe(struct spi_device *spi)
     			FTS_INFO("TP is not focal!\n");
     			return -ENODEV;
     		}
+
+    		/* _b584a-B1#1：blob '\x016[FTS_TS_D][%s:%d]: TP is focaltech, panel is TIMMA.\n'
+    		 * +0x1f1e，唯一引用 .rela.init.text +0xdc/0xe0 → init_module(fts_ts_init) loc_3B5D0
+    		 * （cmp w8,#4; b.cs D 门，行 0x1431；DET2==1 分支）⇒ 树侧 blob init 判型块已按
+    		 * #222/A-78 迁 probe，在 ==1 分支同构补打印（FTS_DEBUG = cmp#4 同门） */
+    		FTS_DEBUG("TP is focaltech, panel is TIMMA.\n");
     	} else {
     		FTS_ERROR("gpio%d direction_input failed:%d, fail-open",
     			  PANEL_ID_DET2, ret);
