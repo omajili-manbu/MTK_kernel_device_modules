@@ -222,34 +222,80 @@ struct ftxxxx_proc {
         u8 cmd[FTS_MAX_COMMMAND_LENGTH];
 };
 
+/* _b583b-B10：fts_ts_platform_data 按 blob 机器码全量归位（sizeof 0xC8 → 0x10C）。
+ * 证据（全部为 fts_ts_probe(0x105BC) 内联 fts_parse_dt 的立即数落点，IDA 双证）：
+ *   irq_gpio@0x00（0x109D0 STR W0,[X20] ← of_get_named_gpio("focaltech,irq-gpio")）
+ *   reset_gpio@0x08（0x109E4 irq-gpio 之后 0x109E8 STR W0,[X20,#8]）
+ *   avdd_gpio@0x10（0x10A54 STUR W23,[X22,#-8]，W23 = avdd-gpio 读数）
+ *   avdd_reg_name[40]@0x18（0x10A50 STR XZR+0x10A58/0x10A5C STP 清零 40B +
+ *                          0x10A94 strncpy(…,0x28)，strlen>0x27 跳过）
+ *   iovdd_reg_name[40]@0x40（0x10ABC STR XZR,[X22,#0x40]! 起清零 40B +
+ *                          0x10AFC strncpy(…,0x28)；X22=X20 重定基）
+ *   have_key@0x68（0x108F0 STRB W8,[X20,#0x68] = of_property_read_bool 落点；
+ *                          0x10E30 LDRB 同址回读做 if 判）
+ *   key_number@0x6C（0x108F8 ADD X22,X20,#0x6C 作 of_property_read_u32 实参）
+ *   keys[4]@0x70（0x10928 ADD X2,X20,#0x70 作 u32_array 实参；VK 打印读 0x70/74/78）
+ *   key_x_coords[4]@0x80（VK 打印读 0x80/84/88 = x[0..2]）
+ *   key_y_coords[4]@0x90（VK 打印读 0x90/94/98 = y[0..2]）
+ *   x_max@0xA0 / y_max@0xA4 / x_min@0xA8 / y_min@0xAC
+ *     （0x1080C STP W3,W5,[X20,#0xA8] + 0x10814 STP W4,W6,[X20,#0xA0] 双 STP；
+ *      input_set_abs_params 实参 0x11130 W2=[#0xA8]=min、0x11134 W3=[#0xA0]=max
+ *      （ABS_MT_POSITION_X），0x1114C/0x11150 同构（Y）⇒ min/max 方向与树一致，
+ *      display-coords 解析语义不受影响；driver_info_show 0x15318/0x1531C 同址复读）
+ *   max_touch_number@0xB0（0x10BB0 STR clamp 落点；0x11120 LDR 作 DEBUG 实参）
+ *   super_resolution_factors@0xB4（0x10B5C STR，parse 序在 max-touch 之前）
+ *   touch_range_array[5]@0xB8 / touch_def_array[4]@0xCC / touch_expert_array[12]@0xDC
+ *     （0x10BDC/0x10BBC/0x10BFC 三条 ADD X2,X20,#imm 作 u32_array 实参；
+ *      0xDC+0x30 = 0x10C = sizeof，与 kmalloc_trace size=0x10C 互证）
+ * 树侧保留 irq_gpio_flags/reset_gpio_flags 两个 blob 零访问点成员（0x04/0x0C 死槽），
+ * key_y_coords/key_x_coords 按 blob 互换声明序；名字域由 const char* 换 char[40]
+ * （blob 内嵌数组，parse 侧同步改 memset/strncpy 形态，见 focaltech_core.c）。 */
 struct fts_ts_platform_data {
-        /* _b581：A-74③ 收口——blob 无 iovdd_source/avdd_source 属性与成员
-         * （fts_parse_dt 的 of_property_read_string 仅 avdd-name/iovdd-name 2 处，
-         *  fts_power_source_init 的 regulator_get 仅字面量 "avdd"/"iovdd"），已删。 */
-        const char *iovdd_reg_name;
-        const char *avdd_reg_name;
-        u32 irq_gpio;
-        u32 irq_gpio_flags;
-        u32 reset_gpio;
-        u32 reset_gpio_flags;
-        int avdd_gpio;
-        bool have_key;
-        u32 key_number;
-        u32 keys[FTS_MAX_KEYS];
-        u32 key_y_coords[FTS_MAX_KEYS];
-        u32 key_x_coords[FTS_MAX_KEYS];
-        u32 x_max;
-        u32 y_max;
-        u32 x_min;
-        u32 y_min;
-        u32 max_touch_number;
-	u32 super_resolution_factors;
-/*#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE*/
-	u32 touch_range_array[5];
-	u32 touch_def_array[4];
-	u32 touch_expert_array[4 * EXPERT_ARRAY_SIZE];
-/*#endif*/
+	u32 irq_gpio;					/* blob 0x00 */
+	u32 irq_gpio_flags;				/* blob 0x04（全 ko 零访问点，占位） */
+	u32 reset_gpio;					/* blob 0x08 */
+	u32 reset_gpio_flags;				/* blob 0x0C（全 ko 零访问点，占位） */
+	int avdd_gpio;					/* blob 0x10 */
+	u32 avdd_gpio_flags;				/* blob 0x14 槽（blob 零访问点；0x18 名字域锚点反推的 4B 位，
+							 * 命名按 donor irq/reset_flags 对称风格） */
+	char avdd_reg_name[40];				/* blob 0x18..0x3F（内嵌 40B 数组） */
+	char iovdd_reg_name[40];			/* blob 0x40..0x67 */
+	bool have_key;					/* blob 0x68 */
+	u32 key_number;					/* blob 0x6C */
+	u32 keys[FTS_MAX_KEYS];				/* blob 0x70 */
+	u32 key_x_coords[FTS_MAX_KEYS];			/* blob 0x80 */
+	u32 key_y_coords[FTS_MAX_KEYS];			/* blob 0x90 */
+	u32 x_max;					/* blob 0xA0 */
+	u32 y_max;					/* blob 0xA4 */
+	u32 x_min;					/* blob 0xA8 */
+	u32 y_min;					/* blob 0xAC */
+	u32 max_touch_number;				/* blob 0xB0 */
+	u32 super_resolution_factors;			/* blob 0xB4 */
+	u32 touch_range_array[5];			/* blob 0xB8 */
+	u32 touch_def_array[4];				/* blob 0xCC */
+	u32 touch_expert_array[4 * EXPERT_ARRAY_SIZE];	/* blob 0xDC */
 };
+/* _b583b-B10 编译期断言（与 blob 机器码立即数偏移等式，见上注证据） */
+_Static_assert(sizeof(struct fts_ts_platform_data) == 0x10C, "_b583b-B10 sizeof(pdata)==0x10C (blob probe 0x10660 kmalloc_trace)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, irq_gpio) == 0x00, "_b583b-B10 irq_gpio@0x00");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, reset_gpio) == 0x08, "_b583b-B10 reset_gpio@0x08");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, avdd_gpio) == 0x10, "_b583b-B10 avdd_gpio@0x10");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, avdd_reg_name) == 0x18, "_b583b-B10 avdd_reg_name@0x18 (probe 0x10A94 strncpy)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, iovdd_reg_name) == 0x40, "_b583b-B10 iovdd_reg_name@0x40 (probe 0x10AFC strncpy)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, have_key) == 0x68, "_b583b-B10 have_key@0x68 (probe 0x108F0 STRB)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_number) == 0x6C, "_b583b-B10 key_number@0x6C (probe 0x108F8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, keys) == 0x70, "_b583b-B10 keys@0x70 (probe 0x10928)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_x_coords) == 0x80, "_b583b-B10 key_x_coords@0x80 (VK print 0x10990)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_y_coords) == 0x90, "_b583b-B10 key_y_coords@0x90 (VK print 0x10968)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, x_max) == 0xA0, "_b583b-B10 x_max@0xA0 (abs_params max=0xA0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, y_max) == 0xA4, "_b583b-B10 y_max@0xA4");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, x_min) == 0xA8, "_b583b-B10 x_min@0xA8 (abs_params min=0xA8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, y_min) == 0xAC, "_b583b-B10 y_min@0xAC");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, max_touch_number) == 0xB0, "_b583b-B10 max_touch_number@0xB0 (probe 0x10BB0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, super_resolution_factors) == 0xB4, "_b583b-B10 super_resolution_factors@0xB4 (probe 0x10B5C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_range_array) == 0xB8, "_b583b-B10 touch_range_array@0xB8 (probe 0x10BDC)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_def_array) == 0xCC, "_b583b-B10 touch_def_array@0xCC (probe 0x10BBC)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_expert_array) == 0xDC, "_b583b-B10 touch_expert_array@0xDC (probe 0x10BFC)");
 /*thp struct tp_raw*/
 #if 0
 #ifdef THP_FRAMEDATA_DEBUG
@@ -542,69 +588,92 @@ struct fts_ts_data {
         u32 ta_size;
         u8 *ta_buf;
 
-        struct frame_thp_data frame_data;
-        u8 *bus_tx_buf;
-        u8 *bus_rx_buf;
-        int bus_type;
-	struct regulator *iovdd;
-	struct regulator *avdd;
+	/* _b583b-B8：blob 0x468..0xAC7（0x660B）零访问区 —— 全 ko 对该区无任何
+	 * [ts,#imm] 立即数访问（blbscan_2e8_af0.txt + irq_handler 全量 ADD X,X19 穷举
+	 * = {0x210,0x270,0x2B8,0x318,0x32C,0x330,0x430,0x1B0}），树侧 frame_data
+	 * (struct frame_thp_data, 0x1D0) 唯一写者 fts_frame_parse_data 位于
+	 * #ifdef CRC_CHECK 内而 CRC_CHECK 全工程未定义（死代码），blob 亦无 CRC 解析
+	 * 面证据 ⇒ 按 blob 匿名占位。若后续拿到 6.6 厂商源佐证该区语义，再行命名。 */
+	u8 reserved_frame_zone[0x660];			/* blob 0x468..0xAC7 零访问洞 */
+        u8 *bus_tx_buf;					/* blob 0xAC8（fts_bus_init/read/write） */
+        u8 *bus_rx_buf;					/* blob 0xAD0 */
+        int bus_type;					/* blob 0xAD8（hid2std/ft5008_upgrade/probe） */
+	struct regulator *iovdd;			/* blob 0xAE0（power_source_*） */
+	struct regulator *avdd;				/* blob 0xAE8 */
 	/* _b581：blob 全 ko 只向 +0xae0/+0xae8 写/读这两个稳压器指针（regulator_*
 	 * 各 2 次）；原 iovdd_source/avdd_source 成员为 donor 多余件，已删。 */
-	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];
+	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];	/* blob 0xAF0..0xAF7 */
 #if FTS_PINCTRL_EN
-        struct pinctrl *pinctrl;
-        struct pinctrl_state *pins_active;
-        struct pinctrl_state *pins_suspend;
-        struct pinctrl_state *pins_release;
-	struct pinctrl_state *pinctrl_state_spimode;
-	struct pinctrl_state *pinctrl_state_cs_spimode;	/* blob："Set pinctrl_cs_spi_mode sucesses." 对应态 */
-	struct pinctrl_state *pinctrl_state_cs_gpiomode;	/* blob："Set pinctrl_cs_gpio_mode sucesses." 对应态 */
-	struct pinctrl_state *pinctrl_touch_mode_ap;	/* blob 0xb40：touch_mode_ap */
-	struct pinctrl_state *pinctrl_touch_mode_scp;	/* blob 0xb48：touch_mode_scp */
-	/* rodin blob 成员（donor ft3383 代缺，blob 反汇编实证） */
-	int dump_type;					/* blob："enable_touch_raw:%d, dump_type:%d" */
-	struct delayed_work thp_signal_work;		/* blob fts_thp_signal_work */
-	struct pinctrl_state *pinctrl_dvdd_enable;
-	struct pinctrl_state *pinctrl_dvdd_disable;
+	/* _b583b-B8：11 指针段 0xAF8..0xB4F，序 = blob fts_power_source_init(0x11DD8)
+	 * 内联 pinctrl 初始化的存储顺序（0x11EF4..0x120CC）：
+	 *   pinctrl@0xAF8(devm_pinctrl_get) → active@0xB00 → suspend@0xB08 →
+	 *   release@0xB10 → spimode@0xB18 → dvdd_enable@0xB20 → dvdd_disable@0xB28
+	 *   （_b581 已判 0xB20/0xB28 全 ko 只写零读死槽）→ cs_gpio@0xB30 →
+	 *   cs_spi@0xB38（power_source_ctrl enable 路径 0x129AC 读 0xB30=cs_gpio/
+	 *   disable 路径 0x128D8 读 0xB38=cs_spi，串面 "Set pinctrl_cs_{gpio,spi}_mode"
+	 *   双证，_b581 注释同口径）→ touch_ap@0xB40 → touch_scp@0xB48。
+	 * 与旧树序差异 = dvdd 对移到 spimode 之后、cs_gpio/cs_spi 对调。 */
+        struct pinctrl *pinctrl;			/* blob 0xAF8 */
+        struct pinctrl_state *pins_active;		/* blob 0xB00 */
+        struct pinctrl_state *pins_suspend;		/* blob 0xB08 */
+        struct pinctrl_state *pins_release;		/* blob 0xB10 */
+	struct pinctrl_state *pinctrl_state_spimode;	/* blob 0xB18 */
+	struct pinctrl_state *pinctrl_dvdd_enable;	/* blob 0xB20（死槽：只写零读） */
+	struct pinctrl_state *pinctrl_dvdd_disable;	/* blob 0xB28（死槽：只写零读） */
+	struct pinctrl_state *pinctrl_state_cs_gpiomode;	/* blob 0xB30："Set pinctrl_cs_gpio_mode sucesses." */
+	struct pinctrl_state *pinctrl_state_cs_spimode;		/* blob 0xB38："Set pinctrl_cs_spi_mode sucesses." */
+	struct pinctrl_state *pinctrl_touch_mode_ap;	/* blob 0xB40 */
+	struct pinctrl_state *pinctrl_touch_mode_scp;	/* blob 0xB48 */
 #endif
+	/* _b583b-B8 FOD/尾部块（blob 访问点全录）：blob 把 FOD 域紧随 pinctrl 段
+	 * （0xB50 起），与旧树的独立 #ifdef FOD 块序不同。 */
 #ifdef FTS_TOUCHSCREEN_FOD
-	int fod_status;
-	bool finger_in_fod;
-	bool fod_finger_skip;
-	int overlap_area;
-	int fod_icon_status;
-	struct mutex fod_mutex;
-	bool point_id_changed;
+	bool finger_in_fod;				/* blob 0xB50（irq_handler 0xF5DC 存入 tp_frame->fod_pressed；release_all_finger/fod 报点读写） */
+	bool fod_finger_skip;				/* blob 0xB51（fod 报点门控；release_all_finger STRH 连 0xB50 清零） */
+	int overlap_area;				/* blob 0xB54（fod 报点 0xA7FC/0xA810/0xA92C 三读，WIDTH_MAJOR 实参） */
+	int fod_status;					/* 【blob 无访问点】树侧 recovery/fod 报点/gesture_suspend 仍依赖；
+							* 状态面疑为框架 fts_touch_mode 镜像，blob 侧不落 ts_data；
+							* 占位于 0xB58 零访问洞，语义不变。 */
+	u8 reserved_fod[0x2C];				/* blob 0xB5C..0xB87 零访问洞 */
+	bool point_id_changed;				/* blob 0xB88（fod 报点 0xA6FC 写 / release_all_finger 0xA48C 清零） */
 #endif
-
-	struct mutex cmd_update_mutex;
-	bool poweroff_on_sleep;
-	u8 gesture_status;
-	int nonui_status;
-	int doubletap_status;
-	int aod_status;
-        int sensor_tap_status;
-	struct dentry *tpdbg_dentry;
-	bool gamemode_enabled;
-	bool power_status;
-	bool is_expert_mode;
-	u8 gesture_cmd;
-	bool gesture_cmd_delay;
-	int current_fps;
-	int report_rate_status;
-	void *notifier_cookie;
-	struct delayed_work panel_notifier_register_work;
-	bool enable_touch_raw;
-	struct tp_frame thp_frame;
-	bool fod_pressed;
-	int palm_status;	/* blob 0xbd8：fts_palm_sensor_write 存（_b571） */
-
-#ifdef TOUCH_THP_SUPPORT
-	struct delayed_work thp_signal_work;
-#ifdef TOUCH_DUMP_TIC_SUPPORT
-	int dump_type;
-#endif /* TOUCH_DUMP_TIC_SUPPORT */
-#endif
+	/* 0xB89..0xBD7：blob 零访问区（0x4F），宿主为下列树侧仍依赖成员；各成员
+	 * blob 全 ko 无立即数访问点（状态面疑为框架 fts_touch_mode 镜像）。布局按
+	 * 6.18 自然对齐（mutex=0x30）恰好填满该窗：pad7→mutex@0xB90..0xBBF →
+	 * nonui@0xBC0/doubletap@0xBC4/aod@0xBC8 → pad4 → reserved_bd0@0xBD0..0xBD7。 */
+	struct mutex cmd_update_mutex;			/* 0xB90（6.18 sizeof=0x30） */
+	int nonui_status;				/* 0xBC0（fod 报点用；blob 对应函数取框架值入局部） */
+	int doubletap_status;				/* 0xBC4（suspend 路径用） */
+	int aod_status;					/* 0xBC8（suspend 路径用） */
+	u8 reserved_bd0[12];				/* 0xBCC..0xBD7（aod 尾垫 4B + blob 零访问 8B；原 tpdbg_dentry@0xBD0 的垫位由显式占位保留） */
+	int palm_status;				/* blob 0xBD8：fts_palm_sensor_write(0xDDA8) 存、tp_state_recovery/irq_handler 读 */
+	bool poweroff_on_sleep;				/* blob 0xBDC：ic_switch_mode(0xCF50/0xCFC8)、suspend(0x131E8) 读写 */
+	u8 gesture_status;				/* blob 0xBDD：update_gesture_state(0xEBA4..)/resume_suspend(0xB970) 读写 */
+	/* 0xBE0..0xBE7 = tp_debug debugfs 目录 dentry（blob 双证：fts_ftest 为全局符号
+	 * .bss+0x5b0、read_mass_data 0x1A934 adrp+PAGEOFF 走全局；probe 0x11684
+	 * debugfs_create_dir("tp_debug",NULL) 返回值 0x11690 STR [X19,#0xBE0]、
+	 * 0x119D4 以该槽作 create_file 父目录、fts_ts_remove 0x11B58 读出
+	 * debugfs_remove。树侧 probe/remove 已用本成员（_b582-PROC 面），槽位由
+	 * 0xBD0 归位至 blob 0xBE0 —— A1 原判（fts_ftest 成员化）系 tdata 内
+	 * [X8,#0xBE0] 基址混淆，经 A2+A3 甄别 + 符号表/IDA 复核推翻。） */
+	struct dentry *tpdbg_dentry;			/* blob 0xBE0..0xBE7 */
+	bool gamemode_enabled;				/* blob 0xBE8（update_touchmode_data 0x58fc 写、tp_state_recovery 0x93E4 读） */
+	bool power_status;				/* 0xBE9 槽位（blob 零访问；树亦零引用，作 gamemode/expert 间隔占位 —— C 布尔不产生自然间隙） */
+	bool is_expert_mode;				/* blob 0xBEA（game_mode_update 0xD218 写、update_touchmode_data 0xE7E0 读） */
+	u8 gesture_cmd;					/* blob 0xBEB（update_gesture_state/ic_switch_mode 写） */
+	bool gesture_cmd_delay;				/* blob 0xBEC（update_gesture_state 0xEBF4/0xEC54 写） */
+	int report_rate_status;				/* 0xBF0 槽位（blob 零访问；树侧 report_rate_recovery 依赖） */
+	int current_fps;				/* blob 0xBF4（probe 0x10D8C 初始化、game_mode_update 240/135 写、tp_state_recovery 0x9380 读） */
+	u8 reserved_mid[0x90];				/* blob 0xBF8..0xC87 零访问洞（0x90；候选宿主 = blob 独有
+							* schedule_resume_suspend_work_common 相关域 —— ②b 串
+							* 'enter schedule_resume_suspend_work_common enable %d'
+							* 宿主 blob fts_suspend/doze 面，树侧无对应工作，留账） */
+	bool enable_touch_raw;				/* blob 0xC88（set_cur_value 0xD6C0/game_mode_update 0xD194/irq_handler 0xF614） */
+	/* blob 0xC89..0xC8F pad7（自然对齐）。blob 侧 thp_signal_work 0xC90..0xCD7
+	 * （其内核 delayed_work=0x48）；本树 6.18 delayed_work=0x88 ⇒ 槽体
+	 * 0xC90..0xD17 恰好衔接 blob 的 dump_type@0xD18 锚点，无占位。 */
+	struct delayed_work thp_signal_work;		/* blob 0xC90（probe 0x106E0 INIT_DELAYED_WORK：data@0xC90/entry@0xC98/func@0xCA8=fts_thp_signal_work） */
+	int dump_type;					/* blob 0xD18（irq_handler 0xF5EC 存入 tp_frame->dump_type、set_cur_value 0xDAA4 读） */
 };
 
 /* _b582-TEST：ftxxxx_proc / proc_ta 布局判据（⑥-b 实证：opmode @+0x08、
@@ -676,6 +745,74 @@ _Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_support) == 0x2e4,
                "_b583-FTS gesture_support@0x2e4 (blob fts_gesture_readdata ldrb [x0,#0x2e4])");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_bmode) == 0x2e5,
                "_b583-FTS gesture_bmode@0x2e5 (blob fts_gesture_bm_show/store)");
+
+/* ===== _b583b-B8/B10：中尾段布局断言（证据 = blob 全 ko [reg,#imm] 基址追踪，
+ * tools/_b583_ftsface/{ida_dump.py,blbscan_2e8_af0.txt} + evidence_b583b.txt；
+ * 等式右端 = blob 机器码立即数偏移，左端 = 本结构编译期 offsetof） ===== */
+_Static_assert(sizeof(struct pen_event) == 48, "_b583b-B8 sizeof(pen_event)==48 (blob events@0x318 边界反推)");
+_Static_assert(sizeof(struct mutex) == 0x30, "_b583b-B8 sizeof(mutex)==0x30 (6.18 mutex_types.h)");
+_Static_assert(sizeof(struct delayed_work) == 0x88, "_b583b-B8 sizeof(delayed_work)==0x88 (0xC90+0x88==0xD18 锚点衔接)");
+/* 0x2E6..0x668 段（改动前后与 blob 同构，DWARF/IDA 双证） */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, old_point_id) == 0x2e6, "_b583b-B8 old_point_id@0x2e6");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pen_etype) == 0x2e7, "_b583b-B8 pen_etype@0x2e7 (blob fts_pen_show/store ldrb/strb)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pevent) == 0x2e8, "_b583b-B8 pevent@0x2e8");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, events) == 0x318, "_b583b-B8 events@0x318 (blob irq_handler ADD X8,X19,#0x318 → input_report_b)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_addr) == 0x430, "_b583b-B8 touch_addr@0x430 (blob irq_handler STRB 0xEEA0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_size) == 0x434, "_b583b-B8 touch_size@0x434 (blob touch_size_show 0x15C1C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_fod_addr) == 0x438, "_b583b-B8 touch_fod_addr@0x438 (blob fod STRB 0x438)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_fod_size) == 0x43c, "_b583b-B8 touch_fod_size@0x43c (blob fod STR 0x43c)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_buf) == 0x440, "_b583b-B8 touch_buf@0x440 (blob probe 0x1125C/irq 0xEE50)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_event_num) == 0x448, "_b583b-B8 touch_event_num@0x448 (blob irq 0xF3E4/report_b LDRSW 0x100C0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_points) == 0x44c, "_b583b-B8 touch_points@0x44c (blob report_b ldr/str)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, key_state) == 0x450, "_b583b-B8 key_state@0x450 (blob report_b 0x10164..)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_flag) == 0x454, "_b583b-B8 ta_flag@0x454 (blob ta_open/ta_read/irq 0xFA54..0xFA60)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_size) == 0x458, "_b583b-B8 ta_size@0x458 (blob irq 0xEEA4 = touch_size 同步、0xFA68 memcpy n)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_buf) == 0x460, "_b583b-B8 ta_buf@0x460 (blob ta_open 0x14124 kmalloc 落槽)");
+/* bus/power/lockdown 段 */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_tx_buf) == 0xac8, "_b583b-B8 bus_tx_buf@0xac8 (blob fts_bus_init/write/probe 0x11460)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_rx_buf) == 0xad0, "_b583b-B8 bus_rx_buf@0xad0 (blob fts_read/fts_bus_exit)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_type) == 0xad8, "_b583b-B8 bus_type@0xad8 (blob hid2std/ft5008_upgrade LDR W)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, iovdd) == 0xae0, "_b583b-B8 iovdd@0xae0 (blob power_source_* 0xae0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, avdd) == 0xae8, "_b583b-B8 avdd@0xae8 (blob power_source_* 0xae8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, lockdown_info) == 0xaf0, "_b583b-B8 lockdown_info@0xaf0 (8B 锚点)");
+#if FTS_PINCTRL_EN
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl) == 0xaf8, "_b583b-B8 pinctrl@0xaf8 (blob power_source_exit 0x1275C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_active) == 0xb00, "_b583b-B8 pins_active@0xb00 (blob init 0x11F10/power 0x12184)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_suspend) == 0xb08, "_b583b-B8 pins_suspend@0xb08");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_release) == 0xb10, "_b583b-B8 pins_release@0xb10 (blob power_source_exit 0x12768)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_spimode) == 0xb18, "_b583b-B8 spimode@0xb18 (blob power 0x121A4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_dvdd_enable) == 0xb20, "_b583b-B8 dvdd_enable@0xb20 (死槽：init 只写零读)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_dvdd_disable) == 0xb28, "_b583b-B8 dvdd_disable@0xb28 (死槽：init 只写零读)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_cs_gpiomode) == 0xb30, "_b583b-B8 cs_gpio@0xb30 (blob ctrl 0x129AC + cs_gpio_mode 串)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_cs_spimode) == 0xb38, "_b583b-B8 cs_spi@0xb38 (blob ctrl 0x128D8 + cs_spi_mode 串)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_touch_mode_ap) == 0xb40, "_b583b-B8 touch_ap@0xb40");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_touch_mode_scp) == 0xb48, "_b583b-B8 touch_scp@0xb48");
+#endif
+#ifdef FTS_TOUCHSCREEN_FOD
+_Static_assert(__builtin_offsetof(struct fts_ts_data, finger_in_fod) == 0xb50, "_b583b-B8 finger_in_fod@0xb50 (blob irq 0xF5DC → tp_frame.fod_pressed)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, fod_finger_skip) == 0xb51, "_b583b-B8 fod_finger_skip@0xb51 (blob fod 报点 0xB7C0/release STRH 连清)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, overlap_area) == 0xb54, "_b583b-B8 overlap_area@0xb54 (blob fod 报点 0xA7FC/0xA810/0xA92C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, point_id_changed) == 0xb88, "_b583b-B8 point_id_changed@0xb88 (blob fod 0xA6FC 写/release 0xA48C 清)");
+#endif
+_Static_assert(__builtin_offsetof(struct fts_ts_data, palm_status) == 0xbd8, "_b583b-B8 palm_status@0xbd8 (blob palm_sensor_write 0xDDA8 / irq 0x9410)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, poweroff_on_sleep) == 0xbdc, "_b583b-B8 poweroff_on_sleep@0xbdc (blob ic_switch_mode 0xCF50/0xCFC8、suspend 0x131E8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_status) == 0xbdd, "_b583b-B8 gesture_status@0xbdd (blob update_gesture_state 0xEBA4..0xECB4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, tpdbg_dentry) == 0xbe0, "_b583b-B8 裁决归位 tpdbg_dentry@0xbe0 (blob probe 0x11690 STR、0x119D4 父目录、remove 0x11B58；fts_ftest 系全局 .bss+0x5b0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gamemode_enabled) == 0xbe8, "_b583b-B8 gamemode_enabled@0xbe8 (blob 0x93E4/0xE900/0xDD28)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, is_expert_mode) == 0xbea, "_b583b-B8 is_expert_mode@0xbea (blob game_mode_update 0xD218)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_cmd) == 0xbeb, "_b583b-B8 gesture_cmd@0xbeb (blob update_gesture_state 0xEBB4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_cmd_delay) == 0xbec, "_b583b-B8 gesture_cmd_delay@0xbec (blob update_gesture_state 0xEBF4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, current_fps) == 0xbf4, "_b583b-B8 current_fps@0xbf4 (blob probe 0x10D8C/game_mode_update 0xD260)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, enable_touch_raw) == 0xc88, "_b583b-B8 enable_touch_raw@0xc88 (blob 0xB410/0xD194/0xF614)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, thp_signal_work) == 0xc90, "_b583b-B8 thp_signal_work@0xc90 (blob probe INIT_DELAYED_WORK 0x106E0..0x10718)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, dump_type) == 0xd18, "_b583b-B8 dump_type@0xd18 (blob irq 0xF5EC → tp_frame+0x1018)");
+_Static_assert(sizeof(struct fts_ts_data) == 0xd20, "_b583b-B8 sizeof(fts_ts_data)==0xd20 (blob probe 0x10660 kmalloc_trace w2=0xD20)");
+/* 头段补钉（blob 侧证据链见 82/83 轮 + 本轮 set_charge_state 0x1A8/irq_handler 0x1B0/0x210） */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ts_workqueue) == 0x60, "_b583b-B8 ts_workqueue@0x60 (blob probe 0x10CF8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, charger_status) == 0x1a8, "_b583b-B8 charger_status@0x1a8 (blob set_charge_state 0xCD8C/charger_on 0xAA30)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ts_waitqueue) == 0x1b0, "_b583b-B8 ts_waitqueue@0x1b0 (blob irq_handler wake_up ADD X0,X19,#0x1B0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, irq_lock) == 0x208, "_b583b-B8 irq_lock@0x208 (blob probe spin_lock_init 0x10D1C STR WZR)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, report_mutex) == 0x210, "_b583b-B8 report_mutex@0x210 (blob irq_handler mutex_lock ADD X21,X19,#0x210)");
 
 enum GESTURE_MODE_TYPE {
 	GESTURE_DOUBLETAP,

@@ -99,7 +99,7 @@ static int async_read(struct goodix_tools_dev *dev, void __user *arg)
 	}
 	databuf = kzalloc(length, GFP_KERNEL);
 	if (!databuf) {
-		ts_err("Alloc memory failed");
+		ts_err("memory failed");		/* _b583b-GX：blob tools 统一措辞 0x5f8a */
 		return -ENOMEM;
 	}
 
@@ -144,7 +144,7 @@ static int read_config_data(struct goodix_ts_core *ts_core, void __user *arg)
 	}
 	tmp_buf = kzalloc(length, GFP_KERNEL);
 	if (!tmp_buf) {
-		ts_err("failed alloc memory");
+		ts_err("memory failed");		/* _b583b-GX：blob tools 统一措辞 0x5f8a */
 		return -ENOMEM;
 	}
 	/* if reg_addr == 0, read config data with specific flow */
@@ -199,7 +199,7 @@ static int async_write(struct goodix_tools_dev *dev, void __user *arg)
 
 	databuf = kzalloc(length, GFP_KERNEL);
 	if (!databuf) {
-		ts_err("Alloc memory failed");
+		ts_err("memory failed");		/* _b583b-GX：blob tools 统一措辞 0x5f8a */
 		return -ENOMEM;
 	}
 	ret = copy_from_user(databuf, (u8 *)arg + I2C_MSG_HEAD_LEN, length);
@@ -313,7 +313,7 @@ static long goodix_tools_ioctl(struct file *filp, unsigned int cmd,
 	case GTP_SEND_CONFIG:
 		temp_cfg = kzalloc(sizeof(struct goodix_ic_config), GFP_KERNEL);
 		if (temp_cfg == NULL) {
-			ts_err("Memory allco err");
+			ts_err("memory failed");		/* _b583b-GX：blob tools 统一措辞 0x5f8a */
 			ret = -ENOMEM;
 			goto err_out;
 		}
@@ -470,7 +470,7 @@ int goodix_tools_init(void)
 
 	goodix_tools_dev = kzalloc(sizeof(struct goodix_tools_dev), GFP_KERNEL);
 	if (goodix_tools_dev == NULL) {
-		ts_err("Memory allco err");
+		ts_err("memory failed");		/* _b583b-GX：blob tools 统一措辞 0x5f8a */
 		return -ENOMEM;
 	}
 

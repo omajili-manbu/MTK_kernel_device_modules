@@ -425,7 +425,10 @@ int goodix_normalize_coeffi_update(struct goodix_ts_core *cd)
 	output_pack = kzalloc(1024 * 16, GFP_KERNEL);
 	read_back_pack = kzalloc(1024 * 16, GFP_KERNEL);
 	if (!output_pack || !read_back_pack) {
-		ts_err("failed alloc memory");
+		/* _b583b-GX 勘误：blob 0x2269c 实引 rodata+0x41fd 全串
+		 * "alloc read_back_pack or output_pack memory failed"（前轮误取
+		 * 0xbaa 邻位短串 "memory failed"），逐字归位。 */
+		ts_err("alloc read_back_pack or output_pack memory failed");
 		ret = -1;
 		goto err_out;
 	}

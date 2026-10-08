@@ -1326,7 +1326,7 @@ bool compare_array_new(struct fts_test_fail_buf *out, int *data,
  *    +0x40 item1_data +0x48 item2_data +0x50 item3_data +0x58 item4_data
  *    +0x60 item5_data +0x68 item6_data +0x70 item7_data
  *    +0x90 buffer  +0x98 buffer_length  +0xa0 node_valid  (+0xa8 node_valid_sc[TODO-VERIFY])
- *    +0xc0 csv_item_cnt  +0xc4 csv_item_sraw  +0xc8 csv_item_scb  +0xd4 csv_item_af_noise
+ *    +0xc0 csv_item_cnt  +0xc4 csv_item_scb(scap_cb 位图)  +0xc8 csv_item_sraw(sraw 位图)  +0xd4 csv_item_af_noise
  *    +0x35* mapping；+0xbe0 testresult  +0xbe8 testresult_len
  *    +0x12bc item_fail_flag（int 位掩码，0=全过；本文件 start_test 写、save_data 读）
  *    +0x12c0 struct fts_test_fail_buf fail[..] 起始（元素 30004B，见 compare 契约）
@@ -1492,87 +1492,318 @@ static __attribute__((always_inline)) inline int ft5672_rst_test(struct fts_test
 /* ================================================================== *
  * 3. scap_cb_ccbypass —— donor 同名函数（focaltech_test_ft3383.c:115）
  *    blob 内联：ENTER 串 @0x1ed2c；Exit 串 @0x240d4（region B 冷块）
+ *    _b583-FT3683 A 组：三段 WP 体按 blob 重建 ——
+ *      on  段 0x20614-0x207f0 + 冷 0x232b4/0x23528（0x44<-1, scb|=0x01, fail_buf[4]）
+ *      off 段 0x2366c-0x23b40                （0x44<-0, scb|=0x02, fail_buf[5]）
+ *      hi  段 0x23b44-0x23d40                （0x44<-2, scb|=0x04, 无 fail 记录）
+ *    每段：cnt+=2 → 写 0x44 → wait AA → get_cb_ft5672(基址+段偏移) → 读 0xbe(GCB_RX)/
+ *    0xbc(GCB_TX) → SAVE_INFO(模式)/show_data_mc_sc/SAVE_INFO(GCB) → 逐点阈值判定
+ *    （on/off 另做 gcb_rx/gcb_tx 对 on/off_gcb_min/max 的窗判，按 ON_TX/ON_RX、
+ *    OFF_TX/OFF_RX 门控；hi 段按 hc_sel bit1/bit0 门控、窗用 hi_gcb_min/max）。
+ *    合并 *result = on ? (off && hi) : false（blob 0x240bc-0x240cc）。
  * ================================================================== */
 static __attribute__((always_inline)) inline int scap_cb_ccbypass(struct fts_test *tdata, int *scap_cb, bool *result)
 {
 	int ret = 0;
-	int i = 0;
-	u8 sc_cb[4] = { 0 };
-	u8 sc_mode = 0;
-	int gcb_tx = 0;
-	int gcb_rx = 0;
-	int *cb_on = NULL;
-	int *cb_off = NULL;
-	int *cb_hi = NULL;
+	int i = 0, n = 0;
+	int mode_off = 0;
+	int val = 0;
+	u8 wc_sel = 0, hc_sel = 0;
+	u8 gcb_rx = 0, gcb_tx = 0;
+	bool tx_check = false, rx_check = false;
+	bool tmp_on = false, tmp_off = false, tmp_hi = true;
+	int *cb_base = NULL;
 	struct mc_sc_threshold *thr = &tdata->ic.mc_sc.thr;
 
 	*result = false;
-	FTS_TEST_FUNC_ENTER();
-	if (!scap_cb) {
-		FTS_TEST_SAVE_ERR("scap_cb fails");			/* 0x1e2c0 */
-		return -EINVAL;
-	}
+	FTS_TEST_FUNC_ENTER();					/* 0x1ed2c */
+	/* 0x1ed50-0x1ed7c：6 个阈值指针全非空才继续 */
 	if (!thr->scap_cb_on_min || !thr->scap_cb_on_max ||
-	    !thr->scap_cb_off_min || !thr->scap_cb_off_max) {
+	    !thr->scap_cb_off_min || !thr->scap_cb_off_max ||
+	    !thr->scap_cb_hi_min || !thr->scap_cb_hi_max) {
 		FTS_TEST_SAVE_ERR("scap_cb_on/off/hi_min/max is null\n");/* 0x1ed9c */
-		return -EINVAL;
+		return -EINVAL;					/* w22=-0x16 */
 	}
-	ret = fts_test_read_reg(0x59, &sc_cb[0]);			/* [TODO-VERIFY] 0x59 位置 */
+	ret = fts_test_read_reg(FACTORY_REG_WC_SEL, &wc_sel);	/* 0x1ff78 reg 0x09 */
 	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("read 0x59 fail,ret=%d\n", ret);
+		FTS_TEST_SAVE_ERR("read water_channel_sel fail,ret=%d\n", ret);/* 0x1ffac */
 		return ret;
 	}
-	ret = enter_factory_mode();					/* 0x1e308 */
+	ret = fts_test_read_reg(FACTORY_REG_HC_SEL, &hc_sel);	/* 0x201b4 reg 0x0f */
 	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("enter factory mode fail,ret=%d\n", ret);/* 0x1e338 */
+		FTS_TEST_SAVE_ERR("read high_channel_sel fail,ret=%d\n", ret);/* 0x201ec */
 		return ret;
 	}
-	ret = mapping_switch(NO_MAPPING);				/* 0x1e36c */
-	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("switch no-mapping fail,ret=%d\n", ret);/* 0x1e39c */
-		return ret;
-	}
-	ret = fts_test_read_reg(0x44, &sc_mode);			/* 0x1e450 */
-	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("read sc_mode fail,ret=%d\n", ret);	/* 0x1e480 */
-		return ret;
-	}
-	/* 三次空扫丢帧 */
-	for (i = 0; i < 3; i++) {
-		ret = start_scan();
+
+	/* 运行 max/min 累加器初始化（blob 0x20614-0x20624 一条 64bit 常量写两对） */
+	tdata->scap_cb_on_result_max = 0;			/* +0x1178 */
+	tdata->scap_cb_on_result_min = 0xffff;			/* +0x117c */
+	tdata->scap_cb_off_result_max = 0;			/* +0x1180 */
+	tdata->scap_cb_off_result_min = 0xffff;			/* +0x1184 */
+
+	/* ---------------- water proof on（0x20630-0x2366c） ---------------- */
+	tmp_on = true;						/* 0x2062c [sp+0x38]=1 */
+	if (thr->basic.scap_cb_wp_on_check && get_fw_wp(wc_sel, WATER_PROOF_ON)) {
+		tdata->csv_item_cnt += 2;			/* 0x20644 +0xc0 +=2 */
+		tdata->csv_item_scb |= 0x01;			/* 0x20654 +0xc4 |= 1 */
+		mode_off = 0;					/* 0x20638 [sp+0x30]=0 */
+		cb_base = scap_cb;
+		ret = fts_test_write_reg(FACTORY_REG_MC_SC_MODE, 1);/* 0x2065c 0x44<-1 */
 		if (ret < 0) {
-			FTS_TEST_SAVE_ERR("scan fail\n");		/* 0x202d0 */
-			goto restore;
+			FTS_TEST_SAVE_ERR("set mc_sc mode fail\n");/* 0x23b9c */
+			return ret;
+		}
+		ret = wait_state_update(TEST_RETVAL_AA);	/* 0x20668 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("wait state update fail\n");/* 0x23c00 */
+			return ret;
+		}
+		ret = get_cb_ft5672(cb_base, tdata->sc_node.node_num);/* 0x20678 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read sc_cb fail,ret=%d\n", ret);/* 0x23c84 */
+			return ret;
+		}
+		ret = fts_test_read_reg(0xbe, &gcb_rx);		/* 0x20688 GCB_RX */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read GCB_RX fail,ret=%d\n", ret);/* 0x23e04 */
+			return ret;
+		}
+		ret = fts_test_read_reg(0xbc, &gcb_tx);		/* 0x20698 GCB_TX */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read GCB_TX fail,ret=%d\n", ret);/* 0x23f44 */
+			return ret;
+		}
+		/* 0x206a0-0x206b8：gcb 写回 scap_cb[node_num] / [node_num+rx_num] */
+		cb_base[tdata->sc_node.node_num] = gcb_rx;
+		cb_base[tdata->sc_node.node_num + tdata->sc_node.rx_num] = gcb_tx;
+		FTS_TEST_SAVE_INFO("scap_cb in waterproof on mode:\n");/* 0x206dc SAVE_INFO */
+		show_data_mc_sc(cb_base);			/* 0x20724 */
+		FTS_TEST_SAVE_INFO("GCB RX:%d,TX:%d\n", gcb_rx, gcb_tx);/* 0x20748+0x20774 */
+		tx_check = get_fw_wp(wc_sel, WATER_PROOF_ON_TX);/* 0x20790 */
+		rx_check = get_fw_wp(wc_sel, WATER_PROOF_ON_RX);/* 0x207a4 */
+		tdata->fail_buf[4].fail_num = 0;		/* 0x207b8 fail_buf[4] */
+		if (tdata->sc_node.node_num >= 1) {		/* 0x207b0 */
+			for (i = 0; i < tdata->sc_node.node_num; i++) {
+				if (0 == tdata->node_valid_sc[i])/* 0x232b4 */
+					continue;
+				if (rx_check && (i < tdata->sc_node.rx_num))
+					val = cb_base[i];
+				else if (tx_check && (i >= tdata->sc_node.rx_num))
+					val = cb_base[i];
+				else
+					continue;		/* 0x232d0/0x232a4 */
+				if (val > tdata->scap_cb_on_result_max)
+					tdata->scap_cb_on_result_max = val;/* 0x232e8 */
+				if (val < tdata->scap_cb_on_result_min)
+					tdata->scap_cb_on_result_min = val;/* 0x232fc */
+				if ((val < thr->scap_cb_on_min[i]) ||
+				    (val > thr->scap_cb_on_max[i])) {/* +0x2f0/+0x2f8 */
+					FTS_TEST_SAVE_ERR("test fail,CH%d=%5d,range=(%5d,%5d)\n",
+						i + 1, val,
+						thr->scap_cb_on_min[i],
+						thr->scap_cb_on_max[i]);/* 0x23360 */
+					if (tdata->fail_buf[4].fail_num < 1500) {/* 0x23254 */
+						n = tdata->fail_buf[4].fail_num;
+						tdata->fail_buf[4].node[n].tx = i + 1;
+						tdata->fail_buf[4].node[n].val = val;
+						tdata->fail_buf[4].node[n].min = thr->scap_cb_on_min[i];
+						tdata->fail_buf[4].node[n].max = thr->scap_cb_on_max[i];
+						tdata->fail_buf[4].fail_num++;
+					}
+					tmp_on = false;		/* 0x23274 */
+				}
+			}
+		}
+		/* gcb 窗判（0x23530-0x2365c）：rx 按 ON_RX、tx 按 ON_TX 门控 */
+		if (rx_check &&
+		    !((gcb_rx >= thr->basic.scap_cb_on_gcb_min) &&
+		      (gcb_rx <= thr->basic.scap_cb_on_gcb_max))) {/* +0x1a0/+0x1a4 */
+			FTS_TEST_SAVE_ERR("test fail,gcb_rx:%5d,range=(%5d,%5d)\n",
+				gcb_rx, thr->basic.scap_cb_on_gcb_min,
+				thr->basic.scap_cb_on_gcb_max);	/* 0x23578 */
+			tmp_on = false;
+		}
+		if (tx_check &&
+		    !((gcb_tx >= thr->basic.scap_cb_on_gcb_min) &&
+		      (gcb_tx <= thr->basic.scap_cb_on_gcb_max))) {
+			FTS_TEST_SAVE_ERR("test fail,gcb_tx:%5d,range=(%5d,%5d)\n",
+				gcb_tx, thr->basic.scap_cb_on_gcb_min,
+				thr->basic.scap_cb_on_gcb_max);	/* 0x23610 */
+			tmp_on = false;
+		}
+		mode_off = tdata->sc_node.node_num * 2;		/* 0x23660-0x23668 */
+	}
+
+	/* ---------------- water proof off（0x2366c-0x23b40） ---------------- */
+	tmp_off = true;						/* 0x2367c [sp+0x28]=1 */
+	if (thr->basic.scap_cb_wp_off_check && get_fw_wp(wc_sel, WATER_PROOF_OFF)) {
+		tdata->csv_item_cnt += 2;			/* 0x2368c */
+		tdata->csv_item_scb |= 0x02;			/* 0x2369c |= 2 */
+		cb_base = scap_cb + mode_off;			/* 0x236c0 x23 = x20+[sp+0x30]*4 */
+		ret = fts_test_write_reg(FACTORY_REG_MC_SC_MODE, 0);/* 0x236a4 0x44<-0 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("set mc_sc mode fail\n");
+			return ret;
+		}
+		ret = wait_state_update(TEST_RETVAL_AA);	/* 0x236b0 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("wait state update fail\n");
+			return ret;
+		}
+		ret = get_cb_ft5672(cb_base, tdata->sc_node.node_num);/* 0x236c8 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read sc_cb fail,ret=%d\n", ret);
+			return ret;
+		}
+		ret = fts_test_read_reg(0xbe, &gcb_rx);		/* 0x236d8 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read GCB_RX fail,ret=%d\n", ret);
+			return ret;
+		}
+		ret = fts_test_read_reg(0xbc, &gcb_tx);		/* 0x236e8 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read GCB_TX fail,ret=%d\n", ret);
+			return ret;
+		}
+		cb_base[tdata->sc_node.node_num] = gcb_rx;	/* 0x236f0-0x236f8 */
+		cb_base[tdata->sc_node.node_num + tdata->sc_node.rx_num] = gcb_tx;
+		FTS_TEST_SAVE_INFO("scap_cb in waterproof off mode:\n");/* 0x2372c */
+		show_data_mc_sc(cb_base);			/* 0x23778 */
+		FTS_TEST_SAVE_INFO("GCB RX:%d,TX:%d\n", gcb_rx, gcb_tx);/* 0x2379c+0x237c8 */
+		tx_check = get_fw_wp(wc_sel, WATER_PROOF_OFF_TX);/* 0x237e4 */
+		rx_check = get_fw_wp(wc_sel, WATER_PROOF_OFF_RX);/* 0x237f8 */
+		tdata->fail_buf[5].fail_num = 0;		/* 0x2380c fail_buf[5]=0x25cc4 */
+		if (tdata->sc_node.node_num >= 1) {		/* 0x23804 */
+			for (i = 0; i < tdata->sc_node.node_num; i++) {
+				if (0 == tdata->node_valid_sc[i])/* 0x238bc */
+					continue;
+				if (rx_check && (i < tdata->sc_node.rx_num))
+					val = cb_base[i];
+				else if (tx_check && (i >= tdata->sc_node.rx_num))
+					val = cb_base[i];
+				else
+					continue;
+				if (val > tdata->scap_cb_off_result_max)
+					tdata->scap_cb_off_result_max = val;/* 0x238f0 */
+				if (val < tdata->scap_cb_off_result_min)
+					tdata->scap_cb_off_result_min = val;/* 0x23904 */
+				if ((val < thr->scap_cb_off_min[i]) ||
+				    (val > thr->scap_cb_off_max[i])) {/* +0x2e0/+0x2e8 */
+					FTS_TEST_SAVE_ERR("test fail,CH%d=%5d,range=(%5d,%5d)\n",
+						i + 1, val,
+						thr->scap_cb_off_min[i],
+						thr->scap_cb_off_max[i]);/* 0x23974 */
+					if (tdata->fail_buf[5].fail_num < 1500) {/* 0x23858 */
+						n = tdata->fail_buf[5].fail_num;
+						tdata->fail_buf[5].node[n].tx = i + 1;
+						tdata->fail_buf[5].node[n].val = val;
+						tdata->fail_buf[5].node[n].min = thr->scap_cb_off_min[i];
+						tdata->fail_buf[5].node[n].max = thr->scap_cb_off_max[i];
+						tdata->fail_buf[5].fail_num++;
+					}
+					tmp_off = false;	/* 0x2387c */
+				}
+			}
+		}
+		if (rx_check &&
+		    !((gcb_rx >= thr->basic.scap_cb_off_gcb_min) &&
+		      (gcb_rx <= thr->basic.scap_cb_off_gcb_max))) {/* +0x1a8/+0x1ac */
+			FTS_TEST_SAVE_ERR("test fail,gcb_rx:%5d,range=(%5d,%5d)\n",
+				gcb_rx, thr->basic.scap_cb_off_gcb_min,
+				thr->basic.scap_cb_off_gcb_max);/* 0x23a4c */
+			tmp_off = false;
+		}
+		if (tx_check &&
+		    !((gcb_tx >= thr->basic.scap_cb_off_gcb_min) &&
+		      (gcb_tx <= thr->basic.scap_cb_off_gcb_max))) {
+			FTS_TEST_SAVE_ERR("test fail,gcb_tx:%5d,range=(%5d,%5d)\n",
+				gcb_tx, thr->basic.scap_cb_off_gcb_min,
+				thr->basic.scap_cb_off_gcb_max);/* 0x23ae4 */
+			tmp_off = false;
+		}
+		mode_off += tdata->sc_node.node_num * 2;	/* 0x23b34-0x23b40 */
+	}
+
+	/* ---------------- high sensitivity（0x23b44-0x240bc） ----------------
+	 * blob 0x23b50-0x23b58 将 get_fw_wp(hc_sel, HIGH_SENSITIVITY) 内联为
+	 * (hc_sel & 0x03) != 0（树侧 get_fw_wp 无 HIGH 分支，照内联形直写）。 */
+	if (thr->basic.scap_cb_hi_check && (hc_sel & 0x03)) {	/* 0x23b44/0x23b58 */
+		tdata->csv_item_cnt += 2;			/* 0x23b5c */
+		tdata->csv_item_scb |= 0x04;			/* 0x23b6c |= 4 */
+		cb_base = scap_cb + mode_off;			/* 0x23c4c（=4*node_num） */
+		ret = fts_test_write_reg(FACTORY_REG_MC_SC_MODE, 2);/* 0x23b74 0x44<-2 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("set mc_sc mode fail\n");
+			return ret;
+		}
+		ret = wait_state_update(TEST_RETVAL_AA);	/* 0x23bd8 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("wait state update fail\n");
+			return ret;
+		}
+		ret = get_cb_ft5672(cb_base, tdata->sc_node.node_num);/* 0x23c54 */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read sc_cb fail,ret=%d\n", ret);
+			return ret;
+		}
+		ret = fts_test_read_reg(0xbe, &gcb_rx);		/* 0x23cbc */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read GCB_RX fail,ret=%d\n", ret);
+			return ret;
+		}
+		ret = fts_test_read_reg(0xbc, &gcb_tx);		/* 0x23ccc */
+		if (ret < 0) {
+			FTS_TEST_SAVE_ERR("read GCB_TX fail,ret=%d\n", ret);
+			return ret;
+		}
+		cb_base[tdata->sc_node.node_num] = gcb_rx;	/* 0x23cd4-0x23cdc */
+		cb_base[tdata->sc_node.node_num + tdata->sc_node.rx_num] = gcb_tx;
+		FTS_TEST_SAVE_INFO("scap_cb in high mode:\n");	/* 0x23d04 */
+		show_data_mc_sc(cb_base);			/* 0x23d48 */
+		FTS_TEST_SAVE_INFO("GCB RX:%d,TX:%d\n", gcb_rx, gcb_tx);/* 0x23d6c+0x23d98 */
+		if (tdata->sc_node.node_num >= 1) {		/* 0x23db0 */
+			for (i = 0; i < tdata->sc_node.node_num; i++) {
+				if (0 == tdata->node_valid_sc[i])/* 0x23e68 */
+					continue;
+				if ((hc_sel & 0x02) && (i < tdata->sc_node.rx_num))
+					val = cb_base[i];	/* 0x23e74 bit1 = rx 半 */
+				else if ((hc_sel & 0x01) && (i >= tdata->sc_node.rx_num))
+					val = cb_base[i];	/* 0x23e84 bit0 = tx 半 */
+				else
+					continue;
+				if ((val < thr->scap_cb_hi_min[i]) ||
+				    (val > thr->scap_cb_hi_max[i])) {/* +0x300/+0x308 */
+					FTS_TEST_SAVE_ERR("test fail,CH%d=%5d,range=(%5d,%5d)\n",
+						i + 1, val,
+						thr->scap_cb_hi_min[i],
+						thr->scap_cb_hi_max[i]);/* 0x23ed8 */
+					/* hi 段无 fail 记录、无运行 max/min 累加 */
+					tmp_hi = false;		/* 0x23e58 w9=0 */
+				}
+			}
+		}
+		if ((hc_sel & 0x02) &&
+		    !((gcb_rx >= thr->basic.scap_cb_hi_gcb_min) &&
+		      (gcb_rx <= thr->basic.scap_cb_hi_gcb_max))) {/* +0x1b0/+0x1b4 */
+			FTS_TEST_SAVE_ERR("test fail,gcb_rx:%5d,range=(%5d,%5d)\n",
+				gcb_rx, thr->basic.scap_cb_hi_gcb_min,
+				thr->basic.scap_cb_hi_gcb_max);	/* 0x23fd4 */
+			tmp_hi = false;
+		}
+		if ((hc_sel & 0x01) &&
+		    !((gcb_tx >= thr->basic.scap_cb_hi_gcb_min) &&
+		      (gcb_tx <= thr->basic.scap_cb_hi_gcb_max))) {
+			FTS_TEST_SAVE_ERR("test fail,gcb_tx:%5d,range=(%5d,%5d)\n",
+				gcb_tx, thr->basic.scap_cb_hi_gcb_min,
+				thr->basic.scap_cb_hi_gcb_max);	/* 0x2406c */
+			tmp_hi = false;
 		}
 	}
-	/* water proof on / off / high 三段，逐段 get_cb_mc_sc + compare
-	 * 证据串：0x206dc "scap_cb in waterproof on mode:" 0x2372c "...off mode:"
-	 *         0x23d04 "...high mode:" 0x23230/0x1f2f0(GCB) 等
-	 *         get_cb_ft5672 调用点 0x20678 / 0x236c8 / 0x23c54
-	 *         compare_array_new 调用点 0x29c7c（在 ft5672_panel_differ_test 内，不属本段）
-	 * [TODO-VERIFY] 三段内部逐项比较细节（gcb_tx / gcb_rx 串已落实）
-	 */
-	ret = get_cb_ft5672(scap_cb, tdata->sc_node.node_num);/* 0x20678 */
-	/* 实证：x0=scap_cb(x20), w1=w21=sc_node.node_num(0x1ed28 `ldr w21,[x19,#0x28]`)；
-	 * w2(is_cf) 未在调用点附近设置 → 形参待 get_cb_ft5672 分段定案 [TODO-VERIFY] */
-	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("read sc_cb fail,ret=%d\n", ret);	/* [TODO-VERIFY] 串 */
-		goto restore;
-	}
-	show_data(scap_cb, false);
-	/* _b583-FT3683：blob 站点 0x20748+0x20774 / 0x2379c+0x237c8 / 0x23d6c+0x23d98
-	 * 均为 SAVE_INFO 形态（bare 串 + '\x016[FTS_TS/I][TEST]%s:' 前缀串各一）；
-	 * 原树 FTS_TEST_INFO 只发射 '\x013' 前缀串（blob 无此站点）⇒ 改 SAVE_INFO。 */
-	FTS_TEST_SAVE_INFO("GCB RX:%d,TX:%d\n", gcb_rx, gcb_tx);
-	*result = true;
-
-restore:
-	ret = fts_test_write_reg(0x44, sc_mode);			/* 恢复 sc mode */
-	if (ret < 0)
-		FTS_TEST_SAVE_ERR("restore sc mode fail,ret=%d\n", ret);
-	fts_test_write_reg(0x59, 0x00);					/* set 0x59 to 0x00 */
-	wait_state_update(TEST_RETVAL_AA);
-	FTS_TEST_FUNC_EXIT();
+	/* 安全偏离判据：blob hi 段未进 if 体时 tmp_hi 为未初始化局部（clang 以寄存器
+	 * 残值并入 0x240bc 的 and —— 源级 UB，不可复现）；树侧预置 true，仅影响该
+	 * UB 路径，且与 on/off 两段"预置 true"的 blob 形态一致。 */
+	*result = tmp_on ? (tmp_off && tmp_hi) : false;		/* 0x240bc-0x240cc */
+	FTS_TEST_FUNC_EXIT();					/* 0x240d4 Exit(443) */
 	return ret;
 }
 
@@ -1723,6 +1954,11 @@ static __attribute__((always_inline)) inline int ft5672_uniformity_test(struct f
 
 	FTS_TEST_FUNC_ENTER();						/* 0x1df78 */
 	FTS_TEST_SAVE_INFO("\n============ Test Item: rawdata unfiormity test\n");/*0x1dfa0*/
+	ret = enter_factory_mode();					/* 0x1dffc（_b583b 补：blob tbz 成功→0x1e06c memset 段） */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("failed to enter factory mode,ret=%d\n", ret);/* 0x1e028 str+0xdddd */
+		goto test_err;
+	}
 	memset(tdata->buffer, 0, tdata->buffer_length);			/* 0x1e078 (+0x90,+0x98) */
 	rawdata = tdata->item1_data;					/* 0x1e07c */
 	tx_num = tdata->node.tx_num;
@@ -1835,7 +2071,6 @@ static __attribute__((always_inline)) inline int ft5672_scap_cb_test(struct fts_
 	u8 sc_cb[4] = { 0 };
 	bool tmp_result = false;
 	int *scap_cb = NULL;
-	int i = 0;
 
 	FTS_TEST_FUNC_ENTER();						/* 0x1e224 */
 	FTS_TEST_SAVE_INFO("\n============ Test Item: Scap CB Test\n");/* 0x1e250 */
@@ -1857,20 +2092,15 @@ static __attribute__((always_inline)) inline int ft5672_scap_cb_test(struct fts_
 		tmp_result = false;
 		goto test_err;
 	}
-	ret = fts_test_read_reg(0x44, &sc_mode);			/* 0x1e450 */
+	ret = fts_test_read_reg(FACTORY_REG_MC_SC_MODE, &sc_mode);	/* 0x1e450 */
 	if (ret < 0) {
 		FTS_TEST_SAVE_ERR("read sc_mode fail,ret=%d\n", ret);	/* 0x1e480 */
 		tmp_result = false;
 		goto test_err;
 	}
-	for (i = 0; i < 3; i++) {
-		ret = start_scan();
-		if (ret < 0) {
-			FTS_TEST_SAVE_ERR("scan fail\n");
-			tmp_result = false;
-			goto test_err;
-		}
-	}
+	/* _b583-FT3683：blob 0x1e450 读 0x44 后直接进 ccbypass（0x1ed28），
+	 * 无空扫预热（原树侧 3×start_scan 为推测，删除；'scan fail' 仍由
+	 * rawdata/ft3658_get_rawdata 侧发射，串面不受影响）。 */
 	ret = scap_cb_ccbypass(tdata, scap_cb, &tmp_result);		/* 0x1ed2c 内联 */
 	if (ret < 0)
 		FTS_TEST_SAVE_ERR("scap_cb fail,ret:%d", ret);
@@ -2058,15 +2288,25 @@ test_err:
 
 /* ================================================================== *
  * 8. ft5672_noise_test —— blob 内联，热 0x1e7ec-0x1e9a4
- *    主体（含 get_noise_ft5672 @0x223d4/0x226a0/0x22d24、compare_data_new
- *    @0x22414/0x2274c、get_null_noise @0x23218、compare_array_new @0x23174/0x23208）
+ *    _b583-FT3683 B 组：测量体按 blob 重建 ——
+ *      序列 0x1eba4(enter_factory) → 0x1ec04 读 0x0d 触控值 → 读 0x0A/0x06/0x1a/0x1b
+ *      → INFO fre/data_sel/reg1a/reg1b → 0x06<-1(set data_sel) → delay10 → 0x1a<-1
+ *      → 0x207d0 'noise frame num:%d,%d'（tdata+0x194 打包：帧=高字节,模式=低字节）
+ *      → 0x1c<-帧(0x207f4) → 0x1d<-模式(0x2214c) → get_noise_ft5672(tdata,noise,0,1,0)
+ *      @0x22d24 → show_data(0x2315c) → compare_array_new(&fail[8]) @0x23174
+ *      → 运行 max/min 累加(0x23184-0x23210, +0x11a0/+0x11a4) → get_null_noise @0x23218
+ *      → restore 0x1a/0x1b（0x22d94/0x22e08，错误双路都走）。
+ *    判据：blob 0x23174→0x23214 间无 result 分支（仅扫界 b.lt/b.ge），get_null_noise
+ *      为无条件调用；树侧照抄（donor 的 if(!result) 门为推测，弃）。
  * ================================================================== */
 static __attribute__((always_inline)) inline int ft5672_noise_test(struct fts_test *tdata, bool *test_result)
 {
 	int ret = 0;
-	int i = 0, j = 0;
+	int i = 0;
 	int *noise = NULL;
 	bool result = false;
+	u8 fre = 0, data_sel = 0, reg1a = 0, reg1b = 0;
+	u8 touch_value = 0, framenum = 0, noise_mode = 0;
 	struct mc_sc_threshold *thr = &tdata->ic.mc_sc.thr;
 
 	FTS_TEST_FUNC_ENTER();						/* 0x1e7ec */
@@ -2078,27 +2318,95 @@ static __attribute__((always_inline)) inline int ft5672_noise_test(struct fts_te
 		ret = -EINVAL;
 		goto test_err;
 	}
-	/* ★ blob 主路径 → 0x1eba4，其中：
-	 *   - 多帧 get_noise_ft5672(noise, fre) 累加/取平均   [0x223d4 / 0x226a0 / 0x22d24]
-	 *   - 某些子项 compare_data_new(&fail[11+idx], ...)   [0x22414 / 0x2274c]
-	 *   - min/max 统计写 fts_ftest+0x11a0/0x11a4         [0x23184-0x231e0]
-	 *   - compare_array_new(&fail[8], noise, noise_min, noise_max) [0x23174]
-	 *   - 无有效点 → get_null_noise(tdata)              [0x23218]
-	 *   - 触控值 → "noise(touch) value:%d" / "read touch_value fail,ret=%d"
-	 * [TODO-VERIFY] 中间 5 个 compare_data_new/array_new 的分组语义（见 recon §6）
-	 */
-	ret = get_noise_ft5672(tdata, noise, 0, (int)tdata->fre_num, false);/*0x223d4*/
+	ret = enter_factory_mode();					/* 0x1eba4 */
 	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("get noise fails,ret=%d\n", ret);
+		FTS_TEST_SAVE_ERR("failed to enter factory mode,ret=%d\n", ret);/* 0x1ebd4 */
 		goto test_err;
 	}
-	for (i = 0; i < tdata->node.node_num; i++)
-		noise[i] = noise[i];
-	show_data(noise, false);
-	result = compare_array_new(&tdata->fail_buf[8], noise,
-				   thr->noise_min, thr->noise_max, false);	/*0x23174*/
-	if (!result)
-		get_null_noise(tdata);					/* 0x23218 */
+	ret = mapping_switch(MAPPING);					/* 0x1eed8（0x1eba8 tbz 成功→0x1eed4 W0=WZR） */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("switch mapping fail,ret=%d\n", ret);	/* blob str+0x7d6f */
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x0d, &touch_value);			/* 0x1ec04 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read touch_value fail,ret=%d\n", ret);/* 0x1f4a4 域 */
+		goto test_err;
+	}
+	FTS_TEST_INFO("noise(touch) value:%d", touch_value);		/* 0x1ec18 */
+	ret = fts_test_read_reg(FACTORY_REG_FRE_LIST, &fre);		/* 0x1ec2c 0x0A */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read 0x0A fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = fts_test_read_reg(FACTORY_REG_DATA_SELECT, &data_sel);	/* 0x1ec3c 0x06 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read 0x06 fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x1a, &reg1a);				/* 0x1ec4c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read reg1a fail,ret=%d\n", ret);	/* 0x1fa34 域 */
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x1b, &reg1b);				/* 0x1ec5c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read reg1b fail,ret=%d\n", ret);	/* 0x1ec94 */
+		goto test_err;
+	}
+	FTS_TEST_INFO("fre:%d,data_sel:%d,reg1a:%d,reg1b:%d",		/* 0x1ffe4(noise 副本) */
+		      fre, data_sel, reg1a, reg1b);
+	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 1);		/* 0x20000 0x06<-1 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("set data_sel fail,ret=%d\n", ret);	/* 0x20acc 域 */
+		goto test_err;
+	}
+	sys_delay(10);							/* 0x2022c */
+	ret = fts_test_write_reg(0x1a, 1);				/* 0x20238 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("set reg1A fail,ret=%d\n", ret);	/* 0x2026c */
+		goto test_err;
+	}
+	/* 0x207d0：tdata+0x194 为打包值 —— 打印(高字节,低字节)，帧数取高字节 */
+	framenum = (u8)((u32)thr->basic.noise_framenum >> 8);
+	noise_mode = (u8)((u32)thr->basic.noise_framenum & 0xff);
+	FTS_TEST_INFO("noise frame num:%d,%d", framenum, noise_mode);	/* 0x207d4 */
+	ret = fts_test_write_reg(0x1c, framenum);			/* 0x207f4 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("write 0x1c fail,ret=%d\n", ret);	/* 0x2082c */
+		goto test_err;
+	}
+	ret = fts_test_write_reg(0x1d, noise_mode);			/* 0x2214c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("write 0x1d fail,ret=%d\n", ret);	/* 0x21884 域(0x22188) */
+		goto test_err;
+	}
+	ret = get_noise_ft5672(tdata, noise, 0, 1, false);		/* 0x22d10 w2=0,w3=1,w4=0 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("get noise fails,ret=%d\n", ret);	/* 0x22d54 */
+		result = false;
+	} else {
+		show_data(noise, false);				/* 0x2315c */
+		result = compare_array_new(&tdata->fail_buf[8], noise,
+					   thr->noise_min, thr->noise_max, false);/*0x23174*/
+		/* 运行 max/min 累加（0x23184-0x23210，+0x11a0/+0x11a4，F3 NoiseRecord 读） */
+		tdata->noise_result_max = 0;
+		tdata->noise_result_min = 0xffff;
+		for (i = 0; i < tdata->node.node_num; i++) {		/* 界 = node.node_num */
+			if (noise[i] > tdata->noise_result_max)
+				tdata->noise_result_max = noise[i];
+			if (noise[i] < tdata->noise_result_min)
+				tdata->noise_result_min = noise[i];
+		}
+		get_null_noise(tdata);					/* 0x23218 无条件（见头注判据） */
+	}
+	/* restore（0x22d94/0x22e08：get_noise 成败两路都执行） */
+	ret = fts_test_write_reg(0x1a, reg1a);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore reg1a fail,ret=%d\n", ret);	/* 0x22dcc */
+	ret = fts_test_write_reg(0x1b, reg1b);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore reg1b fail,ret=%d\n", ret);	/* 0x22e40 */
 test_err:
 	if (result) {
 		*test_result = true;
@@ -2113,16 +2421,47 @@ test_err:
 
 /* ================================================================== *
  * 9. ft5672_auxiliary_freq_noise_test —— blob 内联，热 0x1e9c4-0x20c3c
- *    (含 scap_cb_ccbypass 的第二次内联体 0x1ed2c 起？→ 见 recon §4 备注)
+ *    _b583-FT3683 D 组：6 频点体按 blob 重建 ——
+ *      序列 0x1eba4 enter_factory → 读 0x0d/0x0A/0x06/0x1a/0x1b → INFO fre:...
+ *      → 0x1fc04 0x06<-1(set data_sel) → 0x221b4 频点循环（跳表 6 分支，每频点
+ *      使能域 = thr->basic.auxiliary_fre_noise_test_freN，0x22240/0x22278/0x222b0/
+ *      0x222ec/0x22328/0x22364）：
+ *        INFO 'switch to freq %d to test noise' → csv_item_af_noise |= 1<<N(0x223ac)
+ *        → buf = item7_data + N*node_num（0x22270/0x222d8 步进域 [x19+0x14]）
+ *        → get_noise_ft5672(tdata,buf,N,auxiliary_fre_noise_framenum,0) @0x223d4
+ *        → show_data → compare_data_new(&fail[11+N], buf, 0, freN_threshold*touch,0,0,0)
+ *          @0x22414 → 运行 max/min 累加 +0x11b4/+0x11cc+4N（0x22430/0x22440, 0x22820 同构）
+ *      判据：get_noise 帧数实参 blob 寄存器源未定（w20），按 ini 同名字段
+ *      auxiliary_fre_noise_framenum 取（donor 同形）；阈值乘子 = 触控值（0x223a0-0x223b0
+ *      mul w10,w10,w11，w11=0x0d 读数）。
  * ================================================================== */
 static __attribute__((always_inline)) inline int ft5672_auxiliary_freq_noise_test(struct fts_test *tdata, bool *test_result)
 {
 	int ret = 0;
-	int i = 0;
+	int i = 0, j = 0;
 	int *noise = NULL;
-	int *noise_tmp = NULL;
-	bool result = false;
-	struct mc_sc_threshold *thr = &tdata->ic.mc_sc.thr;
+	int *buf = NULL;
+	int af_max = 0;
+	bool result = true;
+	u8 fre = 0, data_sel = 0, reg1a = 0, reg1b = 0;
+	u8 touch_value = 0;
+	struct mc_sc_threshold *thr_b = &tdata->ic.mc_sc.thr;
+	int *af_fre[6] = {
+		&thr_b->basic.auxiliary_fre_noise_test_fre0,
+		&thr_b->basic.auxiliary_fre_noise_test_fre1,
+		&thr_b->basic.auxiliary_fre_noise_test_fre2,
+		&thr_b->basic.auxiliary_fre_noise_test_fre3,
+		&thr_b->basic.auxiliary_fre_noise_test_fre4,
+		&thr_b->basic.auxiliary_fre_noise_test_fre5,
+	};
+	int *af_thr[6] = {
+		&thr_b->basic.auxiliary_fre_noise_test_fre0_threshold,
+		&thr_b->basic.auxiliary_fre_noise_test_fre1_threshold,
+		&thr_b->basic.auxiliary_fre_noise_test_fre2_threshold,
+		&thr_b->basic.auxiliary_fre_noise_test_fre3_threshold,
+		&thr_b->basic.auxiliary_fre_noise_test_fre4_threshold,
+		&thr_b->basic.auxiliary_fre_noise_test_fre5_threshold,
+	};
 
 	FTS_TEST_FUNC_ENTER();						/* 0x1e9c4 */
 	FTS_TEST_SAVE_INFO("\n============ Test Item: Auxiliary Freq Noise Test\n");/*0x1ea08*/
@@ -2133,36 +2472,92 @@ static __attribute__((always_inline)) inline int ft5672_auxiliary_freq_noise_tes
 		ret = -EINVAL;
 		goto test_err;
 	}
-	/* 0x1ebxx-0x20c3c：6 个辅助频点循环
-	 *   每个频点：compare_data_new(&fail[11+i], noise, min, max, 0, 0, 0) [0x22414] +
-	 *   起始 "switch to freq %d to test noise" / 越频 "freq %d jump to freq %d to test noise"
-	 *   失败串全覆盖：set data_sel / set reg1A / write 0x1c / write 0x1d /
-	 *   read 0x59 fail / read reg1a / read reg1b / read 0x06 / read 0x0A /
-	 *   get rawdata fail / read touch_value fail / read GCB_TX/RX fail /
-	 *   restore reg1a / restore reg1b / restore 0x0A / restore data_sel /
-	 *   wait state update fail / get noise fails
-	 *   csv_item_af_noise(+0xd4) 位 0..5 对应 6 个频点（save_data 侧实证）
-	 * [TODO-VERIFY] 6 频点各自的 fre 值来自 thr->basic.auxiliary_fre_noise_test_fre{0..5}
-	 */
+	ret = enter_factory_mode();					/* 0x1eae0(IDA 0x27ae4) */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("failed to enter factory mode,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = mapping_switch(MAPPING);					/* 0x1eb44(IDA 0x27b48) W0=WZR=MAPPING(枚举0) */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("switch mapping fail,ret=%d\n", ret);	/* blob str+0x7d6f */
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x0d, &touch_value);			/* 0x1ec04 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read touch_value fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	FTS_TEST_INFO("noise(touch) value:%d", touch_value);		/* 0x1ec18 */
+	ret = fts_test_read_reg(FACTORY_REG_FRE_LIST, &fre);		/* 0x1ec2c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read 0x0A fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = fts_test_read_reg(FACTORY_REG_DATA_SELECT, &data_sel);	/* 0x1ec3c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read 0x06 fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x1a, &reg1a);				/* 0x1ec4c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read reg1a fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x1b, &reg1b);				/* 0x1ec5c */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read reg1b fail,ret=%d\n", ret);	/* 0x1ec94 */
+		goto test_err;
+	}
+	FTS_TEST_INFO("fre:%d,data_sel:%d,reg1a:%d,reg1b:%d",		/* 0x1fbe0(aux 副本) */
+		      fre, data_sel, reg1a, reg1b);
+	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 1);		/* 0x1fc04 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("set data_sel fail,ret=%d\n", ret);
+		goto test_err;
+	}
 	for (i = 0; i < 6; i++) {
-		if (!(tdata->csv_item_af_noise & (1 << i)))
+		if (*af_fre[i] == 0)					/* 0x22240 域：使能域判定 */
 			continue;
-		FTS_TEST_INFO("switch to freq %d to test noise", i);
-		ret = fts_test_write_reg(FACTORY_REG_FRE_LIST, (u8)i);
-		if (ret < 0)
-			goto test_err;
-		ret = wait_state_update(TEST_RETVAL_AA);
+		FTS_TEST_INFO("switch to freq %d to test noise", i);	/* 0x22248 域 */
+		tdata->csv_item_af_noise |= (1 << i);			/* 0x223ac +0xd4 */
+		buf = noise + i * tdata->node.node_num;			/* 0x223a8 x25 步进 */
+		af_max = *af_thr[i] * touch_value;			/* 0x223b0 mul */
+		ret = get_noise_ft5672(tdata, buf, i,
+				       thr_b->basic.auxiliary_fre_noise_scan_mode,
+				       false);/*0x223d4 w3=scan_mode(_b583b: blob 0x1e9c4 LDR W20,[x19+0x1d8]=aux scan_mode→0x1b)*/
 		if (ret < 0) {
-			FTS_TEST_SAVE_ERR("wait state update fail\n");
-			goto test_err;
+			FTS_TEST_SAVE_ERR("get noise fails,ret=%d\n", ret);/* 0x234c0 域 */
+			result = false;
+			goto restore_reg;
 		}
-		ret = get_noise_ft5672(tdata, noise, (int)i, 1, false); /* [TODO-VERIFY] 形参 */
-		if (ret < 0) {
-			FTS_TEST_SAVE_ERR("get noise fails,ret=%d\n", ret);
-			goto test_err;
+		show_data(buf, false);					/* 0x223e4 */
+		if (!compare_data_new(&tdata->fail_buf[11 + i], buf, 0,
+				      af_max, 0, 0, 0))			/* 0x22414 */
+			result = false;					/* 0x22424 栈 flag */
+		/* 运行 max/min（0x22430/0x22440 置初值 + 0x22444-0x2246c 域扫） */
+		tdata->aux_noise_max[i] = 0;
+		tdata->aux_noise_min[i] = 0xffff;
+		for (j = 0; j < tdata->node.node_num; j++) {
+			if (buf[j] > tdata->aux_noise_max[i])
+				tdata->aux_noise_max[i] = buf[j];
+			if (buf[j] < tdata->aux_noise_min[i])
+				tdata->aux_noise_min[i] = buf[j];
 		}
 	}
-	result = true;
+restore_reg:
+	/* restore 尾（blob 冷区 0x22e80/0x22f90 域的 restore 家族，判据见 evidence D） */
+	ret = fts_test_write_reg(0x1a, reg1a);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore reg1a fail,ret=%d\n", ret);
+	ret = fts_test_write_reg(0x1b, reg1b);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore reg1b fail,ret=%d\n", ret);
+	ret = fts_test_write_reg(FACTORY_REG_FRE_LIST, fre);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore 0x0A fail,ret=%d\n", ret);
+	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, data_sel);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore data_sel fail,ret=%d\n", ret);
 test_err:
 	if (result) {
 		*test_result = true;
@@ -2177,25 +2572,103 @@ test_err:
 
 /* ================================================================== *
  * 10. ft5672_jump_freq_noise_test —— blob 内联，热 0x20c5c-0x211d8
- *     冷块 0x21a70-0x21f40（region B）
+ *     冷块 0x21a70-0x21f40 + 对循环 0x224b0-0x22900（region B）
+ *     _b583-FT3683 C 组：15 组跳频按 blob 重建 ——
+ *       缓冲 = item8_data(+0x88, 0x20d00 ldr x23)；帧数 = jump_fre_noise_framenum
+ *       （0x20c5c ldr w20,[x19,#0x210]）。写序列：0x06<-1(set data_sel) →
+ *       0x1a<-1(0x21ba8) → 0x1c<-帧(0x21c34) → 0x1d<-模式(0x21ee8)。
+ *       对循环（外层门控域 = [x19+0x218+4k] k=0..4 = jump_fre_noise_test_fre1..5，
+ *       按fre基域 0x214 计即外层 1..5）：每对 INFO+SAVE_INFO 'freq %d jump to freq
+ *       %d to test noise'（0x22620/0x226c8+0x226f0）、jump_fre_noise_item_mask|=
+ *       1<<pair（0x22644-0x2265c, +0xd8）、0x0A<-src、delay18、wait AA、
+ *       get_noise_ft5672(t,item8+pair*node_num,dst,帧,wp=true)@0x226a0（'set 0x59
+ *       to 0x01 fail' 支路复活点）、show_data、compare_data_new(&fail[17+pair],0,
+ *       freIJ_threshold*touch,0,0,0)@0x2274c（x25<=0xf brk 保护 0x22750）、
+ *       0x59<-0（0x2276c）+delay18+30 次轮询 read 0x59==0（0x227a4-0x22820，
+ *       单次读失败 FTS_TEST_ERROR 'read 0x59 fail,ret=%d' @0x22784、耗尽
+ *       SAVE_ERR 'read 0x59 fail, reg59_val=%d' @0x23074）、运行 max/min
+ *       +0x11e4/+0x1220+4*pair（0x2282c/0x2283c）。
+ *       restore：0x1a/0x1b/0x0A/0x06（0x21c74 尾域）。
  * ================================================================== */
 static __attribute__((always_inline)) inline int ft5672_jump_freq_noise_test(struct fts_test *tdata, bool *test_result)
 {
 	int ret = 0;
-	int i = 0, j = 0;
+	int i = 0, j = 0, k = 0, n = 0;
+	int pair = 0;
+	int jp_max = 0;
+	int val59 = 0;
+	int t = 0;
 	u8 fre = 0, data_sel = 0;
 	u8 reg1a = 0, reg1b = 0;
+	u8 touch_value = 0, framenum = 0, jump_mode = 0;
+	u8 scan_mode = 0;
+	int frame_pack = 0;
 	int *noise = NULL;
+	int *buf = NULL;
 	bool result = true;
+	bool pair_ok[15] = { false };
+	struct mc_sc_threshold *thr = &tdata->ic.mc_sc.thr;
+	int *jp_fre[6] = {
+		&thr->basic.jump_fre_noise_test_fre0,
+		&thr->basic.jump_fre_noise_test_fre1,
+		&thr->basic.jump_fre_noise_test_fre2,
+		&thr->basic.jump_fre_noise_test_fre3,
+		&thr->basic.jump_fre_noise_test_fre4,
+		&thr->basic.jump_fre_noise_test_fre5,
+	};
+	int *jp_thr[15] = {
+		&thr->basic.jump_fre_noise_test_fre01_threshold,
+		&thr->basic.jump_fre_noise_test_fre02_threshold,
+		&thr->basic.jump_fre_noise_test_fre03_threshold,
+		&thr->basic.jump_fre_noise_test_fre04_threshold,
+		&thr->basic.jump_fre_noise_test_fre05_threshold,
+		&thr->basic.jump_fre_noise_test_fre12_threshold,
+		&thr->basic.jump_fre_noise_test_fre13_threshold,
+		&thr->basic.jump_fre_noise_test_fre14_threshold,
+		&thr->basic.jump_fre_noise_test_fre15_threshold,
+		&thr->basic.jump_fre_noise_test_fre23_threshold,
+		&thr->basic.jump_fre_noise_test_fre24_threshold,
+		&thr->basic.jump_fre_noise_test_fre25_threshold,
+		&thr->basic.jump_fre_noise_test_fre34_threshold,
+		&thr->basic.jump_fre_noise_test_fre35_threshold,
+		&thr->basic.jump_fre_noise_test_fre45_threshold,
+	};
 
 	FTS_TEST_FUNC_ENTER();						/* 0x20c5c */
 	FTS_TEST_SAVE_INFO("\n============ Test Item: Jump Freq Noise Test\n");/*0x20ca8*/
-	noise = tdata->item7_data;
+	noise = tdata->item8_data;					/* 0x20d00 +0x88 */
+	/* _b583b 勘误①：blob 0x20c5c(IDA 0x29c60) `LDR W20,[X19,#0x210]` —— param_init_ft5672
+	 * 0x26a58(IDA) 键 "Jump_Fre_Noise_Test_Scan_Mode"→thr+0x210、"…_Frames"→+0x214 实证，
+	 * +0x210 = jump_fre_noise_scan_mode。W20 全程只作 get_noise_ft5672 第 4 实参
+	 * （函数体 0x2a048 `write 0x1B<-w3`），并非帧数。 */
+	scan_mode = (u8)thr->basic.jump_fre_noise_scan_mode;
+	/* _b583b 勘误②：blob 0x2abdc `LDR W22,[X19,#0x214]`（jump_fre_noise_framenum 打包
+	 * int）→ INFO 'noise frame num:%d,%d'（byte1,byte0）→ 0x1c<-byte1(0x2ac00 LSR#8)、
+	 * 0x1d<-byte0(0x2aeb8 MOV W1,W22)。原写法 framenum/scan_mode 两域用反。 */
+	frame_pack = thr->basic.jump_fre_noise_framenum;
+	framenum = (u8)(frame_pack >> 8);
+	jump_mode = (u8)(frame_pack & 0xff);
 	if (!noise) {
 		FTS_TEST_SAVE_ERR("noise is null\n");			/* 0x20d2c */
 		ret = -EINVAL;
 		goto test_err;
 	}
+	ret = enter_factory_mode();					/* 0x20d74 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("failed to enter factory mode,ret=%d\n", ret);
+		goto test_err;
+	}
+	ret = mapping_switch(MAPPING);					/* 0x20dd8(IDA 0x29dd8) W0=WZR=MAPPING(枚举0) */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("switch mapping fail,ret=%d\n", ret);	/* blob str+0x7d6f */
+		goto test_err;
+	}
+	ret = fts_test_read_reg(0x0d, &touch_value);			/* 触控值（0x20e4c 副本域） */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("read touch_value fail,ret=%d\n", ret);
+		goto test_err;
+	}
+	FTS_TEST_INFO("noise(touch) value:%d", touch_value);		/* 0x20e4c */
 	ret = fts_test_read_reg(FACTORY_REG_FRE_LIST, &fre);		/* 0x0A */
 	if (ret < 0) {
 		FTS_TEST_SAVE_ERR("read 0x0A fail,ret=%d\n", ret);
@@ -2218,24 +2691,113 @@ static __attribute__((always_inline)) inline int ft5672_jump_freq_noise_test(str
 	}
 	FTS_TEST_INFO("fre:%d,data_sel:%d,reg1a:%d,reg1b:%d",		/* 0x21a78 */
 		      fre, data_sel, reg1a, reg1b);
-	/* 0x20exx-0x211d8：6 频点两两跳频测量
-	 *   "freq %d jump to freq %d to test noise"（FTS_TEST_INFO）
-	 *   "noise frame num:%d,%d"（FTS_TEST_INFO）
-	 *   失败串：set data_sel / set reg1A / write 0x1c / restore reg1a /
-	 *           restore reg1b / restore 0x0A / restore data_sel / wait state update fail
-	 * [TODO-VERIFY] 具体写寄存器值 0x1c/0x1d 与帧数来源
-	 */
-	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 0x01);
+	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 1);		/* 0x06<-1 */
 	if (ret < 0) {
 		FTS_TEST_SAVE_ERR("set data_sel fail,ret=%d\n", ret);
 		goto test_err;
 	}
-	ret = wait_state_update(TEST_RETVAL_AA);
+	ret = fts_test_write_reg(0x1a, 1);				/* 0x21b74 */
 	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("wait state update fail\n");
+		FTS_TEST_SAVE_ERR("set reg1A fail,ret=%d\n", ret);	/* 0x21ba8 */
 		goto test_err;
 	}
-	result = true;
+	FTS_TEST_INFO("noise frame num:%d,%d", framenum, jump_mode);	/* 0x2abe0 域(IDA)：byte1,byte0 */
+	ret = fts_test_write_reg(0x1c, framenum);			/* 0x21c00：byte1 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("write 0x1c fail,ret=%d\n", ret);	/* 0x21c34 */
+		goto test_err;
+	}
+	ret = fts_test_write_reg(0x1d, jump_mode);			/* 0x21eb4 */
+	if (ret < 0) {
+		FTS_TEST_SAVE_ERR("write 0x1d fail,ret=%d\n", ret);	/* 0x21ee8 */
+		goto test_err;
+	}
+	/* ---- 15 组两两跳频（0x224b0-0x22900）---- */
+	for (i = 0; i < 5; i++) {
+		if (*jp_fre[i] == 0)					/* 0x224f8 域门控 fre[i] */
+			continue;
+		for (j = i + 1; j < 6; j++) {
+			if (pair > 0xf)					/* 0x22750 brk 保护 */
+				break;
+			if (*jp_fre[j] == 0)				/* 0x2b5d8 域(IDA)：内层门 [x19+0x21c+4j'] = fre[j] */
+				continue;
+			FTS_TEST_INFO("freq %d jump to freq %d to test noise",
+				      i, j);				/* 0x22620 */
+			tdata->jump_fre_noise_item_mask |= (1 << pair);	/* 0x22644 +0xd8 */
+			ret = fts_test_write_reg(FACTORY_REG_FRE_LIST, (u8)i);/* 0x22664 0x0A<-src */
+			if (ret < 0) {
+				FTS_TEST_SAVE_ERR("set frequecy fail,ret=%d\n", ret);/* 0x233bc */
+				goto restore_reg;
+			}
+			sys_delay(18);					/* 0x2266c */
+			ret = wait_state_update(TEST_RETVAL_AA);	/* 0x22678 */
+			if (ret < 0) {
+				FTS_TEST_SAVE_ERR("wait state update fail\n");/* 0x233fc 域 */
+				goto restore_reg;
+			}
+			buf = noise + pair * tdata->node.node_num;	/* 0x22694-0x2269c */
+			ret = get_noise_ft5672(tdata, buf, j, scan_mode,
+					       true);			/* 0x226a0 w3=scan_mode(0x1b), w4=1(wp) */
+			if (ret < 0) {
+				FTS_TEST_SAVE_ERR("get noise fails,ret=%d\n", ret);/* 0x2345c 域 */
+				result = false;
+				goto restore_reg;
+			}
+			FTS_TEST_SAVE_INFO("freq %d jump to freq %d to test noise\n",
+					   i, j);			/* 0x226c8+0x226f0 */
+			show_data(buf, false);				/* 0x22710 */
+			jp_max = *jp_thr[pair] * touch_value;		/* 0x2273c mul */
+			pair_ok[pair] = compare_data_new(&tdata->fail_buf[17 + pair],
+					buf, 0, jp_max, 0, 0, 0);	/* 0x2274c */
+			if (!pair_ok[pair])
+				result = false;
+			/* 运行 max/min（0x2282c/0x2283c 置初值 + 0x22840-0x228c0 扫描） */
+			tdata->jump_fre_noise_max[pair] = 0;
+			tdata->jump_fre_noise_min[pair] = 0xffff;
+			for (k = 0; k < tdata->node.node_num; k++) {
+				if (buf[k] > tdata->jump_fre_noise_max[pair])
+					tdata->jump_fre_noise_max[pair] = buf[k];
+				if (buf[k] < tdata->jump_fre_noise_min[pair])
+					tdata->jump_fre_noise_min[pair] = buf[k];
+			}
+			/* 0x59 复位 + 就绪轮询（0x2276c-0x22820） */
+			ret = fts_test_write_reg(0x59, 0);
+			if (ret < 0) {
+				FTS_TEST_SAVE_ERR("set 0x59 to 0x00 fail,ret=%d\n", ret);/* 0x239cc */
+				goto restore_reg;
+			}
+			sys_delay(18);					/* 0x22778 */
+			for (t = 30; t > 0; t--) {			/* 0x2277c w22=0x1e */
+				ret = fts_test_read_reg(0x59, (u8 *)&val59);/* 0x227a8 */
+				if (ret < 0) {
+					FTS_TEST_ERROR("read 0x59 fail,ret=%d\n", ret);/* 0x22784 仅打印 */
+					continue;
+				}
+				if (0 == val59)				/* 0x227bc */
+					break;
+				sys_delay(18);				/* 0x227c4 */
+			}
+			if (t <= 0)
+				FTS_TEST_SAVE_ERR("read 0x59 fail, reg59_val=%d\n",
+						  val59);		/* 0x23074 */
+			pair++;						/* 0x225b4/x26 */
+		}
+	}
+	n = pair;							/* 保持 n 有定义（见下） */
+restore_reg:
+	/* restore 尾（0x21c74 域：0x1a/0x1b/0x0A/0x06） */
+	ret = fts_test_write_reg(0x1a, reg1a);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore reg1a fail,ret=%d\n", ret);	/* 0x22dcc 域 */
+	ret = fts_test_write_reg(0x1b, reg1b);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore reg1b fail,ret=%d\n", ret);
+	ret = fts_test_write_reg(FACTORY_REG_FRE_LIST, fre);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore 0x0A fail,ret=%d\n", ret);
+	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, data_sel);
+	if (ret < 0)
+		FTS_TEST_SAVE_ERR("restore data_sel fail,ret=%d\n", ret);
 test_err:
 	if (result) {
 		*test_result = true;
@@ -2623,8 +3185,8 @@ static void save_data_ft5672(char *buf, int *data_length)
 		}
 		/* 0x02 / 0x04 同构 */
 	}
-	/* 0x25738-0x25740：'\n\n' 收尾 */
-	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "\n\n");
+	/* 0x25738-0x25740：'\n\n\n' 收尾（fnstr 实测 blob 字面量 = 3 个换行） */
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "\n\n\n");
 
 	/* ---- 总体结果 / IC / 版本 / lockdown（0x25744-0x25864） ---- */
 	/* _b582-INTB：blob 0x25744-0x2576c 用 csel 选格式串（两独立字面量，非 %s 参数） */
@@ -2791,8 +3353,10 @@ static void save_data_ft5672(char *buf, int *data_length)
 	 *   ch%4d=%5d < min=(%5d)                 —— short
 	 * fail 槽位（blob 逐点实证）：uniformity tx/rx=1/2、panel=3、scapcb on/off=4/5、
 	 *   sraw on/off=6/7、noise=8、rawshiftpic=10、aux=11..16、jump=17..31、short=32
-	 * 注意：F3 的 rawdata 记录用 csv_item_scb(+0xc8) 门控、cb 记录用 csv_item_sraw(+0xc4)
-	 *   （blob 实测交叉，非笔误；与 L1/数据区的取用方向相反，照抄）。 */
+ * 注意：_b583-FT3683 勘误 —— blob 位图向为 +0xc4=scap_cb、+0xc8=scap_rawdata（写侧
+ *   ccbypass 0x20644/0x2368c/0x23b5c、sraw 0x20548；读侧 L1 0x24a4c/0x24aa0、T1
+ *   0x2519c/0x253fc、F3 0x270cc/0x2744c 全部同向），字段名已随 ini.h 更名归位，
+ *   本函数各门控现按语义直写（rawdata 记录=csv_item_sraw、cb 记录=csv_item_scb）。 */
 #define SAVE_REC_ROW(arr) do {						\
 		for (i = 0; i < tdata->node.node_num; i++) {		\
 			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,	\
@@ -2906,7 +3470,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 		tmp_cnt = 0;
 		cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 				"ScapRawdataRecord\n");			/* 0x270bc */
-		if (tdata->csv_item_scb & 0x01) {			/* 0x270cc */
+		if (tdata->csv_item_sraw & 0x01) {			/* 0x270cc：+0xc8（blob 位图向，csv_item_sraw@0xc8） */
 			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 				"ScapRawdataOn max=%d min=%d\n",
 				tdata->scap_rawdata_on_result_max,
@@ -2922,7 +3486,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 			SAVE_FAIL_CH(6);				/* 0x271b8 */
 			tmp_cnt += tdata->sc_node.node_num;
 		}
-		if (tdata->csv_item_scb & 0x02) {			/* 0x27218 */
+		if (tdata->csv_item_sraw & 0x02) {			/* 0x27218：+0xc8 */
 			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 				"ScapRawdataOff max=%d min=%d\n",
 				tdata->scap_rawdata_off_result_max,
@@ -2938,7 +3502,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 			SAVE_FAIL_CH(7);				/* 0x27308 */
 			tmp_cnt += tdata->sc_node.node_num;
 		}
-		if (tdata->csv_item_scb & 0x04) {			/* 0x27368：hi 段无标题/无记录 */
+		if (tdata->csv_item_sraw & 0x04) {			/* 0x27368：+0xc8；hi 段无标题/无记录 */
 			for (i = 0; i < tdata->sc_node.rx_num; i++)
 				cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 						"%d,", tdata->item4_data[tmp_cnt + i]);
@@ -2953,7 +3517,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 		tmp_cnt = 0;
 		cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 				"ScapCBRecord\n");			/* 0x27440 */
-		if (tdata->csv_item_sraw & 0x01) {			/* 0x2744c */
+		if (tdata->csv_item_scb & 0x01) {			/* 0x2744c：+0xc4（csv_item_scb@0xc4） */
 			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 				"ScapCBOn max=%d min=%d\n",
 				tdata->scap_cb_on_result_max,
@@ -2969,7 +3533,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 			SAVE_FAIL_CH(4);				/* 0x27538 */
 			tmp_cnt += tdata->sc_node.node_num;
 		}
-		if (tdata->csv_item_sraw & 0x02) {			/* 0x275a4 */
+		if (tdata->csv_item_scb & 0x02) {			/* 0x275a4：+0xc4 */
 			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 				"ScapCBOff max=%d min=%d\n",
 				tdata->scap_cb_off_result_max,
@@ -2985,7 +3549,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 			SAVE_FAIL_CH(5);				/* 0x27694 */
 			tmp_cnt += tdata->sc_node.node_num;
 		}
-		if (tdata->csv_item_sraw & 0x04) {			/* 0x276f4：hi 段无标题/无记录 */
+		if (tdata->csv_item_scb & 0x04) {			/* 0x276f4：+0xc4；hi 段无标题/无记录 */
 			for (i = 0; i < tdata->sc_node.rx_num; i++)
 				cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 						"%d,", tdata->item3_data[tmp_cnt + i]);
@@ -3141,20 +3705,29 @@ static void save_data_ft5672(char *buf, int *data_length)
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag == 0) ? "test_result:[PASS]" : "test_result:[Failure]");
 	/* _b583-FT3683：blob 0x27d94-0x27f48 = 10 组（bit 0x1..0x200 → -0F/-0P … -9F/-9P），
-	 * 每块 = `ldr mask` → `tst 位` → `csel("-kF","-kP")` → snprintf。 */
-	{
-		static const char *const ft5672_fp_str[10][2] = {
-			{ "-0P", "-0F" }, { "-1P", "-1F" }, { "-2P", "-2F" },
-			{ "-3P", "-3F" }, { "-4P", "-4F" }, { "-5P", "-5F" },
-			{ "-6P", "-6F" }, { "-7P", "-7F" }, { "-8P", "-8F" },
-			{ "-9P", "-9F" },
-		};
-
-		for (i = 0; i < 10; i++) {
-			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "%s",
-					ft5672_fp_str[i][(tdata->item_fail_flag >> i) & 0x1]);
-		}
-	}
+	 * 每块 = `ldr mask` → `tst 位` → `csel("-kF","-kP")` → snprintf（0x27d9c-0x27f34
+	 * 逐块实证）。csel 两操作数为代码引用字面量 —— 故写成 10 组三目（与上方 R1
+	 * 节同形），不用静态表（表形态为 .data 引用，fnstr 代码口径不可见）。 */
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x1) ? "-0F" : "-0P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x2) ? "-1F" : "-1P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x4) ? "-2F" : "-2P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x8) ? "-3F" : "-3P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x10) ? "-4F" : "-4P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x20) ? "-5F" : "-5P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x40) ? "-6F" : "-6P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x80) ? "-7F" : "-7P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x100) ? "-8F" : "-8P");
+	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
+			(tdata->item_fail_flag & 0x200) ? "-9F" : "-9P");
 
 	*data_length = cnt;						/* 0x27f48 */
 	free_item_data(tdata);						/* 0x27f5c */

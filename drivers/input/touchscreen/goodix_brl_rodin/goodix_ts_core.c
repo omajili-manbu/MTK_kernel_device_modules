@@ -2357,14 +2357,11 @@ static void goodix_ts_release_connects(struct goodix_ts_core *core_data)
 	input_mt_sync_frame(input_dev);
 	input_sync(input_dev);
 
-	if (goodix_core_data->fingerprint_authstate == 0) {
-		update_fod_press_status_common(0);
-		ts_debug("fingerprint_authstate: %d update_fod_press_status_common \n",
-			goodix_core_data->fingerprint_authstate);
-	} else {
-		ts_info("fingerprint_authstate: %d means wrong fingerprint, skip\n",
-			goodix_core_data->fingerprint_authstate);
-	}
+	/* _b583b-GX/T3：blob release_connects（resume_suspend 内联，站点
+	 * 0x103e0/0x10478，0x10488-0x10628）在 mt_slot 环+sync 后**无**
+	 * fingerprint_authstate 分支与第二次 update_fod 站点，直接 unlock。
+	 * 树原 authstate if/else（含 'fingerprint_authstate: %d ...' 两条
+	 * tree-only 串与第 3 个 update_fod 站点）为 warsaw 残项，按 blob 删 */
 
 	mutex_unlock(&input_dev->mutex);
 }
@@ -2384,11 +2381,10 @@ static void goodix_cmd_fifo_get(u64 address, u8 *buf)
 	read_buff = (u8*)kzalloc(node_data_size, GFP_KERNEL);
 
 	if (!read_buff) {
-		ts_err("fail memory");
+		/* _b583b-GX：blob 无 'fail memory' 串（strcmp only-tree），删打印留守卫 */
 		return;
 	}
 	if (!buf) {
-		ts_err("fail memory");
 		goto end;
 	}
 	ret = hw_ops->read(goodix_core_data, misc->frame_data_addr,
@@ -2510,11 +2506,10 @@ static int goodix_htc_ic_setModeValue(common_data_t *common_data)
 		return 0;
 	}
 
-	if (atomic_read(&goodix_core_data->suspended)) {
-		ts_info("tp is suspend, skip setModeValue :mode = %d, addr = 0x%x", common_data->mode, addr);
-		return 0;
-	}
-
+	/* _b583b-GX/T6 裁决：blob goodix_htc_ic_setModeValue（0x11438，488B）
+	 * 全函数无 suspended 提前返回——suspended 期照发 hw_ops->write；
+	 * 等价性判据见 evidence_b583b.txt。树原 'tp is suspend, skip setModeValue'
+	 * 为 warsaw 残项，删 */
 	ret = goodix_core_data->hw_ops->write(goodix_core_data, addr, data_buf, data_len);
 	if (ret < 0) {
 		ts_err("failed write addr(%x) data 0x%*ph", addr,
@@ -2539,10 +2534,9 @@ static int goodix_htc_ic_getModeValue(common_data_t *common_data)
 		ts_err("data length is over the limit");
 		return -EFAULT;
 	}
-	if (atomic_read(&goodix_core_data->suspended)) {
-		ts_info("tp is suspend, skip getModeValue: addr = 0x%x, data length = %d", addr, data_len);
-		return 0;
-	}
+	/* _b583b-GX/T6 裁决：blob goodix_htc_ic_getModeValue（0x11624，348B）
+	 * 全函数无 suspended 提前返回——suspended 期照发 hw_ops->read；
+	 * 树原 'tp is suspend, skip getModeValue' 为 warsaw 残项，删 */
 
 	ret = goodix_core_data->hw_ops->read(goodix_core_data, addr, data_buf, data_len);
 	if (ret) {
@@ -2675,14 +2669,10 @@ out:
 			input_report_abs(input_dev, ABS_MT_WIDTH_MAJOR, 0);
 			input_report_abs(input_dev, ABS_MT_WIDTH_MINOR, 0);
 			input_sync(input_dev);
-			if (goodix_core_data->fingerprint_authstate == 0) {
-				update_fod_press_status_common(0);
-				ts_debug("fingerprint_authstate: %d update_fod_press_status_common \n",
-					goodix_core_data->fingerprint_authstate);
-			} else {
-				ts_info("fingerprint_authstate: %d means wrong fingerprint, skip\n",
-					goodix_core_data->fingerprint_authstate);
-			}
+			/* _b583b-GX/T3：blob 该 THP 块（站点 A，0x103e0）update_fod(0)
+			 * 无 fingerprint_authstate 门（blob 全 ko 无 authstate 串），
+			 * 树原 if/else 两打印为 warsaw 残项 */
+			update_fod_press_status_common(0);
 			ts_info("ts fod up for suspend");
 			mutex_unlock(&input_dev->mutex);
 		}
@@ -2700,7 +2690,12 @@ out:
 		} else if (scp_tp_param.param0 >= 2) {
 			ret = scp_tp_switch(1);
 			if (ret)
-				ts_err("scp_tp_switch fail, ret=%d", ret);
+				ts_err("scp_tp_switch fail, ret=%d", ret);	/* blob ts_suspend:2656 */
+			/* _b583b-GX/T5：blob 0x1077c（ts_suspend:2660，E 级）在切换后
+			 * param0<=1 时补打当前状态（\n 结尾，strcmp 工具盲区但 blob 有）
+			 * ——blob 0x10684-0x10694 对成败两路均判 param0<=1 */
+			if (scp_tp_param.param0 <= 1)
+				ts_err("scp_tp_switch fail, scptp_cur_state=%d\n", scp_tp_param.param0);
 		}
 	}
 
@@ -3373,12 +3368,8 @@ static int goodix_fw_version_info_read(char *buf)
 
 static int goodix_get_limit_csv_version(char *buf)
 {
-
-	int ret = 0;
-
-	ret = get_limit_csv_file_version(goodix_core_data, buf);
-	if (ret)
-		ts_info("get_limit_csv_file_version failed");
+	/* _b583b-GX：blob 无 'get_limit_csv_file_version failed' 串，删打印 */
+	get_limit_csv_file_version(goodix_core_data, buf);
 	return 0;
 }
 
@@ -3427,12 +3418,9 @@ bool goodix_get_ic_self_test_mode(void)
 }
 //END:fix echo open/short > proc/tp_selftest can not open csv
 
-/* #228（b581）按 blob goodix_ic_self_test 内联体重建：blob 0xf328-0xf3e8 的
- * __func__ 串为 "goodix_short_open_test"（.rodata.str1.1+0x8c70，树侧原缺该函数），
- * 语义 = vzalloc(sizeof(struct ts_rawdata_info)==14104) → goodix_get_rawdata(dev, info)
- * → 判 info->result[1]=='P'（即 "[PASS]" 前缀）→ PASS/FAIL 打印 → resultInfo → vfree。
- * 返回值：PASS=GTP_RESULT_PASS(2)；"[FAIL]"=GTP_RESULT_FAIL(1)；alloc/get_rawdata
- * 失败=0（GTP_RESULT_INVALID，blob f360/f370 mov w25,wzr）。 */
+/* #228（b581）blob goodix_short_open_test 为独立源函数（内联进 ic_self_test 后
+ * __func__ 串 'goodix_short_open_test' 仍保留在 blob .rodata —— 树侧保持独立
+ * static 函数（clang 单调用点自动内联，符号不落 .o，串随之保留），勿并入 */
 static int goodix_short_open_test(struct goodix_ts_core *cd)
 {
 	struct ts_rawdata_info *info;
@@ -3463,24 +3451,27 @@ static int goodix_short_open_test(struct goodix_ts_core *cd)
 	return ret;
 }
 
+/* _b583b-GX：blob goodix_ic_self_test（0xf26c，848B）主体与树 b581 版同形，
+ * 差异点：① !goodix_core_data 时置 *result=0（blob 0xf2a0→0xf47c）；
+ * ② chip_ver 清零（0xf2c4-0xf2cc）；③ resultInfo 打印门 I 级（0xf578）；
+ * ④ miev 上报以 !pass 门控（0xf58c，与 retval!=PASS 等价） */
 static int goodix_ic_self_test(char *type, int *result)
 {
-	struct goodix_fw_version chip_ver;
+	struct goodix_fw_version chip_ver = {0};
 	struct goodix_ts_hw_ops *hw_ops;
 	int retval = 0;
 
-	if (!goodix_core_data)
-		return GTP_RESULT_INVALID;
-	else
-		hw_ops = goodix_core_data->hw_ops;
+	if (!goodix_core_data) {
+		*result = GTP_RESULT_INVALID;
+		return 0;
+	}
+	hw_ops = goodix_core_data->hw_ops;
 
 	ic_self_test_flag = true;
 	ts_debug("enter ic_self_test_flag %d", ic_self_test_flag);
 
 	if (!strncmp("short", type, 5) || !strncmp("open", type, 4)) {
-		/* #228（b581）blob 0xf328 起为 goodix_short_open_test 内联体
-		 * （vzalloc info → goodix_get_rawdata → "[PASS]" 判定），
-		 * 原树走 donor 的 do_inspect_thread + get_final_result（blob 无此二符号） */
+		/* blob 0xf328 起 goodix_short_open_test 内联体 */
 		retval = goodix_short_open_test(goodix_core_data);
 #if IS_ENABLED(CONFIG_MIEV)
 		if (retval != GTP_RESULT_PASS) {
@@ -3529,7 +3520,8 @@ int goodix_ts_get_lockdown_info(struct goodix_ts_core *cd)
 static void  goodix_xiaomi_touch_fod_test(int value)
 {
 	struct input_dev *input_dev = goodix_core_data->input_dev;
-	ts_info("fod_test enter, value = %d", value);
+	/* _b583b-GX/T4：blob goodix_xiaomi_touch_fod_test（0x11ab0，380B）无入口打印
+	 * （calldiff only-tree _printk:1；'fod_test enter' 串 blob 无），删 */
 	if (value) {
 		input_report_key(input_dev, BTN_INFO, 1);
 		update_fod_press_status_common(1);
@@ -3869,14 +3861,9 @@ static void goodix_set_cur_value(int mode, int *value)
 	int gtp_value = value[0];
 	bool flag = false;
 
+	/* _b583b-GX：blob 0xfad4 只此一处 mode/value 打印（I 级，行 3589）；
+	 * 树原第二条（suspended 检查后）与 FACTORY cmd_flag 门 blob 均无 */
 	ts_info("mode:%d, value:%d", gtp_mode, gtp_value);
-#ifdef CONFIG_TOUCH_FACTORY_BUILD
-	ts_debug("cmd_flag:%d", cmd_flag);
-	if (!cmd_flag && (gtp_mode == THP_LOCK_SCAN_MODE || gtp_mode == THP_IDLE_BASALINE_UPDATE)) {
-		ts_err("tp self test in progress, reject mode:%d", gtp_mode);
-		return;
-	}
-#endif
 
 	if (!goodix_core_data || goodix_core_data->init_stage != CORE_INIT_STAGE2) {
 		ts_err("initialization not completed, return");
@@ -3903,21 +3890,19 @@ static void goodix_set_cur_value(int mode, int *value)
 		ts_err("invalid mode value");
 		return;
 	}
-	if (atomic_read(&goodix_core_data->suspended)) {
-		ts_info("tp is suspend, skip set_cur_value :mode:%d, value:%d", gtp_mode, gtp_value);
-		return;
-	}
-	ts_info("mode:%d, value:%d", gtp_mode, gtp_value);
+	/* _b583b-GX/T6 裁决：blob 0xf9bc-0xfb3c 全函数无 suspended 提前返回
+	 * （suspended 期照发 SPI 写，等价性判据见 evidence_b583b.txt），删除之 */
 	switch(gtp_mode) {
-		case Touch_Is_In_Input_Method:
-			//goodix_send_camera_report_rate(gtp_value);
-			break;
-		case TOUCH_FINGERPRINT_AUTHSTATE:
-			goodix_core_data->fingerprint_authstate = !!gtp_value;
-			break;
 		case TOUCH_CLOUD_MODE_WATER_PROOF:
 			goodix_core_data->need_update_cfg = 1;
 			goodix_core_data->cfg_cloud_state = !!gtp_value;
+			break;
+		case TOUCH_CLOUD_MODE_CLOSE_SCP_TP_MISTOUCH:
+			/* _b583b-GX：blob 0xfbd4-0xfbec + 打印 0xfd64（I 级行 3627）：
+			 * csel(open/close by value==0) 后写 mistouch_close=(value==0)。
+			 * 树原缺 case（blob 跳表 103 → 专用块） */
+			ts_info("%s SCP_TP_MISTOUCH", gtp_value ? "close" : "open");
+			goodix_scp_tp_mistouch_close = (gtp_value == 0);
 			break;
 		case Touch_Boost_EN: {
 			/* _b583-GX：blob 0xfb58-0xfb7c（跳转表 mode 200 → 块 0xfb58）=
@@ -3936,12 +3921,6 @@ static void goodix_set_cur_value(int mode, int *value)
 			break;
 		case Touch_Super_Report:
 			brl_switch_report_rate(goodix_core_data, !!gtp_value);
-			break;
-		case Touch_Idle_Scan_Rate:
-		//not to do, to thp
-			break;
-		case Touch_Move_Jitter:
-		//not to do, to thp
 			break;
 		case THP_LOCK_SCAN_MODE:
 			ts_info("THP enable doze mode [%d]", gtp_value);	/* _b583-GX：blob L3645（0xfd98） */
@@ -3969,11 +3948,13 @@ static void goodix_set_cur_value(int mode, int *value)
 			goodix_htc_enable_b_array();
 			break;
 		case THP_IDLE_BASALINE_UPDATE:
-			ts_debug("THP update idle baseline");	/* _b583-GX：blob L3670（0xfe34，D 级） */
+			ts_debug("THP update idle baseline");	/* _b583-GX：blob L3678（0xfe34，D 级） */
 			goodix_htc_update_idle_baseline();
 			break;
 #if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
 		case Touch_THP_Dump:
+			/* _b583b-GX：blob 0xfcac-0xfce0（mode 1076）：value>1 落
+			 * default；enable_ic_dump 失败不改 dump_type。树同形 */
 			if ((gtp_value == DUMP_OFF || gtp_value == DUMP_ON) && goodix_core_data->dump_type != gtp_value) {
 				if (!goodix_htc_enable_ic_dump(gtp_value)) {
 					ts_debug("change dump state(%d) as %d",
@@ -3983,7 +3964,6 @@ static void goodix_set_cur_value(int mode, int *value)
 			}
 			break;
 #endif //TOUCH_DUMP_TIC_SUPPORT
-			break;
 		case THP_IDLE_THD:
 			goodix_htc_set_idle_threshold(gtp_value);
 			break;
@@ -4005,85 +3985,44 @@ static void goodix_set_cur_value(int mode, int *value)
 		case THP_IC_GESTRUE_FEEDBACK:
 			goodix_htc_set_gesture_feedback(gtp_value);
 			break;
-		case THP_HAL_IDLE_RATE:
-			//默认应用up之后,thp下发5s 240hz idle 先强制写死,后续同THP修改参数
-			//cmd 00 00 09 9F 05 47 10 32 00 36 01（10 47是前段刷新率4167<单位 1us>，00 32是保持50<单位 100ms>，01 36是校验和）
-			if (gtp_value == 240) {
-				value[0] = 1;
-				value[1] = 4167;
-				value[2] = 50;
-				goodix_htc_enter_idle(&value[0]);
-			} else {
-				ts_info("not set to ic");
-			}
-			break;
-		case THP_REF_HOPPING_SET:
-			goodix_htc_ref_hopping_set(value);
-			break;
-		case THP_HAL_DISPLAY_FPS:
-			if (gtp_value <= 125) {
-				gtp_value = 120;
-			} else if (gtp_value <= 149) {
-				gtp_value = 144;
-			} else if (gtp_value <= 170) {
-				gtp_value = 165;
-			} else {
-				gtp_value = 120;
-			}
-			if (gtp_value != goodix_core_data->fps_value) {
-				ts_info("fps %d change to %d ",goodix_core_data->fps_value, gtp_value);
-				goodix_core_data->fps_value = gtp_value;
-				goodix_htc_set_display_fps(gtp_value);
-			}
-			break;
 		default:
-			ts_err("not support mode, mode(%d)!", gtp_mode);
+			/* _b583b-GX：blob 0xfbf4-0xfc04 = ts_warn（W 级、无 mode 实参，
+			 * 跳表 1000-1103 之外与其内 1002/1003/1005-1010/1012-1015 全落此；
+			 * 1012=DISPLAY_FPS/1105=IDLE_RATE/1106=REF_HOPPING 亦然）。
+			 * 树原 ts_err("not support mode, mode(%d)!") 为 warsaw 残项 */
+			ts_warn("not support mode!");
 			break;
 	}
 }
 
 static u8 goodix_panel_color_read(void)
 {
-	u8 info = 0;
-	if (!goodix_core_data) {
-		ts_err("core data is null");
+	/* _b583b-GX：blob 0x10d84 = 28B 纯转发（cbz 判空 + ldrb [cd+0x612]），
+	 * 无任何打印；树原 'core data is null'/'read info is %c' 为 warsaw 残项 */
+	if (!goodix_core_data)
 		return 0;
-	}
-
-	info = goodix_core_data->lockdown_info[2];
-	ts_info("read info is %c", info);
-	return info;
+	return goodix_core_data->lockdown_info[2];
 }
 
 static u8 goodix_panel_vendor_read(void)
 {
-	u8 info = 0;
-	if (!goodix_core_data) {
-		ts_err("core data is null");
+	/* _b583b-GX：blob 0x10d64 同上（ldrb [cd+0x610]） */
+	if (!goodix_core_data)
 		return 0;
-	}
-
-	info = goodix_core_data->lockdown_info[0];
-	ts_info("read info is %c", info);
-	return info;
+	return goodix_core_data->lockdown_info[0];
 }
 
 static u8 goodix_panel_display_read(void)
 {
-	u8 info = 0;
-	if (!goodix_core_data) {
-		ts_err("core data is null");
+	/* _b583b-GX：blob 0x10da4 同上（ldrb [cd+0x611]） */
+	if (!goodix_core_data)
 		return 0;
-	}
-
-	info = goodix_core_data->lockdown_info[1];
-	ts_info("read info is %c", info);
-	return info;
+	return goodix_core_data->lockdown_info[1];
 }
 
 static char goodix_touch_vendor_read(void)
 {
-	ts_info("retrun info is %c", '2');
+	/* _b583b-GX：blob 0x10dc4 = 8B（mov w0,#0x32; ret），无打印 */
 	return '2';
 }
 
@@ -4312,7 +4251,7 @@ static int goodix_start_later_init(struct goodix_ts_core *ts_core)
 		update_flag |= UPDATE_MODE_FORCE;
 		goto upgrade;
 	}
-	ts_err("get version info!!!!!!");
+	/* _b583b-GX：blob 无 'get version info!!!!!!' 串（strcmp only-tree），删 */
 	/* get ts lockdown info */
 	goodix_ts_get_lockdown_info(cd);
 	goodix_match_panel(cd);
@@ -4720,9 +4659,11 @@ static void goodix_ts_remove(struct platform_device *pdev)
 	struct goodix_ts_hw_ops *hw_ops = core_data->hw_ops;
 	struct goodix_ts_esd *ts_esd = &core_data->ts_esd;
 
-	/* _b573 scp 接线：blob 0xe1b0-0xe1cc = remove 起手 scp_tp_exit + 框架双反注册 */
+	/* _b573 scp 接线：blob 0xe1b0-0xe1cc = remove 起手 scp_tp_exit + 框架双反注册。
+	 * _b583b-GX/T4：blob ts_remove（0xe198，532B）无 ts_notifier 反注册
+	 * （0xe250 的 blocking_notifier_chain_unregister 仅 esd_notifier 一处，
+	 * calldiff only-tree blocking_notifier_chain_unregister:1），删之 */
 	scp_tp_exit();
-	goodix_ts_unregister_notifier(&core_data->ts_notifier);
 	xiaomi_unregister_panel_notifier_common(core_data->bus->dev, TOUCH_ID);
 	unregister_touch_panel_common(TOUCH_ID);
 	goodix_tools_exit();

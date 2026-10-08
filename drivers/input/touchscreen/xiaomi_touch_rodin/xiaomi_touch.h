@@ -247,14 +247,18 @@ typedef struct xiaomi_touch_data {
 	struct work_struct suspend_work;			/* 0x28f8 */
 	struct work_struct resume_work;				/* 0x2928 */
 	struct delayed_work panel_notifier_register_work;	/* 0x2958 notifier_work[work-0x2958=元素基址] */
-	struct device *dev;					/* 0x29e0 rpc[0x20e0 str x0,[x20,#0x29f0]]，x20=元素-0x10 */
+	struct device *dev;					/* 0x29e0 rpnc[IDA 0x80E4/.disr 0x20E0 str x0,[x20,#0x29f0]]，x20=元素-0x10 */
 	struct notifier_block disp_nb;	/* blob：nb 内嵌（work+0x90 形态，notifier_work[0x2378 str x8,[x19,#0x90]!]）*/
 #endif
 	/* blob 0x2A00 / 0x2A04（各 4B）：xiaomi_register_panel_notifier_common 的第 3/4 实参
-	 * 落点（rpc[0x20ec/0x20f8 str w2/w3,[x20,#0x2a10/0x2a14]]，x20=元素-0x10）；
-	 * blob 两 IC ko 调用点均传 0（focaltech 0x3b00-0x3b08、goodix 0xeeb0-0xeebc 的 w2=w3=0）
-	 * ⇒ 语义未定，保留空洞。注：树侧 donor 成员 `panel_register_retry`（原占 0x29F8）已删，
-	 * blob 0x29F8 实为 disp_nb.priority（见 register_touch_panel_common 锚点）。 */
+	 * 落点（rpnc IDA 0x80F0/0x80FC = .disr 0x20EC/0x20F8 `str w2/w3,[x20,#0x2a10/0x2a14]`，
+	 * x20=元素-0x10 无回写——0x80F8 queue_delayed_work_on 实参 X2=X20+0x2968=元素+0x2958
+	 * 定标）；blob 两 IC ko 调用点均传 0（focaltech 0x3b00-0x3b08、goodix 0xeeb0-0xeebc
+	 * 的 w2=w3=0）⇒ 语义未定，保留空洞。注：树侧 donor 成员 `panel_register_retry`
+	 * （原占 0x29F8）已删——blob 该 4B = disp_nb.priority（disp_nb@0x29E8 的 +0x10），
+	 * 全模块无写入点（.bss 零初始化）；此前"register 内 w9=1 落 0x29F8"的读法漏看
+	 * rpc 0x7058(.disr 0x1054) `str xzr,[x28,#0x28]!` 前索引回写，w9=1(0x7068/0x1064)
+	 * 实落元素+0x2A20 = temp_detect_ready（见 xiaomi_touch_core.c 锚点）。 */
 	u32 reserved_2a00;					/* 0x2A00 */
 	u32 reserved_2a04;					/* 0x2A04 */
 	wait_queue_head_t temp_detect_wait_queue;		/* 0x2A08 rpc/notifier_common [x28/x20,#0x2a08] 4B 存 */
@@ -292,13 +296,19 @@ typedef struct hardware_operation {
 	int (*htc_ic_setModeValue)(common_data_t *common_data);		/* 0xa0 */
 	int (*htc_ic_getModeValue)(common_data_t *common_data);		/* 0xa8 */
 	int (*ic_resume_suspend)(bool is_resume, u8 gesture_type);	/* 0xb0 */
-	/* ==== 以下 16 项 = 6.18 在场扩展（blob 6.6 框架 ops 到 0xB8 即止：0x178+0xB8 = 0x230
-	 * == driver_param 步长实测；IC 表 0xB8-0xD0 的 4 槽与 6.18 独有 12 项统一集中尾部）==== */
-	void (*ic_set_charge_state)(int status);			/* +0xb8（IC 表槽位）*/
-	void (*touch_dfs_test)(int value);				/* +0xc0 */
-	void (*xiaomi_touch_fod_test)(int value);			/* +0xc8 */
-	int (*set_thermal_temp)(int temp, bool force);   		/* +0xd0（blob 2 参实证）*/
-	int (*get_limit_csv_version)(char limit_version[30]);		/* 6.18 独有 */
+	/* ==== blob 槽位（blob ops = 0xD8 = 27 槽：rpc 拷贝 memcpy(param+0x158, 0xD8) 实证，
+	 * IDA register_touch_panel_common 0x6FB4-0x6FC8 / .disr 0x0BB8；框架调用点：
+	 * +0xB8 ic_set_charge_state ← xiaomi_touch_resume_work 0x8744；
+	 * +0xC8 xiaomi_touch_fod_test ← store_fod_test 0xD854（LDR [x20,#0x220]）；
+	 * +0xD0 set_thermal_temp ← rpc 0x7314 空判 + enable_temperature_detection_func
+	 * 0x6DDC / xiaomi_touch_temp_thread_func 0x77C4、0x7964；
+	 * +0xC0 touch_dfs_test：blob 全模块无调用点（名取 6.18 树序，见遗留）==== */
+	void (*ic_set_charge_state)(int status);			/* +0xb8（blob 槽 23）*/
+	void (*touch_dfs_test)(int value);				/* +0xc0（blob 槽 24，无调用点）*/
+	void (*xiaomi_touch_fod_test)(int value);			/* +0xc8（blob 槽 25）*/
+	int (*set_thermal_temp)(int temp, bool force);   		/* +0xd0（blob 槽 26/末槽，2 参实证）*/
+	/* ==== 以下 12 项 = 6.18 独有（blob ops 只拷 0xD8=27 槽，0xD8 起 blob 无），置尾 ==== */
+	int (*get_limit_csv_version)(char limit_version[30]);		/* 6.18 独有，置尾 */
 	void (*set_mode_long_value)(s32 value[], int length);
 	int (*touch_log_level_control_v2)(int value);
 	bool (*get_tddi_status)(void);
@@ -314,17 +324,20 @@ typedef struct hardware_operation {
 } hardware_operation_t;
 
 typedef struct xiaomi_touch_driver_param {
-	s8 touch_id;						/* 0x000 */
+	s8 touch_id;						/* 0x000（rpc 0x6FA4 strb）*/
 	char hal_version[HAL_VERSION_LENGTH];			/* 0x001 */
-	char limit_csv_version[LIMIT_CSV_VERSION_LENGTH];	/* 0x081 */
-	hardware_param_t hardware_param;			/* 0x0a0（逐成员与 blob 一致，
-								 * 见文末断言：lockdown@0xd、fw_version@0x95）*/
-	/* blob 步长实测 = 0x230：get_xiaomi_touch_driver_param umaddl(#0x230)+#0x5500
-	 * → &param[1] = .bss+0x5500+0x230，闭包 = probe 的 charging_status 存点 0x5960
-	 * （=0x5500+2*0x230）⇒ hardware_operation 起址 0x178、blob ops 大小 0xB8（23 槽）。
-	 * 树侧尾部 16 项使 sizeof=0x2B0（blob+0x80），blob 同形前缀 = 前 0x230B。 */
-	hardware_operation_t hardware_operation;		/* 0x178（前 0xB8 与 blob 同槽）*/
-} xiaomi_touch_driver_param_t;
+	hardware_param_t hardware_param;			/* 0x082（hardware_param_t 2 字节对齐自然落位；
+								 * blob rpc 0x6F9C-0x6FA8 memcpy(param+0x82, 0xD6)
+								 * 同位同长；lockdown@0xd、fw_version@0x95）*/
+	/* blob 步长实测 = 0x230（get_xiaomi_touch_driver_param 0x64F8-0x650C umaddl(#0x230)
+	 * + #0x5500；rpc 0x6F74-0x6F98 同）⇒ blob param = {touch_id, hal_version[128],
+	 * hardware_param(0xD6)@0x82, hardware_operation(0xD8)@0x158}，0x82+0xD6+0xD8=0x230 闭合。
+	 * 树侧尾部多 12 项 ops + limit_csv_version[30]（均 6.18 独有）⇒ sizeof 0x2B0。 */
+	hardware_operation_t hardware_operation;		/* 0x158（blob rpc 0x6FC0-0x6FC8
+								 * memcpy(param+0x158, 0xD8)：前 27 槽与 blob
+								 * 同槽，其后 12 项 6.18 独有）*/
+	char limit_csv_version[LIMIT_CSV_VERSION_LENGTH];	/* 0x290 6.18 独有，置尾（blob 无） */
+} xiaomi_touch_driver_param_t;						/* sizeof == 0x2B0 */
 
 typedef struct xiaomi_touch {
 	/* _b583-XT：blob xiaomi_touch_t 首成员（结构基址 +0x0）——blob 证据三重：
@@ -392,23 +405,35 @@ static_assert(__XT_OFF(xiaomi_touch_data_t, temp_detect_wait_queue) == 0x2A08, "
 static_assert(__XT_OFF(xiaomi_touch_data_t, temp_detect_ready) == 0x2A20, "ready 单槽 @2a20");
 static_assert(__XT_OFF(xiaomi_touch_data_t, boost_state) == 0x2A24, "boost 子状态 @2a24");
 static_assert(sizeof(((xiaomi_touch_data_t *)0)->boost_state) == 0x54, "boost 子状态 0x54B");
-/* 参数结构侧：blob 步长 0x230（同形前缀）；树侧尾部 16 项扩展至 0x2B0 */
+/* 参数结构侧：blob 步长 0x230（rpc 双 memcpy 定标：param+0x82/0xD6、param+0x158/0xD8）；
+ * 树侧尾部 12 项独有 ops + limit_csv_version[30] 扩展至 0x2B0 */
 static_assert(__XT_OFF(xiaomi_touch_driver_param_t, touch_id) == 0x000, "param touch_id @0");
 static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hal_version) == 0x001, "hal_version @1");
-static_assert(__XT_OFF(xiaomi_touch_driver_param_t, limit_csv_version) == 0x081, "limit_csv @81");
-static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_param) == 0x0A0, "hw param @a0");
-static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_operation) == 0x178, "ops @178");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_param) == 0x082,
+	      "hw param @82（rpc memcpy(param+0x82,0xD6)，2 字节对齐自然落位）");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_param) + sizeof(hardware_param_t) == 0x158,
+	      "0x82+0xD6=0x158：blob param/ops 分界闭合");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_operation) == 0x158,
+	      "ops @158（rpc memcpy(param+0x158,0xD8)）");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, limit_csv_version) == 0x290,
+	      "limit_csv @290（6.18 独有，置尾）");
+static_assert(sizeof(xiaomi_touch_driver_param_t) == 0x2B0,
+	      "树侧 0x2B0 = blob 步长 0x230 + 0x80（12 独有 ops 0x60 + limit_csv 0x1E + 填充 0x2）");
 static_assert(__XT_OFF(hardware_operation_t, ic_self_test) == 0x00, "ops slot0");
 static_assert(__XT_OFF(hardware_operation_t, set_mode_value) == 0x20, "ops slot4");
 static_assert(__XT_OFF(hardware_operation_t, cmd_update_func) == 0x48, "ops slot9");
 static_assert(__XT_OFF(hardware_operation_t, ic_enable_irq) == 0x50, "ops slot10");
 static_assert(__XT_OFF(hardware_operation_t, htc_ic_setModeValue) == 0xA0, "ops slot20");
-static_assert(__XT_OFF(hardware_operation_t, ic_resume_suspend) == 0xB0, "ops slot22（blob 末槽）");
-static_assert(__XT_OFF(hardware_operation_t, ic_set_charge_state) == 0xB8,
-	      "blob 框架 ops 到 0xB8 止（0x178+0xB8 = 0x230 = blob 步长）；其下为 6.18 尾部");
-static_assert(sizeof(hardware_operation_t) == 0x138, "ops = 23 blob 槽 + 16 扩展项");
-static_assert(sizeof(xiaomi_touch_driver_param_t) == 0x2B0,
-	      "树侧 0x2B0 = blob 0x230 + 0x80（6.18 尾部 16 项；同形前缀 = 0x230）");
+static_assert(__XT_OFF(hardware_operation_t, ic_resume_suspend) == 0xB0, "ops slot22");
+static_assert(__XT_OFF(hardware_operation_t, ic_set_charge_state) == 0xB8, "ops slot23（blob：resume_work 0x8744 调用）");
+static_assert(__XT_OFF(hardware_operation_t, touch_dfs_test) == 0xC0, "ops slot24（blob 无调用点）");
+static_assert(__XT_OFF(hardware_operation_t, xiaomi_touch_fod_test) == 0xC8,
+	      "ops slot25（blob store_fod_test 0xD854 经 [x20,#0x220] 调用）");
+static_assert(__XT_OFF(hardware_operation_t, set_thermal_temp) == 0xD0,
+	      "ops slot26（blob 末槽：rpc 0x7314 空判 + 3 调用点）");
+static_assert(__XT_OFF(hardware_operation_t, get_limit_csv_version) == 0xD8,
+	      "ops slot27 = 6.18 独有首项（blob 只拷 0xD8=27 槽）");
+static_assert(sizeof(hardware_operation_t) == 0x138, "ops = 27 blob 槽 + 12 扩展项");
 #undef __XT_OFF
 /* ============================== 断言块结束 ============================== */
 

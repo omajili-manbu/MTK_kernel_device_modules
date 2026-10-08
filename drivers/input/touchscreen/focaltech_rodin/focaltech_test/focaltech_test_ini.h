@@ -490,8 +490,13 @@ struct fts_test {
      * 前移至 0xa8 保留洞的尾 8 字节（其余偏移不变，struct 尺寸不变）。 */
     char *csv_data_buffer;            /* 0xb8 blob 实证（0x1659c str / 0x18844 ldr） */
     int csv_item_cnt;                 /* 0xc0 */
-    int csv_item_sraw;                /* 0xc4 */
-    int csv_item_scb;                 /* 0xc8 */
+    /* _b583-FT3683 A 组勘误：blob 机器码实测 +0xc4 = scap_cb 位图、+0xc8 = scap_rawdata
+     * 位图（写侧 scap_cb_ccbypass 0x20644/0x2368c/0x23b5c `ldp [x19,#0xc0]`+orr 1/2/4 →
+     * +0xc4；scap_rawdata 0x20548/0x22a?? orr → +0xc8；读侧 save_data L1 SCAP Rawdata
+     * Test 门 0x24a4c ldr [x20,#0xc8]、SCAP CB Test 门 0x24aa0 ldr [x20,#0xc4]、T1
+     * 0x2519c/0x253fc、F3 0x270cc/0x2744c 同向）。原声明两字段名义互换，本轮更名归位。 */
+    int csv_item_scb;                 /* 0xc4 scap_cb 三段 WP 位图 bit0/1/2 = on/off/high */
+    int csv_item_sraw;                /* 0xc8 scap_rawdata 位图 bit0/1/2 = on/off/(hi) */
     u32 data_valid_mask;              /* 0xcc seg3: bit0..5=6频点 bit6..8=min/max/differ */
     u32 rawshift_result_mask;         /* 0xd0 bit0=black bit1=white bit2=compared（pic 状态机） */
     int csv_item_af_noise;            /* 0xd4 */
@@ -616,8 +621,8 @@ _Static_assert(__builtin_offsetof(struct fts_test, csv_item_cnt) == 0xc0, "csv_i
 /* _b581：A-74 续行④ 判据——blob 的 csv 文本缓冲在 +0xb8（fts_test_init 0x1659c
  * str / fts_csv_show 0x18844 ldr），与树侧同名字段必须同址；0xbf0 只许是洞。 */
 _Static_assert(__builtin_offsetof(struct fts_test, csv_data_buffer) == 0xb8, "csv_data_buffer@0xb8 (blob 0x1659c/0x18844)");
-_Static_assert(__builtin_offsetof(struct fts_test, csv_item_sraw) == 0xc4, "csv_item_sraw@0xc4");
-_Static_assert(__builtin_offsetof(struct fts_test, csv_item_scb) == 0xc8, "csv_item_scb@0xc8");
+_Static_assert(__builtin_offsetof(struct fts_test, csv_item_scb) == 0xc4, "csv_item_scb@0xc4 (blob scap_cb 位图, 0x20644/0x24aa0/0x2744c)");
+_Static_assert(__builtin_offsetof(struct fts_test, csv_item_sraw) == 0xc8, "csv_item_sraw@0xc8 (blob scap_rawdata 位图, 0x20548/0x24a4c/0x270cc)");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_af_noise) == 0xd4, "csv_item_af_noise@0xd4");
 _Static_assert(__builtin_offsetof(struct fts_test, item1_data) == 0x40, "item1@0x40");
 _Static_assert(__builtin_offsetof(struct fts_test, item7_data) == 0x70, "item7@0x70");

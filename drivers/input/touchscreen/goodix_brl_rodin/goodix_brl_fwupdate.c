@@ -825,7 +825,7 @@ static int goodix_flash_subsystem(struct fw_subsys_info *subsys)
 	total_size = subsys->size;
 	fw_packet = kzalloc(ISP_MAX_BUFFERSIZE + 4, GFP_KERNEL);
 	if (!fw_packet) {
-		ts_err("Failed alloc memory");
+		ts_err("alloc fw_packet memory failed");	/* _b583b-GX：blob 0x6a11 */
 		return -EINVAL;
 	}
 
@@ -1288,7 +1288,9 @@ static int goodix_fw_update_thread(void *data)
 	mutex_lock(&fwu_ctrl->mutex);
 
 	if (fwu_ctrl->mode & UPDATE_MODE_SRC_REQUEST) {
-		ts_info("Firmware request update starts,[%s]", fwu_ctrl->fw_name);
+		/* _b583b-GX：blob 0x14bec 'Firmware request update starts' 无 fw_name 实参
+		 * （树原 ',[%s]' 为偏离） */
+		ts_info("Firmware request update starts");
 		r = goodix_request_firmware(&fwu_ctrl->fw_data,
 						fwu_ctrl->fw_name);
 		if (r < 0)

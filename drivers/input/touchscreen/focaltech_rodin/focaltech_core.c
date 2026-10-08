@@ -2519,17 +2519,26 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
     else
         FTS_ERROR("can't find avdd-gpio, use other power supply");
 
+    /* _b583b-B10：名字域按 blob 换 char[40] 内嵌数组（0x18/0x40 槽）。blob 形态
+     * （probe 0x10A50..0x10AFC）：先 memset 清零 40B → of_property_read_string →
+     * 成功且 strlen<=0x27 才 strncpy(dst,src,0x28)；读失败或超长保持全零
+     * （无 "avdd"/"iovdd" 字面量兜底 —— 电源面 regulator_get 用字面量，与该
+     * 成员无耦合，见 fts_power_source_init）。 */
+    memset(pdata->avdd_reg_name, 0, sizeof(pdata->avdd_reg_name));
     ret = of_property_read_string(np, "focaltech,avdd-name", &name);
-    if (ret == 0)
+    if (ret == 0) {
         FTS_INFO("avdd name from dt: %s", name);	/* blob L2322 串（0xf694） */
-    pdata->avdd_reg_name = (ret == 0) ? name : "avdd";
-    /* 注：blob 该成员是 pdata 内 char[40]（0x7a7c 长度上限 0x27 + 0x7a90 strncpy）；
-     * 树侧保留 const char* 语义等价（值仅用于本行打印，init 用字面量）。 */
+        if (strlen(name) <= 0x27)
+            strncpy(pdata->avdd_reg_name, name, sizeof(pdata->avdd_reg_name));
+    }
 
+    memset(pdata->iovdd_reg_name, 0, sizeof(pdata->iovdd_reg_name));
     ret = of_property_read_string(np, "focaltech,iovdd-name", &name);
-    if (ret == 0)
+    if (ret == 0) {
         FTS_INFO("iovdd name from dt: %s", name);	/* blob L2328 串（0x8bb3） */
-    pdata->iovdd_reg_name = (ret == 0) ? name : "iovdd";
+        if (strlen(name) <= 0x27)
+            strncpy(pdata->iovdd_reg_name, name, sizeof(pdata->iovdd_reg_name));
+    }
 
     ret = of_property_read_u32(np, "focaltech,super-resolution-factors", &temp_val);
     if (ret < 0) {
@@ -2587,35 +2596,34 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
  */
 static void fts_set_charge_state(int status)
 {
-	int ret;
-	if (status == fts_data->charger_status) {
-		FTS_INFO("last charger status id %d, equal, skip", status);
+	/* _b583b-T4b：blob fts_set_charge_state (0xCD28, data 面被
+	 * fts_init_xiaomi_touchfeature_v3+0x1F0 取址) 逐点收口 ——
+	 *   0xCD38-0xCD40  !fts_data → 直接返回；
+	 *   0xCD44-0xCD48  门 = [ts_data,#0x2D8](pm_suspend)：非挂起才动充电链；
+	 *   0xCD58-0xCD6C  挂起分支 = FTS_ERROR("TP is in suspend mode, don't set usb
+	 *                  status!")（串 0x4D76C = '\0016[FTS_TS_E][%s:%d]: TP is in
+	 *                  suspend mode, don't set usb status!'，门 cbz lv ⇒ E 族）；
+	 *   0xCD74-0xCD7C  pm_stay_awake([ts,#0x10]=dev)；
+	 *   0xCD80-0xCD90  [ts,#0x1A8](charger_status) = status 后 fts_charger_on(fts_data,
+	 *                  status != 0)（CSET NE —— 0/非0 归一，不再透传原值）；
+	 *   0xCD94-0xCD9C  pm_relax(dev)。
+	 * 原树 donor 的 fts_write_reg(0x8B) 双写与 I/E/D 三族打印全部删除（其宿主在 blob
+	 * 为 fts_charger_on，本函数 callface = {fts_charger_on, pm_stay_awake, pm_relax}
+	 * 与 blob 全等，无 _printk/无 fts_write_reg）。 */
+	struct fts_ts_data *ts_data = fts_data;
+
+	if (!ts_data)
+		return;
+
+	if (ts_data->pm_suspend) {
+		FTS_ERROR("TP is in suspend mode, don't set usb status!");
+		return;
 	}
 
-	fts_data->charger_status = status;
-	/* _b582-INTA：族对齐 I→D ×2（blob 0x9ab0 '\0016[FTS_TS_D][%s:%d]: success to set power supply
-	 * status:%d'，引用点 fts_charger_on+0x58/0x5c，门 cmp w8,#4; b.lo）。
-	 * 【跨侧残留】blob 的该串宿主 = fts_charger_on，本函数在 blob 内只调
-	 * fts_charger_on + pm_stay_awake/pm_relax（callface: only-blob={fts_charger_on:1,
-	 * pm_relax:1, pm_stay_awake:1} / only-tree={_printk:3, fts_write_reg:2}）——
-	 * 本批只做族对齐（I→D），本函数整体重构另账。 */
-	if(status) {
-		FTS_INFO("charger usb in");
-		ret = fts_write_reg(FTS_REG_CHARGER_MODE_EN, true);
-		if (ret < 0) {
-			FTS_ERROR("failed to set power supply status:%d", fts_data->charger_status);
-		} else {
-			FTS_DEBUG("success to set power supply status:%d", fts_data->charger_status);
-		}
-	}else {
-		FTS_INFO("charger usb out");
-		ret = fts_write_reg(FTS_REG_CHARGER_MODE_EN, false);
-		if (ret < 0) {
-			FTS_ERROR("failed to set power supply status:%d", fts_data->charger_status);
-		} else {
-			FTS_DEBUG("success to set power supply status:%d", fts_data->charger_status);
-		}
-	}
+	pm_stay_awake(ts_data->dev);
+	ts_data->charger_status = status;
+	fts_charger_on(fts_data, status != 0);
+	pm_relax(fts_data->dev);
 }
 #ifdef FTS_TOUCHSCREEN_FOD
 static void fts_xiaomi_touch_fod_test(int value)
@@ -5045,12 +5053,11 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     mutex_init(&ts_data->bus_lock);
     init_waitqueue_head(&ts_data->ts_waitqueue);
 
-#ifdef FTS_TOUCHSCREEN_FOD
-	mutex_init(&ts_data->fod_mutex);
-#endif
+    /* _b583b-B8：blob 无 fod_mutex/sensor_tap_status 成员与初始化
+     * （FOD 区锁 = report_mutex；0xB50..0xB88 访问点全录无此二者）⇒ 删
+     * mutex_init(&ts_data->fod_mutex) 与 ts_data->sensor_tap_status = 0。 */
     ts_data->doubletap_status = 0;
     ts_data->aod_status = 0;
-    ts_data->sensor_tap_status = 0;
     ts_data->report_rate_status = 240;
     /* Init communication interface */
     ret = fts_bus_init(ts_data);

@@ -407,20 +407,28 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 
 void fts_gesture_recovery(struct fts_ts_data *ts_data)
 {
+    /* _b583b-T4a：blob fts_gesture_recovery (0x17A34, EXPORT, 唯一调用点
+     * fts_tp_state_recovery+0x80) 逐点收口 ——
+     *   0x17A34/0x17A3C  门 = [x0,#0x2E4](gesture_support) && [x0,#0x2D9](suspended)；
+     *   0x17A50-0x17A5C  FTS_DEBUG("gesture recovery...")（debug>=4 门，串同树）；
+     *   0x17A60-0x17AB0  fts_write_reg 七连写：0xD1/0xD2/0xD5/0xD6/0xD7/0xD8 ← 0xFF +
+     *                    FTS_REG_GESTURE_EN(0xD0) ← 1 —— **无** gesture_cmd 写（树侧原
+     *                    `fts_write_reg(FTS_GESTURE_CTRL, ts_data->gesture_cmd)` 为
+     *                    donor 形态，blob 该函数零 gesture_cmd(0xBEB) 访问点）；
+     *   0x17AB4          fts_fod_reg_write(0x01, 1) **无条件** —— 全函数仅读 0x2E4/0x2D9
+     *                    两布尔，树侧原 fod_status 门前独有（callface only-tree 已清）。
+     * callface: 7×fts_write_reg + 1×fts_fod_reg_write + 1×_printk，与 blob 全等。 */
     if (ts_data->gesture_support && ts_data->suspended) {
         FTS_DEBUG("gesture recovery...");
-        // fts_write_reg(0xD1, 0xFF);
-        // fts_write_reg(0xD2, 0xFF);
-        // fts_write_reg(0xD5, 0xFF);
-        // fts_write_reg(0xD6, 0xFF);
-        // fts_write_reg(0xD7, 0xFF);
-        // fts_write_reg(0xD8, 0xFF);
-        fts_write_reg(FTS_GESTURE_CTRL, ts_data->gesture_cmd);
+        fts_write_reg(0xD1, 0xFF);
+        fts_write_reg(0xD2, 0xFF);
+        fts_write_reg(0xD5, 0xFF);
+        fts_write_reg(0xD6, 0xFF);
+        fts_write_reg(0xD7, 0xFF);
+        fts_write_reg(0xD8, 0xFF);
         fts_write_reg(FTS_REG_GESTURE_EN, ENABLE);
 #ifdef FTS_TOUCHSCREEN_FOD
-        if (ts_data->fod_status != -1 && ts_data->fod_status != 0) {
-            fts_fod_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);
-        }
+        fts_fod_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);
 #endif
     }
 }

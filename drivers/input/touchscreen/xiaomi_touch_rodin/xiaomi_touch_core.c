@@ -436,17 +436,19 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	xiaomi_touch_data->raw_data_size = hardware_param->raw_data_page_size * PAGE_SIZE;
 	xiaomi_touch_data->raw_data_buf_size = hardware_param->raw_data_buf_size;
 
+	/* _b583b-XT③（纠错）：blob 0x7068(IDA)/0x1064(.disr) `str w9(=1),[x28,#0x2a08]` 的 x28
+	 * 已被 0x7058/0x1054 `str xzr,[x28,#0x28]!` 前索引回写定标为 元素+0x18 ⇒ 落点 =
+	 * 元素+0x2A20 = temp_detect_ready（此处即 blob 位置：raw_data_buf_size 存点之后、
+	 * frame 分配之前，无条件——set_thermal_temp 判空只门槛线程创建，见 0x7314）。
+	 * 此前按"+0x29F8=priority"读法写的 disp_nb.priority=1 已删：disp_nb@0x29E8 的
+	 * .priority @0x29F8 blob 全模块无写入点（.bss 零初始化；notifier 注册点
+	 * xiaomi_register_panel_notifier_work 0x837C 只写 .notifier_call）。
+	 * ready 另一写入点：unregister 0x1dbc `str wzr,[x23,#0x2a20]` 清 0（unregister_
+	 * touch_panel_common 同位已对齐）。 */
+	atomic_set(&xiaomi_touch_data->temp_detect_ready, 1);
+
 	/* alloc mmap memory */
 	xiaomi_touch_data->frame_data_mmap_phy_base = 0;
-	/* _b583-XT2③：blob 0x1064 `str w9(=1), [x28, #0x2a08]` —— x28 = 元素-0x10（同函数
-	 * 0x1034 `str w4,[x28,#0x18]`=frame_data_size、0x1054 `str xzr,[x28,#0x28]!`=
-	 * frame_data_mmap_phy_base 两个定标点）⇒ 落点 = 元素+0x29F8 = disp_nb.priority
-	 * （disp_nb @元素+0x29E8 由 work 相对存点 xiaomi_register_panel_notifier_work
-	 * 0x2378 `str x8,[x19,#0x90]!`（x19 = work = 元素+0x2958）锁定，notifier_block
-	 * .priority 位于 +0x10）。值 1、4B 宽；mi_disp_notifier.c 不读 priority
-	 * ⇒ 无行为影响，纯布局保真（coordinator/A3 的"+0x29F0 dev"读法即差该 0x10 偏置）。
-	 * 注：树侧原占该 4B 的 donor 成员 panel_register_retry 已删（见 xiaomi_touch.h）。 */
-	xiaomi_touch_data->disp_nb.priority = 1;
 	alloc_size = xiaomi_touch_data->frame_data_size * xiaomi_touch_data->frame_data_buf_size;
 	LOG_DEBUG("alloc size = %d, frame data size %d, frame data page size %d, frame data buf size %d",
 		alloc_size, xiaomi_touch_data->frame_data_size,
@@ -524,7 +526,10 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	/* create a thread for temp detect */
 	if (hardware_operation && hardware_operation->set_thermal_temp) {
 		/* The temperature detection function is enabled by default when machine startup */
-		atomic_set(&xiaomi_touch_data->temp_detect_ready, 1);
+		/* _b583b-XT③：blob 线程创建/等待队列初始化确在 set_thermal_temp 判空内
+		 * （0x7314 `ldr x8,[x21,#0xD0]`+cbz、0x73E8 __init_waitqueue_head(+0x2A18
+		 * 基址→元素+0x2A08)+wake_up_process 0x7410）；temp_detect_ready=1 不在此门内
+		 * （无条件，已前移至 raw_data_buf_size 存点后，见上）。 */
 		if (xiaomi_touch_temp_thread == NULL) {
 			LOG_INFO("startup temperature detect thread");
 			xiaomi_touch_temp_thread = kthread_create(xiaomi_touch_temp_thread_func, NULL, "xiaomi_touch_temp_thread");

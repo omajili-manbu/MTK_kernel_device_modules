@@ -180,7 +180,7 @@ static int goodix_parse_cfg_bin(struct goodix_cfg_bin *cfg_bin)
 	cfg_bin->cfg_pkgs = kzalloc(sizeof(struct goodix_cfg_package) *
 				    cfg_bin->head.pkg_num, GFP_KERNEL);
 	if (!cfg_bin->cfg_pkgs) {
-		ts_err("cfg_pkgs, allocate memory ERROR");
+		ts_err("cfg_pkgs, allocate memory failed");	/* _b583b-GX：blob 0x12a90 措辞 failed（树原 ERROR 为偏离） */
 		return -ENOMEM;
 	}
 
@@ -307,7 +307,7 @@ static int goodix_get_config_data(struct goodix_ts_core *cd, u8 sensor_id)
 	char *cfg_name = cd->board_data.cfg_bin_name;
 	int ret;
 
-	ts_err("config name:%s", cd->board_data.cfg_bin_name);
+	/* _b583b-GX：blob 无 'config name:%s' 打印（relref 0 命中），删 */
 	/*get cfg_bin from file system*/
 	ret = goodix_read_cfg_bin(&cd->pdev->dev, cfg_name, &cfg_bin);
 	if (ret) {

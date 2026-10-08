@@ -295,7 +295,8 @@ int brl_gesture(struct goodix_ts_core *cd, int gesture_type)
 	ts_debug("BRL cmd 0 is 0x%x", cmd.data[0]);
 	ts_debug("BRL cmd 1 is 0x%x", cmd.data[1]);
 	if (cd->hw_ops->send_cmd(cd, &cmd))
-		ts_err("failed send gesture cmd");
+		/* _b583b-GX：blob brl_gesture 0x155c 带 '[GESTURE CMD ERROR]' 前缀 */
+		ts_err("[GESTURE CMD ERROR]failed send gesture cmd");
 
 	return 0;
 }
@@ -375,26 +376,19 @@ static int brl_irq_enbale(struct goodix_ts_core *cd, bool enable)
 static int brl_read(struct goodix_ts_core *cd, unsigned int addr, unsigned char *data, unsigned int len)
 {
 	struct goodix_bus_interface *bus = cd->bus;
-	int ret = -1;
 
-	ret = bus->read(bus->dev, addr, data, len);
-	if (ret == 0)
-		ts_verbose("[0x%04X]:%*ph", addr, len > 24 ? 24 : len, data);
-
-	return ret;
+	/* _b583b-GX/T4：blob brl_read（0x3e9c，60B）= 纯转发 bus->read，
+	 * 无 ts_verbose dump（only-tree 串 '[0x%04X]:%*ph'/'brl_read'） */
+	return bus->read(bus->dev, addr, data, len);
 }
 
 static int brl_write(struct goodix_ts_core *cd, unsigned int addr,
 		unsigned char *data, unsigned int len)
 {
 	struct goodix_bus_interface *bus = cd->bus;
-	int ret = -1;
 
-	ret = bus->write(bus->dev, addr, data, len);
-	if (ret == 0)
-		ts_verbose("[0x%04X]:%*ph", addr, len > 24 ? 24 : len, data);	
-
-	return ret;
+	/* _b583b-GX/T4：blob brl_write（0x3edc，64B）同上纯转发 */
+	return bus->write(bus->dev, addr, data, len);
 }
 
 /* command ack info */
@@ -532,7 +526,9 @@ resend_cmd:
 		return ret;
 	}
 	for (i = 0; i < retry_count; i++) {
-		msleep(20);
+		/* _b583b-GX/T4：blob 0x7af4 循环头直接读，无 20ms 前置 sleep
+		 *（calldiff only-tree msleep:1）；读失败路径的 usleep(5000,5100)
+		 * 与成功路径 usleep 相同（blob 0x7ad8/0x7c5c） */
 		ret = brl_read(cd, cmd_addr, tmp_buf, sizeof(tmp_buf));
 		if (ret) {
 			ts_err("failed read cmd ack info");
@@ -706,6 +702,11 @@ static int wait_cmd_status(struct goodix_ts_core *cd,
 	struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
 	int i, ret;
 
+	/* _b583b-GX：blob 把本函数整体内联进 send_cfg_cmd（0x7d98-0x7eb4，
+	 * blob 无 wait_cmd_status 符号）；循环体树同形。超时打印为短式
+	 * 'cmd status not ready, retry %d, ack 0x%x, status 0x%x, ret %d'
+	 * （blob only-blob 串，实参 retry/ack/state/ret，0x7e88-0x7eac），
+	 * 树原带 addr+cmd buf 的长式为 warsaw 残项 */
 	for (i = 0; i < retry; i++) {
 		ret = hw_ops->read(cd, misc->cmd_addr, cmd_ack.buf,
 			sizeof(cmd_ack));
@@ -717,8 +718,8 @@ static int wait_cmd_status(struct goodix_ts_core *cd,
 		msleep(20);
 	}
 
-	ts_err("cmd status not ready, retry %d, addr 0x%x,  cmd buf %*ph, ack 0x%x, status 0x%x, ret %d",
-			i, misc->cmd_addr, (int)sizeof(cmd_ack), cmd_ack.buf, cmd_ack.ack, cmd_ack.state, ret);
+	ts_err("cmd status not ready, retry %d, ack 0x%x, status 0x%x, ret %d",
+			i, cmd_ack.ack, cmd_ack.state, ret);
 	return -EINVAL;
 }
 
@@ -726,10 +727,13 @@ static int send_cfg_cmd(struct goodix_ts_core *cd,
 	struct goodix_ts_cmd *cfg_cmd, u8 target_status)
 {
 	int ret;
-	ts_debug("enter cmd:0x%*ph", (int)sizeof(cfg_cmd), cfg_cmd);
+	/* _b583b-GX/T4：blob 0x7ce8-0x7edc：
+	 * ① 无 'enter cmd:0x%*ph' 入口打印（only-tree 串）；
+	 * ② 失败打印短式 'failed write cfg prepare cmd %d'（0x7d54，行 686）；
+	 * ③ wait_cmd_status 内联。 */
 	ret = cd->hw_ops->send_cmd(cd, cfg_cmd);
 	if (ret) {
-		ts_err("failed write cfg prepare cmd %d, cmd:0x%*ph", ret,  (int)sizeof(cfg_cmd), cfg_cmd);
+		ts_err("failed write cfg prepare cmd %d", ret);
 		return ret;
 	}
 
@@ -773,7 +777,7 @@ static int brl_package_config(u8 *cfg, int len, u8 *buf)
 	buf[2] = (checksum >> 16) & 0xFF;
 	buf[3] = (checksum >> 24) & 0xFF;
 
-	ts_debug("buf:0x%*ph", CONFIG_DATA_HEAD_BD, buf);
+	/* _b583b-GX：blob brl_package_config 无 'buf:0x%*ph' 打印（relref 0 命中），删 */
 
 	return 0;
 }
@@ -816,7 +820,7 @@ static int brl_send_config(struct goodix_ts_core *cd, u8 *cfg, int len)
 
 	tmp_buf = kzalloc(tx_len, GFP_KERNEL);
 	if (!tmp_buf) {
-		ts_err("try alloc (tx_len=%d) memory err", tx_len);
+		/* _b583b-GX：blob 无 'try alloc (tx_len=%d) memory err' 串，删打印留守卫 */
 		return -ENOMEM;
 	}
 
@@ -2170,10 +2174,13 @@ static int goodix_htc_enable_touch_coord(int en)
 
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
+	/* _b583b-GX：blob 0x1784/0x181c（enable_touch_coord 内联体）：
+	 * E '%s...cmd %d, ret %d' / I 'success send touch data cmd %d'（无 ret），
+	 * %d = data[0]；树原 '(%02x) data %d' 为 warsaw 残项 */
 	if (ret)
-		ts_err("failed send touch data cmd(%02x) data %d, ret %d", tmp_cmd.cmd, tmp_cmd.data[0], ret);
+		ts_err("failed send touch data cmd %d, ret %d", tmp_cmd.data[0], ret);
 	else {
-		ts_info("success send touch data cmd(%02x) data %d, ret %d", tmp_cmd.cmd, tmp_cmd.data[0], ret);
+		ts_info("success send touch data cmd %d", tmp_cmd.data[0]);
 	}
 
 	return ret;
@@ -2218,10 +2225,12 @@ int goodix_htc_enable_b_array(void)
 		raw_cmd.data[0] = 0x87;
 	raw_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &raw_cmd);
+	/* _b583b-GX：blob 0x18e0 E 'failed send b array cmd %d'(ret) /
+	 * 0x1914 I 'success send b array cmd'（无 sync_mode 实参） */
 	if (ret)
-		ts_err("failed send b array cmd %d, sync mode is %02x", ret, goodix_core_data->sync_mode);
+		ts_err("failed send b array cmd %d", ret);
 	else
-		ts_info("success send b array cmd, sync mode is %02x", goodix_core_data->sync_mode);
+		ts_info("success send b array cmd");
 
 	return ret;
 }
@@ -2378,8 +2387,10 @@ int goodix_htc_enter_idle(int *value)
 	}
 
 	ret = hw_ops->send_cmd(goodix_core_data, &idle_cmd);
-	ts_info("%s send idle cmd en: %d, cycle: %d, time: %d, ret %d",
-		ret ? "failed" : "success", en, cycle, time, ret);
+	/* _b583b-GX：blob 0x1de0（I 级）'%s send idle cmd %d, ret %d'，
+	 * 只打 en 一个实参（w4=value[0]，0x1cc8 ldp w21,[x0]） */
+	ts_info("%s send idle cmd %d, ret %d",
+		ret ? "failed" : "success", en, ret);
 
 	return ret;
 }
@@ -2389,22 +2400,10 @@ int goodix_htc_enter_idle(int *value)
 * 00 00 06 D3 data0 data1 sum0 sum1，data0：基准所在的频点，data1：备用
 */
 
-int goodix_htc_ref_hopping_set(int *value) {
-	struct goodix_ts_hw_ops *hw_ops;
-	struct goodix_ts_cmd hopping_cmd;
-	int ret = -1;
-	if (!goodix_core_data)
-		return -EINVAL;
-	hw_ops = goodix_core_data->hw_ops;
-	hopping_cmd.cmd = GOODIX_REF_HOPPING_SET;
-	hopping_cmd.data[0] = value[0];
-	hopping_cmd.data[1] = value[1];
-	hopping_cmd.len = 6;
-	if (hw_ops->send_cmd)
-		ret = hw_ops->send_cmd(goodix_core_data, &hopping_cmd);
-	ts_debug("%s send ref_hopping_set cmd, ret %d", ret ? "failed" : "success", ret);
-	return ret;
-}
+/* _b583b-GX/T2：goodix_htc_ref_hopping_set 按 blob 删除——blob 无该符号
+ * （symdiff only-tree）亦无 'ref_hopping_set' 串；其调用点 mode 1106
+ * （THP_REF_HOPPING_SET）在 blob 跳表（1000-1103）之外落 default
+ * 'not support mode!'，case 已随本轮删除 */
 
 /*
  * update idle base line.
@@ -2424,8 +2423,10 @@ int goodix_htc_update_idle_baseline(void)
 	tmp_cmd.cmd = GOODIX_CMD_UPDATE_IDLE_BASELINE;
 	tmp_cmd.len = 4;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	ts_info("%s send update idle baseline cmd(%02x), ret %d",
-		ret ? "failed" : "success", tmp_cmd.cmd, ret);
+	/* _b583b-GX：blob 0x1ed0（D 级）'%s send update idle baseline cmd, ret %d'，
+	 * 无 cmd(%02x)；树原 I 级为等级偏离 */
+	ts_debug("%s send update idle baseline cmd, ret %d",
+		ret ? "failed" : "success", ret);
 
 	return ret;
 }
@@ -2533,8 +2534,10 @@ int goodix_htc_set_idle_threshold(int threshold)
 	//tmp_cmd.data[1] = (u8)((threshold >> 8) & 0xFF);
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	ts_debug("%s send idle threshold cmd(%02x) date %d, ret %d",
-		ret ? "failed" : "success", tmp_cmd.cmd, tmp_cmd.data[0], ret);
+	/* _b583b-GX：blob 0x21d0（D 级）'%s send idle threshold cmd %d, ret %d'
+	 * 直接打 threshold，无 cmd(%02x)、无 'date' 笔误 */
+	ts_debug("%s send idle threshold cmd %d, ret %d",
+		ret ? "failed" : "success", tmp_cmd.data[0], ret);
 
 	return ret;
 }
@@ -2548,26 +2551,13 @@ int goodix_htc_set_idle_threshold(int threshold)
  * others                   -----> value = 120
  * return: 0 on success, otherwise return < 0.
  */
-#define GOODIX_CMD_FPS 0x2A
-int goodix_htc_set_display_fps(int value) {
-	struct goodix_ts_hw_ops *hw_ops;
-	struct goodix_ts_cmd tmp_cmd;
-	int ret = -1;
-
-	if (!goodix_core_data)
-		return -EINVAL;
-	hw_ops = goodix_core_data->hw_ops;
-	tmp_cmd.cmd = GOODIX_CMD_FPS;
-	tmp_cmd.data[0] = (u8)(value & 0xFF);
-	tmp_cmd.data[1] = (u8)((value >> 8) & 0xFF);
-	tmp_cmd.len = 6;
-	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	ts_debug("%s send fps cmd %d, ret %d", ret ? "failed" : "success", value, ret);
-	return ret;
-}
+/* _b583b-GX/T2：goodix_htc_set_display_fps 按 blob 删除——blob 无该符号
+ * （symdiff only-tree）与 'send fps cmd'/'fps %d change to %d' 两串；
+ * mode 1012（THP_HAL_DISPLAY_FPS）在 blob 跳表内映射到 default
+ * 'not support mode!'（0xfbf4），case 已随本轮删除 */
 
 /*
- * set ic freq hopping value 
+ * set ic freq hopping value
  *
  *
  * return: 0 on success, otherwise return < 0.
@@ -2587,8 +2577,10 @@ int goodix_htc_set_freq_hopping(int index)
 	tmp_cmd.len = 5;
 	if (hw_ops->send_cmd)
 		ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	ts_info("%s send freq hopping index cmd(%02x) data %x, ret %d",
-		ret ? "failed" : "success", tmp_cmd.cmd, tmp_cmd.data[0], ret);
+	/* _b583b-GX：blob 0x2304 '%s send freq hopping index %x, ret %d'（I 级），
+	 * 直接打 index，无 cmd(%02x) data 前缀 */
+	ts_info("%s send freq hopping index %x, ret %d",
+		ret ? "failed" : "success", index, ret);
 
 	return ret;
 }
@@ -2613,8 +2605,9 @@ int goodix_htc_set_soft_reset(int index)
 	tmp_cmd.data[0] = index & 0xff;
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	ts_info("%s send soft reset index cmd(%02x) data %x, ret %d",
-		ret ? "failed" : "success", tmp_cmd.cmd, tmp_cmd.data[0], ret);
+	/* _b583b-GX：blob 0x2408 '%s send soft reset index %x, ret %d'（I 级） */
+	ts_info("%s send soft reset index %x, ret %d",
+		ret ? "failed" : "success", index, ret);
 
 	return ret;
 }
@@ -2722,8 +2715,10 @@ int goodix_htc_enable_freq_shift(bool en)
 
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	ts_debug("%s send freq shift cmd(%02x) data %d, ret %d",
-		ret ? "failed" : "success", tmp_cmd.cmd, tmp_cmd.data[0], ret);
+	/* _b583b-GX：blob 0x27e0（D 级）'%s send freq shift cmd %d, ret %d'，
+	 * 直接打 data[0]，无 cmd(%02x) */
+	ts_debug("%s send freq shift cmd %d, ret %d",
+		ret ? "failed" : "success", tmp_cmd.data[0], ret);
 
 	return ret;
 }

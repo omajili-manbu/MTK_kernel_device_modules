@@ -56,26 +56,57 @@ static int gesture_event_handler(struct goodix_ts_core *cd,
 	struct goodix_ic_info_misc *misc = &cd->ic_info.misc;
 	int ges_read_len;
 	u8 event_status;
-	int ret;
+	int ret = 0;
 	bool sync_late = false;
 
-	ges_read_len = IRQ_EVENT_HEAD_LEN + FOD_EVENT_LEN;
-	ret = hw_ops->read(cd, misc->touch_data_addr,
-			pre_buf, ges_read_len);
+	/* _b583b-GX：blob 0x164c0（handler:78，I 级）入口即打 SCP 状态 */
+	ts_info("scptp_cur_state=%d\n", scp_tp_param.param0);
+
+	/* blob 0x163ac：param0==3 时手势体来自 SCP ddr 缓冲（gesture_len 运行期，
+	 * blob 带 fortify 上界 32 的检查，C 层同形即得）；否则 IC 读 32 字节
+	 * （blob 0x16400 w3=0x20，树原 8+10=18 为 warsaw 残项） */
+	if (scp_tp_param.param0 == 3) {
+		ges_read_len = scp_tp_param.gesture_len;
+		memcpy(pre_buf, scp_tp_param.gesture_data, ges_read_len);
+	} else {
+		ges_read_len = IRQ_EVENT_HEAD_LEN_LARGER;
+		ret = hw_ops->read(cd, misc->touch_data_addr,
+				pre_buf, ges_read_len);
+	}
+
+	/* blob 0x16448（readprint_debuginfo 内联）：debug>=4 读 IC 调试页 80B，
+	 * 与读手势成败无关（0x16420-0x16498 在 ret 判定之前） */
+	if (debug_log_level >= GTP_LOG_DEBUG) {
+		u8 dbg_buf[80] = {0};
+		int dbg_ret = hw_ops->read(cd, 0x10218, dbg_buf, sizeof(dbg_buf));
+
+		if (dbg_ret)
+			ts_err("failed get debug info\n");
+		else
+			ts_debug("GF_DEBUG: %*ph\n", (int)sizeof(dbg_buf), dbg_buf);
+	}
+
 	if (ret) {
-		ts_err("failed get gesture event head data, ret=%d", ret);
+		/* blob 0x164a0（handler:90，无 ret 参数） */
+		ts_err("failed get gesture event head data");
 		return ret;
 	}
 
+	/* blob 0x16530（handler:96，D 级）：len 与长度实参同值 */
+	if (debug_log_level >= GTP_LOG_DEBUG)
+		ts_debug("len=%d, data_buf: %*ph\n",
+				ges_read_len, ges_read_len, pre_buf);
+
 	if (checksum_cmp(pre_buf, IRQ_EVENT_HEAD_LEN, CHECKSUM_MODE_U8_LE)) {
 		ts_err("touch head checksum err");
+		/* blob 0x165f4（handler:101）：E 级 8 字节（树原 16 为 warsaw 残项） */
 		ts_err("touch_head %*ph", IRQ_EVENT_HEAD_LEN, pre_buf);
-		ts_event->retry = 1;
 		if (pre_buf[4] == GOODIX_GESTURE_FOD_UP && pre_buf[0] == 0) {
 			ts_info("warning: fod up checksum err");
 			sync_late = true;
 		} else {
-			ts_info("checksum err, return -EINVAL");
+			/* blob 无 'checksum err, return -EINVAL' 打印（0x1659c 直接
+			 * 落 ist 的 failed get gesture data 路径） */
 			return -EINVAL;
 		}
 	}
@@ -87,9 +118,9 @@ static int gesture_event_handler(struct goodix_ts_core *cd,
 	if (event_status & GOODIX_GESTURE_EVENT || sync_late) {
 		ts_event->event_type = EVENT_GESTURE;
 		ts_event->gesture_type = pre_buf[4];
-	} else {
-		ts_info("no gesture event in status, event_status=0x%02x", event_status);
 	}
+	/* blob 无 'no gesture event in status' 打印：无事件时由 ist 打
+	 * 'invalid event type: 0x%x'（0x169ec，E 级） */
 
 	if (cd->sync_mode == SYNC)
 		hw_ops->after_event_handler(cd);
@@ -115,7 +146,7 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 	unsigned int fodx, fody, fod_id;
 	unsigned int overlay_area;
 #endif
-	u8 gesture_data[32];
+	u8 gesture_data[32] = {0};
 
 	if (atomic_read(&cd->suspended) == 0)
 		return EVT_CONTINUE;
@@ -124,13 +155,14 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 
 	ret = gesture_event_handler(cd, &gs_event, gesture_data);
 	if (ret) {
-		ts_err("failed get gesture data, ret=%d, goto re_send_ges_cmd", ret);
+		/* blob 0x165a0（ist:151，E 级，无 ret 参数） */
+		ts_err("failed get gesture data");
 		goto re_send_ges_cmd;
 	}
 
 	if (!(gs_event.event_type & EVENT_GESTURE)) {
-		ts_info("no EVENT_GESTURE in event_type=0x%x, goto re_send_ges_cmd",
-			gs_event.event_type);
+		/* blob 0x169ec（ist:157，E 级；树原 'no EVENT_GESTURE...goto' I 级为 warsaw 残项） */
+		ts_err("invalid event type: 0x%x", gs_event.event_type);
 		goto re_send_ges_cmd;
 	}
 
@@ -159,6 +191,10 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 		fody *= cd->board_data.super_resolution_factor;
 		ts_debug("gesture coordinate fodx: %d, fody: %d, fod_id: %d, overlay_area: %d",	/* #228：blob 等级 D */
 					fodx, fody, fod_id, overlay_area);
+		/* _b583b-GX：blob FOD down 上报序列以 BTN_INFO(1)+sync 开头
+		 * （0x16a44-0x16a6c），树原缺这两个事件 */
+		input_report_key(cd->input_dev, BTN_INFO, 1);
+		input_sync(cd->input_dev);
 #ifdef TYPE_B_PROTOCOL
 		input_mt_slot(cd->input_dev, fod_id);
 		input_mt_report_slot_state(cd->input_dev, MT_TOOL_FINGER, 1);
@@ -175,15 +211,10 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 		cd->fod_finger = true;
 		update_fod_press_status_common(1);
 		goto gesture_ist_exit;
-		break;
 
 	case GOODIX_GESTURE_FOD_UP:
 		cd->fod_down_before_suspend = false;
-		if (!(cd->gesture_enabled & FOD_EN) && (driver_get_touch_mode_common(TOUCH_ID, Touch_Nonui_Mode) != 2)
-#ifndef TOUCH_THP_SUPPORT
-			&& (!cd->fod_finger)
-#endif
-			) {
+		if (!(cd->gesture_enabled & FOD_EN) && (driver_get_touch_mode_common(TOUCH_ID, Touch_Nonui_Mode) != 2)) {
 			ts_info("not enable FOD Up");
 			if (cd->fod_finger)
 				goto gesture_ist_exit;
@@ -194,19 +225,21 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 		if (cd->fod_finger) {
 			ts_info("gesture fod up, overlay_area: %d", overlay_area);
 			cd->fod_finger = false;
+			/* _b583b-GX：blob FOD up 序列 = BTN_INFO(0)+sync 开头、
+			 * BTN_TOUCH/TOOL_FINGER(0)+sync 结尾（0x167fc-0x168ac），
+			 * 树原以 WMAJ/WMIN(0) 收尾为 warsaw 残项 */
+			input_report_key(cd->input_dev, BTN_INFO, 0);
+			input_sync(cd->input_dev);
 #ifdef TYPE_B_PROTOCOL
 			input_mt_slot(cd->input_dev, fod_id);
 			input_mt_report_slot_state(cd->input_dev, MT_TOOL_FINGER, 0);
 #endif
 			input_report_key(cd->input_dev, BTN_TOUCH, 0);
 			input_report_key(cd->input_dev, BTN_TOOL_FINGER, 0);
-			input_report_abs(cd->input_dev, ABS_MT_WIDTH_MAJOR, 0);
-			input_report_abs(cd->input_dev, ABS_MT_WIDTH_MINOR, 0);
 			input_sync(cd->input_dev);
 			update_fod_press_status_common(0);
 		}
 		goto gesture_ist_exit;
-		break;
 #endif
 
 	case GOODIX_GESTURE_SINGLE_TAP:
@@ -241,8 +274,11 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 	}
 
 re_send_ges_cmd:
-	if (hw_ops->gesture(cd, cd->gesture_enabled))
-		ts_info("warning: failed re_send gesture cmd");
+	/* _b583b-GX：blob 0x16688-0x16690 SCP 接管（param0==3）时不重发手势命令 */
+	if (scp_tp_param.param0 != 3) {
+		if (hw_ops->gesture(cd, cd->gesture_enabled))
+			ts_info("warning: failed re_send gesture cmd");
+	}
 
 gesture_ist_exit:
 	mutex_unlock(&cd->report_mutex);

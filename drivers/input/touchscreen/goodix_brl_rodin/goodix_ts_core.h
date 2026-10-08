@@ -1034,7 +1034,8 @@ int get_limit_csv_file_version(struct goodix_ts_core *ts_core, char *limit_versi
 #ifdef TOUCH_THP_SUPPORT
 int goodix_htc_enable(int en);
 int goodix_htc_enter_idle(int *value);
-int goodix_htc_ref_hopping_set(int *value);
+/* _b583b-GX/T2：goodix_htc_ref_hopping_set 声明删除（blob 无此函数，
+ * mode 1106 落 default） */
 int goodix_htc_enter_glove(int *value);
 int goodix_htc_start_calibration(void);
 int goodix_htc_enable_b_array(void);
@@ -1055,7 +1056,8 @@ int goodix_htc_set_double_scan(int index);
 int goodix_htc_set_normalize_study(int *index);
 int goodix_htc_set_gesture_feedback(int index);
 int goodix_htc_set_idle_threshold(int threshold);
-int goodix_htc_set_display_fps(int value);
+/* _b583b-GX/T2：goodix_htc_set_display_fps 声明删除（blob 无此函数，
+ * mode 1012 在跳表内落 default） */
 
 int goodix_htc_enable_empty_int(bool en);
 int goodix_htc_enable_ic_dump(int en);
