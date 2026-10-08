@@ -2888,12 +2888,14 @@ int fts_set_idle_high_refresh_mode(u8 mode, int value)
  * blob 符号面（.symtab + UND 表）0 命中、串面 0 命中、跳表无对应 case；树侧原调用点
  * （DATA_MODE_25）已同批删除。 */
 
-#define P_ACTIVE	0
-#define P_MONITOR	1
 int fts_htc_enter_idle(int *value)
 {
 	int ret;
+	/* _b584-B2（A-83）：idle_status = blob [SP] 槽（0xAC64 STR W21,[SP]）—— value[0]
+	 * 入口快照，专作尾部 0xA5 thp 写（0xAD68 MOV X1,SP / W2=1）的写值来源，函数内
+	 * 不再改写（树原 "set work mode always 1" 恒写 P_MONITOR(1) 为树独有行为，删）。 */
 	int idle_status = value[0];
+	int en;
 	int idle_scan_cycle = 0;
 	int idle_scan_time = 0;
 
@@ -2901,11 +2903,15 @@ int fts_htc_enter_idle(int *value)
 	 * loc_AC94 _printk，__func__="fts_htc_enter_idle"，W2=0xB37），实参
 	 * W3/W4/W5 = value[0]/value[1]/value[2] 三个 int，位于函数首（先打印后写）。 */
 	FTS_INFO("idle data0: %d, data1: %d, data2: %d", value[0], value[1], value[2]);
+	/* _b584-B2（A-83）：blob 0xAC6C..0xACD0 —— EN 判定 = value[0]==1 且 value[1]、
+	 * value[2] 均非 0 才置 EN=1（CMP W21,#1; B.NE→loc_ACC0；CBZ W20/CBZ W19→loc_ACC0）；
+	 * EN 为局部标志（W21 复用，全函数无 ts_data 字段访问），非树原 P_ACTIVE(0) 判定。 */
+	en = (idle_status == 1 && value[1] != 0 && value[2] != 0) ? 1 : 0;
 	/* enable idle high refresh mode */
-	ret = fts_set_idle_high_refresh_mode(SET_IDLE_HIGH_BASE_EN_TYPE, idle_status == P_ACTIVE ? ENABLE : DISABLE);
+	ret = fts_set_idle_high_refresh_mode(SET_IDLE_HIGH_BASE_EN_TYPE, en);
 	if (ret < 0)
 		FTS_ERROR("fail send send SET_IDLE_HIGH_BASE_EN_TYPE cmd, ret= %d !", ret);
-	if (idle_status == P_ACTIVE) {
+	if (en) {
 		idle_scan_cycle = value[1];
 		idle_scan_time = value[2];
 		/* set idle high refresh scan sycle */
@@ -2917,8 +2923,9 @@ int fts_htc_enter_idle(int *value)
 		if (ret < 0)
 			FTS_ERROR("fail send send SET_IDLE_HIGH_BASE_KEEP_TIME_TYPE cmd, ret= %d !", ret);
 	}
-	/* set work mode always 1*/
-	idle_status = P_MONITOR;
+	/* _b584-B2（A-83）：blob 0xAD68..0xAD74 —— 0xA5(SET_IC_WORK_MODE_TYPE) 写值 =
+	 * value[0] 入口原值（[SP] 快照传指针、长度 1），非树原恒写 P_MONITOR(1)；
+	 * 返回值只取本写（返回值 = fts_thp_ic_write_interfaces 返回，与 blob W19 同源）。 */
 	ret = fts_thp_ic_write_interfaces(SET_IC_WORK_MODE_TYPE, (s32 *)&idle_status, 1);
 	if (ret < 0)
 		FTS_ERROR("fail send send idle cmd, ret= %d", ret);
@@ -3451,6 +3458,18 @@ static int fts_touch_doze_analysis(int value)
 		case IRQ_PIN_LEVEL:
 			result = gpio_get_value(fts_data->pdata->irq_gpio) == 0 ? 0 : 1;
 			break;
+		case ENTER_SUSPEND:
+			/* _b584-B2：blob 0xE244（跳表 case 6 = ENTER_SUSPEND）——
+			 * schedule_resume_suspend_work_common(0, false)（W0=0/W1=0；TOUCH_ID 恒 0），
+			 * resume-suspend work 机制 doze 面 schedule 站点（机制宿主在 xiaomi_touch
+			 * 模块：event_wq + suspend_work/resume_work，本 ko UND 导入）。 */
+			schedule_resume_suspend_work_common(TOUCH_ID, false);
+			break;
+		case ENTER_RESUME:
+			/* _b584-B2：blob 0xE254（跳表 case 7 = ENTER_RESUME）——
+			 * schedule_resume_suspend_work_common(0, 1)。 */
+			schedule_resume_suspend_work_common(TOUCH_ID, true);
+			break;
 		default:
 			FTS_INFO("%s don't support touch doze analysis\n", __func__);
 			break;
@@ -3615,6 +3634,12 @@ static void tpdbg_shutdown(struct fts_ts_data *ts_data, bool enable)
 
 static void tpdbg_suspend(struct fts_ts_data *ts_data, bool enable)
 {
+	/* _b584-B2：blob 0x13248/0x13268（tpdbg_write 内联 tpdbg_suspend 两站，
+	 * tp-suspend-en/off）—— INFO 门（cmp #3; b.cs），__func__="tpdbg_suspend"，
+	 * W2=0xDC0，W3=enable(1/0)；"common" 与 "enable" 之间双空格 = blob 原串字节
+	 * （.rodata.str1.1 +0x6f8a，重定位恰两站）。tpdbg_shutdown（tp-sd-en/off）
+	 * blob 无打印，树侧同（不补）。 */
+	FTS_INFO("enter schedule_resume_suspend_work_common  enable %d", enable);
 	schedule_resume_suspend_work_common(TOUCH_ID, !enable);
 }
 
