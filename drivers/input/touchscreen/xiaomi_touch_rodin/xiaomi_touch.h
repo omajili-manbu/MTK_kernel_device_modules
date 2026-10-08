@@ -201,108 +201,143 @@ typedef struct private_data {
 	u8 mmap_area;
 	s8 touch_id;
 	wait_queue_head_t poll_wait_queue_head;
-	wait_queue_head_t poll_wait_queue_head_for_cmd;
-	wait_queue_head_t poll_wait_queue_head_for_frame;
-	wait_queue_head_t poll_wait_queue_head_for_raw;
-
+	/* _b583-XT：blob private_data_t = 0x40B —— xiaomi_touch_dev_open 0x71c8 实参
+	 * `kzalloc_retry(#0x40, 3)`（64 = node16+mmap_area1+touch_id1+pad6+waitqueue24
+	 * +3×atomic12 → 0x40），且全区只有 1 个 wait queue：
+	 *   · dev_open 0x7204/0x720c：`strb w10(-1),[priv+0x11]`（touch_id=-1）后单次
+	 *     __init_waitqueue_head(priv+0x18, "&client_private_data->poll_wait_queue_head")；
+	 *     blob 串表全量复核：**无** poll_wait_queue_head_for_{cmd,frame,raw}（.strings 仅 1 条
+	 *     `&client_private_data->poll_wait_queue_head`）。
+	 *   · notify_xiaomi_touch 0x59c：列表遍历内单次 `__wake_up(priv+0x18, 3, 0, NULL)`
+	 *     （type 形参未用）。
+	 *   · xiaomi_touch_dev_poll 0x69dc：单点 poll_wait(&priv+0x18)——0x69e4 起即标准
+	 *     poll_wait 宏序列 `if (p && p->_qproc && addr) p->_qproc(...)`，无 _key 分支。
+	 * ⇒ 树侧 _for_cmd/_for_frame/_for_raw 三个队列（3×0x18 = 0x48B）为 donor 附加，删除。 */
 	atomic_t common_data_index;
 	atomic_t frame_data_index;
 	atomic_t raw_data_index;
 } private_data_t;
 
+/* _b583-XT2：xiaomi_touch_data_t 逐成员按 blob 归位（步长 0x2A78，见文末断言块）。
+ * 归位证据链（双证 = .disr 机器码 + IDA asm）：见各成员行内锚点。 */
 typedef struct xiaomi_touch_data {
-	s8 touch_id;
-
-	atomic_t frame_data_buf_index;
-	u32 frame_data_size;
-	u8 frame_data_buf_size;
-	void *frame_data_mmap_base;
-	dma_addr_t frame_data_mmap_phy_base;
-
-	atomic_t raw_data_buf_index;
-	u32 raw_data_size;
-	u8 raw_data_buf_size;
-	void *raw_data_mmap_base;
-	dma_addr_t raw_data_mmap_phy_base;
-
-	struct list_head private_data_list;
-	spinlock_t private_data_lock;
-
-	atomic_t common_data_buf_index;
-	common_data_t common_data_buf[COMMON_DATA_BUF_SIZE];
-	struct mutex common_data_buf_lock;
-	struct htc_ic_polldata* poll_data;
-
-	struct workqueue_struct *event_wq;
+	s8 touch_id;						/* 0x0000 */
+	atomic_t frame_data_buf_index;				/* 0x0004 dev_poll[0x6a18 段前] */
+	u32 frame_data_size;					/* 0x0008 register_tpc[x28+0x18]，x28=元素-0x10 */
+	u8 frame_data_buf_size;					/* 0x000c 同上 [x28+0x1c] */
+	void *frame_data_mmap_base;				/* 0x0010 unregister_tpc[x26+0x20]，x26=元素-0x10 */
+	dma_addr_t frame_data_mmap_phy_base;			/* 0x0018 dev_mmap area1 [xd+0x18] */
+	atomic_t raw_data_buf_index;				/* 0x0020 dev_poll [x19+0x20] */
+	u32 raw_data_size;					/* 0x0024 register_tpc [x26+0x34] */
+	u8 raw_data_buf_size;					/* 0x0028 register_tpc [x21+0x10] */
+	void *raw_data_mmap_base;				/* 0x0030 unregister_tpc [x26+0x40] */
+	dma_addr_t raw_data_mmap_phy_base;			/* 0x0038 dev_mmap area2 [xd+0x38] */
+	/* blob 独有 8B：全模块无任何读写点（IDA + .disr 对 0x40/0x44 的检索仅命中
+	 * 偏置基址 x26+0x40=元素+0x30）；语义未定 ⇒ 保留空洞，禁止访问。 */
+	u8 reserved_0x40[8];					/* 0x0040 */
+	struct list_head private_data_list;			/* 0x0048 notify[0x578 ldr x21,[x19,#0x48]!] */
+	spinlock_t private_data_lock;				/* 0x0058 notify[0x568 add x20,x0,#0x58] */
+	atomic_t common_data_buf_index;				/* 0x005c dev_poll[0x6a18 ldr w9,[x19,#0x5c]] */
+	common_data_t common_data_buf[COMMON_DATA_BUF_SIZE];	/* 0x0060 */
+	struct mutex common_data_buf_lock;			/* 0x28b0 */
+	struct htc_ic_polldata* poll_data;			/* 0x28e0 元素-0x10 基址 umaddl 命中 20 处 */
+	struct workqueue_struct *event_wq;			/* 0x28e8 */
 #if defined(CONFIG_DRM)
-	bool is_suspend;
-	struct work_struct suspend_work;
-	struct work_struct resume_work;
-	struct delayed_work panel_notifier_register_work;
-	struct device *dev;
-	struct notifier_block disp_nb;	/* blob：nb 内嵌（work+0x90 形态） */
-	int panel_register_retry;	/* blob check_count ≤5 @1250ms */
+	bool is_suspend;					/* 0x28f0 */
+	struct work_struct suspend_work;			/* 0x28f8 */
+	struct work_struct resume_work;				/* 0x2928 */
+	struct delayed_work panel_notifier_register_work;	/* 0x2958 notifier_work[work-0x2958=元素基址] */
+	struct device *dev;					/* 0x29e0 rpc[0x20e0 str x0,[x20,#0x29f0]]，x20=元素-0x10 */
+	struct notifier_block disp_nb;	/* blob：nb 内嵌（work+0x90 形态，notifier_work[0x2378 str x8,[x19,#0x90]!]）*/
 #endif
-	wait_queue_head_t temp_detect_wait_queue;
-	atomic_t temp_detect_ready[MAX_TOUCH_PANEL_COUNT];
-} xiaomi_touch_data_t;
+	/* blob 0x2A00 / 0x2A04（各 4B）：xiaomi_register_panel_notifier_common 的第 3/4 实参
+	 * 落点（rpc[0x20ec/0x20f8 str w2/w3,[x20,#0x2a10/0x2a14]]，x20=元素-0x10）；
+	 * blob 两 IC ko 调用点均传 0（focaltech 0x3b00-0x3b08、goodix 0xeeb0-0xeebc 的 w2=w3=0）
+	 * ⇒ 语义未定，保留空洞。注：树侧 donor 成员 `panel_register_retry`（原占 0x29F8）已删，
+	 * blob 0x29F8 实为 disp_nb.priority（见 register_touch_panel_common 锚点）。 */
+	u32 reserved_2a00;					/* 0x2A00 */
+	u32 reserved_2a04;					/* 0x2A04 */
+	wait_queue_head_t temp_detect_wait_queue;		/* 0x2A08 rpc/notifier_common [x28/x20,#0x2a08] 4B 存 */
+	atomic_t temp_detect_ready;				/* 0x2A20 单槽（三处访问全 0x2A20；无 [1]） */
+	/* blob 0x2A24-0x2A78 = boost 子状态（与元素同体！证据：get_xiaomi_touch_data 0x3f8 同时
+	 * 服务 core/boost 两侧——boost_recon 的"boost 槽访问器"实参/串全同；元素步长 0x2A78 ==
+	 * boost 槽步长 0x2A78；ready 单槽 0x2A20 后紧接 enable@0x2A24）。视图结构见 xiaomi_touch_boost.c，
+	 * 该处有 sizeof==0x54 与 offsetof==0x2A24 断言。 */
+	u8 boost_state[0x54];					/* 0x2A24..0x2A78 */
+} xiaomi_touch_data_t;						/* sizeof == 0x2A78 */
 
 typedef struct hardware_operation {
 	int (*ic_self_test)(char *type, int *result);
 	int (*ic_data_collect)(char *buf, int *length);
 	int (*ic_get_lockdown_info)(u8 lockdown_info[8]);
-	int (*ic_get_fw_version)(char fw_version[64]);
-	int (*get_limit_csv_version)(char limit_version[30]);
+	int (*ic_get_fw_version)(char fw_version[64]);			/* 0x18 */
 
 	void (*set_mode_value)(int mode, int *value);
 	void (*get_mode_value)(common_data_t *common_data);
-	void (*get_mode_all)(common_data_t *common_data);
-	void (*reset_mode)(common_data_t *common_data);
-	void (*ic_switch_mode)(u8 gesture_type);
-	void (*ic_enable_irq)(bool enable);
-	void (*cmd_update_func)(long mode_update_flag, int mode_value[DATA_MODE_45]);
-	void (*set_mode_long_value)(s32 value[], int length);
+	void (*get_mode_all)(common_data_t *common_data);		/* 0x30 */
+	void (*reset_mode)(common_data_t *common_data);			/* 0x38 */
+	void (*ic_switch_mode)(u8 gesture_type);			/* 0x40 */
+	void (*cmd_update_func)(long mode_update_flag, int mode_value[DATA_MODE_45]); /* 0x48 */
+	void (*ic_enable_irq)(bool enable);				/* 0x50 */
 
-	int (*palm_sensor_write)(int on);
-	int (*enable_touch_raw)(int en);
-	u8 (*panel_vendor_read)(void);
-	u8 (*panel_color_read)(void);
-	u8 (*panel_display_read)(void);
-	char (*touch_vendor_read)(void);
-	void (*get_touch_ic_buffer)(u64 address, u8 *buf);
-	int (*touch_doze_analysis)(int value);
-	int (*touch_log_level_control)(bool value);
+	int (*palm_sensor_write)(int on);				/* 0x58 */
+	int (*enable_touch_raw)(int en);				/* 0x60 */
+	u8 (*panel_vendor_read)(void);					/* 0x68 */
+	u8 (*panel_color_read)(void);					/* 0x70 */
+	u8 (*panel_display_read)(void);					/* 0x78 */
+	char (*touch_vendor_read)(void);				/* 0x80 */
+	void (*get_touch_ic_buffer)(u64 address, u8 *buf);		/* 0x88 */
+	int (*touch_doze_analysis)(int value);				/* 0x90 */
+	int (*touch_log_level_control)(bool value);			/* 0x98 */
+	int (*htc_ic_setModeValue)(common_data_t *common_data);		/* 0xa0 */
+	int (*htc_ic_getModeValue)(common_data_t *common_data);		/* 0xa8 */
+	int (*ic_resume_suspend)(bool is_resume, u8 gesture_type);	/* 0xb0 */
+	/* ==== 以下 16 项 = 6.18 在场扩展（blob 6.6 框架 ops 到 0xB8 即止：0x178+0xB8 = 0x230
+	 * == driver_param 步长实测；IC 表 0xB8-0xD0 的 4 槽与 6.18 独有 12 项统一集中尾部）==== */
+	void (*ic_set_charge_state)(int status);			/* +0xb8（IC 表槽位）*/
+	void (*touch_dfs_test)(int value);				/* +0xc0 */
+	void (*xiaomi_touch_fod_test)(int value);			/* +0xc8 */
+	int (*set_thermal_temp)(int temp, bool force);   		/* +0xd0（blob 2 参实证）*/
+	int (*get_limit_csv_version)(char limit_version[30]);		/* 6.18 独有 */
+	void (*set_mode_long_value)(s32 value[], int length);
 	int (*touch_log_level_control_v2)(int value);
 	bool (*get_tddi_status)(void);
 	void (*set_nfc_to_touch_event)(u8 val);
 	void (*display_suspend_ready)(void);
-	int (*htc_ic_setModeValue)(common_data_t *common_data);
-	int (*htc_ic_getModeValue)(common_data_t *common_data);
-
-	int (*ic_resume_suspend)(bool is_resume, u8 gesture_type);
-	void (*ic_set_charge_state)(int status);
 	void (*ic_set_fod_value)(s32 value[], int length);
-	void (*xiaomi_touch_fod_test)(int value);
 	void (*xiaomi_touch_fod_attn_test)(int value);
 	void (*xiaomi_touch_fod_low_attn)(int value);
-	int (*set_thermal_temp)(int temp, bool force);   /* blob 2 参（goodix_set_thermal_temp 实证） */
-	void (*touch_dfs_test)(int value);
 	void (*set_panel_notifier_status)(enum suspend_state panel_status[]);
 	void (*notify_sensorhub_status)(int notify_type);
-	/* blob param+0x178 op（scp_tp_mistouch_enable store 回调）；popsicle ops
-	 * 与 blob ops 不同代，按命名成员追加（§B 记账） */
+	/* popsicle ops 与 blob ops 不同代，按命名成员追加（§B 记账） */
 	void (*scp_mistouch_enable)(int *value);
 } hardware_operation_t;
 
 typedef struct xiaomi_touch_driver_param {
-	s8 touch_id;
-	char hal_version[HAL_VERSION_LENGTH];
-	char limit_csv_version[LIMIT_CSV_VERSION_LENGTH];
-	hardware_param_t hardware_param;
-	hardware_operation_t hardware_operation;
+	s8 touch_id;						/* 0x000 */
+	char hal_version[HAL_VERSION_LENGTH];			/* 0x001 */
+	char limit_csv_version[LIMIT_CSV_VERSION_LENGTH];	/* 0x081 */
+	hardware_param_t hardware_param;			/* 0x0a0（逐成员与 blob 一致，
+								 * 见文末断言：lockdown@0xd、fw_version@0x95）*/
+	/* blob 步长实测 = 0x230：get_xiaomi_touch_driver_param umaddl(#0x230)+#0x5500
+	 * → &param[1] = .bss+0x5500+0x230，闭包 = probe 的 charging_status 存点 0x5960
+	 * （=0x5500+2*0x230）⇒ hardware_operation 起址 0x178、blob ops 大小 0xB8（23 槽）。
+	 * 树侧尾部 16 项使 sizeof=0x2B0（blob+0x80），blob 同形前缀 = 前 0x230B。 */
+	hardware_operation_t hardware_operation;		/* 0x178（前 0xB8 与 blob 同槽）*/
 } xiaomi_touch_driver_param_t;
 
 typedef struct xiaomi_touch {
+	/* _b583-XT：blob xiaomi_touch_t 首成员（结构基址 +0x0）——blob 证据三重：
+	 *   ① xiaomi_touch_probe 0x4abc/0x4b00/0x4b04：`add x20,x0,#0x10`(=&pdev->dev)->
+	 *      `cbz x20`->`str x20,[x19]`(x19=.bss+0x8=&xiaomi_touch)；
+	 *   ② xiaomi_register_panel_notifier_work 0x21fc/0x2204：`ldr x8,[&xiaomi_touch]`
+	 *      后 `ldr x0,[x8,#0x300]`(=dev->of_node) 传给 of_count_phandle_with_args；
+	 *   ③ 成员偏移自洽：blob panel_register_mask 在 .bss+0x12(=结构 +0xA)、
+	 *      xiaomi_touch_data[] 在结构 +0x10（get_xiaomi_touch_data umaddl 基址 .bss+0x8
+	 *      +0x10），⇒ 首 8B 必为指针、use_count@+0x8。DTS 的 panel 属性只挂
+	 *      xiaomi-touch 节点（xiaomi_rodin_mt6899_touch.dtsi:12），IC 节点无该属性
+	 *      ⇒ 面板 phandle 必须从本字段解析（树侧原用 per-panel dev 会永远解析失败）。 */
+	struct device *dev;
 	u16 use_count;
 	u8 panel_register_mask;
 	xiaomi_touch_data_t xiaomi_touch_data[MAX_TOUCH_PANEL_COUNT];
@@ -314,6 +349,68 @@ typedef struct xiaomi_touch {
 	void *input_event_time_line_mmap_base;
 	dma_addr_t input_event_time_line_phy_base;
 } xiaomi_touch_t;
+
+/* ===================== _b583-XT2 结构归位断言（blob 双证口径）=====================
+ * 口径：① = .disr 机器码（objdump 重定位视图）② = IDA asm 符号视图；
+ *       偏移 = blob 元素/参数结构相对基址的立即数（偏置基 x20/x26/x28 = 元素-0x10）。
+ * 元素侧：#define XTD(f) offsetof(struct xiaomi_touch_data, f)
+ * 前 0x38B 与树原形态完全一致（frame/raw 两段），0x40 起 blob 整体 +8B（8B 空洞=0x40），
+ * 尾部 0x54B 为 boost 子状态；总步长 0x2A78（get_xiaomi_touch_data umaddl #0x2a78、
+ * &param[0]=.bss+0x18、&param[1]=.bss+0x2a90；闭合：driver_param 起址 .bss+0x5500
+ * = 0x10+2*0x2A78）。 */
+#define __XT_OFF(T, f)	offsetof(T, f)
+static_assert(sizeof(xiaomi_touch_data_t) == 0x2A78, "xiaomi_touch_data_t 必须 = blob 0x2A78");
+static_assert(__XT_OFF(xiaomi_touch_data_t, touch_id) == 0x0000, "touch_id @0");
+static_assert(__XT_OFF(xiaomi_touch_data_t, frame_data_buf_index) == 0x0004, "frame idx @4");
+static_assert(__XT_OFF(xiaomi_touch_data_t, frame_data_size) == 0x0008, "frame size @8");
+static_assert(__XT_OFF(xiaomi_touch_data_t, frame_data_buf_size) == 0x000C, "frame bufsz @c");
+static_assert(__XT_OFF(xiaomi_touch_data_t, frame_data_mmap_base) == 0x0010, "frame base @10");
+static_assert(__XT_OFF(xiaomi_touch_data_t, frame_data_mmap_phy_base) == 0x0018, "frame phy @18");
+static_assert(__XT_OFF(xiaomi_touch_data_t, raw_data_buf_index) == 0x0020, "raw idx @20");
+static_assert(__XT_OFF(xiaomi_touch_data_t, raw_data_size) == 0x0024, "raw size @24");
+static_assert(__XT_OFF(xiaomi_touch_data_t, raw_data_buf_size) == 0x0028, "raw bufsz @28");
+static_assert(__XT_OFF(xiaomi_touch_data_t, raw_data_mmap_base) == 0x0030, "raw base @30");
+static_assert(__XT_OFF(xiaomi_touch_data_t, raw_data_mmap_phy_base) == 0x0038, "raw phy @38");
+static_assert(__XT_OFF(xiaomi_touch_data_t, reserved_0x40) == 0x0040, "blob-only 8B 空洞 @40");
+static_assert(__XT_OFF(xiaomi_touch_data_t, private_data_list) == 0x0048, "list @48");
+static_assert(__XT_OFF(xiaomi_touch_data_t, private_data_lock) == 0x0058, "lock @58");
+static_assert(__XT_OFF(xiaomi_touch_data_t, common_data_buf_index) == 0x005C, "common idx @5c");
+static_assert(__XT_OFF(xiaomi_touch_data_t, common_data_buf) == 0x0060, "common buf @60");
+static_assert(__XT_OFF(xiaomi_touch_data_t, common_data_buf_lock) == 0x28B0, "common lock @28b0");
+static_assert(__XT_OFF(xiaomi_touch_data_t, poll_data) == 0x28E0, "poll_data @28e0");
+static_assert(__XT_OFF(xiaomi_touch_data_t, event_wq) == 0x28E8, "event_wq @28e8");
+static_assert(__XT_OFF(xiaomi_touch_data_t, is_suspend) == 0x28F0, "is_suspend @28f0");
+static_assert(__XT_OFF(xiaomi_touch_data_t, suspend_work) == 0x28F8, "suspend_work @28f8");
+static_assert(__XT_OFF(xiaomi_touch_data_t, resume_work) == 0x2928, "resume_work @2928");
+static_assert(__XT_OFF(xiaomi_touch_data_t, panel_notifier_register_work) == 0x2958,
+	      "panel work @2958（container_of 步长 0x2958 实证）");
+static_assert(__XT_OFF(xiaomi_touch_data_t, dev) == 0x29E0, "dev @29e0（work+0x88）");
+static_assert(__XT_OFF(xiaomi_touch_data_t, disp_nb) == 0x29E8, "disp_nb @29e8（work+0x90）");
+static_assert(__XT_OFF(xiaomi_touch_data_t, reserved_2a00) == 0x2A00, "rpc 第3实参落点 @2a00");
+static_assert(__XT_OFF(xiaomi_touch_data_t, reserved_2a04) == 0x2A04, "rpc 第4实参落点 @2a04");
+static_assert(__XT_OFF(xiaomi_touch_data_t, temp_detect_wait_queue) == 0x2A08, "temp wq @2a08");
+static_assert(__XT_OFF(xiaomi_touch_data_t, temp_detect_ready) == 0x2A20, "ready 单槽 @2a20");
+static_assert(__XT_OFF(xiaomi_touch_data_t, boost_state) == 0x2A24, "boost 子状态 @2a24");
+static_assert(sizeof(((xiaomi_touch_data_t *)0)->boost_state) == 0x54, "boost 子状态 0x54B");
+/* 参数结构侧：blob 步长 0x230（同形前缀）；树侧尾部 16 项扩展至 0x2B0 */
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, touch_id) == 0x000, "param touch_id @0");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hal_version) == 0x001, "hal_version @1");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, limit_csv_version) == 0x081, "limit_csv @81");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_param) == 0x0A0, "hw param @a0");
+static_assert(__XT_OFF(xiaomi_touch_driver_param_t, hardware_operation) == 0x178, "ops @178");
+static_assert(__XT_OFF(hardware_operation_t, ic_self_test) == 0x00, "ops slot0");
+static_assert(__XT_OFF(hardware_operation_t, set_mode_value) == 0x20, "ops slot4");
+static_assert(__XT_OFF(hardware_operation_t, cmd_update_func) == 0x48, "ops slot9");
+static_assert(__XT_OFF(hardware_operation_t, ic_enable_irq) == 0x50, "ops slot10");
+static_assert(__XT_OFF(hardware_operation_t, htc_ic_setModeValue) == 0xA0, "ops slot20");
+static_assert(__XT_OFF(hardware_operation_t, ic_resume_suspend) == 0xB0, "ops slot22（blob 末槽）");
+static_assert(__XT_OFF(hardware_operation_t, ic_set_charge_state) == 0xB8,
+	      "blob 框架 ops 到 0xB8 止（0x178+0xB8 = 0x230 = blob 步长）；其下为 6.18 尾部");
+static_assert(sizeof(hardware_operation_t) == 0x138, "ops = 23 blob 槽 + 16 扩展项");
+static_assert(sizeof(xiaomi_touch_driver_param_t) == 0x2B0,
+	      "树侧 0x2B0 = blob 0x230 + 0x80（6.18 尾部 16 项；同形前缀 = 0x230）");
+#undef __XT_OFF
+/* ============================== 断言块结束 ============================== */
 
 #pragma pack(1)
 typedef struct htc_ic_polldata {
@@ -348,7 +445,7 @@ int update_fod_press_status_common(int value);
 #endif
 struct class *get_xiaomi_touch_class_common(void);
 int update_palm_sensor_value_common(int value);
-int update_weak_doubletap_value(int value);
+/* _b583-XT2：update_weak_doubletap_value 声明删除（blob 确无；见 xiaomi_touch_sys.c 锚点）*/
 int update_abnormal_event(u16 type, u16 code, u16 value);
 void *get_raw_data_base_common(s8 touch_id);
 void notify_raw_data_update_common(s8 touch_id);

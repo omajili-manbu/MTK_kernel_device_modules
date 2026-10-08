@@ -2546,11 +2546,12 @@ static int goodix_htc_ic_getModeValue(common_data_t *common_data)
 
 	ret = goodix_core_data->hw_ops->read(goodix_core_data, addr, data_buf, data_len);
 	if (ret) {
-		ts_err("can't get, addr = 0x%x, data length = %d", addr, data_len);
+		/* _b583-GX：blob L2513（站点 0x11740）无参数；L2517（0x1175c）不带 addr */
+		ts_err("can't get, error");
 		return -EINVAL;
 	}
 
-	ts_info("getModeValue out, addr = 0x%x, value:0x%*ph", addr, data_len, data_buf);
+	ts_info("getModeValue out, value:0x%*ph", data_len, data_buf);
 	return 0;
 }
 
@@ -3918,9 +3919,18 @@ static void goodix_set_cur_value(int mode, int *value)
 			goodix_core_data->need_update_cfg = 1;
 			goodix_core_data->cfg_cloud_state = !!gtp_value;
 			break;
-		case Touch_Boost_EN:
-			ts_info("touchfeature already notify hal to boost, skip");
+		case Touch_Boost_EN: {
+			/* _b583-GX：blob 0xfb58-0xfb7c（跳转表 mode 200 → 块 0xfb58）=
+			 * ts_info("notify hal to boost")（L3635）+ add_common_data_to_buf_common(
+			 * 0, SET_CUR_VALUE, 10001, 1, &out)（w2=0x2711，out=-1 见 0xfa00）；
+			 * 树原为 warsaw 死面打印（该串 blob 无） */
+			int boost_out = -1;
+
+			ts_info("notify hal to boost");
+			add_common_data_to_buf_common(TOUCH_ID, SET_CUR_VALUE, DATA_MODE_178,
+					1, &boost_out);
 			break;
+		}
 		case Touch_Empty_Int:
 			goodix_htc_enable_empty_int(!!gtp_value);
 			break;
@@ -3934,6 +3944,7 @@ static void goodix_set_cur_value(int mode, int *value)
 		//not to do, to thp
 			break;
 		case THP_LOCK_SCAN_MODE:
+			ts_info("THP enable doze mode [%d]", gtp_value);	/* _b583-GX：blob L3645（0xfd98） */
 			goodix_htc_enter_idle(value);
 			break;
 		case THP_FOD_DOWNUP_CTL:
@@ -3950,12 +3961,15 @@ static void goodix_set_cur_value(int mode, int *value)
 			goodix_htc_set_active_scan_rate(gtp_value);
 			break;
 		case THP_NORMALIZE_STUDY_SCAN:
+			ts_info("B array is not reasonable, need scan freq...");	/* _b583-GX：blob L3662（0xfdfc） */
 			goodix_htc_start_calibration();
 			break;
 		case THP_NORMALIZE_B_REQUEST:
+			ts_info("THP request B array");	/* _b583-GX：blob L3666（0xfe18） */
 			goodix_htc_enable_b_array();
 			break;
 		case THP_IDLE_BASALINE_UPDATE:
+			ts_debug("THP update idle baseline");	/* _b583-GX：blob L3670（0xfe34，D 级） */
 			goodix_htc_update_idle_baseline();
 			break;
 #if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
@@ -4150,8 +4164,13 @@ static int goodix_set_thermal_temp(int temp, bool force)
 #endif
 
 #ifdef GOODIX_DEBUGFS_ENABLE
-static void tpdbg_suspend(struct goodix_ts_core *core_data, bool enable)
+/* _b583-GX：blob tpdbg_suspend（LOCAL FUNC @0x1204c, 100B）单形参 = enable；
+ * 0x12090-0x120a8 = ts_info("enter schedule_resume_suspend_work_common  enable %d", enable)
+ * （I 级，源行 3839；__func__ = "tpdbg_suspend"），0x12070-0x1207c =
+ * schedule_resume_suspend_work_common(0, !enable)。树原为 2 形参且无打印（被内联掉）。 */
+static void tpdbg_suspend(bool enable)
 {
+	ts_info("enter schedule_resume_suspend_work_common  enable %d", enable);
 	schedule_resume_suspend_work_common(TOUCH_ID, !enable);
 }
 
@@ -4215,13 +4234,13 @@ static ssize_t tpdbg_write(struct file *file, const char __user *buf,
 	else if (!strncmp(cmd, "irq-enable", 10))
 		hw_ops->irq_enable(core_data, true);
 	else if (!strncmp(cmd, "tp-sd-en", 8))
-		tpdbg_suspend(core_data, true);
+		tpdbg_suspend(true);
 	else if (!strncmp(cmd, "tp-sd-off", 9))
-		tpdbg_suspend(core_data, false);
+		tpdbg_suspend(false);
 	else if (!strncmp(cmd, "tp-suspend-en", 13))
-		tpdbg_suspend(core_data, true);
+		tpdbg_suspend(true);
 	else if (!strncmp(cmd, "tp-suspend-off", 14))
-		tpdbg_suspend(core_data, false);
+		tpdbg_suspend(false);
 out:
 	kfree(cmd);
 

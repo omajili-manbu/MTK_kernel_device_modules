@@ -33,7 +33,6 @@ static DEFINE_MUTEX(fod_press_status_mutex);
 #endif
 static DEFINE_MUTEX(abnormal_event_mutex);
 static DEFINE_MUTEX(palm_mutex);
-static DEFINE_MUTEX(weak_doubletap_mutex);
 
 static DEFINE_MUTEX(thp_ic_mutex);
 static DEFINE_MUTEX(thp_ic_read_data_mutex);
@@ -55,7 +54,6 @@ static int stylus_connect_status_value = 0;
 static int doze_analysis_result;
 static int is_enable_touchraw = 1;
 static int palm_value;
-static int weak_doubletap_value;
 static u64 ic_buffer_addr;
 static int touch_finger_status = 0;
 
@@ -151,15 +149,13 @@ EXPORT_SYMBOL(update_palm_sensor_value_common);
  * 单一全局 palm_value@bss+0x8b48），且树内已无调用者（mode.c SET_CMD_FOR_DRIVER 已按 blob
  * 收口为单面板调用）；rodin 无 panel1 的 palm_sensor_1 节点。按 blob 删除，不动导出面。 */
 
-int update_weak_doubletap_value(int value)
-{
-	mutex_lock(&weak_doubletap_mutex);
-	LOG_INFO("value:%d", value);
-	weak_doubletap_value = value;
-	sysfs_notify(&xiaomi_touch_dev->kobj, NULL, "weak_doubletap_sensor");
-	mutex_unlock(&weak_doubletap_mutex);
-	return 0;
-}
+/* _b583-XT2（跨侧定论：fts 侧 A1 双证后已删其 2 处调用）：
+ * `update_weak_doubletap_value` 与串 "weak_doubletap_sensor" 在 blob **确无** ——
+ *   ① blob 符号面（框架 def/dynsym + fts UND）0 命中；
+ *   ② blob .strings/.rostr 0 命中 "weak_doubletap_sensor"；
+ *   ③ blob dev_attr_* 全量 = 17 项，无该节点（树侧本就无其 DEVICE_ATTR 定义，
+ *      sysfs_notify 目标不存在 ⇒ 原为恒无效通知）。
+ * ⇒ 函数 + weak_doubletap_mutex/weak_doubletap_value 一并删除（导出面本无 EXPORT）。 */
 
 int update_abnormal_event(u16 type, u16 code, u16 value)
 {

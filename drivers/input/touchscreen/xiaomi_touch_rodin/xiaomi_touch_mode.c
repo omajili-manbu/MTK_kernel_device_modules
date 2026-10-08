@@ -10,6 +10,20 @@
 #define MI_TOUCH_MODE_PARAMETERS_SIZE 5
 #define MI_CORNERFILTER_AREA_STEP_SIZE 4
 #define VALUE_TYPE_SIZE 6
+/* _b583-XT③：blob 触摸模式表维度 = 35 模式/面板（非树侧 DATA_MODE_45=45）——
+ * ① driver_get_touch_mode_common 0x9068/0x906c/0x9098：面板步长 #0x348=840=35×24、
+ *    槽步长 #0x18=24；xiaomi_touch_get_mode_all 0xac48-0xacc0 同形；
+ * ② 有效模式上界 0..34：driver_update_touch_mode_common 0x8ff8 `cmp w1,#0x22`、
+ *    xiaomi_touch_get_mode_all 0xac34 `cmp w3,#0x22`、xiaomi_touch_set_mode_value
+ *    0xa668 段 `cmp w22,#0x23`（b581 已收口）。
+ * ③ 表访问者清单 = 本文件 xiaomi_touch_get_mode_value/get_mode_all/reset_mode/
+ *    driver_get_touch_mode_common/driver_update_touch_mode_common/
+ *    xiaomi_touch_cmd_update_work；stylus 分支（DATA_MODE_40/24）在本树
+ *    -DTOUCH_FOD_SUPPORT -DTOUCH_THP_SUPPORT 下未编（Makefile:14，无
+ *    -DTOUCH_STYLUS_SUPPORT）⇒ 无 ≥35 索引。
+ * IC 侧仅消费前段（focaltech_core.c:3367 `__i <= DATA_MODE_8 && __i < FTS_TOUCH_MODE_MAX`
+ * 读 mode_value[0..8]），故表维收缩不产生越界读。 */
+#define DATA_MODE_COUNT 35
 
 typedef struct {
 	unsigned int game_mode[MI_TOUCH_MODE_PARAMETERS_SIZE];
@@ -40,7 +54,12 @@ enum xiaomi_touch_mode_dts_index {
 	MI_DTS_GET_CUR_INDEX,
 };
 
-static int touch_mode[MAX_TOUCH_PANEL_COUNT][DATA_MODE_45][VALUE_TYPE_SIZE];
+static int touch_mode[MAX_TOUCH_PANEL_COUNT][DATA_MODE_COUNT][VALUE_TYPE_SIZE];
+/* _b583-XT：blob 布局断言（面板步长 0x348=840B、槽步长 0x18=24B） */
+static_assert(sizeof(touch_mode[0]) == DATA_MODE_COUNT * VALUE_TYPE_SIZE * sizeof(int),
+	      "touch_mode[panel] must be 35*6*4 = 840 (blob 0x348)");
+static_assert(sizeof(touch_mode[0][0]) == VALUE_TYPE_SIZE * sizeof(int),
+	      "touch_mode slot stride must be 24 (blob 0x18)");
 static xiaomi_game_mode_board_data_t game_mode_bdata[MAX_TOUCH_PANEL_COUNT];
 static struct work_struct switch_mode_work[MAX_TOUCH_PANEL_COUNT];
 static struct workqueue_struct *cmd_update_wq = NULL;
@@ -59,7 +78,7 @@ void driver_update_touch_mode_common(s8 touch_id, int _touch_mode[DATA_MODE_45],
 		return;
 	}
 
-	for (i = 0; i < DATA_MODE_45; i++) {
+	for (i = 0; i < DATA_MODE_COUNT; i++) {
 		if (update_mode_mask & (1 << i)) {
 			touch_mode[touch_id][i][SET_CUR_VALUE] = _touch_mode[i];
 			if (i > DATA_MODE_8) {
@@ -82,7 +101,7 @@ EXPORT_SYMBOL(driver_update_touch_mode_common);
 
 int driver_get_touch_mode_common(s8 touch_id, int mode)
 {
-	if (touch_id < 0 || touch_id >= MAX_TOUCH_PANEL_COUNT || mode < 0 || mode >= DATA_MODE_45)
+	if (touch_id < 0 || touch_id >= MAX_TOUCH_PANEL_COUNT || mode < 0 || mode >= DATA_MODE_COUNT)
 		return -1;
 	return touch_mode[touch_id][mode][GET_CUR_VALUE];
 }
@@ -200,12 +219,12 @@ static void xiaomi_touch_cmd_update_work(struct work_struct *work)
 	s8 touch_id = get_work_touch_id(cmd_update_work, work);
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);
 	uint64_t mode_update_flag = 0;
-	int mode_value[DATA_MODE_45];
+	int mode_value[DATA_MODE_COUNT];
 	LOG_INFO("touch id %d enter", touch_id);
 	if (!xiaomi_touch_driver_param)
 		return;
 
-	for (i = 0; i < DATA_MODE_45; i++) {
+	for (i = 0; i < DATA_MODE_COUNT; i++) {
 		if (i <= DATA_MODE_8) {
 			if (touch_mode[touch_id][i][SET_CUR_VALUE] > touch_mode[touch_id][i][GET_MAX_VALUE])
 				touch_mode[touch_id][i][SET_CUR_VALUE] = touch_mode[touch_id][i][GET_MAX_VALUE];
@@ -438,7 +457,7 @@ static void xiaomi_touch_get_mode_value(common_data_t *common_data)
 	int *value = (int *)common_data->data_buf;
 	int val_type = common_data->cmd;
 
-	if ((mode < DATA_MODE_45) && (mode >= 0)) {
+	if ((mode < DATA_MODE_COUNT) && (mode >= 0)) {
 		value[0] = touch_mode[common_data->touch_id][mode][val_type];
 	}
 	else
@@ -450,7 +469,7 @@ static void xiaomi_touch_get_mode_all(common_data_t *common_data)
 	int mode = common_data->mode;
 	int *val = (int *)common_data->data_buf;
 
-	if ((mode < DATA_MODE_45) && (mode >= 0)) {
+	if ((mode < DATA_MODE_COUNT) && (mode >= 0)) {
 		val[0] = touch_mode[common_data->touch_id][mode][GET_CUR_VALUE];
 		val[1] = touch_mode[common_data->touch_id][mode][GET_DEF_VALUE];
 		val[2] = touch_mode[common_data->touch_id][mode][GET_MIN_VALUE];
@@ -472,7 +491,7 @@ static void xiaomi_touch_reset_mode(common_data_t *common_data)
 
 	/* _b581-XT③：blob xiaomi_touch_reset_mode 串 = "mode: %d reset!"（0x31df，I 级）。 */
 	LOG_INFO("mode: %d reset!", mode);
-	if (mode < DATA_MODE_45 && mode > 0) {
+	if (mode < DATA_MODE_COUNT && mode > 0) {
 		touch_mode[common_data->touch_id][mode][SET_CUR_VALUE] =
 			touch_mode[common_data->touch_id][mode][GET_DEF_VALUE];
 

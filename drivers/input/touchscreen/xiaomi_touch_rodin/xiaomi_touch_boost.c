@@ -53,51 +53,54 @@ extern xiaomi_touch_t xiaomi_touch;
 
 /* current_log_level 定义在 xiaomi_touch_core.c（blob GLOBAL .data+0x150） */
 
-/* 槽结构（boost_recon.md §1.2；0x2A24 以下为同结构体其它子系统成员，
- * 本文件不触摸，保持 [unobserved] 占位以闭合 stride 0x2A78） */
-struct xiaomi_touch_irq_boost {
-	u8  unobserved_low[0x2a24];
-	u8  enable;                      /* 0x2A24 */
-	u8  normal_boost_support;        /* 0x2A25 */
-	u8  game_boost_support;          /* 0x2A26 */
-	u8  need_boost;                  /* 0x2A27 */
-	u8  cpu_mask_valid;              /* 0x2A28 */
-	u8  cpu_mask_applied;            /* 0x2A29 */
-	u8  boosting;                    /* 0x2A2A */
-	u8  pad_2a2b;                    /* 0x2A2B */
-	int count;                       /* 0x2A2C */
-	int normal_freq_num;             /* 0x2A30 */
-	int game_freq_num;               /* 0x2A34 */
-	int policy_num;                  /* 0x2A38 */
-	u32 pad_2a3c;                    /* 0x2A3C */
-	u32 *freq;                       /* 0x2A40 */
-	u32 *normal_freq;                /* 0x2A48 */
-	u32 *game_freq;                  /* 0x2A50 */
-	struct cpumask *cpu_mask;        /* 0x2A58 */
-	struct cpumask cpu_mask_normal;  /* 0x2A60 */
-	struct cpumask cpu_mask_game;    /* 0x2A68 */
-	struct freq_qos_request *qos;    /* 0x2A70 */
-}; /* sizeof == 0x2A78 */
+/* _b583-XT2：boost 子状态视图 —— blob 里它就是 xiaomi_touch_data_t 的尾部（同体！），
+ * 证据三重：① blob 的"boost 槽访问器"就是 get_xiaomi_touch_data @0x3f8（实参/串全同，
+ * b567 因 =y 符号撞名才让名 _boost；本文件现直接复用之）；② 元素步长 0x2A78 == 本槽步长
+ * 0x2A78（get_xiaomi_touch_data umaddl #0x2a78；两端闭合 &param[1]=.bss+0x2a90、
+ * driver_param=.bss+0x5500）；③ 元素 ready 单槽 @0x2A20 后紧接 enable @0x2A24。
+ * ⇒ 树侧原独立数组 xiaomi_touch_irq_slot[2]（重复 2×0x2A78）删除，改为元素尾部视图，
+ * 视图起点 = offsetof(xiaomi_touch_data_t, boost_state)=0x2A24（下方断言）。 */
+struct __packed __aligned(4) xiaomi_touch_irq_boost {
+	u8  enable;                      /* 元素+0x2A24 */
+	u8  normal_boost_support;        /* +0x2A25 */
+	u8  game_boost_support;          /* +0x2A26 */
+	u8  need_boost;                  /* +0x2A27 */
+	u8  cpu_mask_valid;              /* +0x2A28 */
+	u8  cpu_mask_applied;            /* +0x2A29 */
+	u8  boosting;                    /* +0x2A2A */
+	u8  pad_2a2b;                    /* +0x2A2B */
+	int count;                       /* +0x2A2C */
+	int normal_freq_num;             /* +0x2A30 */
+	int game_freq_num;               /* +0x2A34 */
+	int policy_num;                  /* +0x2A38 */
+	u32 pad_2a3c;                    /* +0x2A3C */
+	u32 *freq;                       /* +0x2A40 */
+	u32 *normal_freq;                /* +0x2A48 */
+	u32 *game_freq;                  /* +0x2A50 */
+	struct cpumask *cpu_mask;        /* +0x2A58 */
+	struct cpumask cpu_mask_normal;  /* +0x2A60 */
+	struct cpumask cpu_mask_game;    /* +0x2A68 */
+	struct freq_qos_request *qos;    /* +0x2A70 */
+}; /* __packed __aligned(4)：blob 指针成员相对基址 0x1C/0x24/...（基址 0x2A24 ≡4 mod 8，
+      绝对地址 8 对齐）；sizeof == 0x54（0x2A24..0x2A78），下方断言由编译器验证 */
 
-static struct xiaomi_touch_irq_boost xiaomi_touch_irq_slot[MAX_TOUCH_PANEL_COUNT];
+static_assert(sizeof(struct xiaomi_touch_irq_boost) == 0x54);
+static_assert(offsetof(xiaomi_touch_data_t, boost_state) == 0x2A24,
+	      "boost 视图须落在元素 +0x2A24");
+static_assert(sizeof(xiaomi_touch_data_t) == offsetof(xiaomi_touch_data_t, boost_state) + 0x54,
+	      "boost 视图须铺满元素尾部至 0x2A78");
 
-static_assert(sizeof(struct xiaomi_touch_irq_boost) == 0x2a78);
-
-/* blob get_xiaomi_touch_boost_data @0x3f8：GLOBAL 非 static 非 EXPORT（16 处内联 +
- * 1 out-of-line 副本；勿加 static，否则 out-of-line 副本消失） */
+/* blob 里无独立 boost 访问器：两侧共用 get_xiaomi_touch_data @0x3f8（其两道串
+ * "touch id %d hasn't select, return!"/"panel in touch id %d hasn't register, return!"
+ * 即本函数原串，b567 已逐字对齐）。此处仅做类型视图转换，不再自带日志
+ * ⇒ 串面 tree-only 项 `get_xiaomi_touch_boost_data` 随之清零。 */
 struct xiaomi_touch_irq_boost *get_xiaomi_touch_boost_data(int id)
 {
-	if ((id & 0xff) >= MAX_TOUCH_PANEL_COUNT) {
-		if (current_log_level)
-			TOUCH_ERR("touch id %d hasn't select, return!", id);   /* blob 行161 */
+	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(id);
+
+	if (!xiaomi_touch_data)
 		return NULL;
-	}
-	if (!(xiaomi_touch.panel_register_mask & BIT(id))) {
-		if (current_log_level)
-			TOUCH_ERR("panel in touch id %d hasn't register, return!", id); /* 行164 */
-		return NULL;
-	}
-	return &xiaomi_touch_irq_slot[id];
+	return (struct xiaomi_touch_irq_boost *)xiaomi_touch_data->boost_state;
 }
 
 /* blob xiaomi_touch_set_cpumask @0x4984：LOCAL 284B；上界字面 8（blob 0x49e0），
@@ -285,6 +288,18 @@ static void init_touch_irq_boost(int id, struct device_node *np)
 			TOUCH_ERR("qos kcalloc failed, disable touch boost"); /* 行1076 */
 		goto disable;
 	}
+
+	/* _b583-XT③：blob 0x376c-0x37a8 —— qos kcalloc 成功且 current_log_level>=3
+	 * （0x3770 `cmp w8,#0x3`、0x3778 `b.hs 0x39f8`）时打一条 I 级日志：
+	 *   0x3a08 `ldr w4,[x22,#0x2a38]`（boost->policy_num）
+	 *   0x3a0c 串 = .rodata.str1.1+0x14a3 = "[MI_TP_I][%s:%d]: cpu: %d, policy num: %d"
+	 *   0x3a1c `mov w2,#0x442`（源行 1090）
+	 *   0x3a20 `mov w3,w20` —— w20 = 上一 for_each_possible_cpu 的退出值
+	 *        （0x31f0 `mov w20,#0x20`），即被引用的循环变量 cpu
+	 * 打完 0x3a28 `b 0x377c` 才 `mov w20,wzr`(i=0) 进入 qos 注册循环
+	 * ⇒ 本日志位于「policy 计数循环」与「qos 注册循环」之间，无尾 \n。 */
+	if (current_log_level >= 3)
+		TOUCH_INFO("cpu: %d, policy num: %d", cpu, boost->policy_num);
 
 	i = 0;
 	for_each_possible_cpu(cpu) {

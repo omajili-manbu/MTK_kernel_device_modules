@@ -25,10 +25,12 @@ static int xiaomi_touch_dev_open(struct inode *inode, struct file *file)
 	xiaomi_touch->use_count++;
 	client_private_data->touch_id = -1;
 
+	/* _b583-XT：blob xiaomi_touch_dev_open 0x71b0-0x7214 —— kzalloc_retry(#0x40,3)
+	 * （0x71c8）、`strb w10(#0xff),[priv+0x11]`（touch_id=-1，0x7204）后**单次**
+	 * __init_waitqueue_head(priv+0x18, "&client_private_data->poll_wait_queue_head")
+	 * （0x720c），随即 `str x19,[file+0xd8]`。blob 串表无 poll_wait_queue_head_for_
+	 * {cmd,frame,raw} ⇒ 删除 donor 三队列初始化（0x48B；见 xiaomi_touch.h 锚点）。 */
 	init_waitqueue_head(&client_private_data->poll_wait_queue_head);
-	init_waitqueue_head(&client_private_data->poll_wait_queue_head_for_cmd);
-	init_waitqueue_head(&client_private_data->poll_wait_queue_head_for_frame);
-	init_waitqueue_head(&client_private_data->poll_wait_queue_head_for_raw);
 
 	file->private_data = client_private_data;
 	LOG_VERBOSE("open xiaomi_touch sucess! private data is %p, open count %d", client_private_data, xiaomi_touch->use_count);
@@ -134,25 +136,21 @@ static ssize_t xiaomi_touch_dev_write(struct file *file, const char __user *buf,
 
 static unsigned int xiaomi_touch_dev_poll(struct file *file, poll_table *wait)
 {
-	static u32 poll_event = POLLPRI | POLLRDNORM | POLLRDBAND;
-	u32 wait_event = wait->_key & poll_event;
 	unsigned int mask = 0;
 	private_data_t *client_private_data = file->private_data;
 	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(client_private_data->touch_id);
 
-	if (!xiaomi_touch_data || wait_event == 0) {
+	if (!xiaomi_touch_data) {
 		return 0;
 	}
 
-	if (wait_event == POLLPRI) {
-		poll_wait(file, &client_private_data->poll_wait_queue_head_for_frame, wait);
-	} else if (wait_event == POLLRDNORM) {
-		poll_wait(file, &client_private_data->poll_wait_queue_head_for_cmd, wait);
-	} else if (wait_event == POLLRDBAND) {
-		poll_wait(file, &client_private_data->poll_wait_queue_head_for_raw, wait);
-	} else {
-		poll_wait(file, &client_private_data->poll_wait_queue_head, wait);
-	}
+	/* _b583-XT③：blob 0x69d8-0x6a10 —— 单点 `poll_wait(file, &priv+0x18, wait)`：
+	 * 0x69dc `add x1,x22,#0x18`、0x69e4 `ldr x8,[x21]`(=_qproc)、`cbz x8`、
+	 * 0x6a0c `blr x8`（KCFI 前缀 brk #0x8228）——即标准 poll_wait 宏序列，
+	 * **不读 wait->_key**、无 _for_{cmd,frame,raw} 分支。掩码生成（0x6a14-0x6a58）
+	 * 仍为三组 index 比较：priv+0x30↔xd+0x5c→POLLRDNORM(0x40)、priv+0x34↔xd+0x4
+	 * →POLLPRI(2)、priv+0x38↔xd+0x20→POLLRDBAND(0x80)。 */
+	poll_wait(file, &client_private_data->poll_wait_queue_head, wait);
 
 	if (atomic_read(&client_private_data->common_data_index) != atomic_read(&xiaomi_touch_data->common_data_buf_index)) {
 		mask |= POLLRDNORM;

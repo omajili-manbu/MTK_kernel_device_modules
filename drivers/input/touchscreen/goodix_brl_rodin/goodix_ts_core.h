@@ -540,6 +540,16 @@ struct goodix_pen_data {
 };
 
 #ifdef TOUCH_THP_SUPPORT
+/* _b583-GX：struct tp_frame 按 blob 收口（goodix_core_rodin.ko brl_event_handler）：
+ *   0x633c  add x23, x0, #0x18         frame_ptr = &tp_frame->thp_frame
+ *   0x634c  mov w3, #0x9c4 (=2500)     常规帧读入 slot+0x18
+ *   0x65f8  str w8, [x21, #0x9dc]      tp_frame->dump_type @0x9dc（紧随 2500 帧）
+ *   0x6640  add x21, x21, #0x9e0       dump 读目标 = 第二缓冲 @0x9e0
+ *   ⇒ 布局 = 头(0x18) + thp_frame[2500] + dump_type + 第二缓冲（分离双缓冲，
+ *     常规帧与 dump 帧互不覆盖）。
+ * 树原形态（=warsaw donor goodix_ts_core.h 同形）= thp_frame[GOODIX_THP_FRAME_DUMP_SIZE]
+ * 单缓冲 4096 + dump_type@0x1018，与 blob 的 0x9dc/0x9e0 不符（dump 帧落入 2500
+ * 常规帧缓冲，且 dump_type 位置偏移 0x3c）。 */
 struct tp_frame {
 	long time_ns;
 	unsigned long frame_cnt;
@@ -547,12 +557,31 @@ struct tp_frame {
 	int fod_trackingId;
 //For P12X fw report diffdata
 #ifdef TOUCH_DUMP_TIC_SUPPORT
-	u8 thp_frame[GOODIX_THP_FRAME_DUMP_SIZE];
+	u8 thp_frame[GOODIX_THP_FRAME_SIZE];
 	int dump_type;
+	u8 thp_frame_dump[GOODIX_THP_FRAME_DUMP_SIZE];
 #else
 	u8 thp_frame[GOODIX_THP_FRAME_SIZE];
 #endif
 };
+/* _b583-GX：blob 布局锚点（编译期门）——地址见 struct 上方注释；第二缓冲尺寸取
+ * GOODIX_THP_FRAME_DUMP_SIZE（vendor 宏，注释 "For P12X fw report diffdata" 即
+ * dump 帧用途；剥离符号的 blob 无法读出声明尺寸，可证的是偏移锚点 0x9dc/0x9e0）。 */
+_Static_assert(__builtin_offsetof(struct tp_frame, thp_frame) == 0x18,
+	"tp_frame.thp_frame must be at blob offset 0x18 (brl_event_handler 0x633c)");
+#ifdef TOUCH_DUMP_TIC_SUPPORT
+_Static_assert(__builtin_offsetof(struct tp_frame, dump_type) == 0x9dc,
+	"tp_frame.dump_type must be at blob offset 0x9dc (brl_event_handler 0x65f8)");
+_Static_assert(__builtin_offsetof(struct tp_frame, thp_frame_dump) == 0x9e0,
+	"tp_frame.thp_frame_dump must be at blob offset 0x9e0 (brl_event_handler 0x6640)");
+_Static_assert(sizeof(struct tp_frame) == 0x9e0 + GOODIX_THP_FRAME_DUMP_SIZE,
+	"tp_frame size = dump buffer start + GOODIX_THP_FRAME_DUMP_SIZE");
+#endif
+/* 框架分槽尺寸 = hardware_param.frame_data_page_size * PAGE_SIZE；blob 0xec84
+ * （stur w9,[x20,#0x9]，w9=0x05050a02）实证 page=2 / buf=10（树侧 goodix_ts_core.c
+ * 4404/4408 同值）⇒ 4K 页下一槽 8192B，结构必须放得下。 */
+_Static_assert(sizeof(struct tp_frame) <= 2 * 4096,
+	"tp_frame must fit into the framework frame slot (page_size 2 * 4K)");
 #endif
 
 /*

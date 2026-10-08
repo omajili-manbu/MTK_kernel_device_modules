@@ -244,7 +244,9 @@ static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
 {
     int gesture;
 
-    FTS_DEBUG("gesture_id:0x%x", gesture_id);
+    /* _b583-FTS（A2）：blob fts_gesture_readdata 内联 fts_gesture_report 段
+	 * （0xE9CC..0xE9E8，__func__ = 0xEEFE "fts_gesture_report"）只有 "Gesture Code=%d"
+	 * 一条 DEBUG；"gesture_id:0x%x" 为树侧独有串（classify_intD ③树）⇒ 删。 */
     switch (gesture_id) {
     case GESTURE_LEFT:
         gesture = KEY_GESTURE_LEFT;
@@ -332,8 +334,20 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 		FTS_ERROR("gesture no support");
 		return -EINVAL;
 	}
-	if (ts_data->gesture_bmode == GESTURE_BM_TOUCH) {
-		memcpy(buf, touch_buf + FTS_TOUCH_DATA_LEN, FTS_GESTURE_DATA_LEN);
+	/* _b583-FTS（A2）：blob 0xE5CC 头部按 IDA/objdump 逐点补齐：
+	 *   0xE61C `cmp w8,#3; b.hs 0xE780` → 0xE780 = _printk(.rodata.str1.1+0x6065
+	 *     b'\x016[FTS_TS_I][%s:%d]: scptp_cur_state=%d\n'（classify ②b：blob 有树无，
+	 *     它在 blob 全模块**只**被本函数引用，refs 0xE784/0xE788）实参 = scp_tp_param.param0；
+	 *   0xE628 `ldr w8,[scp_tp_param]; cmp w8,#3` → 0xE634-0xE658 从 scp_tp_param+0x30
+	 *     （= gesture_data）拷 26B（ldp+ldp+ldrh = 0x1A）到 buf；
+	 *   0xE674 `cbz x20, 0xE6BC` = touch_buf == NULL 时跳过拷贝（树侧 focal_scp_gesture
+	 *     正是以 NULL 调用，原码会解引用 touch_buf+0xC30）。 */
+	FTS_INFO("scptp_cur_state=%d\n", fts_scp_tp_param.param0);
+	if (fts_scp_tp_param.param0 == 3) {
+		memcpy(buf, fts_scp_tp_param.gesture_data, FTS_GESTURE_DATA_LEN);
+	} else if (ts_data->gesture_bmode == GESTURE_BM_TOUCH) {
+		if (touch_buf)
+			memcpy(buf, touch_buf + FTS_TOUCH_DATA_LEN, FTS_GESTURE_DATA_LEN);
 	} else {
 		buf[2] = FTS_REG_GESTURE_OUTPUT_ADDRESS;
 		ret = fts_read(&buf[2], 1, &buf[2], FTS_GESTURE_DATA_LEN - 2);
@@ -348,22 +362,35 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 	gesture->gesture_id = buf[2];
 	gesture->point_num = buf[3];
 	if (gesture->gesture_id == GESTURE_DOUBLECLICK && !(ts_data->gesture_status & 0x01)) {
-		FTS_INFO("double click is not enabled!, gesture_status:%d", ts_data->gesture_status);
+		/* _b583-FTS（A2）：blob 串 .rodata.str1.1+0xB08F =
+		 * b'\x016[FTS_TS_I][%s:%d]: double click is not enabled!'（无 ", gesture_status:%d"、
+		 * 无第 3 实参；classify ④ 对体 r=0.76）⇒ 逐字节收口。 */
+		FTS_INFO("double click is not enabled!");
 		return 1;
 	}
 	if (gesture->gesture_id == GESTURE_SINGLETAP && !(ts_data->gesture_status & 0x02)) {
-		if (ts_data->fod_status != 0 && ts_data->fod_status != -1 && ts_data->fod_status != 100 && ts_data->nonui_status == 0) {
-			FTS_INFO("FOD on support single tap, fod_status:%d, nonui_status:%d", ts_data->fod_status, ts_data->nonui_status);
+		/* _b583-FTS（A2）：blob 0xE71C-0xE7BC 逐点 ——
+		 *   0xE724/0xE72C `mov w0,#0; mov w1,#0xA / #0x11; bl driver_get_touch_mode_common`
+		 *     ⇒ fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10)（新查框架，
+		 *     不是读 ts_data->fod_status 缓存）；
+		 *   0xE738 第二个调用 = nonui_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_17)；
+		 *   0xE740 `cbz w0`（nonui == 0 才继续）、0xE7A0 `cmn w20,#1 / cmp w20,#0x64`
+		 *     ⇒ 只排除 -1 与 100（**无** !=0 项）；
+		 *   0xEA0C = _printk(.rodata.str1.1+0x173E b'…: FOD on support single tap')，无参数；
+		 *   0xE7BC 之后树侧独有两处一并删（classify ③树）：
+		 *     "gesture_id=%x; DoubleClick:0x24  SingleTap:0x25 WeakDoubleClick:0x50"
+		 *     与 update_weak_doubletap_value(1)（blob 符号面 UND 表 + 全 ko 串面均无
+		 *     update_weak_doubletap_value）。 */
+		int fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10);
+		int nonui_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_17);
+
+		if (nonui_status == 0 && fod_status != -1 && fod_status != 100) {
+			FTS_INFO("FOD on support single tap");
 		} else {
 			FTS_INFO("single tap is not enabled!");
 			return 1;
 		}
 	}
-
-    if (gesture->gesture_id == GESTURE_WEAKDOUBLECLICK && (ts_data->gesture_status & 0x01)) {
-        update_weak_doubletap_value(1);
-    } 
-	FTS_INFO("gesture_id=%x; DoubleClick:0x24  SingleTap:0x25 WeakDoubleClick:0x50", gesture->gesture_id);
 	/* save point data,max:6 */
 	for (i = 0; i < FTS_GESTURE_POINTS_MAX; i++) {
 		index = 4 * i + 4;
@@ -402,9 +429,13 @@ void fts_fod_recovery(void)
 {
 	FTS_FUNC_ENTER();
 	if (fts_data->suspended) {
-		FTS_INFO("%s, tp is in suspend mode, write 0xD0 to 1, 0xD1 to 0x%x", __func__, fts_data->gesture_cmd);
+		/* _b583-FTS（A1）：按 blob / IDA 0xEDA0 收口 —— 0xEDDC = `mov w0,#1 / mov w1,#1 /
+		 * bl fts_gesture_reg_write` 之后**直接** fts_fod_reg_write（0xEDF0），全函数**无**
+		 * fts_write_reg（callface only-tree={'fts_write_reg':1}）；串实证
+		 * .rodata.str1.1+0x3B21 = b'\x016[FTS_TS_I][%s:%d]: %s, tp is in suspend mode,
+		 * write 0xD0 to 1'（无 "0xD1 to 0x%x" 尾段、无第 3 实参 w4）⇒ 删 0xD1 写 + 串收短。 */
+		FTS_INFO("%s, tp is in suspend mode, write 0xD0 to 1", __func__);
 		fts_gesture_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);
-        fts_write_reg(FTS_GESTURE_CTRL, fts_data->gesture_cmd);
 	}
 	fts_fod_reg_write(FTS_REG_GESTURE_FOD_ON, true);
 	FTS_FUNC_EXIT();
@@ -476,20 +507,28 @@ int fts_gesture_suspend(struct fts_ts_data *ts_data)
 	int i = 0;
 	int ret;
 	u8 state = 0xFF;
-	FTS_FUNC_ENTER();
-    if (!ts_data->irq_wake) {
-        enable_irq_wake(ts_data->irq);
-        ts_data->irq_wake = true;
-    }
+    FTS_FUNC_ENTER();
+	/* _b583-FTS（A5）：blob 0xF2D4 起 = **无条件** `LDR W0,[X19,#0x2A8]; MOV W1,#1;
+	 * BL irq_set_irq_wake` + 失败打印（0xF42C，门 debug>=4，串 "enable_irq_wake(irq:%d) fail"）
+	 * —— 全 ko 无 ts_data->irq_wake 读写（0x2DA..0x2DD 布尔区实证：0x2DA=fw_loading、
+	 * 0x2DB=irq_disabled、0x2DC=power_disabled，无第四槽）⇒ 删护栏与成员（见 core.h B9）。 */
+	if (irq_set_irq_wake(ts_data->irq, 1)) {
+		if (fts_debug_log_level >= 4)
+			FTS_DEBUG("enable_irq_wake(irq:%d) fail", ts_data->irq);
+	}
 
 	for (i = 0; i < 5; i++) {
-		// fts_write_reg(0xD1, 0xFF);
-		// fts_write_reg(0xD2, 0xFF);
-		// fts_write_reg(0xD5, 0xFF);
-		// fts_write_reg(0xD6, 0xFF);
-		// fts_write_reg(0xD7, 0xFF);
-		// fts_write_reg(0xD8, 0xFF);
-		fts_write_reg(FTS_GESTURE_CTRL, ts_data->gesture_cmd);
+		/* _b583-FTS（A5）：blob 循环体 0xF2F4-0xF358 = 6 次 0xFF 写 0xD1/0xD2/0xD5/0xD6/
+		 * 0xD7/0xD8 + fts_write_reg(FTS_REG_GESTURE_EN(0xD0), ENABLE) + msleep(1) +
+		 * fts_read_reg(0xD0,&state)（callface blob fts_write_reg=7 / msleep=1 / read=1，
+		 * 树侧因把 6 写注释掉且改 0xD1←gesture_cmd 而 10/5/5）⇒ 按 blob 恢复 6 写、
+		 * 删除 gesture_cmd 写。 */
+		fts_write_reg(0xD1, 0xFF);
+		fts_write_reg(0xD2, 0xFF);
+		fts_write_reg(0xD5, 0xFF);
+		fts_write_reg(0xD6, 0xFF);
+		fts_write_reg(0xD7, 0xFF);
+		fts_write_reg(0xD8, 0xFF);
 		fts_write_reg(FTS_REG_GESTURE_EN, ENABLE);
 		msleep(1);
 		fts_read_reg(FTS_REG_GESTURE_EN, &state);
@@ -520,9 +559,12 @@ int fts_gesture_resume(struct fts_ts_data *ts_data)
 	int ret;
 	u8 state = 0xFF;
 	FTS_FUNC_ENTER();
-	if (ts_data->irq_wake) {
-	    disable_irq_wake(ts_data->irq);
-	    ts_data->irq_wake = false;
+	/* _b583-FTS（A5b）：blob 0x184B8 起 = 无条件 `LDR W0,[X19,#0x2A8]; MOV W1,#0;
+	 * BL irq_set_irq_wake` + 失败打印 0x18684（串 "disable_irq_wake(irq:%d) fail"，门 >=4）
+	 * —— 这是 callface `fts_gesture_resume only-blob={_printk:1}` 的唯一来源 ⇒ 按 blob 收口。 */
+	if (irq_set_irq_wake(ts_data->irq, 0)) {
+		if (fts_debug_log_level >= 4)
+			FTS_DEBUG("disable_irq_wake(irq:%d) fail", ts_data->irq);
 	}
 
 	for (i = 0; i < 5; i++) {

@@ -495,7 +495,10 @@ struct fts_test {
     u32 data_valid_mask;              /* 0xcc seg3: bit0..5=6频点 bit6..8=min/max/differ */
     u32 rawshift_result_mask;         /* 0xd0 bit0=black bit1=white bit2=compared（pic 状态机） */
     int csv_item_af_noise;            /* 0xd4 */
-    u8 reserved_d8[0x10];             /* 0xd8..0xe7 */
+    /* _b583-FT3683：0xd8 归位（save_data JumpFreqNoise 记录 15 段位门控，
+     * 0x27838-0x2795c 逐 case `ldrb w8,[x20,#0xd8]; tbz w8,#idx`） */
+    int jump_fre_noise_item_mask;     /* 0xd8 15 组跳频对已测位图（bit i = 第 i 对） */
+    u8 reserved_dc[0xc];              /* 0xdc..0xe7（blob 未见引用） */
     int null_noise_value;             /* 0xe8 get_null_noise buf[0] 锚点（blob 0x2a6a8） */
     u8 reserved_ec[4];                /* 0xec..0xef */
     union {
@@ -524,16 +527,41 @@ struct fts_test {
     u8 lockdown_info[8];              /* 0x1158 start_test lockdown 8B 锚点 */
     int rawdata_max;                  /* 0x1160 seg2 save_data RawDataRecord */
     int rawdata_min;                  /* 0x1164 */
-    u8 reserved_1168[0x30];           /* 0x1168..0x1197 */
+    /* _b583-FT3683：0x1168-0x1197 由 reserved 归位（save_data F3 各记录节 max/min 实读点，
+     * 逐点 = blob save_data 汇编；命名 = 记录节归属）：
+     *   Txlinearity 0x26a34/0x26a38 → 0x1168/0x116c
+     *   Rxlinearity 0x26b54/0x26b58 → 0x1170/0x1174
+     *   ScapCBOn    0x27464/0x27468 → 0x1178/0x117c（同一对 = ccbypass 0x232e8/0x232fc 运行 max/min）
+     *   ScapCBOff   0x275b4/0x275b8 → 0x1180/0x1184
+     *   ScapRawdataOn  0x270e4/0x270e8 → 0x1188/0x118c
+     *   ScapRawdataOff 0x27230/0x27234 → 0x1190/0x1194 */
+    int tx_linearity_result_max;      /* 0x1168 */
+    int tx_linearity_result_min;      /* 0x116c */
+    int rx_linearity_result_max;      /* 0x1170 */
+    int rx_linearity_result_min;      /* 0x1174 */
+    int scap_cb_on_result_max;        /* 0x1178 GCB 运行 max */
+    int scap_cb_on_result_min;        /* 0x117c GCB 运行 min */
+    int scap_cb_off_result_max;       /* 0x1180 */
+    int scap_cb_off_result_min;       /* 0x1184 */
+    int scap_rawdata_on_result_max;   /* 0x1188 */
+    int scap_rawdata_on_result_min;   /* 0x118c */
+    int scap_rawdata_off_result_max;  /* 0x1190 */
+    int scap_rawdata_off_result_min;  /* 0x1194 */
     int panel_differ_max;             /* 0x1198 */
     int panel_differ_min;             /* 0x119c */
-    u8 reserved_11a0[0xc];            /* 0x11a0..0x11ab：donor 的 buffer/buffer_length 旧位；
-                                       * _b582-TEST 已按 blob 归位到 0x90/0x98，此处留洞保其后锚点不变 */
+    /* _b583-FT3683：0x11a0-0x11a7 归位（NoiseRecord 0x26da8/0x26dac → 0x11a0/0x11a4） */
+    int noise_result_max;             /* 0x11a0 */
+    int noise_result_min;             /* 0x11a4 */
+    u8 reserved_11a8[4];              /* 0x11a8..0x11ab（blob 未见引用） */
     int code1;                        /* 0x11ac */
-    int code2;                        /* 0x11b0 */
-    int offset;                       /* 0x11b4 */
-    int null_noise_max;               /* 0x11b8 */
-    u8 reserved_11bc[0xa0];           /* 0x11bc..0x125b */
+    int uniformity_min_max_value;     /* 0x11b0（原树名 code2；save_data 0x26c58 读作 min/max 判定当前值） */
+    /* _b583-FT3683：0x11b4-0x125b 归位（save_data Aux/Jump 记录节逐 idx 实读点）：
+     *   AuxiliaryFreq[%d]NoiseRecord 0x26fa4/0x26fa8 → tdata+idx*4+0x11b4 / +0x11cc（idx 0..5）
+     *   JumpFreqNoise[i->j]Record   0x27974/0x27978 → tdata+idx*4+0x11e4 / +0x1220（idx 0..14） */
+    int aux_noise_max[6];             /* 0x11b4 */
+    int aux_noise_min[6];             /* 0x11cc */
+    int jump_fre_noise_max[15];       /* 0x11e4 */
+    int jump_fre_noise_min[15];       /* 0x1220 */
     int rawshift_fre_max[6];          /* 0x125c */
     int rawshift_fre_min[6];          /* 0x1274 */
     int rawshift_raw_max;             /* 0x128c */
@@ -594,6 +622,20 @@ _Static_assert(__builtin_offsetof(struct fts_test, csv_item_af_noise) == 0xd4, "
 _Static_assert(__builtin_offsetof(struct fts_test, item1_data) == 0x40, "item1@0x40");
 _Static_assert(__builtin_offsetof(struct fts_test, item7_data) == 0x70, "item7@0x70");
 _Static_assert(__builtin_offsetof(struct fts_test, rawshift_fre_data) == 0x78, "rawshift_fre_data@0x78");
+/* _b583-FT3683：F3 记录节 max/min 槽位锚点（blob save_data 逐点实证，见各字段注释） */
+_Static_assert(__builtin_offsetof(struct fts_test, tx_linearity_result_max) == 0x1168, "tx_lin_max@0x1168");
+_Static_assert(__builtin_offsetof(struct fts_test, rx_linearity_result_max) == 0x1170, "rx_lin_max@0x1170");
+_Static_assert(__builtin_offsetof(struct fts_test, scap_cb_on_result_max) == 0x1178, "cb_on_max@0x1178");
+_Static_assert(__builtin_offsetof(struct fts_test, scap_cb_off_result_max) == 0x1180, "cb_off_max@0x1180");
+_Static_assert(__builtin_offsetof(struct fts_test, scap_rawdata_on_result_max) == 0x1188, "sraw_on_max@0x1188");
+_Static_assert(__builtin_offsetof(struct fts_test, scap_rawdata_off_result_max) == 0x1190, "sraw_off_max@0x1190");
+_Static_assert(__builtin_offsetof(struct fts_test, noise_result_max) == 0x11a0, "noise_max@0x11a0");
+_Static_assert(__builtin_offsetof(struct fts_test, uniformity_min_max_value) == 0x11b0, "uniformity_minmax@0x11b0");
+_Static_assert(__builtin_offsetof(struct fts_test, aux_noise_max) == 0x11b4, "aux_max[6]@0x11b4");
+_Static_assert(__builtin_offsetof(struct fts_test, aux_noise_min) == 0x11cc, "aux_min[6]@0x11cc");
+_Static_assert(__builtin_offsetof(struct fts_test, jump_fre_noise_max) == 0x11e4, "jump_max[15]@0x11e4");
+_Static_assert(__builtin_offsetof(struct fts_test, jump_fre_noise_min) == 0x1220, "jump_min[15]@0x1220");
+_Static_assert(__builtin_offsetof(struct fts_test, rawshift_fre_max) == 0x125c, "rawshift_fre_max@0x125c 锚不变");
 _Static_assert(__builtin_offsetof(struct fts_test, item8_data) == 0x88, "item8@0x88");
 _Static_assert(__builtin_offsetof(struct fts_test, node_valid) == 0xa0, "node_valid@0xa0");
 _Static_assert(__builtin_offsetof(struct fts_test, test_num) == 0x38, "test_num@0x38");
@@ -654,6 +696,14 @@ _Static_assert(__builtin_offsetof(struct test_funcs, free_item_data) == 0x78, "s
 }
 
 
+/* _b583-FT3683：blob 忠实形态 —— MC_SC 项目名表 = .rodata 0x8d6 起 12 槽 ×0x32 字节
+ * （RAWDATA_TEST/UNIFORMITY_TEST/SCAP_CB_TEST/SCAP_RAWDATA_TEST/WEAK_SHORT_CIRCUIT_TEST/
+ *  PANEL_DIFFER_TEST/NOISE_TEST/SPI_TEST/RESET_PIN_TEST/RAWSHIFT_TEST/
+ *  AUXILIARY_FRE_NOISE_TEST/JUMP_FRE_NOISE_TEST）。
+ * 顺序即语义：get_test_item_mc_sc() 按 `*val |= (tmpval << i)` 发位，
+ * 位序必须与 start_test_ft5672 的 bit 契约一致（bit8=rst_test / bit9=rawshift 结果位 /
+ * bit10=auxiliary_freq_noise / bit11=jump_freq_noise；原树 10 项把 AUX/RESET 位序颠倒、
+ * 且缺 RAWSHIFT/JUMP 两项 ⇒ ini 掩码错位）。 */
 #define TEST_ITEM_MC_SC             { \
     "RAWDATA_TEST", \
     "UNIFORMITY_TEST", \
@@ -663,8 +713,10 @@ _Static_assert(__builtin_offsetof(struct test_funcs, free_item_data) == 0x78, "s
     "PANEL_DIFFER_TEST", \
     "NOISE_TEST", \
     "SPI_TEST", \
-    "AUXILIARY_FRE_NOISE_TEST", \
     "RESET_PIN_TEST", \
+    "RAWSHIFT_TEST", \
+    "AUXILIARY_FRE_NOISE_TEST", \
+    "JUMP_FRE_NOISE_TEST", \
 }
 
 #define BASIC_THRESHOLD_MC_SC       { \

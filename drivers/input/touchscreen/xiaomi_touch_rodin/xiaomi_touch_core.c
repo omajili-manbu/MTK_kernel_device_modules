@@ -167,19 +167,18 @@ void notify_xiaomi_touch(xiaomi_touch_data_t *xiaomi_touch_data, enum poll_notif
 	private_data_t *client_private_data = NULL;
 	if (!xiaomi_touch_data)
 		return;
+	/* _b583-XT：blob notify_xiaomi_touch 0x54c-0x5f0 列表遍历内**只有一处**唤醒：
+	 * 0x59c `add x0,x21,#0x18; mov w1,#3; mov w2,wzr; mov x3,xzr; bl __wake_up`
+	 * （= wake_up_all(&client_private_data->poll_wait_queue_head)，mode=3(nr_exclusive=0)
+	 * ⇔ wake_up_all 形态）；type 形参在 blob 全程未用（blob private_data 只有 1 个队列，
+	 * 见 xiaomi_touch.h 锚点）⇒ 删除按 type 的三分支唤醒。 */
 	spin_lock(&xiaomi_touch_data->private_data_lock);
 	list_for_each_entry_rcu(client_private_data, &xiaomi_touch_data->private_data_list, node) {
 		LOG_VERBOSE("notify xiaomi-touch data update, client private data is %p", client_private_data);
 		wake_up_all(&client_private_data->poll_wait_queue_head);
-		if (type == COMMON_DATA_NOTIFY) {
-			wake_up_all(&client_private_data->poll_wait_queue_head_for_cmd);
-		} else if (type == FRAME_DATA_NOTIFY) {
-			wake_up_all(&client_private_data->poll_wait_queue_head_for_frame);
-		} else if (type == RAW_DATA_NOTIFY) {
-			wake_up_all(&client_private_data->poll_wait_queue_head_for_raw);
-		}
 	}
 	spin_unlock(&xiaomi_touch_data->private_data_lock);
+	(void)type;
 }
 
 void add_common_data_to_buf_common(s8 touch_id, enum common_data_cmd cmd, enum common_data_mode mode, int length, int *data)
@@ -319,12 +318,12 @@ static int xiaomi_touch_temp_thread_func(void *data)
 
 	while (!kthread_should_stop()) {
 		/* _b581-XT③：blob 0x1874-0x18c4 的 wait 条件只有一处 32 位原子读
-		 * （ldr w8,[x21,#0x2a20] ×2 处 = temp_detect_ready[0]），无 ready[1] 项；
+		 * （ldr w8,[x21,#0x2a20] ×2 处 = temp_detect_ready），无 ready[1] 项；
 		 * 树侧原为 donor 的 ready[0]||ready[1]。rodin 为单面板（TOUCH_ID=0，
 		 * enable_temperature_detection_func 也只被 touch_id=0 分支触达），
 		 * 按 blob 收口为只测 ready[0]。 */
 		wait_event_interruptible(xiaomi_touch_data->temp_detect_wait_queue,
-				atomic_read(&xiaomi_touch_data->temp_detect_ready[0]));
+				atomic_read(&xiaomi_touch_data->temp_detect_ready));
 			cur_temp0 = get_bms_temp_common();
 			cur_temp = (cur_temp0 + 5) / 10; // Rounding, in degrees Celsius
 			/* _b580-A74①（站点3-b/c）：blob 0x1960-0x19d4 = 单面板形态——外层只判
@@ -379,11 +378,11 @@ void enable_temperature_detection_func(s8 touch_id, bool is_resume)
 		return;
 
 	if (is_resume) {
-		atomic_set(&xiaomi_touch_data->temp_detect_ready[touch_id], 1);
+		atomic_set(&xiaomi_touch_data->temp_detect_ready, 1);
 		/* _b581-XT③：blob 该两处串为 MI_TP_D（LOG_DEBUG），树侧原为 LOG_INFO。 */
 		LOG_DEBUG("start detect temperature");
 	} else {
-		atomic_set(&xiaomi_touch_data->temp_detect_ready[touch_id], 0);
+		atomic_set(&xiaomi_touch_data->temp_detect_ready, 0);
 		LOG_DEBUG("stop detect temperature");
 	}
 
@@ -439,6 +438,15 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 
 	/* alloc mmap memory */
 	xiaomi_touch_data->frame_data_mmap_phy_base = 0;
+	/* _b583-XT2③：blob 0x1064 `str w9(=1), [x28, #0x2a08]` —— x28 = 元素-0x10（同函数
+	 * 0x1034 `str w4,[x28,#0x18]`=frame_data_size、0x1054 `str xzr,[x28,#0x28]!`=
+	 * frame_data_mmap_phy_base 两个定标点）⇒ 落点 = 元素+0x29F8 = disp_nb.priority
+	 * （disp_nb @元素+0x29E8 由 work 相对存点 xiaomi_register_panel_notifier_work
+	 * 0x2378 `str x8,[x19,#0x90]!`（x19 = work = 元素+0x2958）锁定，notifier_block
+	 * .priority 位于 +0x10）。值 1、4B 宽；mi_disp_notifier.c 不读 priority
+	 * ⇒ 无行为影响，纯布局保真（coordinator/A3 的"+0x29F0 dev"读法即差该 0x10 偏置）。
+	 * 注：树侧原占该 4B 的 donor 成员 panel_register_retry 已删（见 xiaomi_touch.h）。 */
+	xiaomi_touch_data->disp_nb.priority = 1;
 	alloc_size = xiaomi_touch_data->frame_data_size * xiaomi_touch_data->frame_data_buf_size;
 	LOG_DEBUG("alloc size = %d, frame data size %d, frame data page size %d, frame data buf size %d",
 		alloc_size, xiaomi_touch_data->frame_data_size,
@@ -516,7 +524,7 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	/* create a thread for temp detect */
 	if (hardware_operation && hardware_operation->set_thermal_temp) {
 		/* The temperature detection function is enabled by default when machine startup */
-		atomic_set(&xiaomi_touch_data->temp_detect_ready[touch_id], 1);
+		atomic_set(&xiaomi_touch_data->temp_detect_ready, 1);
 		if (xiaomi_touch_temp_thread == NULL) {
 			LOG_INFO("startup temperature detect thread");
 			xiaomi_touch_temp_thread = kthread_create(xiaomi_touch_temp_thread_func, NULL, "xiaomi_touch_temp_thread");
@@ -582,8 +590,8 @@ void unregister_touch_panel_common(s8 touch_id)
 	/* free temp detect thread */
 	if(xiaomi_touch_temp_thread != NULL) {
 		/* _b581-XT③：blob 0x1dbc 只有一处 4 字节清零 str wzr,[x23,#0x2a20]
-		 * = temp_detect_ready[0]（无 ready[1] 槽；ready[1] 为 donor 残留）。 */
-		atomic_set(&xiaomi_touch_data->temp_detect_ready[0], 0);
+		 * = temp_detect_ready（无 ready[1] 槽；ready[1] 为 donor 残留）。 */
+		atomic_set(&xiaomi_touch_data->temp_detect_ready, 0);
 		// kthread_stop(xiaomi_touch_temp_thread); /* Optimize restart time */
 		LOG_INFO("stop detect temperature");
 	}
@@ -796,9 +804,21 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 #endif
 
 	LOG_INFO("Start register panel notifier");
-	count = of_count_phandle_with_args(xiaomi_touch_data->dev->of_node, property_name, NULL);
+	/* _b583-XT③：blob 0x21f8-0x22b0 —— Start 串（行663）之后、of_count_phandle_with_args
+	 * 之前有一处 `ldr x8,[&xiaomi_touch]; cbz x8,<行679 "Invalid params">`（E 级）并
+	 * return；此后 of_count/of_parse 两处 of_node 均取自**该全局 dev**（0x2204/0x2238：
+	 * `ldr x8,[.bss+0x8]; ldr x0,[x8,#0x300]`），而非 per-panel dev。
+	 * 判据：DTS 的 panel 属性只挂 xiaomi-touch 节点（xiaomi_rodin_mt6899_touch.dtsi:12
+	 * `panel = <&rodin_42_02_0a_dsc_vdo &rodin_36_02_0b_dsc_vdo>`），IC(spi)节点无该属性
+	 * ⇒ 原树侧用 xiaomi_touch_data->dev 会 count<1 恒走 "try again"→"not try"，
+	 * 面板通知器永不注册（挂起/恢复事件全丢）。 */
+	if (!xiaomi_touch.dev) {
+		LOG_ERROR("Invalid params");
+		return;
+	}
+	count = of_count_phandle_with_args(xiaomi_touch.dev->of_node, property_name, NULL);
 	for (i = 0; i < count; i++) {
-		node = of_parse_phandle(xiaomi_touch_data->dev->of_node, property_name, i);
+		node = of_parse_phandle(xiaomi_touch.dev->of_node, property_name, i);
 		panel = of_drm_find_panel(node);
 		if (!IS_ERR(panel)) {
 			break;
@@ -815,6 +835,17 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 		else {
 			LOG_ERROR("Failed to register panel notifier, not try");
 		}
+		return;
+	}
+
+	/* _b583-XT③：blob 0x22b8/0x22c8-0x22f4 —— 找到 panel 后、注册前，把 container_of
+	 * 出来的指针与 &xiaomi_touch.xiaomi_touch_data[0]（.bss+0x18）/ [1]（.bss+0x2a90，
+	 * 步长 0x2A78）两两比对（clang 展开的 2 元素 for 循环）；两者皆不等则打
+	 * "can't not find this touch id!"（E 级，行713）并 return。树侧缺此校验（串面
+	 * blob-only 命中即此）。 */
+	if (xiaomi_touch_data != &xiaomi_touch.xiaomi_touch_data[0] &&
+	    xiaomi_touch_data != &xiaomi_touch.xiaomi_touch_data[1]) {
+		LOG_ERROR("can't not find this touch id!");
 		return;
 	}
 
@@ -970,11 +1001,24 @@ static void xiaomi_unregister_power_supply_event(void)
 
 static int xiaomi_touch_probe(struct platform_device *pdev)
 {
+	/* _b583-XT③：blob xiaomi_touch_probe 0x4abc `add x20,x0,#0x10`（=&pdev->dev）→
+	 * 0x4b00 `cbz x20,<行1245 "Invalid touch device">`→`mov w0,#-0x13`(-ENODEV)；
+	 * 0x4b04 `str x20,[x19]`（x19=&xiaomi_touch，即结构 +0x0 的 dev 成员）。
+	 * 判据：该检查在 6.6 blob 为死检（&pdev->dev 恒非 0），但成员与写入是
+	 * xiaomi_register_panel_notifier_work 的 of_node 来源（见 xiaomi_touch.h 锚点）
+	 * ⇒ 必须落码，否则面板通知器解析失败。 */
+	struct device *dev = &pdev->dev;
+
 	LOG_ALWAYS("xiaomi_touch ver: %s", XIAOMI_TOUCH_VERSION);
 #ifdef TOUCH_KNOCK_SUPPORT
 	knock_node_init();
 #endif
 	memset(&xiaomi_touch, 0, sizeof(xiaomi_touch_t));
+	if (!dev) {
+		LOG_INFO("Invalid touch device");
+		return -ENODEV;
+	}
+	xiaomi_touch.dev = dev;
 	xiaomi_touch_sys_init();
 	xiaomi_touch_operation_init(&xiaomi_touch);
 	xiaomi_register_power_supply_event(&xiaomi_touch);

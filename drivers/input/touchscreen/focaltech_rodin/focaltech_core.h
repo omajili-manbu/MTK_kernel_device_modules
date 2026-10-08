@@ -183,6 +183,10 @@ extern struct scp_tp_params fts_scp_tp_param;   /* focaltech_scp_tp.c */
 int fts_scp_tp_init(void);
 void fts_scp_tp_exit(void);
 int fts_scp_tp_switch(u32 mode);
+/* _b583-FTS（A7-f）：fts_htc_set_double_scan 定义在 focaltech_scp_tp.c:556
+ * （blob GLOBAL 符号 0x2114，与 fts_htc_enter_idle 等同一族），fts_set_cur_value 的
+ * DATA_MODE_163 分支直调它（blob 侧该 case 把它内联）。 */
+int fts_htc_set_double_scan(u8 value);
 int fts_gesture_10diff_reg_write(u8 value);
 extern int fts_scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);	/* _b571 patch G */
 extern bool fts_scp_tp_mistouch_close;		/* _b571 patch G */
@@ -497,7 +501,19 @@ struct fts_ts_data {
         bool suspended;
         bool fw_loading;
         bool irq_disabled;
-        bool irq_wake;
+/*****************************************************************************
+ * _b583-FTS（B9）：blob `fts_ts_data` 布尔区实证（逐偏移、逐成员）——
+ *   suspended@0x2D9（fts_fod_recovery/fts_read_and_report_foddata/tp_state_recovery 等 31 点）、
+ *   fw_loading@0x2DA（fts_resume_suspend/fwupg_work/upgrade_bin/test_*_store）、
+ *   irq_disabled@0x2DB（fts_irq_disable/enable/focal_select_touchmode）、
+ *   power_disabled@0x2DC（fts_power_source_{init,ctrl,ctrl_simplify}）、
+ *   glove_mode@0x2DD、cover_mode@0x2DE、charger_mode@0x2DF（ex_mode 三组 sysfs）、
+ *   touch_analysis_support@0x2E0（fts_irq_handler）、prc_support@0x2E1、prc_mode@0x2E2、
+ *   esd_support@0x2E3、gesture_support@0x2E4、gesture_bmode@0x2E5。
+ * ⇒ blob 的 {suspended,fw_loading,irq_disabled,power_disabled} 只有 **3** 个后继布尔，
+ *   树侧多出的 `irq_wake` 是 donor 件（blob 全 ko 对 0x2DA..0x2DD 的四槽只出现三种语义；
+ *   IDA 0xF2D4/0x184F4 两处 irq_set_irq_wake 均为**无条件**、无成员读写）⇒ 删除本成员，
+ *   其后 glove/cover/charger 与 gesture_support/gesture_bmode 全部 -1 字节归位（见断言块）。 */
         bool power_disabled;
         bool glove_mode;
         bool cover_mode;
@@ -621,6 +637,45 @@ _Static_assert(__builtin_offsetof(struct fts_ts_data, ic_info) == 0x40,
                "_b582-INTA ic_info@0x40 (blob fts_get_ic_information 0x40/0x44/0x4c)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, irq) == 0x2a8,
                "_b582-INTA irq@0x2a8 (blob fts_ts_remove 0x8b8c free_irq)");
+/* _b583-FTS（B9）：布尔区锚点 —— 证据 = blob 全模块 [reg,#imm] 偏移扫描
+ * （tools/_b583_ftsface/blbscan.py，逐偏移带访问函数名）：
+ *   0x2D9 suspended（fts_fod_recovery/fts_read_and_report_foddata/fts_resume_suspend/
+ *         fts_tp_state_recovery/fts_test_* 等 31 点）、
+ *   0x2DA fw_loading、0x2DB irq_disabled、0x2DC power_disabled、
+ *   0x2DD glove_mode、0x2DE cover_mode、0x2DF charger_mode、
+ *   0x2E0 touch_analysis_support、0x2E1 prc_support、0x2E2 prc_mode、0x2E3 esd_support、
+ *   0x2E4 gesture_support、0x2E5 gesture_bmode。
+ * 等式两端：本断言的成员偏移（编译器 DWARF 口径）== blob 机器码立即数偏移。 */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pm_completion) == 0x2b8,
+               "_b583-FTS pm_completion@0x2b8 (blob fts_ts_probe 0x8890 str wzr)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pm_suspend) == 0x2d8,
+               "_b583-FTS pm_suspend@0x2d8 (blob fts_update_touchmode_data ldrb [x19,#0x2d8])");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, suspended) == 0x2d9,
+               "_b583-FTS suspended@0x2d9 (blob fts_fod_recovery ldrb [x8,#0x2d9])");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, fw_loading) == 0x2da,
+               "_b583-FTS fw_loading@0x2da (blob fts_fwupg_work strb)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, irq_disabled) == 0x2db,
+               "_b583-FTS irq_disabled@0x2db (blob fts_irq_disable/enable ldrb+strb)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, power_disabled) == 0x2dc,
+               "_b583-FTS power_disabled@0x2dc (blob fts_power_source_ctrl+simplify)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, glove_mode) == 0x2dd,
+               "_b583-FTS glove_mode@0x2dd (blob fts_glove_mode_show/store)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, cover_mode) == 0x2de,
+               "_b583-FTS cover_mode@0x2de (blob fts_cover_mode_store/ex_mode_recovery)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, charger_mode) == 0x2df,
+               "_b583-FTS charger_mode@0x2df (blob fts_charger_mode_store/ex_mode_init)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_analysis_support) == 0x2e0,
+               "_b583-FTS touch_analysis_support@0x2e0 (blob fts_irq_handler 27 点)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, prc_support) == 0x2e1,
+               "_b583-FTS prc_support@0x2e1 (blob fts_prc_show/store/point_report_check_init)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, prc_mode) == 0x2e2,
+               "_b583-FTS prc_mode@0x2e2 (blob fts_prc_queue_work ldrb+strb)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, esd_support) == 0x2e3,
+               "_b583-FTS esd_support@0x2e3 (blob fts_esdcheck_*)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_support) == 0x2e4,
+               "_b583-FTS gesture_support@0x2e4 (blob fts_gesture_readdata ldrb [x0,#0x2e4])");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_bmode) == 0x2e5,
+               "_b583-FTS gesture_bmode@0x2e5 (blob fts_gesture_bm_show/store)");
 
 enum GESTURE_MODE_TYPE {
 	GESTURE_DOUBLETAP,

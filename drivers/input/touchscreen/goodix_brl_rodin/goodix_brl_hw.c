@@ -962,6 +962,7 @@ static int brl_read_version(struct goodix_ts_core *cd,
 	u8 buf[sizeof(struct goodix_fw_version)] = {0};
 	u8 temp_pid[8] = {0};
 
+	ts_debug("enter.");	/* _b583-GX：blob L906（站点 0x534c，D 级） */
 	if (cd->bus->ic_type == IC_TYPE_BERLIN_A)
 		fw_addr = FW_VERSION_INFO_ADDR_BRA;
 	else
@@ -998,6 +999,7 @@ static int brl_read_version(struct goodix_ts_core *cd,
 	ts_info("vid:%*ph", (int)sizeof(version->patch_vid),
 		version->patch_vid);
 	ts_info("sensor_id:%d", version->sensor_id);
+	ts_debug("exit.");	/* _b583-GX：blob L941（站点 0x54a4，D 级） */
 
 	return 0;
 }
@@ -1613,9 +1615,12 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 			if (cd->dump_type == DUMP_ON) {
 				/* blob 0x6600-0x6688：size = get_debug_data_size(cd)
 				 * （drv*sen*2 并回写 cd->debug_data_size），
-				 * 读失败 = "failed get frame data"（行 1543）。 */
+				 * 读失败 = "failed get frame data"（行 1543）。
+				 * _b583-GX：blob 0x6640 `add x21,x21,#0x9e0` ⇒ dump 帧读入
+				 * 第二缓冲 tp_frame->thp_frame_dump（0x9e0），不覆盖 2500
+				 * 常规帧缓冲（0x18）；树原为读回同一个 4096 缓冲，按 blob 收口。 */
 				ret = hw_ops->read(cd, misc->frame_data_addr,
-						tp_frame->thp_frame,
+						tp_frame->thp_frame_dump,
 						get_debug_data_size(cd));
 				if (ret) {
 					ts_err("failed get frame data");
