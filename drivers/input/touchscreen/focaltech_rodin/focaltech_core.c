@@ -2521,14 +2521,19 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
 
     /* _b583b-B10：名字域按 blob 换 char[40] 内嵌数组（0x18/0x40 槽）。blob 形态
      * （probe 0x10A50..0x10AFC）：先 memset 清零 40B → of_property_read_string →
-     * 成功且 strlen<=0x27 才 strncpy(dst,src,0x28)；读失败或超长保持全零
-     * （无 "avdd"/"iovdd" 字面量兜底 —— 电源面 regulator_get 用字面量，与该
-     * 成员无耦合，见 fts_power_source_init）。 */
+     * 成功且 strlen<=0x27 才 strncpy(dst,src,0x28)；超长分支走 INFO 门打印
+     * "invalied avdd|iovdd name length: %ld > %ld"（实参 (strlen(name),0x28)，blob
+     * 0x11354/0x11380 MOV W4,#0x28），打印后跳过拷贝继续（非 return）；读失败或
+     * 超长保持全零（无 "avdd"/"iovdd" 字面量兜底 —— 电源面 regulator_get 用字面量，
+     * 与该成员无耦合，见 fts_power_source_init）。 */
     memset(pdata->avdd_reg_name, 0, sizeof(pdata->avdd_reg_name));
     ret = of_property_read_string(np, "focaltech,avdd-name", &name);
     if (ret == 0) {
-        FTS_INFO("avdd name from dt: %s", name);	/* blob L2322 串（0xf694） */
-        if (strlen(name) <= 0x27)
+        FTS_INFO("avdd name from dt: %s", name);	/* blob L2318 串（0xf694） */
+        if (strlen(name) > 0x27)
+            FTS_INFO("invalied avdd name length: %ld > %ld",
+                     strlen(name), sizeof(pdata->avdd_reg_name));
+        else
             strncpy(pdata->avdd_reg_name, name, sizeof(pdata->avdd_reg_name));
     }
 
@@ -2536,7 +2541,10 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
     ret = of_property_read_string(np, "focaltech,iovdd-name", &name);
     if (ret == 0) {
         FTS_INFO("iovdd name from dt: %s", name);	/* blob L2328 串（0x8bb3） */
-        if (strlen(name) <= 0x27)
+        if (strlen(name) > 0x27)
+            FTS_INFO("invalied iovdd name length: %ld > %ld",
+                     strlen(name), sizeof(pdata->iovdd_reg_name));
+        else
             strncpy(pdata->iovdd_reg_name, name, sizeof(pdata->iovdd_reg_name));
     }
 
@@ -2825,39 +2833,10 @@ int fts_enable_idle_high_refresh_cycle(int *value)
 	return fts_write(writebuf_temp, 3);
 }
 
-#if 0
-int fts_htc_enter_idle(int *value)
-{
-	u8 writebuf[3] = { 0 };
-	int en_status = value[0];
-	FTS_INFO("idle data0[en_status]: %d, data1: %d, data2: %d", en_status, value[1], value[2]);
-	writebuf[0] = 0x2c;
-	if(en_status)
-	{
-		/*enter idle*/
-		if (value[1])
-		{
-			/*game mode for idle time*/
-			fts_enable_idle_high_refresh(1);
-			fts_enable_idle_high_refresh_cycle(value);
-			writebuf[0] = 0x37;
-			writebuf[1] =  ((value[2] >> 8) & 0xFF);
-			writebuf[2] =  (value[2] & 0xFF);
-		} else {
-			/*nomal mode for idle*/
-			writebuf[1] = 0x00;
-			writebuf[2] = 0x02;
-		}
-	} else {
-		/*exit idle*/
-		writebuf[1] = 0x00;
-		writebuf[2] = 0x01;
-	}
-
-	FTS_INFO("writebuf[0]:%d, writebuf[1]:%d, writebuf[2]:%d", writebuf[0], writebuf[1], writebuf[2]);
-	return fts_write(writebuf, 3);
-}
-#endif
+/* _b583c-B（②b 第 5 条）：原 #if 0 死拷贝 fts_htc_enter_idle（带 "idle data0[en_status]"
+ * 尾段串）已删 —— blob 全 ko 仅一条 fts_htc_enter_idle（EXPORT，0xAC2C，fts_set_cur_value
+ * 调用），无第二定义；"en_status" 串在 blob 全文件 strings 0 命中，该尾段为树侧 EXTRA，
+ * 落点以现存活动定义按 blob 收口（见下）。 */
 
 int fts_set_idle_high_refresh_mode(u8 mode, int value)
 {
@@ -2907,6 +2886,10 @@ int fts_htc_enter_idle(int *value)
 	int idle_scan_cycle = 0;
 	int idle_scan_time = 0;
 
+	/* _b583c-B（②b 第 5 条）：blob 0xAC54..0xACB4 —— INFO 门（cmp #3; b.cs，
+	 * loc_AC94 _printk，__func__="fts_htc_enter_idle"，W2=0xB37），实参
+	 * W3/W4/W5 = value[0]/value[1]/value[2] 三个 int，位于函数首（先打印后写）。 */
+	FTS_INFO("idle data0: %d, data1: %d, data2: %d", value[0], value[1], value[2]);
 	/* enable idle high refresh mode */
 	ret = fts_set_idle_high_refresh_mode(SET_IDLE_HIGH_BASE_EN_TYPE, idle_status == P_ACTIVE ? ENABLE : DISABLE);
 	if (ret < 0)
@@ -2928,7 +2911,10 @@ int fts_htc_enter_idle(int *value)
 	ret = fts_thp_ic_write_interfaces(SET_IC_WORK_MODE_TYPE, (s32 *)&idle_status, 1);
 	if (ret < 0)
 		FTS_ERROR("fail send send idle cmd, ret= %d", ret);
-	FTS_DEBUG("idle send suscess, data0:%d idle_scan_cycle:%d idle_scan_time:%d", idle_status, idle_scan_cycle, idle_scan_time);
+	/* _b583c-B：blob fts_htc_enter_idle（0xAC2C..0xAEAC）无 "idle send suscess" 打印
+	 * （.rodata.str1.1 全文件 0 命中，calls 计数 _printk=8 = 1 I + 3 D + 4 E），树侧
+	 * 原 FTS_DEBUG("idle send suscess,...") 为树 EXTRA，按 blob 删除以保整模块
+	 * _printk 计数相等（补上的 idle data0 INFO 与之对消）。 */
 	return ret;
 }
 
