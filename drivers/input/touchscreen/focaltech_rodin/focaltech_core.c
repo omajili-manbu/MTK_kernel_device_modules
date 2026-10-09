@@ -74,8 +74,8 @@ static void fts_update_touchmode_data(struct fts_ts_data *ts_data);
 
 enum FTS_LOG_LEVEL fts_debug_log_level = FTS_LOG_INFO;
 
-#define FOCALTECH_RX_NUM                    9
-#define FOCALTECH_TX_NUM                    14
+#define FOCALTECH_RX_NUM                    17  /* blob B570: mov w0,#0x11 */
+#define FOCALTECH_TX_NUM                    38  /* blob B57C: mov w0,#0x26 */
 #define SUPER_RESOLUTION_FACOTR             100
 /*struct device_node *gf_spi_dp;*/
 

@@ -102,8 +102,8 @@
 #define FTS_TOUCH_E_NUM                     1
 #define FTS_X_MIN_DISPLAY_DEFAULT           0
 #define FTS_Y_MIN_DISPLAY_DEFAULT           0
-#define FTS_X_MAX_DISPLAY_DEFAULT           904
-#define FTS_Y_MAX_DISPLAY_DEFAULT           572
+#define FTS_X_MAX_DISPLAY_DEFAULT           1220  /* blob B558: mov w0,#0x4c4 */
+#define FTS_Y_MAX_DISPLAY_DEFAULT           2712  /* blob B564: mov w0,#0xa98 */
 
 #define FTS_TOUCH_DOWN                      0
 #define FTS_TOUCH_UP                        1

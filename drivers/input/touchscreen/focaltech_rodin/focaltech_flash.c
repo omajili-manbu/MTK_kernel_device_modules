@@ -2072,6 +2072,24 @@ static void fts_fwupg_init_ic_detail(struct fts_upgrade *upg)
  *  Output:
  *  Return:
  *****************************************************************************/
+/* =y 内建 fw 加载重试（blob 无此段，时序适配）：probe 落在 do_basic_setup 尾（vseq
+ * 重放波，早于 ueventd 就绪），request_firmware 单次必败（-ENOENT）；6.6 blob 为 .ko
+ * 由 init insmod、用户态已就绪故单次即成。文件级 delayed_work 不进 ts_data（保 blob
+ * 布局断言零漂移）；TpFirmwareLoadFail 仅在重试耗尽后上报，保持 blob 事件语义。 */
+#define FTS_FWUPG_RETRY_MAX    30
+#define FTS_FWUPG_RETRY_DELAY  (2 * HZ)
+static struct delayed_work fwupg_retry_work;
+static int fwupg_retry_cnt;
+
+static void fts_fwupg_retry_workfn(struct work_struct *work)
+{
+    struct fts_upgrade *upg = fwupgrade;
+
+    if (!upg || !upg->ts_data || !upg->ts_data->ts_workqueue)
+        return;
+    queue_work(upg->ts_data->ts_workqueue, &upg->ts_data->fwupg_work);
+}
+
 static void fts_fwupg_work(struct work_struct *work)
 {
     int ret = 0;
@@ -2095,11 +2113,19 @@ static void fts_fwupg_work(struct work_struct *work)
     /* get fw */
     ret = fts_fwupg_get_fw_file(upg);
     if (ret < 0) {
-        FTS_ERROR("get file fail, can't upgrade");   /* _b582-INTB：blob LINE 2101（无 [DIS-TF-TOUCH]） */
-        /* blob 0x2f34c-0x2f368：mi event（TOUCH_EVENT_FWLOAD_ERR,"TpFirmwareLoadFail","focal"） */
-        xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
-                                               "TpFirmwareLoadFail", "focal");
+        fwupg_retry_cnt++;
+        if (fwupg_retry_cnt <= FTS_FWUPG_RETRY_MAX) {
+            FTS_ERROR("get file fail, can't upgrade, retry %d after %ds",
+                      fwupg_retry_cnt, FTS_FWUPG_RETRY_DELAY / HZ);
+            schedule_delayed_work(&fwupg_retry_work, FTS_FWUPG_RETRY_DELAY);
+        } else {
+            FTS_ERROR("get file fail, can't upgrade");   /* _b582-INTB：blob LINE 2101（无 [DIS-TF-TOUCH]） */
+            /* blob 0x2f34c-0x2f368：mi event（TOUCH_EVENT_FWLOAD_ERR,"TpFirmwareLoadFail","focal"） */
+            xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
+                                                   "TpFirmwareLoadFail", "focal");
+        }
     } else {
+        fwupg_retry_cnt = 0;
         /* ic init if have */
         fts_fwupg_init_ic_detail(upg);
         /* run auto upgrade */
@@ -2175,6 +2201,7 @@ int fts_fwupg_init(struct fts_ts_data *ts_data)
         FTS_ERROR("get lockdown information fails");
     }
     INIT_WORK(&ts_data->fwupg_work, fts_fwupg_work);
+    INIT_DELAYED_WORK(&fwupg_retry_work, fts_fwupg_retry_workfn);
     queue_work(ts_data->ts_workqueue, &ts_data->fwupg_work);
 
     return 0;
@@ -2183,6 +2210,7 @@ int fts_fwupg_init(struct fts_ts_data *ts_data)
 int fts_fwupg_exit(struct fts_ts_data *ts_data)
 {
     FTS_FUNC_ENTER();
+    cancel_delayed_work_sync(&fwupg_retry_work);
     cancel_work_sync(&ts_data->fwupg_work);
 
     if (fwupgrade) {
