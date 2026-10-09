@@ -5896,10 +5896,9 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 
 	if (dsi->panel) {
 		if (!dsi->pending_switch) {
-			/* rodin: 6.18 drm_panel_enable is void */
+			/* rodin: 6.18 drm_panel_enable is void; 6.6 原形调用在 if 条件内作守卫，
+			 * 搬出条件后错误体必须随之删除（#240 31.486s/47.937s 双实证无条件错误体） */
 			drm_panel_enable(dsi->panel);
-			DDPPR_ERR("failed to enable the panel\n");
-			goto err_dsi_power_off;
 		}
 #ifdef CONFIG_MI_DISP_ESD_CHECK
 		if (!new_doze_state)
