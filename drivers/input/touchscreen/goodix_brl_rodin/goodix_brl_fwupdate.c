@@ -1239,11 +1239,18 @@ static void goodix_fw_sysfs_remove(void)
 static int goodix_request_firmware(struct firmware_data *fw_data,
 				const char *name)
 {
+/* =y 内建 fw 加载时序适配（§177 同族，blob 无此改动）：probe 落 vseq 重放波
+ * 早于 ueventd 就绪，request_firmware 首轮必败；60s 窗跨过用户态固件助手就绪
+ * 点（原 3x200ms 为 blob .ko 时代 init insmod、用户态已就绪的保险窗）。
+ * 不动全局宏 GOODIX_RETRY_3（全树 7+ 处消费）。 */
+#define GOODIX_FW_REQ_RETRY     30
+#define GOODIX_FW_REQ_RETRY_MS  2000
+
 	struct fw_update_ctrl *fw_ctrl =
 		container_of(fw_data, struct fw_update_ctrl, fw_data);
 	struct device *dev = &(fw_ctrl->core_data->pdev->dev);
 	int r;
-	int retry = GOODIX_RETRY_3;
+	int retry = GOODIX_FW_REQ_RETRY;
 
 	ts_info("Request firmware image [%s]", name);
 
@@ -1251,8 +1258,8 @@ static int goodix_request_firmware(struct firmware_data *fw_data,
 		r = request_firmware(&fw_data->firmware, name, dev);
 		if (!r)
 			break;
-		ts_info("get fw bin retry:[%d]", GOODIX_RETRY_3 - retry);
-		msleep(200);
+		ts_info("get fw bin retry:[%d]", GOODIX_FW_REQ_RETRY - retry);
+		msleep(GOODIX_FW_REQ_RETRY_MS);
 	}
 	if (retry < 0) {
 		ts_err("Firmware image [%s] not available,errno:%d", name, r);

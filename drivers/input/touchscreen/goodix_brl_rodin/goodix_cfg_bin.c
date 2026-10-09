@@ -103,9 +103,16 @@ struct goodix_cfg_bin {
 static int goodix_read_cfg_bin(struct device *dev, const char *cfg_name,
 			struct goodix_cfg_bin *cfg_bin)
 {
+/* =y 内建 fw 加载时序适配（§177 同族，blob 无此改动）：probe 落 vseq 重放波
+ * 早于 ueventd 就绪，request_firmware 首轮必败；60s 窗跨过用户态固件助手就绪
+ * 点（原 3x200ms 为 blob .ko 时代 init insmod、用户态已就绪的保险窗）。
+ * 不动全局宏 GOODIX_RETRY_3（全树 7+ 处消费）。 */
+#define GOODIX_FW_REQ_RETRY     30
+#define GOODIX_FW_REQ_RETRY_MS  2000
+
 	const struct firmware *firmware = NULL;
 	int ret;
-	int retry = GOODIX_RETRY_3;
+	int retry = GOODIX_FW_REQ_RETRY;
 
 	ts_info("cfg_bin_name:%s", cfg_name);
 
@@ -113,8 +120,8 @@ static int goodix_read_cfg_bin(struct device *dev, const char *cfg_name,
 		ret = request_firmware(&firmware, cfg_name, dev);
 		if (!ret)
 			break;
-		ts_info("get cfg bin retry:[%d]", GOODIX_RETRY_3 - retry);
-		msleep(200);
+		ts_info("get cfg bin retry:[%d]", GOODIX_FW_REQ_RETRY - retry);
+		msleep(GOODIX_FW_REQ_RETRY_MS);
 	}
 	if (retry < 0) {
 		ts_err("failed get cfg bin[%s] error:%d", cfg_name, ret);
