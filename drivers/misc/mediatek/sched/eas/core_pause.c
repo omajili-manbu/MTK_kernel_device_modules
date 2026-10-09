@@ -83,6 +83,8 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
 	unsigned int num_pinned_kthreads = 0;
 	struct rq_flags orf = *rf;
 	int dest_cpu;
+	const struct sched_class *class;
+	struct rq_flags prf = { };
 
 	/*
 	 * Fudge the rq selection such that the below task selection loop
@@ -115,7 +117,17 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
 		if (rq->nr_running == 1)
 			break;
 
-		next = pick_migrate_task(rq);
+		/*
+		 * rodin 6.18: 6.6's pick_migrate_task() export is gone.  Peek the
+		 * next runnable task via the mandatory class->pick_task(); 6.18
+		 * made class->pick_next_task() optional (NULL on most classes).
+		 */
+		next = NULL;
+		for_each_active_class(class) {
+			next = class->pick_task(rq, &prf);
+			if (next && next != RETRY_TASK)
+				break;
+		}
 		/* prevent warn on rq_pin_lock() */
 		if (rq->balance_callback && rq->balance_callback != &balance_push_callback)
 			rq->balance_callback = NULL;

@@ -1378,7 +1378,8 @@ void vip_push_runnable(struct rq *src_rq)
 	update_rq_clock(dst_rq);
 	lockdep_assert_rq_held(dst_rq);
 	activate_task(dst_rq, task_to_pushed, ENQUEUE_NOCLOCK);
-	check_preempt_curr(dst_rq, task_to_pushed, 0);
+	/* rodin 6.18: the 6.6 check_preempt_curr() entry is the wakeup_preempt class op. */
+	dst_rq->curr->sched_class->wakeup_preempt(dst_rq, task_to_pushed, 0);
 
 	trace_sched_force_migrate(task_to_pushed, new_cpu, MIGR_SWITCH_PUSH_VIP);
 
