@@ -3025,7 +3025,7 @@ static int vidioc_vdec_dqbuf(struct file *file, void *priv,
 static int vidioc_vdec_querycap(struct file *file, void *priv,
 	struct v4l2_capability *cap)
 {
-	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
 	struct mtk_vcodec_dev *dev = ctx->dev;
 
 	strscpy(cap->driver, MTK_VCODEC_DEC_NAME, sizeof(cap->driver));
@@ -3497,7 +3497,7 @@ static int vidioc_enum_fmt(struct mtk_vcodec_ctx *ctx, struct v4l2_fmtdesc *f,
 static int vidioc_vdec_enum_fmt_vid_cap_mplane(struct file *file, void *priv,
 	struct v4l2_fmtdesc *f)
 {
-	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
 
 	return vidioc_enum_fmt(ctx, f, false);
 }
@@ -3505,7 +3505,7 @@ static int vidioc_vdec_enum_fmt_vid_cap_mplane(struct file *file, void *priv,
 static int vidioc_vdec_enum_fmt_vid_out_mplane(struct file *file, void *priv,
 	struct v4l2_fmtdesc *f)
 {
-	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
 
 	return vidioc_enum_fmt(ctx, f, true);
 }
