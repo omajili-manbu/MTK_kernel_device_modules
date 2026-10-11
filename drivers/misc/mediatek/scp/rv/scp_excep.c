@@ -799,7 +799,7 @@ void scp_aed(enum SCP_RESET_TYPE type, enum scp_core_id id)
 
 
 static ssize_t scp_A_dump_show(struct file *filep,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t offset, size_t size)
 {
 	unsigned int length = 0;

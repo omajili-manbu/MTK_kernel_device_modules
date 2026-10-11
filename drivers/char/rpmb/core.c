@@ -422,7 +422,7 @@ static ssize_t type_show(struct device *dev,
 static DEVICE_ATTR_RO(type);
 
 static ssize_t id_read(struct file *file, struct kobject *kobj,
-		       struct bin_attribute *attr, char *buf,
+		       const struct bin_attribute *attr, char *buf,
 		       loff_t off, size_t count)
 {
 	struct device *dev = kobj_to_dev(kobj);
@@ -451,7 +451,7 @@ static struct attribute *rpmb_attrs[] = {
 	NULL,
 };
 
-static struct bin_attribute *rpmb_bin_attributes[] = {
+static const struct bin_attribute *const rpmb_bin_attributes[] = {
 	&bin_attr_id,
 	NULL,
 };

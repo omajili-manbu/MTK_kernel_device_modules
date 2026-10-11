@@ -32,10 +32,10 @@
 #define CODEC_SYS_DEBUG_SIZE (1024 * 32)
 
 static ssize_t mt6368_codec_sysfs_read(struct file *filep, struct kobject *kobj,
-				       struct bin_attribute *attr,
+				       const struct bin_attribute *attr,
 				       char *buf, loff_t offset, size_t size);
 static ssize_t mt6368_codec_sysfs_write(struct file *filp, struct kobject *kobj,
-					struct bin_attribute *bin_attr,
+					const struct bin_attribute *bin_attr,
 					char *buf, loff_t off, size_t count);
 static void mt6368_final_dump(struct mt6368_priv *priv, bool is_DL);
 
@@ -5071,7 +5071,7 @@ static struct bin_attribute codec_dev_attr_reg = {
 	.write = mt6368_codec_sysfs_write,
 };
 
-static struct bin_attribute *mtk_codec_bin_attrs[] = {
+static const struct bin_attribute *const mtk_codec_bin_attrs[] = {
 	&codec_dev_attr_reg,
 	NULL,
 };
@@ -7171,7 +7171,7 @@ static ssize_t mt6368_debugfs_read(struct file *file, char __user *buf,
 }
 
 static ssize_t mt6368_codec_sysfs_write(struct file *filp, struct kobject *kobj,
-					struct bin_attribute *bin_attr,
+					const struct bin_attribute *bin_attr,
 					char *buf, loff_t off, size_t count)
 {
 	struct mt6368_priv *priv = (struct mt6368_priv *)bin_attr->private;
@@ -7232,7 +7232,7 @@ static u32 copy_from_buffer_request(void *dest, size_t destsize, const void *src
  * sysfs bin_attribute node
  */
 static ssize_t mt6368_codec_sysfs_read(struct file *filep, struct kobject *kobj,
-				       struct bin_attribute *attr,
+				       const struct bin_attribute *attr,
 				       char *buf, loff_t offset, size_t size)
 {
 	size_t read_size, ceil_size, page_mask;

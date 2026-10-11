@@ -38,6 +38,12 @@
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
 
+/* rodin: the upstream sip header does not carry the SSPM call; value mirrors
+ * the vendor mtk_sip_svc.h (kernel tree untouched). */
+#ifndef MTK_SIP_TINYSYS_SSPM_CONTROL
+#define MTK_SIP_TINYSYS_SSPM_CONTROL	MTK_SIP_SMC_CMD(0x53C)
+#endif
+
 enum mtk_tinysys_sspm_kernel_op {
 	MTK_TINYSYS_SSPM_KERNEL_OP_MBOX_CLEAR = 0,
 	MTK_TINYSYS_SSPM_KERNEL_OP_MD2SPM_IPC_CLEAR = 1,

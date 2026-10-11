@@ -146,7 +146,7 @@ emiisu_ctrl_store_end:
 static DRIVER_ATTR_RW(emiisu_ctrl);
 
 static ssize_t read_emi_isu_buf(struct file *filp, struct kobject *kobj,
-				struct bin_attribute *bin_attr,
+				const struct bin_attribute *bin_attr,
 				char *buff, loff_t pos, size_t count)
 {
 	struct emi_isu *isu;

@@ -240,13 +240,19 @@ typedef struct xiaomi_touch_data {
 	atomic_t common_data_buf_index;				/* 0x005c dev_poll[0x6a18 ldr w9,[x19,#0x5c]] */
 	common_data_t common_data_buf[COMMON_DATA_BUF_SIZE];	/* 0x0060 */
 	struct mutex common_data_buf_lock;			/* 0x28b0 */
+	/* rodin: pure-6.18 mutex is smaller than the blob-era kernel layout;
+	 * explicit pad keeps the pinned offsets below at their blob addresses. */
+	u8 rodin_pad_28d8[8];					/* 0x28d8 */
 	struct htc_ic_polldata* poll_data;			/* 0x28e0 元素-0x10 基址 umaddl 命中 20 处 */
 	struct workqueue_struct *event_wq;			/* 0x28e8 */
 #if defined(CONFIG_DRM)
 	bool is_suspend;					/* 0x28f0 */
 	struct work_struct suspend_work;			/* 0x28f8 */
+	u8 rodin_pad_2918[16];					/* 0x2918 */
 	struct work_struct resume_work;				/* 0x2928 */
+	u8 rodin_pad_2948[16];					/* 0x2948 */
 	struct delayed_work panel_notifier_register_work;	/* 0x2958 notifier_work[work-0x2958=元素基址] */
+	u8 rodin_pad_29c0[32];					/* 0x29c0 */
 	struct device *dev;					/* 0x29e0 rpnc[IDA 0x80E4/.disr 0x20E0 str x0,[x20,#0x29f0]]，x20=元素-0x10 */
 	struct notifier_block disp_nb;	/* blob：nb 内嵌（work+0x90 形态，notifier_work[0x2378 str x8,[x19,#0x90]!]）*/
 #endif

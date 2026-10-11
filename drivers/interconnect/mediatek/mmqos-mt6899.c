@@ -8,6 +8,16 @@
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <dt-bindings/interconnect/mtk,emi.h>
 #include <dt-bindings/memory/mt6899-larb-port.h>
+
+/* rodin: the upstream dt-bindings header shadows the vendor copy and lacks
+ * the multi-domain port-id encoding; values mirror the vendor
+ * mtk-memory-port.h (kernel tree untouched). */
+#ifndef MTK_M4U_PORT_ID
+#define TAB_ID				(0)
+#define MTK_M4U_PORT_ID(tab, dom, larb, port)	(((tab & 0x3) << 20) | ((dom & 0xf) << 16) |\
+						((larb & 0x3f) << 5) | (port & 0x1f))
+#define MTK_M4U_DOM_ID(dom, larb, port)	MTK_M4U_PORT_ID(TAB_ID, dom, larb, port)
+#endif
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include "mmqos-mtk.h"

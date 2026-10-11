@@ -1197,7 +1197,7 @@ static void mt6989_set_force_opp_level(struct mtk_dvfsrc *dvfsrc, u32 level)
 	}
 	dvfsrc->opp_forced = true;
 	if (dvfsrc->dvd->mem_res_req_en)
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REQ,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REQ,
 			0, 0, 0, 0, 0, 0, &ares);
 
 	dvfsrc_rmw(dvfsrc, DVFSRC_HALT_CONTROL, 1, 0x1, 1);
@@ -1214,7 +1214,7 @@ static void mt6989_set_force_opp_level(struct mtk_dvfsrc *dvfsrc, u32 level)
 			val, (val & 0x7f) == level, STARTUP_TIME, POLL_TIMEOUT);
 
 	if (dvfsrc->dvd->mem_res_req_en)
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REL,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REL,
 			0, 0, 0, 0, 0, 0, &ares);
 out:
 	spin_unlock_irqrestore(&dvfsrc->force_lock, flags);
@@ -1459,7 +1459,7 @@ void mtk_dvfsrc_send_request(const struct device *dev, u32 cmd, u64 data)
 	 * after recieving command
 	 */
 	if (dvfsrc->dvd->mem_res_req_en && (cmd == MTK_DVFSRC_CMD_VCORE_REQUEST))
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REQ,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REQ,
 		0, 0, 0, 0, 0, 0, &ares);
 
 	udelay(STARTUP_TIME);
@@ -1488,7 +1488,7 @@ void mtk_dvfsrc_send_request(const struct device *dev, u32 cmd, u64 data)
 	}
 
 	if (dvfsrc->dvd->mem_res_req_en && (cmd == MTK_DVFSRC_CMD_VCORE_REQUEST))
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REL,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_MEM_RS_REL,
 		0, 0, 0, 0, 0, 0, &ares);
 out:
 #ifdef DVFSRC_FORCE_OPP_SUPPORT
@@ -1658,7 +1658,7 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 		dvfsrc->disable_wait_level = of_property_read_bool(np, "disable-wait-level");
 
 	if (!is_bringup) {
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_DVFSRC_INIT,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_DVFSRC_INIT,
 			      dvfsrc_flag, dvfsrc_vmode, 0, 0, 0, 0, &ares);
 		if (!ares.a0) {
 			dvfsrc->dram_type = ares.a1;
@@ -1668,7 +1668,7 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 	} else
 		dev_info(dvfsrc->dev, "dvfs mode is bringup mode\n");
 #else
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_DVFSRC_INIT, 0, 0, 0,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_DVFSRC_INIT, 0, 0, 0,
 		0, 0, 0, &ares);
 
 	if (!ares.a0) {

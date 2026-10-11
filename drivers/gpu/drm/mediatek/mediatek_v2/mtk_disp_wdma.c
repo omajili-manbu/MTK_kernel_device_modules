@@ -29,6 +29,12 @@
 #include "mtk_disp_pmqos.h"
 #include "platform/mtk_drm_platform.h"
 
+/* rodin: the vendor smi dbg hooks are implemented in
+ * drivers/misc/mediatek/smi/mtk-smi-dbg.c; the shadowed upstream smi.h does
+ * not declare them (kernel tree untouched). */
+s32 mtk_smi_dbg_hang_detect(char *user);
+void mtk_smi_dbg_dump_for_disp(void);
+
 #define DO_DIV_ROUND_UP(n, d) DO_COMMON_DIV(((n) + (d) - 1), (d))
 #define DISP_REG_WDMA_INTEN 0x0000
 #define INTEN_FLD_FME_CPL_INTEN REG_FLD_MSB_LSB(0, 0)

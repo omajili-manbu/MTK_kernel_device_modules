@@ -38,6 +38,11 @@
 #include <linux/iommu.h>
 #include <mtk-smmu-v3.h>
 
+/* rodin: the vendor smi dbg hooks are implemented in
+ * drivers/misc/mediatek/smi/mtk-smi-dbg.c; the shadowed upstream smi.h does
+ * not declare them (kernel tree untouched). */
+s32 mtk_smi_dbg_hang_detect(char *user);
+
 /* ODDMR TOP */
 #define DISP_ODDMR_TOP_CTR_1 0x0004
 #define DISP_ODDMR_TOP_CTR_2 0x0008

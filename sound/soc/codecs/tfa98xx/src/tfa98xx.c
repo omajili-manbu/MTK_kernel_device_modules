@@ -2833,7 +2833,7 @@ static int tfa98xx_parse_dt(struct device *dev,
 }
 
 static ssize_t tfa98xx_reg_write(struct file *filp, struct kobject *kobj,
-	struct bin_attribute *bin_attr,
+	const struct bin_attribute *bin_attr,
 	char *buf, loff_t off, size_t count)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
@@ -2850,7 +2850,7 @@ static ssize_t tfa98xx_reg_write(struct file *filp, struct kobject *kobj,
 }
 
 static ssize_t tfa98xx_rw_write(struct file *filp, struct kobject *kobj,
-	struct bin_attribute *bin_attr,
+	const struct bin_attribute *bin_attr,
 	char *buf, loff_t off, size_t count)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
@@ -2884,7 +2884,7 @@ retry:
 }
 
 static ssize_t tfa98xx_rw_read(struct file *filp, struct kobject *kobj,
-	struct bin_attribute *bin_attr,
+	const struct bin_attribute *bin_attr,
 	char *buf, loff_t off, size_t count)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);

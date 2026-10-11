@@ -80,7 +80,7 @@ static void dvfsrc_setup_opp_table(struct mtk_dvfsrc *dvfsrc)
 	struct arm_smccc_res ares;
 
 	for (i = 0; i < dvfsrc->opp_desc->num_vcore_opp; i++) {
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL,
 			MTK_SIP_VCOREFS_GET_VCORE_UV,
 			i, 0, 0, 0, 0, 0,
 			&ares);
@@ -90,7 +90,7 @@ static void dvfsrc_setup_opp_table(struct mtk_dvfsrc *dvfsrc)
 	}
 
 	for (i = 0; i < dvfsrc->opp_desc->num_dram_opp; i++) {
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL,
 			MTK_SIP_VCOREFS_GET_DRAM_FREQ,
 			i, 0, 0, 0, 0, 0,
 			&ares);
@@ -258,7 +258,7 @@ static int mtk_dvfsrc_opp_setting(struct mtk_dvfsrc *dvfsrc)
 	if (dvfsrc->dvd->num_opp_desc == 0)
 		return mtk_dvfsrc_opp_setting_v4(dvfsrc);
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_GET_OPP_TYPE,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_GET_OPP_TYPE,
 		0, 0, 0, 0, 0, 0,
 		&ares);
 
@@ -269,7 +269,7 @@ static int mtk_dvfsrc_opp_setting(struct mtk_dvfsrc *dvfsrc)
 		return ares.a0;
 	}
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_GET_FW_TYPE,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_GET_FW_TYPE,
 		0, 0, 0, 0, 0, 0,
 		&ares);
 

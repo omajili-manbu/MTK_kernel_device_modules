@@ -81,6 +81,11 @@
 #include <linux/interconnect.h>
 #include "dvfsrc-exp.h"
 #endif
+/* rodin: upstream smi.h omits the vendor power hook and the smi driver is a
+ * blob in this build (CONFIG_MTK_SMI unset); mirror the vendor header's
+ * no-op fallback. */
+static inline void mtk_smi_init_power_off(void) { }
+
 #include "mtk_dsi.h"
 
 #include "mtk_drm_mmp.h"
@@ -234,7 +239,7 @@ void mtk_aod_scp_ipi_init(struct mtk_aod_scp_cb *cb)
 EXPORT_SYMBOL(mtk_aod_scp_ipi_init);
 
 static ssize_t read_disp_plat_dbg_buf(struct file *filp, struct kobject *kobj,
-	struct bin_attribute *bin_attr, char *buff, loff_t pos, size_t count)
+	const struct bin_attribute *bin_attr, char *buff, loff_t pos, size_t count)
 {
 	ssize_t bytes = 0, ret;
 
@@ -10376,7 +10381,6 @@ static struct drm_driver mtk_drm_driver = {
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
-	.date = DRIVER_DATE,
 	.major = DRIVER_MAJOR,
 	.minor = DRIVER_MINOR,
 };

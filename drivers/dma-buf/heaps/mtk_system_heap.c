@@ -1068,7 +1068,6 @@ static int mtk_mm_heap_dma_buf_end_cpu_access_partial(struct dma_buf *dmabuf,
 
 static const struct dma_buf_ops mtk_mm_heap_buf_ops = {
 	/* 1 attachment can only map 1 iova */
-	.cache_sgt_mapping = 1,
 	.attach = system_heap_attach,
 	.detach = system_heap_detach,
 	.map_dma_buf = mtk_mm_heap_map_dma_buf,
@@ -1087,7 +1086,6 @@ static const struct dma_buf_ops mtk_mm_heap_buf_ops = {
 
 static const struct dma_buf_ops system_heap_buf_ops = {
 	/* 1 attachment can only map 1 iova */
-	.cache_sgt_mapping = 1,
 	.attach = system_heap_attach,
 	.detach = system_heap_detach,
 	.map_dma_buf = system_heap_map_dma_buf,
@@ -1103,7 +1101,6 @@ static const struct dma_buf_ops system_heap_buf_ops = {
 
 static const struct dma_buf_ops mtk_slc_heap_buf_ops = {
 	/* 1 attachment can only map 1 iova */
-	.cache_sgt_mapping = 1,
 	.attach = system_heap_attach,
 	.detach = system_heap_detach,
 	.map_dma_buf = system_heap_map_dma_buf,

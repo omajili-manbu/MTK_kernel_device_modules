@@ -290,7 +290,7 @@ static inline ssize_t dvfsrc_qos_mode_store(struct device *dev,
 	if (kstrtouint(buf, 0, &mode) != 0)
 		return -EINVAL;
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_QOS_MODE,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_QOS_MODE,
 		mode, 0, 0, 0, 0, 0,
 		&ares);
 
@@ -319,7 +319,7 @@ static inline ssize_t dvfsrc_qosmm_mode_store(struct device *dev,
 	if (kstrtou32(buf, 16, &mode))
 		return -EINVAL;
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_QOS_MODE,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_QOS_MODE,
 		mode, 0, 0, 0, 0, 0,
 		&ares);
 

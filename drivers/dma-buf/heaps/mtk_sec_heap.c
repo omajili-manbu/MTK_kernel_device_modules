@@ -1164,7 +1164,6 @@ static int mtk_sec_heap_dma_buf_get_flags(struct dma_buf *dmabuf,
 
 static const struct dma_buf_ops sec_buf_region_ops = {
 	/* one attachment can only map once */
-	.cache_sgt_mapping = 1,
 	.attach = mtk_sec_heap_attach,
 	.detach = mtk_sec_heap_detach,
 	.map_dma_buf = mtk_sec_heap_region_map_dma_buf,
@@ -1175,7 +1174,6 @@ static const struct dma_buf_ops sec_buf_region_ops = {
 
 static const struct dma_buf_ops sec_buf_page_ops = {
 	/* one attachment can only map once */
-	.cache_sgt_mapping = 1,
 	.attach = mtk_sec_heap_attach,
 	.detach = mtk_sec_heap_detach,
 	.map_dma_buf = mtk_sec_heap_page_map_dma_buf,

@@ -874,7 +874,7 @@ static const struct proc_ops sw_loggerSeqLogL_ops = {
 
 /* must ensure uP no longer print log */
 static ssize_t apusys_log_dump(struct file *filep,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t offset, size_t size)
 {
 	unsigned int length = 0;

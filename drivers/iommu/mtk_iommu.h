@@ -19,7 +19,43 @@
 #include <linux/workqueue.h>
 #include <linux/dma-mapping.h>
 #include <soc/mediatek/smi.h>
+
+/* rodin: upstream smi.h gates struct mtk_smi_larb_iommu behind CONFIG_MTK_SMI;
+ * the smi driver stays a blob and the kernel tree is untouched, so keep the
+ * identical layout available locally. */
+#if !IS_ENABLED(CONFIG_MTK_SMI)
+#ifndef MTK_SMI_LARB_IOMMU_RODIN_FALLBACK
+#define MTK_SMI_LARB_IOMMU_RODIN_FALLBACK
+struct mtk_smi_larb_iommu {
+	struct device *dev;
+	unsigned int   mmu;
+	unsigned char  bank[32];
+};
+#endif
+
+/* rodin: the upstream dt-bindings header shadows the vendor copy and lacks
+ * the multi-domain extensions; values mirror the vendor mtk-memory-port.h. */
+#ifndef MTK_M4U_DOM_NR_MAX
+#define MTK_M4U_DOM_NR_MAX		16
+#endif
+#ifndef MTK_M4U_TAB_NR_MAX
+#define MTK_M4U_TAB_NR_MAX		3
+#endif
+#ifndef MTK_M4U_TO_DOM
+#define MTK_M4U_TO_DOM(id)		(((id) >> 16) & 0xf)
+#endif
+#ifndef MTK_M4U_TO_TAB
+#define MTK_M4U_TO_TAB(id)		(((id) >> 20) & 0x3)
+#endif
+#endif
+
 #include <dt-bindings/memory/mtk-memory-port.h>
+
+/* rodin: the upstream dt-bindings header caps MTK_LARB_NR_MAX at 32; the
+ * vendor encoding supports up to 64.  Kept after the include on purpose:
+ * re-ordered above it, the header's own define would trip -Wmacro-redefined. */
+#undef MTK_LARB_NR_MAX
+#define MTK_LARB_NR_MAX		64
 
 /* rodin stage2: fallback removed -- the vendor smi.h is ported into
  * include/soc/mediatek/smi.h and always provides struct mtk_smi_larb_iommu. */

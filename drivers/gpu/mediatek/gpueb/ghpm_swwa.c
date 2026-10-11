@@ -32,6 +32,12 @@
 #include <uapi/asm-generic/errno-base.h>
 
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+
+/* rodin: the upstream sip header does not carry the GPUEB call; value mirrors
+ * the vendor mtk_sip_svc.h (kernel tree untouched). */
+#ifndef MTK_SIP_KERNEL_GPUEB_CONTROL
+#define MTK_SIP_KERNEL_GPUEB_CONTROL	MTK_SIP_SMC_CMD(0x530)
+#endif
 #include <linux/soc/mediatek/mtk_tinysys_ipi.h>
 
 #include "gpueb_helper.h"

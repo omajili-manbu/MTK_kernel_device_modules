@@ -121,7 +121,7 @@ static int dvfsrc_init_freq_info(struct device *dev)
 	int index, err;
 	unsigned long rate;
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, DVFSRC_DDR_DVFS_GET_FREQ_COUNT,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, DVFSRC_DDR_DVFS_GET_FREQ_COUNT,
 			0, 0, 0, 0, 0, 0, &res);
 	if (res.a0)
 		return -ENODEV;
@@ -131,7 +131,7 @@ static int dvfsrc_init_freq_info(struct device *dev)
 		return -EINVAL;
 
 	for (index = 0; index < dvfsrc->freq_count; ++index) {
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL,
 				DVFSRC_DDR_DVFS_GET_FREQ_INFO,
 				index, 0, 0, 0, 0, 0, &res);
 		if ((res.a0) || (long)res.a1 <= 0)

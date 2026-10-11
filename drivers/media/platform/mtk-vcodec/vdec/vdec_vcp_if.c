@@ -27,6 +27,12 @@
 // TODO: need remove ISR ipis
 #include "mtk_vcodec_intr.h"
 #include "mtk_vcodec_dec_pm.h"
+
+/* rodin: the vendor smi dbg hooks are implemented in
+ * drivers/misc/mediatek/smi/mtk-smi-dbg.c; the shadowed upstream smi.h does
+ * not declare them (kernel tree untouched). */
+s32 mtk_smi_dbg_hang_detect(char *user);
+void mtk_smi_dbg_dump_for_vdec(void);
 #include "../../../misc/mediatek/mmdvfs/mtk-mmdvfs-debug.h"
 
 #if IS_ENABLED(CONFIG_MTK_ENG_BUILD)

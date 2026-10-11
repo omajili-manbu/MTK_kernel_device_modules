@@ -15,6 +15,11 @@
 #include <linux/vmalloc.h> /* rodin: 6.18 header thinning */
 #include <linux/clk.h>
 #include <linux/clocksource.h>
+
+/* rodin: the vendor smi dbg hooks are implemented in
+ * drivers/misc/mediatek/smi/mtk-smi-dbg.c; the shadowed upstream smi.h does
+ * not declare them (kernel tree untouched). */
+s32 mtk_smi_dbg_hang_detect(char *user);
 #include <linux/sched.h>
 #include <linux/sched/clock.h>
 #include <linux/component.h>

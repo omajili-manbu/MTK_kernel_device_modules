@@ -54,7 +54,7 @@ static ssize_t sspm_aee_show(struct device *kobj, struct device_attribute *attr,
 DEVICE_ATTR_RO(sspm_aee);
 
 static ssize_t sspm_coredump_read(struct file *filep, struct kobject *kobj,
-	struct bin_attribute *attr, char *buf, loff_t offset, size_t size)
+	const struct bin_attribute *attr, char *buf, loff_t offset, size_t size)
 {
 	if (!sspm_cd_exists)
 		return 0;

@@ -1358,7 +1358,7 @@ static ssize_t gt9896s_sysfs_fwsize_store(struct gt9896s_ext_module *module,
 }
 
 static ssize_t gt9896s_sysfs_fwimage_store(struct file *file,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t pos, size_t count)
 {
 	struct fw_update_ctrl *fw_ctrl;

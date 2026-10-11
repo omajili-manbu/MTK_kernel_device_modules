@@ -1051,7 +1051,7 @@ static ssize_t goodix_sysfs_update_en_store(
 }
 
 static ssize_t goodix_sysfs_fwimage_store(struct file *file,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t pos, size_t count)
 {
 	struct firmware **fw = &goodix_fw_update_ctrl.fw_data.fw_sysfs;

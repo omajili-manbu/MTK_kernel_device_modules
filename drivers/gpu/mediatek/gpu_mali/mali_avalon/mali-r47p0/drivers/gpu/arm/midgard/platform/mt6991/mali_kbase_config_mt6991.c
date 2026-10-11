@@ -13,6 +13,12 @@
 #include <linux/pm_runtime.h>
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+
+/* rodin: the upstream sip header does not carry the GPUEB call; value mirrors
+ * the vendor mtk_sip_svc.h (kernel tree untouched). */
+#ifndef MTK_SIP_KERNEL_GPUEB_CONTROL
+#define MTK_SIP_KERNEL_GPUEB_CONTROL	MTK_SIP_SMC_CMD(0x530)
+#endif
 #include <device/mali_kbase_device.h>
 #include <mali_kbase.h>
 #include <mali_kbase_defs.h>

@@ -200,7 +200,7 @@ static int __mt6985_mtkips_enable(struct ips_drv_data *ips_data, bool en)
 		return 0;
 	}
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_ENABLE,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_ENABLE,
 	ips_data->dvd->id, en, 0, 0, 0, 0,
 	&ares);
 	if (!ares.a0)
@@ -240,7 +240,7 @@ int __mt6985_mtkips_getvmin(struct ips_drv_data *ips_data)
 	if (ips_data->dvd->id == 0)
 		return ips_read(ips_data, IPS_06);
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN,
 	ips_data->dvd->id, 0, 0, 0, 0, 0,
 	&ares);
 	if (!ares.a0)
@@ -275,7 +275,7 @@ static int __mt6985_mtkips_getvmin_clear(struct ips_drv_data *ips_data)
 		return val;
 	}
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN_CLEAR,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN_CLEAR,
 	ips_data->dvd->id, 0, 0, 0, 0, 0,
 	&ares);
 	if (!ares.a0)
@@ -315,7 +315,7 @@ static int __mt6991_mtkips_enable(struct ips_drv_data *ips_data, bool en)
 		return 0;
 	}
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_ENABLE,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_ENABLE,
 	ips_data->dvd->id, en, 0, 0, 0, 0,
 	&ares);
 	if (!ares.a0)
@@ -355,7 +355,7 @@ int __mt6991_mtkips_getvmin(struct ips_drv_data *ips_data)
 	if (ips_data->dvd->id == 0)
 		return ips_read(ips_data, IPS_06);
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN,
 	ips_data->dvd->id, 0, 0, 0, 0, 0,
 	&ares);
 	if (!ares.a0)
@@ -390,7 +390,7 @@ static int __mt6991_mtkips_getvmin_clear(struct ips_drv_data *ips_data)
 		return val;
 	}
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN_CLEAR,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_GET_VMIN_CLEAR,
 	ips_data->dvd->id, 0, 0, 0, 0, 0,
 	&ares);
 	if (!ares.a0)

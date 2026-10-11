@@ -28,6 +28,11 @@
 #include "mtk_drm_fb.h"
 #include "mtk_dp.h"
 
+/* rodin: the vendor smi dbg hooks are implemented in
+ * drivers/misc/mediatek/smi/mtk-smi-dbg.c; the shadowed upstream smi.h does
+ * not declare them (kernel tree untouched). */
+s32 mtk_smi_dbg_hang_detect(char *user);
+
 #define DP_EN							0x0000
 	#define DP_CONTROLLER_EN				BIT(0)
 	#define CON_FLD_DP_EN					BIT(0)

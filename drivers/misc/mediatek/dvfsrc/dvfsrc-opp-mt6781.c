@@ -25,7 +25,7 @@ static int __init dvfsrc_opp_init(void)
 	struct arm_smccc_res ares;
 
 	for (i = 0; i < NUM_DRAM_OPP; i++) {
-		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL,
+		arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL,
 			MTK_SIP_VCOREFS_SET_FREQ,
 			i, mtk_dramc_get_steps_freq(ddr_level_to_step(i)), 0, 0, 0, 0,
 			&ares);

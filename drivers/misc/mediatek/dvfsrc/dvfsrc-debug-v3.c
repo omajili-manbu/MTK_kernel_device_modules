@@ -862,7 +862,7 @@ static int dvfsrc_dvfs_get_vcore_info_data(u32 idx)
 {
 	struct arm_smccc_res ares;
 
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_VCOREFS_GET_VCORE_INFO,
+	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_GET_VCORE_INFO,
 		idx, 0, 0, 0, 0, 0,
 		&ares);
 

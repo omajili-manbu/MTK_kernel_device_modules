@@ -96,7 +96,7 @@ static void fill_ko_list(unsigned int idx, struct module *mod)
 	unsigned long init_addr = 0;
 	const void *build_id = NULL;
 	struct elf_note *note;
-	struct bin_attribute **battr;
+	const struct bin_attribute *const *battr;
 	int build_id_sz = 0;
 
 	if (idx >= MAX_KO_NUM)

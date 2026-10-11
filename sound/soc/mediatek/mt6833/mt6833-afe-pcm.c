@@ -3090,7 +3090,7 @@ static u32 copy_from_buffer_request(void *dest, size_t destsize, const void *src
  */
 
 static ssize_t afe_sysfs_debug_read(struct file *filep, struct kobject *kobj,
-				    struct bin_attribute *attr,
+				    const struct bin_attribute *attr,
 				    char *buf, loff_t offset, size_t size)
 {
 	size_t read_size, ceil_size, page_mask;
@@ -3117,7 +3117,7 @@ static ssize_t afe_sysfs_debug_read(struct file *filep, struct kobject *kobj,
  * sysfs bin_attribute node
  */
 static ssize_t afe_sysfs_debug_write(struct file *filep, struct kobject *kobj,
-				     struct bin_attribute *attr,
+				     const struct bin_attribute *attr,
 				     char *buf, loff_t offset, size_t size)
 {
 	struct mtk_base_afe *afe = (struct mtk_base_afe *)attr->private;
@@ -3166,7 +3166,7 @@ struct bin_attribute bin_attr_afe_dump = {
 	.write = afe_sysfs_debug_write,
 };
 
-static struct bin_attribute *afe_bin_attrs[] = {
+static const struct bin_attribute *const afe_bin_attrs[] = {
 	&bin_attr_afe_dump,
 	NULL,
 };

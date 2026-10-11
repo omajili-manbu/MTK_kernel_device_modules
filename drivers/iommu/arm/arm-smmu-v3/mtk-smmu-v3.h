@@ -18,6 +18,25 @@
 #include <dt-bindings/memory/mtk-memory-port.h>
 #include "arm-smmu-v3.h"
 
+/* rodin: upstream smi.h gates struct mtk_smi_larb_iommu behind CONFIG_MTK_SMI;
+ * the smi driver stays a blob and the kernel tree is untouched, so keep the
+ * identical layout available locally. */
+#if !IS_ENABLED(CONFIG_MTK_SMI)
+#ifndef MTK_SMI_LARB_IOMMU_RODIN_FALLBACK
+#define MTK_SMI_LARB_IOMMU_RODIN_FALLBACK
+struct mtk_smi_larb_iommu {
+	struct device *dev;
+	unsigned int   mmu;
+	unsigned char  bank[32];
+};
+#endif
+#endif
+
+/* rodin: the upstream dt-bindings header caps MTK_LARB_NR_MAX at 32; the
+ * vendor encoding supports up to 64. */
+#undef MTK_LARB_NR_MAX
+#define MTK_LARB_NR_MAX		64
+
 /* rodin r25: 6.18 gates this struct behind CONFIG_MTK_SMI; the smi driver is
  * a blob in this batch, so keep the identical upstream layout available.
  * RODIN_..._FALLBACK is shared with mtk_iommu.h (same-TU collision). */

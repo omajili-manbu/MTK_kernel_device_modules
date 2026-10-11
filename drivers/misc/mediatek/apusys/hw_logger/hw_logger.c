@@ -1696,7 +1696,7 @@ static const struct proc_ops aov_tcm_log_ops = {
 
 #ifdef HW_LOG_SYSFS_BIN
 static ssize_t apusys_log_dump(struct file *filep,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t offset, size_t size)
 {
 	unsigned int length = 0;

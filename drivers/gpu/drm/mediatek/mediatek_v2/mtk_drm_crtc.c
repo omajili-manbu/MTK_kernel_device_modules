@@ -101,6 +101,12 @@ module_param(debug_trigger_loop, int, 0644);
  #ifdef CONFIG_MI_DISP_FOD_SYNC
  #include "mi_disp/mi_drm_crtc.h"
  #endif
+/* rodin: the vendor smi dbg hooks are implemented in
+ * drivers/misc/mediatek/smi/mtk-smi-dbg.c; the shadowed upstream smi.h does
+ * not declare them (kernel tree untouched). */
+s32 mtk_smi_dbg_hang_detect(char *user);
+void mtk_smi_dbg_dump_for_disp(void);
+
 static struct mtk_drm_property mtk_crtc_property[CRTC_PROP_MAX] = {
 	{DRM_MODE_PROP_ATOMIC, "OVERLAP_LAYER_NUM", 0, ULONG_MAX, 0},
 	{DRM_MODE_PROP_ATOMIC, "LAYERING_IDX", 0, ULONG_MAX, 0},

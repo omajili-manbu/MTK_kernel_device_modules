@@ -918,7 +918,7 @@ static const struct attribute_group sysfs_group = {
 };
 
 static ssize_t gt9896s_sysfs_config_write(struct file *file,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t pos, size_t count)
 {
 	struct platform_device *pdev = container_of(kobj_to_dev(kobj),
@@ -956,7 +956,7 @@ static ssize_t gt9896s_sysfs_config_write(struct file *file,
 }
 
 static ssize_t gt9896s_sysfs_config_read(struct file *file,
-		struct kobject *kobj, struct bin_attribute *attr,
+		struct kobject *kobj, const struct bin_attribute *attr,
 		char *buf, loff_t pos, size_t size)
 {
 	struct platform_device *pdev = container_of(kobj_to_dev(kobj),

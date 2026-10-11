@@ -521,15 +521,22 @@ struct fts_ts_data {
         struct ts_ic_info ic_info;
         struct workqueue_struct *ts_workqueue;
         struct work_struct fwupg_work;
+	/* rodin: pure-6.18 work_struct is smaller than the blob-era kernel layout;
+	 * explicit pad keeps the pinned offsets below at their blob addresses. */
+        u8 rodin_pad_fwupg[16];
         struct delayed_work esdcheck_work;
+        u8 rodin_pad_esd[32];
         struct delayed_work prc_work;
+        u8 rodin_pad_prc[32];
 	int charger_status;
         wait_queue_head_t ts_waitqueue;
         struct ftxxxx_proc proc;
         struct ftxxxx_proc proc_ta;
         spinlock_t irq_lock;
         struct mutex report_mutex;
+        u8 rodin_pad_rmutex[8];
         struct mutex bus_lock;
+        u8 rodin_pad_bmutex[8];
         /* _b582-INPUT：blob fts_irq_handler 用 cpu_latency_qos_add/remove_request
          * （blob 0x5e2c/0x6a98 直调），句柄槽 blob [ts+0x270] 恒 48B =
          * sizeof(struct pm_qos_request)（struct dev_pm_qos_request 为 56B）⇒ 按 blob
@@ -641,7 +648,8 @@ struct fts_ts_data {
 	 * blob 全 ko 无立即数访问点（状态面疑为框架 fts_touch_mode 镜像）。布局按
 	 * 6.18 自然对齐（mutex=0x30）恰好填满该窗：pad7→mutex@0xB90..0xBBF →
 	 * nonui@0xBC0/doubletap@0xBC4/aod@0xBC8 → pad4 → reserved_bd0@0xBD0..0xBD7。 */
-	struct mutex cmd_update_mutex;			/* 0xB90（6.18 sizeof=0x30） */
+	struct mutex cmd_update_mutex;			/* 0xB90（rebase 纯 6.18 sizeof=0x28） */
+	u8 rodin_pad_bb8[8];				/* 0xBB8（mutex 缩水垫；port 排窗按 0x30） */
 	int nonui_status;				/* 0xBC0（fod 报点用；blob 对应函数取框架值入局部） */
 	int doubletap_status;				/* 0xBC4（suspend 路径用） */
 	int aod_status;					/* 0xBC8（suspend 路径用） */
@@ -673,6 +681,7 @@ struct fts_ts_data {
 	 * （其内核 delayed_work=0x48）；本树 6.18 delayed_work=0x88 ⇒ 槽体
 	 * 0xC90..0xD17 恰好衔接 blob 的 dump_type@0xD18 锚点，无占位。 */
 	struct delayed_work thp_signal_work;		/* blob 0xC90（probe 0x106E0 INIT_DELAYED_WORK：data@0xC90/entry@0xC98/func@0xCA8=fts_thp_signal_work） */
+	u8 rodin_pad_cd8[32];				/* 0xCD8（rebase 纯 6.18 delayed_work=0x68，较 blob 锚窗缩 0x20；0xC90+0x88==0xD18 衔接由本垫维持） */
 	int dump_type;					/* blob 0xD18（irq_handler 0xF5EC 存入 tp_frame->dump_type、set_cur_value 0xDAA4 读） */
 };
 
@@ -750,8 +759,8 @@ _Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_bmode) == 0x2e5,
  * tools/_b583_ftsface/{ida_dump.py,blbscan_2e8_af0.txt} + evidence_b583b.txt；
  * 等式右端 = blob 机器码立即数偏移，左端 = 本结构编译期 offsetof） ===== */
 _Static_assert(sizeof(struct pen_event) == 48, "_b583b-B8 sizeof(pen_event)==48 (blob events@0x318 边界反推)");
-_Static_assert(sizeof(struct mutex) == 0x30, "_b583b-B8 sizeof(mutex)==0x30 (6.18 mutex_types.h)");
-_Static_assert(sizeof(struct delayed_work) == 0x88, "_b583b-B8 sizeof(delayed_work)==0x88 (0xC90+0x88==0xD18 锚点衔接)");
+_Static_assert(sizeof(struct mutex) == 0x28, "_b583b-B8 sizeof(mutex)==0x28 (rebase 纯 6.18 实际值；blob 世界的 0x30 差额由 rodin_pad_* 垫片吸收，内核树零改动)");
+_Static_assert(sizeof(struct delayed_work) == 0x68, "_b583b-B8 sizeof(delayed_work)==0x68 (rebase 纯 6.18 实际值；0xC90+0x88==0xD18 锚点衔接改由 rodin_pad_cd8 垫片维持)");
 /* 0x2E6..0x668 段（改动前后与 blob 同构，DWARF/IDA 双证） */
 _Static_assert(__builtin_offsetof(struct fts_ts_data, old_point_id) == 0x2e6, "_b583b-B8 old_point_id@0x2e6");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, pen_etype) == 0x2e7, "_b583b-B8 pen_etype@0x2e7 (blob fts_pen_show/store ldrb/strb)");

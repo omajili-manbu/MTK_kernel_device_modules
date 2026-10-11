@@ -956,29 +956,19 @@ static void dma_heap_attach_dump(const struct dma_buf *dmabuf,
 {
 	struct dma_buf_attachment *attach_obj;
 	int attach_cnt = 0;
-	dma_addr_t iova = 0x0;
 	const char *device_name = NULL;
 
 	list_for_each_entry(attach_obj, &dmabuf->attachments, node) {
-		iova = (dma_addr_t)0;
-
 		attach_cnt++;
-		if (!attach_obj->sgt)
-			if (!dump_all_attach)
-				continue;
-		if (!dev_iommu_fwspec_get(attach_obj->dev)) {
-			if (!dump_all_attach)
-				continue;
-		} else if (attach_obj->sgt) {
-			iova = sg_dma_address(attach_obj->sgt->sgl);
-		}
+
+		if (!dev_iommu_fwspec_get(attach_obj->dev) && !dump_all_attach)
+			continue;
 
 		device_name = dev_name(attach_obj->dev);
 		dmabuf_dump(s,
-			    "\tattach[%d]: iova:0x%-14lx attr:%-4lx dir:%-2d dev:%s\n",
-			    attach_cnt, (unsigned long)iova,
+			    "\tattach[%d]: attr:%-4lx dev:%s\n",
+			    attach_cnt,
 			    attach_obj->dma_map_attrs,
-			    attach_obj->dir,
 			    device_name);
 	}
 	//dmabuf_dump(s, "\tTotal %d devices attached\n", attach_cnt);
@@ -1010,11 +1000,10 @@ static int dma_heap_buf_dump_cb(const struct dma_buf *dmabuf, void *priv)
 		return 0;
 
 	spin_lock((spinlock_t *)&dmabuf->name_lock);
-	dmabuf_dump(s, "inode:%-8lu size(Byte):%-10zu count:%-2ld cache_sg:%d  exp:%s\tname:%s\n",
+	dmabuf_dump(s, "inode:%-8lu size(Byte):%-10zu count:%-2ld  exp:%s\tname:%s\n",
 		    file_inode(dmabuf->file)->i_ino,
 		    dmabuf->size,
 		    file_count(dmabuf->file) - delta,
-		    dmabuf->ops->cache_sgt_mapping,
 		    dmabuf->exp_name?:"NULL",
 		    dmabuf->name?:"NULL");
 	spin_unlock((spinlock_t *)&dmabuf->name_lock);
@@ -1045,6 +1034,26 @@ static int dma_heap_total_cb(const struct dma_buf *dmabuf,
 		dump_info->ret += dmabuf->size;
 
 	return 0;
+}
+
+/* rodin: 6.18 upstream dropped the MTK dma_buf_get_each helper; rebuild it
+ * locally on top of the exported dma_buf_iter_begin/next pair (DMA_BUF
+ * namespace). iter_next() releases the previous buffer's reference, so only
+ * a callback-termination path needs an explicit dma_buf_put(). */
+static int dma_buf_get_each(int (*callback)(const struct dma_buf *dmabuf,
+			   void *private), void *private)
+{
+	struct dma_buf *buf;
+	int ret = 0;
+
+	for (buf = dma_buf_iter_begin(); buf; buf = dma_buf_iter_next(buf)) {
+		ret = callback(buf, private);
+		if (ret) {
+			dma_buf_put(buf);
+			break;
+		}
+	}
+	return ret;
 }
 
 /* support NULL heap, means dump all */
