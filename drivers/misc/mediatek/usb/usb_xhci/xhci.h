@@ -1807,22 +1807,17 @@ struct xhci_hcd {
 
 	spinlock_t	lock;
 
-	/* packed release number */
-	u8		sbrn;
+	/* packed release number; 6.18 layout: sbrn/max_slots/max_ports/
+	 * isoc_threshold/event_ring_max/page_shift relocated into the tail
+	 * ANDROID_KABI slots, msix_count renamed to nvecs (6.18 naming) */
 	u16		hci_version;
-	u8		max_slots;
 	u16		max_interrupters;
-	u8		max_ports;
-	u8		isoc_threshold;
 	/* imod_interval in ns (I * 250ns) */
 	u32		imod_interval;
-	int		event_ring_max;
 	/* 4KB min, 128MB max */
 	int		page_size;
-	/* Valid values are 12 to 20, inclusive */
-	int		page_shift;
-	/* msi-x vectors */
-	int		msix_count;
+	/* MSI-X/MSI vectors */
+	int		nvecs;
 	/* optional clocks */
 	struct clk		*clk;
 	struct clk		*reg_clk;
@@ -1857,6 +1852,7 @@ struct xhci_hcd {
 	struct dma_pool	*device_pool;
 	struct dma_pool	*segment_pool;
 	struct dma_pool	*small_streams_pool;
+	struct dma_pool	*port_bw_pool;
 	struct dma_pool	*medium_streams_pool;
 
 	/* Host controller watchdog timer structures */
@@ -1950,9 +1946,6 @@ struct xhci_hcd {
 	unsigned		broken_suspend:1;
 	/* Indicates that omitting hcd is supported if root hub has no ports */
 	unsigned		allow_single_roothub:1;
-	/* cached usb2 extened protocol capabilites */
-	u32                     *ext_caps;
-	unsigned int            num_ext_caps;
 	/* cached extended protocol port capabilities */
 	struct xhci_port_cap	*port_caps;
 	unsigned int		num_port_caps;
@@ -1971,14 +1964,26 @@ struct xhci_hcd {
 
 	/* Used for bug 194461020 */
 	ANDROID_KABI_USE(1, struct xhci_vendor_ops *vendor_ops);
-
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
+	/* 6.6-era members kept for the MTK fork; 6.18 removed them from
+	 * struct xhci_hcd. Anonymous structs keep the original
+	 * xhci->field access form working at every reference site. */
+	ANDROID_KABI_USE(2, struct { u32 *ext_caps; });
+	ANDROID_KABI_USE(3, struct { int page_shift; unsigned int num_ext_caps; });
+	ANDROID_KABI_USE(4, struct { u8 sbrn; u8 max_ports; });
 
 	/* platform-specific data -- must come last */
 	unsigned long		priv[] __aligned(sizeof(s64));
 };
+
+/*
+ * Layout guardrail: the MTK fork must stay byte-identical with the
+ * kernel-tree (6.18) struct xhci_hcd across the whole shared prefix,
+ * so a #118-class cross-unit layout drift becomes a compile error.
+ */
+_Static_assert(__builtin_offsetof(struct xhci_hcd, dbc) == 2824,
+	       "xhci_hcd.dbc offset drifted from the 6.18 kernel layout (2824)");
+_Static_assert(sizeof(struct xhci_hcd) == 2864,
+	       "xhci_hcd size drifted from the 6.18 kernel layout (2864)");
 
 /* Platform specific overrides to generic XHCI hc_driver ops */
 struct xhci_driver_overrides {
@@ -2133,9 +2138,6 @@ int xhci_ring_expansion_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		unsigned int num_trbs, gfp_t flags);
 void xhci_initialize_ring_info_(struct xhci_ring *ring,
 			unsigned int cycle_state);
-/* Kernel-tree variant (1 arg): the vendor-built DbC glue (xhci-dbgcap.c)
- * calls it on rings it owns itself. */
-void xhci_initialize_ring_info(struct xhci_ring *ring);
 void xhci_free_endpoint_ring_mtk(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		unsigned int ep_index);
