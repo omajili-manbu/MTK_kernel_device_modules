@@ -178,7 +178,7 @@ void inc_deq_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring)
 		ring->deq_seg = ring->deq_seg->next;
 		ring->dequeue = ring->deq_seg->trbs;
 
-		trace_xhci_inc_deq_(ring);
+		trace_xhci_inc_deq(ring);
 
 		return;
 	}
@@ -195,7 +195,7 @@ void inc_deq_mtk(struct xhci_hcd *xhci, struct xhci_ring *ring)
 		ring->deq_seg = ring->deq_seg->next;
 		ring->dequeue = ring->deq_seg->trbs;
 
-		trace_xhci_inc_deq_(ring);
+		trace_xhci_inc_deq(ring);
 
 		if (link_trb_count++ > ring->num_segs) {
 			xhci_warn(xhci, "Ring is an endless link TRB loop\n");
@@ -240,7 +240,7 @@ static void inc_enq_past_link(struct xhci_hcd *xhci, struct xhci_ring *ring, u32
 		ring->enq_seg = ring->enq_seg->next;
 		ring->enqueue = ring->enq_seg->trbs;
 
-		trace_xhci_inc_enq_(ring);
+		trace_xhci_inc_enq(ring);
 
 		if (link_trb_count++ > ring->num_segs) {
 			xhci_warn(xhci, "Link TRB loop at enqueue\n");
@@ -427,7 +427,7 @@ void xhci_ring_cmd_db_(struct xhci_hcd *xhci)
 
 	xhci_dbg(xhci, "// Ding dong!\n");
 
-	trace_xhci_ring_host_doorbell_(0, DB_VALUE_HOST);
+	trace_xhci_ring_host_doorbell(0, DB_VALUE_HOST);
 
 	writel(DB_VALUE_HOST, &xhci->dba->doorbell[0]);
 	/* Flush PCI posted writes */
@@ -568,7 +568,7 @@ void xhci_ring_ep_doorbell_mtk(struct xhci_hcd *xhci,
 	    (ep_state & EP_HALTED) || (ep_state & EP_CLEARING_TT))
 		return;
 
-	trace_xhci_ring_ep_doorbell_(slot_id, DB_VALUE(ep_index, stream_id));
+	trace_xhci_ring_ep_doorbell(slot_id, DB_VALUE(ep_index, stream_id));
 
 	writel(DB_VALUE(ep_index, stream_id), db_addr);
 	/* flush the write */
@@ -784,7 +784,7 @@ static int xhci_move_dequeue_past_td(struct xhci_hcd *xhci,
 	ep->queued_deq_seg = new_seg;
 	ep->queued_deq_ptr = new_deq;
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 		       "Set TR Deq ptr 0x%llx, cycle %u\n", addr, new_cycle);
 
 	/* Stop the TD queueing code from ringing the doorbell until
@@ -841,7 +841,7 @@ static void xhci_giveback_urb_in_irq(struct xhci_hcd *xhci,
 	}
 	xhci_urb_free_priv_mtk(urb_priv);
 	usb_hcd_unlink_urb_from_ep(hcd, urb);
-	trace_xhci_urb_giveback_(urb);
+	trace_xhci_urb_giveback(urb);
 	usb_hcd_giveback_urb(hcd, urb, status);
 }
 
@@ -1055,7 +1055,7 @@ static int xhci_invalidate_cancelled_tds(struct xhci_virt_ep *ep)
 	xhci = ep->xhci;
 
 	list_for_each_entry_safe(td, tmp_td, &ep->cancelled_td_list, cancelled_td_list) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 			       "Removing canceled TD starting at 0x%llx (dma) in stream %u URB %p",
 			       (unsigned long long)xhci_trb_virt_to_dma_(
 				       td->start_seg, td->start_trb),
@@ -1208,7 +1208,7 @@ static void xhci_handle_cmd_stop_ep(struct xhci_hcd *xhci, int slot_id,
 
 	ep_ctx = xhci_get_ep_ctx__(xhci, ep->vdev->out_ctx, ep_index);
 
-	trace_xhci_handle_cmd_stop_ep_(ep_ctx);
+	trace_xhci_handle_cmd_stop_ep(ep_ctx);
 
 	if (comp_code == COMP_CONTEXT_STATE_ERROR) {
 	/*
@@ -1347,7 +1347,7 @@ void xhci_kill_endpoint_urbs(struct xhci_hcd *xhci,
 			if (!ring)
 				continue;
 
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 					"Killing URBs for slot ID %u, ep index %u, stream %u",
 					slot_id, ep_index, stream_id);
 			xhci_kill_ring_urbs(xhci, ring);
@@ -1356,7 +1356,7 @@ void xhci_kill_endpoint_urbs(struct xhci_hcd *xhci,
 		ring = ep->ring;
 		if (!ring)
 			return;
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 				"Killing URBs for slot ID %u, ep index %u",
 				slot_id, ep_index);
 		xhci_kill_ring_urbs(xhci, ring);
@@ -1444,12 +1444,12 @@ static void xhci_handle_cmd_set_deq(struct xhci_hcd *xhci, int slot_id,
 
 	ep_ctx = xhci_get_ep_ctx__(xhci, ep->vdev->out_ctx, ep_index);
 	slot_ctx = xhci_get_slot_ctx_(xhci, ep->vdev->out_ctx);
-	trace_xhci_handle_cmd_set_deq_(slot_ctx);
-	trace_xhci_handle_cmd_set_deq_ep_(ep_ctx);
+	trace_xhci_handle_cmd_set_deq(slot_ctx);
+	trace_xhci_handle_cmd_set_deq_ep(ep_ctx);
 
 	if (ep->ep_state & EP_HAS_STREAMS) {
 		stream_ctx = &ep->stream_info->stream_ctx_array[stream_id];
-		trace_xhci_handle_cmd_set_deq_stream_(ep->stream_info, stream_id);
+		trace_xhci_handle_cmd_set_deq_stream(ep->stream_info, stream_id);
 	}
 
 	if (cmd_comp_code != COMP_SUCCESS) {
@@ -1465,7 +1465,7 @@ static void xhci_handle_cmd_set_deq(struct xhci_hcd *xhci, int slot_id,
 			ep_state = GET_EP_CTX_STATE(ep_ctx);
 			slot_state = le32_to_cpu(slot_ctx->dev_state);
 			slot_state = GET_SLOT_STATE(slot_state);
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 					"Slot state = %u, EP state = %u",
 					slot_state, ep_state);
 			break;
@@ -1506,7 +1506,7 @@ static void xhci_handle_cmd_set_deq(struct xhci_hcd *xhci, int slot_id,
 		} else {
 			deq = le64_to_cpu(ep_ctx->deq) & TR_DEQ_PTR_MASK;
 		}
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 			"Successful Set TR Deq Ptr cmd, deq = @%08llx", deq);
 		if (xhci_trb_virt_to_dma_(ep->queued_deq_seg,
 					 ep->queued_deq_ptr) == deq) {
@@ -1569,12 +1569,12 @@ static void xhci_handle_cmd_reset_ep(struct xhci_hcd *xhci, int slot_id,
 		return;
 
 	ep_ctx = xhci_get_ep_ctx__(xhci, ep->vdev->out_ctx, ep_index);
-	trace_xhci_handle_cmd_reset_ep_(ep_ctx);
+	trace_xhci_handle_cmd_reset_ep(ep_ctx);
 
 	/* This command will only fail if the endpoint wasn't halted,
 	 * but we don't care.
 	 */
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_reset_ep_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_reset_ep,
 		"Ignoring reset ep completion code of %u", cmd_comp_code);
 
 	/* Cleanup cancelled TDs as ep is stopped. May queue a Set TR Deq cmd */
@@ -1610,7 +1610,7 @@ static void xhci_handle_cmd_disable_slot(struct xhci_hcd *xhci, int slot_id,
 		return;
 
 	slot_ctx = xhci_get_slot_ctx_(xhci, virt_dev->out_ctx);
-	trace_xhci_handle_cmd_disable_slot_(slot_ctx);
+	trace_xhci_handle_cmd_disable_slot(slot_ctx);
 
 	if (xhci->quirks & XHCI_EP_LIMIT_QUIRK)
 		/* Delete default control endpoint resources */
@@ -1649,7 +1649,7 @@ static void xhci_handle_cmd_config_ep(struct xhci_hcd *xhci, int slot_id)
 	ep_index = xhci_last_valid_endpoint_mtk(add_flags) - 1;
 
 	ep_ctx = xhci_get_ep_ctx__(xhci, virt_dev->out_ctx, ep_index);
-	trace_xhci_handle_cmd_config_ep_(ep_ctx);
+	trace_xhci_handle_cmd_config_ep(ep_ctx);
 
 	return;
 }
@@ -1663,7 +1663,7 @@ static void xhci_handle_cmd_addr_dev(struct xhci_hcd *xhci, int slot_id)
 	if (!vdev)
 		return;
 	slot_ctx = xhci_get_slot_ctx_(xhci, vdev->out_ctx);
-	trace_xhci_handle_cmd_addr_dev_(slot_ctx);
+	trace_xhci_handle_cmd_addr_dev(slot_ctx);
 }
 
 static void xhci_handle_cmd_reset_dev(struct xhci_hcd *xhci, int slot_id)
@@ -1678,7 +1678,7 @@ static void xhci_handle_cmd_reset_dev(struct xhci_hcd *xhci, int slot_id)
 		return;
 	}
 	slot_ctx = xhci_get_slot_ctx_(xhci, vdev->out_ctx);
-	trace_xhci_handle_cmd_reset_dev_(slot_ctx);
+	trace_xhci_handle_cmd_reset_dev(slot_ctx);
 
 	xhci_dbg(xhci, "Completed reset device command.\n");
 }
@@ -1690,7 +1690,7 @@ static void xhci_handle_cmd_nec_get_fw(struct xhci_hcd *xhci,
 		xhci_warn(xhci, "WARN NEC_GET_FW command on non-NEC host\n");
 		return;
 	}
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 			"NEC firmware version %2x.%02x",
 			NEC_FW_MAJOR(le32_to_cpu(event->status)),
 			NEC_FW_MINOR(le32_to_cpu(event->status)));
@@ -1815,7 +1815,7 @@ static void handle_cmd_completion(struct xhci_hcd *xhci,
 	cmd_dma = le64_to_cpu(event->cmd_trb);
 	cmd_trb = xhci->cmd_ring->dequeue;
 
-	trace_xhci_handle_command_(xhci->cmd_ring, &cmd_trb->generic, cmd_dma);
+	trace_xhci_handle_command(xhci->cmd_ring, &cmd_trb->generic, cmd_dma);
 
 	cmd_comp_code = GET_COMP_CODE(le32_to_cpu(event->status));
 
@@ -2044,7 +2044,7 @@ static void handle_port_status(struct xhci_hcd *xhci, union xhci_trb *event)
 	xhci_dbg(xhci, "Port change event, %d-%d, id %d, portsc: 0x%x\n",
 		 hcd->self.busnum, hcd_portnum + 1, port_id, portsc);
 
-	trace_xhci_handle_port_status_(port, portsc);
+	trace_xhci_handle_port_status(port, portsc);
 
 	if (hcd->state == HC_STATE_SUSPENDED) {
 		xhci_dbg(xhci, "resume root hub\n");
@@ -2963,7 +2963,7 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		return 0;
 
 	ep_trb = &ep_seg->trbs[(ep_trb_dma - ep_seg->dma) / sizeof(*ep_trb)];
-	trace_xhci_handle_transfer_(ep_ring, (struct xhci_generic_trb *) ep_trb, ep_trb_dma);
+	trace_xhci_handle_transfer(ep_ring, (struct xhci_generic_trb *) ep_trb, ep_trb_dma);
 
 	/*
 	 * No-op TRB could trigger interrupts in a case where a URB was killed
@@ -3021,7 +3021,7 @@ static int xhci_handle_event_trb(struct xhci_hcd *xhci, struct xhci_interrupter 
 {
 	u32 trb_type;
 
-	trace_xhci_handle_event_(ir->event_ring, &event->generic,
+	trace_xhci_handle_event(ir->event_ring, &event->generic,
 				xhci_trb_virt_to_dma_(ir->event_ring->deq_seg,
 						     ir->event_ring->dequeue));
 
@@ -3283,7 +3283,7 @@ static void queue_trb(struct xhci_hcd *xhci, struct xhci_ring *ring,
 	wmb();
 	trb->field[3] = cpu_to_le32(field4);
 
-	trace_xhci_queue_trb_(ring, trb,
+	trace_xhci_queue_trb(ring, trb,
 			     xhci_trb_virt_to_dma_(ring->enq_seg, ring->enqueue));
 
 	inc_enq(xhci, ring, more_trbs_coming);
@@ -3335,7 +3335,7 @@ static int prepare_ring(struct xhci_hcd *xhci, struct xhci_ring *ep_ring,
 	}
 
 	if (new_segs) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_ring_expansion_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_ring_expansion,
 				"ERROR no room on ep ring, try ring expansion");
 		if (xhci_ring_expansion_mtk(xhci, ep_ring, new_segs, mem_flags)) {
 			xhci_err(xhci, "Ring expansion failed\n");

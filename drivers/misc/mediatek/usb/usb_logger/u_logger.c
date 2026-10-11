@@ -106,8 +106,8 @@ static void xhci_urb_giveback_dbg(void *data, struct urb *urb)
 
 static int xhci_trace_init(struct u_logger *logger)
 {
-	WARN_ON(register_trace_xhci_urb_enqueue_(xhci_urb_enqueue_dbg, logger));
-	WARN_ON(register_trace_xhci_urb_giveback_(xhci_urb_giveback_dbg, logger));
+	WARN_ON(register_trace_xhci_urb_enqueue(xhci_urb_enqueue_dbg, logger));
+	WARN_ON(register_trace_xhci_urb_giveback(xhci_urb_giveback_dbg, logger));
 	return 0;
 }
 

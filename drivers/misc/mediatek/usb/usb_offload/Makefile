@@ -18,6 +18,8 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/clk/mediatek/
 
 ifneq ($(CONFIG_DEVICE_MODULES_USB_XHCI_MTK), )
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/usb/usb_xhci
+# b246: dbg/trace/dbgcap/ext-caps headers handed back to the kernel tree
+ccflags-y += -I$(srctree)/drivers/usb/host
 else
 ifneq ($(CONFIG_DEVICE_MODULES_USB_XHCI_MTK), )
 ccflags-y += -I$(srctree)/drivers/usb/host

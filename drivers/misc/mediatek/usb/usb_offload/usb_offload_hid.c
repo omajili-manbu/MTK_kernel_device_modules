@@ -1216,5 +1216,5 @@ static int sned_payload_to_adsp(unsigned int msg_id, void *payload,
 
 static void xhci_mtk_trace_init(void)
 {
-	WARN_ON(register_trace_xhci_urb_dequeue_(hid_trace_dequeue, NULL));
+	WARN_ON(register_trace_xhci_urb_dequeue(hid_trace_dequeue, NULL));
 }

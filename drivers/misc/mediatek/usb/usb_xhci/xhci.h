@@ -573,12 +573,6 @@ struct xhci_doorbell_array {
  *			follows, typically "USB ".
  * @port_info:		Port offset, count, and protocol-defined information.
  */
-struct xhci_protocol_caps {
-	u32	revision;
-	u32	name_string;
-	u32	port_info;
-};
-
 #define	XHCI_EXT_PORT_MAJOR(x)	(((x) >> 24) & 0xff)
 #define	XHCI_EXT_PORT_MINOR(x)	(((x) >> 16) & 0xff)
 #define	XHCI_EXT_PORT_PSIC(x)	(((x) >> 28) & 0x0f)
@@ -2104,7 +2098,7 @@ static inline int xhci_link_trb_quirk(struct xhci_hcd *xhci)
 /* xHCI debugging */
 char *xhci_get_slot_state_mtk(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *ctx);
-void xhci_dbg_trace_(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
+void xhci_dbg_trace(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
 			const char *fmt, ...);
 
 /* xHCI memory management */
@@ -2217,7 +2211,7 @@ int xhci_disable_slot_mtk(struct xhci_hcd *xhci, u32 slot_id);
 int xhci_disable_and_free_slot_(struct xhci_hcd *xhci, u32 slot_id);
 void xhci_add_interrupter_(struct xhci_hcd *xhci, unsigned int intr_num);
 void xhci_process_cancelled_tds_(struct xhci_virt_ep *ep);
-int xhci_ext_cap_init_(struct xhci_hcd *xhci);
+int xhci_ext_cap_init(struct xhci_hcd *xhci);
 
 int xhci_suspend_(struct xhci_hcd *xhci, bool do_wakeup);
 int xhci_resume_(struct xhci_hcd *xhci, bool power_lost, bool is_auto_resume);

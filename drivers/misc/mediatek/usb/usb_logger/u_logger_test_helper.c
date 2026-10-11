@@ -7,6 +7,7 @@
 
 #include <linux/string.h>
 #include "u_logger.h"
+#include "xhci.h"
 #include "xhci-trace.h"
 
 #if IS_ENABLED(CONFIG_MTK_USB_OFFLOAD)
@@ -388,7 +389,7 @@ int u_tester_init(struct u_logger *logger)
 	atomic_set(&tester.running, 0);
 	tester.in_use = 0;
 
-	WARN_ON(register_trace_xhci_urb_giveback_(xhci_monitor_interrupt, &tester));
+	WARN_ON(register_trace_xhci_urb_giveback(xhci_monitor_interrupt, &tester));
 #if IS_ENABLED(CONFIG_MTK_USB_OFFLOAD)
 	WARN_ON(register_trace_usb_offload_trace_trigger(
 		usb_offload_monitor_interrupt, &tester));

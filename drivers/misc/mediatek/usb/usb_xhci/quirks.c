@@ -468,16 +468,16 @@ static void xhci_trace_ep_urb_giveback(void *data, struct urb *urb)
 
 void xhci_mtk_trace_init(struct device *dev)
 {
-	WARN_ON(register_trace_xhci_urb_enqueue_(xhci_trace_ep_urb_enqueue, dev));
-	WARN_ON(register_trace_xhci_urb_giveback_(xhci_trace_ep_urb_giveback, dev));
+	WARN_ON(register_trace_xhci_urb_enqueue(xhci_trace_ep_urb_enqueue, dev));
+	WARN_ON(register_trace_xhci_urb_giveback(xhci_trace_ep_urb_giveback, dev));
 
 	xhci_mtk_mbrain_init(dev);
 }
 
 void xhci_mtk_trace_deinit(struct device *dev)
 {
-	WARN_ON(unregister_trace_xhci_urb_enqueue_(xhci_trace_ep_urb_enqueue, dev));
-	WARN_ON(unregister_trace_xhci_urb_giveback_(xhci_trace_ep_urb_giveback, dev));
+	WARN_ON(unregister_trace_xhci_urb_enqueue(xhci_trace_ep_urb_enqueue, dev));
+	WARN_ON(unregister_trace_xhci_urb_giveback(xhci_trace_ep_urb_giveback, dev));
 
 	xhci_mtk_mbrain_cleanup(dev);
 }

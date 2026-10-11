@@ -469,7 +469,7 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 	if (!virt_dev)
 		return -ENODEV;
 
-	trace_xhci_stop_device_(virt_dev);
+	trace_xhci_stop_device(virt_dev);
 
 	cmd = xhci_alloc_command_(xhci, true, GFP_NOIO);
 	if (!cmd)
@@ -927,9 +927,9 @@ static void xhci_del_comp_mod_timer(struct xhci_hcd *xhci, u32 status,
 		xhci->port_status_u0 |= 1 << wIndex;
 		if (xhci->port_status_u0 == all_ports_seen_u0) {
 			timer_delete_sync(&xhci->comp_mode_recovery_timer);
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"All USB3 ports have entered U0 already!");
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Compliance Mode Recovery Timer Deleted.");
 		}
 	}
@@ -1270,7 +1270,7 @@ int xhci_hub_control_(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			retval = -ENODEV;
 			break;
 		}
-		trace_xhci_get_port_status_(port, temp);
+		trace_xhci_get_port_status(port, temp);
 		status = xhci_get_port_status(hcd, bus_state, wIndex, temp,
 					      &flags);
 		if (status == 0xffffffff)
@@ -1697,7 +1697,7 @@ int xhci_hub_status_data_mtk(struct usb_hcd *hcd, char *buf)
 			retval = -ENODEV;
 			break;
 		}
-		trace_xhci_hub_status_data_(ports[i], temp);
+		trace_xhci_hub_status_data(ports[i], temp);
 
 		if ((temp & mask) != 0 ||
 			(bus_state->port_c_suspend & 1 << i) ||

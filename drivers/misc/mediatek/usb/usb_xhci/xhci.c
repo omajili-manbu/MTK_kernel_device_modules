@@ -146,7 +146,7 @@ int xhci_halt_mtk(struct xhci_hcd *xhci)
 {
 	int ret;
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "// Halt the HC");
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "// Halt the HC");
 	xhci_quiesce_mtk(xhci);
 
 	ret = xhci_handshake_mtk(&xhci->op_regs->status,
@@ -173,7 +173,7 @@ int xhci_start_mtk(struct xhci_hcd *xhci)
 
 	temp = readl(&xhci->op_regs->command);
 	temp |= (CMD_RUN);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "// Turn on HC, cmd = 0x%x.",
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "// Turn on HC, cmd = 0x%x.",
 			temp);
 	writel(temp, &xhci->op_regs->command);
 
@@ -225,7 +225,7 @@ int xhci_reset_mtk(struct xhci_hcd *xhci, u64 timeout_us)
 	trace_android_vh_dwc3_xhci_soft_reset(xhci_to_hcd(xhci),
 					      PRE_SOFT_RESET);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "// Reset the HC");
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "// Reset the HC");
 	command = readl(&xhci->op_regs->command);
 	command |= CMD_RESET;
 	writel(command, &xhci->op_regs->command);
@@ -254,7 +254,7 @@ int xhci_reset_mtk(struct xhci_hcd *xhci, u64 timeout_us)
 	if (xhci->quirks & XHCI_ASMEDIA_MODIFY_FLOWCONTROL)
 		usb_asmedia_modifyflowcontrol(to_pci_dev(xhci_to_hcd(xhci)->self.controller));
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			 "Wait for controller to be ready for doorbell rings");
 	/*
 	 * xHCI cannot write to any doorbells or operational registers other
@@ -423,10 +423,10 @@ static void compliance_mode_recovery(struct timer_list *t)
 			 * Compliance Mode Detected. Letting USB Core
 			 * handle the Warm Reset
 			 */
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 					"Compliance mode detected->port %d",
 					i + 1);
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 					"Attempting compliance mode recovery");
 
 			if (hcd->state == HC_STATE_SUSPENDED)
@@ -460,7 +460,7 @@ static void compliance_mode_recovery_timer_init(struct xhci_hcd *xhci)
 			msecs_to_jiffies(COMP_MODE_RCVRY_MSECS);
 
 	add_timer(&xhci->comp_mode_recovery_timer);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 			"Compliance mode recovery timer initialized");
 }
 
@@ -508,7 +508,7 @@ static void xhci_hcd_page_size(struct xhci_hcd *xhci)
 	}
 
 	xhci->page_size = page_size << 12;
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "HCD page size set to %iK",
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "HCD page size set to %iK",
 		       xhci->page_size >> 10);
 }
 
@@ -518,14 +518,14 @@ static void xhci_enable_max_dev_slots(struct xhci_hcd *xhci)
 	u32 max_slots;
 
 	max_slots = HCS_MAX_SLOTS(xhci->hcs_params1);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "xHC can handle at most %d device slots",
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "xHC can handle at most %d device slots",
 		       max_slots);
 
 	config_reg = readl(&xhci->op_regs->config_reg);
 	config_reg &= ~HCS_SLOTS_MASK;
 	config_reg |= max_slots;
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Setting Max device slots reg = 0x%x",
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Setting Max device slots reg = 0x%x",
 		       config_reg);
 	writel(config_reg, &xhci->op_regs->config_reg);
 }
@@ -545,7 +545,7 @@ static void xhci_set_cmd_ring_deq(struct xhci_hcd *xhci)
 	crcr &= ~CMD_RING_CYCLE;
 	crcr |= xhci->cmd_ring->cycle_state;
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Setting command ring address to 0x%llx", crcr);
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Setting command ring address to 0x%llx", crcr);
 	xhci_write_64(xhci, crcr, &xhci->op_regs->cmd_ring);
 }
 
@@ -555,7 +555,7 @@ static void xhci_set_doorbell_ptr(struct xhci_hcd *xhci)
 
 	offset = readl(&xhci->cap_regs->db_off) & DBOFF_MASK;
 	xhci->dba = (void __iomem *)xhci->cap_regs + offset;
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 		       "Doorbell array is located at offset 0x%x from cap regs base addr", offset);
 }
 
@@ -585,7 +585,7 @@ static int xhci_init(struct usb_hcd *hcd)
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	int retval;
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Starting %s", __func__);
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Starting %s", __func__);
 	spin_lock_init(&xhci->lock);
 
 	INIT_LIST_HEAD(&xhci->cmd_list);
@@ -623,7 +623,7 @@ static int xhci_init(struct usb_hcd *hcd)
 		compliance_mode_recovery_timer_init(xhci);
 	}
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Finished %s", __func__);
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Finished %s", __func__);
 	return 0;
 }
 
@@ -641,12 +641,12 @@ static int xhci_run_finished(struct xhci_hcd *xhci)
 	 */
 	spin_lock_irqsave(&xhci->lock, flags);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Enable interrupts");
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Enable interrupts");
 	temp = readl(&xhci->op_regs->command);
 	temp |= (CMD_EIE);
 	writel(temp, &xhci->op_regs->command);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "Enable primary interrupter");
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Enable primary interrupter");
 	xhci_enable_interrupter_(ir);
 
 	if (xhci_start_mtk(xhci)) {
@@ -694,11 +694,11 @@ int xhci_run_(struct usb_hcd *hcd)
 	if (!usb_hcd_is_primary_hcd(hcd))
 		return xhci_run_finished(xhci);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "xhci_run_");
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "xhci_run_");
 
 	temp_64 = xhci_read_64(xhci, &ir->ir_set->erst_dequeue);
 	temp_64 &= ERST_PTR_MASK;
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"ERST deq = 64'h%0lx", (long unsigned int) temp_64);
 
 	xhci_set_interrupter_moderation_(ir, xhci->imod_interval);
@@ -715,12 +715,12 @@ int xhci_run_(struct usb_hcd *hcd)
 		if (ret)
 			xhci_free_command_(xhci, command);
 	}
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"Finished %s for main hcd", __func__);
 
-	xhci_create_dbc_dev_(xhci);
+	xhci_create_dbc_dev(xhci);
 
-	xhci_debugfs_init_mtk(xhci);
+	xhci_debugfs_init(xhci);
 
 	if (xhci_has_one_roothub(xhci))
 		return xhci_run_finished(xhci);
@@ -754,7 +754,7 @@ void xhci_stop_(struct usb_hcd *hcd)
 		return;
 	}
 
-	xhci_remove_dbc_dev_(xhci);
+	xhci_remove_dbc_dev(xhci);
 
 	spin_lock_irq(&xhci->lock);
 	xhci->xhc_state |= XHCI_STATE_HALTED;
@@ -767,7 +767,7 @@ void xhci_stop_(struct usb_hcd *hcd)
 	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 			(!(xhci_all_ports_seen_u0(xhci)))) {
 		timer_delete_sync(&xhci->comp_mode_recovery_timer);
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"%s: compliance mode recovery timer deleted",
 				__func__);
 	}
@@ -775,16 +775,16 @@ void xhci_stop_(struct usb_hcd *hcd)
 	if (xhci->quirks & XHCI_AMD_PLL_FIX)
 		usb_amd_dev_put();
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"// Disabling event ring interrupts");
 	temp = readl(&xhci->op_regs->status);
 	writel((temp & ~0x1fff) | STS_EINT, &xhci->op_regs->status);
 	xhci_disable_interrupter_(xhci, ir);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_, "cleaning up memory");
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "cleaning up memory");
 	xhci_mem_cleanup_mtk(xhci);
-	xhci_debugfs_exit_mtk(xhci);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_debugfs_exit(xhci);
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"xhci_stop_ completed - status = %x",
 			readl(&xhci->op_regs->status));
 	mutex_unlock(&xhci->mutex);
@@ -831,7 +831,7 @@ void xhci_shutdown_(struct usb_hcd *hcd)
 
 	spin_unlock_irq(&xhci->lock);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_init_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"xhci_shutdown_ completed - status = %x",
 			readl(&xhci->op_regs->status));
 }
@@ -1024,7 +1024,7 @@ int xhci_suspend_(struct xhci_hcd *xhci, bool do_wakeup)
 	if (!HCD_HW_ACCESSIBLE(hcd))
 		return 0;
 
-	xhci_dbc_suspend_(xhci);
+	xhci_dbc_suspend(xhci);
 
 	/* Don't poll the roothubs on bus suspend. */
 	xhci_dbg(xhci, "%s: stopping usb%d port polling.\n",
@@ -1101,7 +1101,7 @@ int xhci_suspend_(struct xhci_hcd *xhci, bool do_wakeup)
 	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 			(!(xhci_all_ports_seen_u0(xhci)))) {
 		timer_delete_sync(&xhci->comp_mode_recovery_timer);
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"%s: compliance mode recovery timer deleted",
 				__func__);
 	}
@@ -1194,7 +1194,7 @@ int xhci_resume_(struct xhci_hcd *xhci, bool power_lost, bool is_auto_resume)
 		if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 				!(xhci_all_ports_seen_u0(xhci))) {
 			timer_delete_sync(&xhci->comp_mode_recovery_timer);
-			xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Compliance Mode Recovery Timer deleted!");
 		}
 
@@ -1221,7 +1221,7 @@ int xhci_resume_(struct xhci_hcd *xhci, bool power_lost, bool is_auto_resume)
 
 		xhci_dbg(xhci, "cleaning up memory\n");
 		xhci_mem_cleanup_mtk(xhci);
-		xhci_debugfs_exit_mtk(xhci);
+		xhci_debugfs_exit(xhci);
 		xhci_dbg(xhci, "xhci_stop_ completed - status = %x\n",
 			    readl(&xhci->op_regs->status));
 
@@ -1276,7 +1276,7 @@ int xhci_resume_(struct xhci_hcd *xhci, bool power_lost, bool is_auto_resume)
 
 	spin_unlock_irq(&xhci->lock);
 
-	xhci_dbc_resume_(xhci);
+	xhci_dbc_resume(xhci);
 
 	if (retval == 0) {
 		/*
@@ -1602,15 +1602,15 @@ static int xhci_check_ep0_maxpacket(struct xhci_hcd *xhci, struct xhci_virt_devi
 
 	switch (max_packet_size) {
 	case 8: case 16: case 32: case 64: case 9:
-		xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci,  trace_xhci_dbg_context_change,
 				"Max Packet Size for ep 0 changed.");
-		xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci,  trace_xhci_dbg_context_change,
 				"Max packet size in usb_device = %d",
 				max_packet_size);
-		xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci,  trace_xhci_dbg_context_change,
 				"Max packet size in xHCI HW = %d",
 				hw_max_packet_size);
-		xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci,  trace_xhci_dbg_context_change,
 				"Issuing evaluate context command.");
 
 		command = xhci_alloc_command_(xhci, true, GFP_KERNEL);
@@ -1692,7 +1692,7 @@ static int xhci_urb_enqueue_(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_fla
 	urb_priv->num_tds_done = 0;
 	urb->hcpriv = urb_priv;
 
-	trace_xhci_urb_enqueue_(urb);
+	trace_xhci_urb_enqueue(urb);
 
 	spin_lock_irqsave(&xhci->lock, flags);
 
@@ -1814,7 +1814,7 @@ static int xhci_urb_dequeue_(struct usb_hcd *hcd, struct urb *urb, int status)
 	xhci = hcd_to_xhci(hcd);
 	spin_lock_irqsave(&xhci->lock, flags);
 
-	trace_xhci_urb_dequeue_(urb);
+	trace_xhci_urb_dequeue(urb);
 
 	/* Make sure the URB hasn't completed or been unlinked already */
 	ret = usb_hcd_check_unlink_urb(hcd, urb, status);
@@ -1856,7 +1856,7 @@ static int xhci_urb_dequeue_(struct usb_hcd *hcd, struct urb *urb, int status)
 	}
 
 	if (xhci->xhc_state & XHCI_STATE_HALTED) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 				"HC halted, freeing TD manually.");
 		for (i = urb_priv->num_tds_done;
 		     i < urb_priv->num_tds;
@@ -1872,7 +1872,7 @@ static int xhci_urb_dequeue_(struct usb_hcd *hcd, struct urb *urb, int status)
 
 	i = urb_priv->num_tds_done;
 	if (i < urb_priv->num_tds)
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_cancel_urb_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 				"Cancel URB %p, dev %s, ep 0x%x, "
 				"starting at offset 0x%llx",
 				urb, urb->dev->devpath,
@@ -2000,7 +2000,7 @@ int xhci_drop_endpoint_(struct usb_hcd *hcd, struct usb_device *udev,
 	ctrl_ctx->add_flags &= cpu_to_le32(~drop_flag);
 	new_add_flags = le32_to_cpu(ctrl_ctx->add_flags);
 
-	xhci_debugfs_remove_endpoint_mtk(xhci, xhci->devs[udev->slot_id], ep_index);
+	xhci_debugfs_remove_endpoint(xhci, xhci->devs[udev->slot_id], ep_index);
 
 	xhci_endpoint_zero_mtk(xhci, xhci->devs[udev->slot_id], ep);
 
@@ -2116,7 +2116,7 @@ int xhci_add_endpoint_(struct usb_hcd *hcd, struct usb_device *udev,
 	ep->hcpriv = udev;
 
 	ep_ctx = xhci_get_ep_ctx__(xhci, virt_dev->in_ctx, ep_index);
-	trace_xhci_add_endpoint_(ep_ctx);
+	trace_xhci_add_endpoint(ep_ctx);
 
 	xhci_dbg(xhci, "add ep 0x%x, slot id %d, new drop flags = %#x, new add flags = %#x\n",
 			(unsigned int) ep->desc.bEndpointAddress,
@@ -2198,7 +2198,7 @@ static int xhci_configure_endpoint_result(struct xhci_hcd *xhci,
 		ret = -ENODEV;
 		break;
 	case COMP_SUCCESS:
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_context_change,
 				"Successful Endpoint Configure command");
 		ret = 0;
 		break;
@@ -2248,7 +2248,7 @@ static int xhci_evaluate_context_result(struct xhci_hcd *xhci,
 		ret = -EINVAL;
 		break;
 	case COMP_SUCCESS:
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_context_change,
 				"Successful evaluate context command");
 		ret = 0;
 		break;
@@ -2315,7 +2315,7 @@ static int xhci_reserve_host_resources(struct xhci_hcd *xhci,
 
 	added_eps = xhci_count_num_new_endpoints(xhci, ctrl_ctx);
 	if (xhci->num_active_eps + added_eps > xhci->limit_active_eps) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Not enough ep ctxs: "
 				"%u active, need to add %u, limit is %u.",
 				xhci->num_active_eps, added_eps,
@@ -2323,7 +2323,7 @@ static int xhci_reserve_host_resources(struct xhci_hcd *xhci,
 		return -ENOMEM;
 	}
 	xhci->num_active_eps += added_eps;
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 			"Adding %u ep ctxs, %u now active.", added_eps,
 			xhci->num_active_eps);
 	return 0;
@@ -2342,7 +2342,7 @@ static void xhci_free_host_resources(struct xhci_hcd *xhci,
 
 	num_failed_eps = xhci_count_num_new_endpoints(xhci, ctrl_ctx);
 	xhci->num_active_eps -= num_failed_eps;
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 			"Removing %u failed ep ctxs, %u now active.",
 			num_failed_eps,
 			xhci->num_active_eps);
@@ -2362,7 +2362,7 @@ static void xhci_finish_resource_reservation(struct xhci_hcd *xhci,
 	num_dropped_eps = xhci_count_num_dropped_endpoints(xhci, ctrl_ctx);
 	xhci->num_active_eps -= num_dropped_eps;
 	if (num_dropped_eps)
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Removing %u dropped ep ctxs, %u now active.",
 				num_dropped_eps,
 				xhci->num_active_eps);
@@ -2524,7 +2524,7 @@ static int xhci_check_bw_table(struct xhci_hcd *xhci,
 	 * that the HS bus has enough bandwidth if we are activing a new TT.
 	 */
 	if (virt_dev->tt_info) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Recalculating BW for rootport %u",
 				virt_dev->rhub_port->hw_portnum + 1);
 		if (xhci_check_tt_bw_table(xhci, virt_dev, old_active_eps)) {
@@ -2532,12 +2532,12 @@ static int xhci_check_bw_table(struct xhci_hcd *xhci,
 					"newly activated TT.\n");
 			return -ENOMEM;
 		}
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Recalculating BW for TT slot %u port %u",
 				virt_dev->tt_info->slot_id,
 				virt_dev->tt_info->ttport);
 	} else {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Recalculating BW for rootport %u",
 				virt_dev->rhub_port->hw_portnum + 1);
 	}
@@ -2644,7 +2644,7 @@ static int xhci_check_bw_table(struct xhci_hcd *xhci,
 			xhci->rh_bw[virt_dev->rhub_port->hw_portnum].num_active_tts;
 	}
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 		"Final bandwidth: %u, Limit: %u, Reserved: %u, "
 		"Available: %u " "percent",
 		bw_used, max_bandwidth, bw_reserved,
@@ -3057,8 +3057,8 @@ static int xhci_configure_endpoint(struct xhci_hcd *xhci,
 
 	slot_ctx = xhci_get_slot_ctx_(xhci, command->in_ctx);
 
-	trace_xhci_configure_endpoint_ctrl_ctx_(ctrl_ctx);
-	trace_xhci_configure_endpoint_(slot_ctx);
+	trace_xhci_configure_endpoint_ctrl_ctx(ctrl_ctx);
+	trace_xhci_configure_endpoint(slot_ctx);
 
 	if (!ctx_change)
 		ret = xhci_queue_configure_endpoint_mtk(xhci, command,
@@ -3072,7 +3072,7 @@ static int xhci_configure_endpoint(struct xhci_hcd *xhci,
 		if ((xhci->quirks & XHCI_EP_LIMIT_QUIRK))
 			xhci_free_host_resources(xhci, ctrl_ctx);
 		spin_unlock_irqrestore(&xhci->lock, flags);
-		xhci_dbg_trace_(xhci,  trace_xhci_dbg_context_change_,
+		xhci_dbg_trace(xhci,  trace_xhci_dbg_context_change,
 				"FIXME allocate a new ring segment");
 		return -ENOMEM;
 	}
@@ -3225,7 +3225,7 @@ int xhci_check_bandwidth_(struct usb_hcd *hcd, struct usb_device *udev)
 		xhci_check_bw_drop_ep_streams(xhci, virt_dev, i);
 		virt_dev->eps[i].ring = virt_dev->eps[i].new_ring;
 		virt_dev->eps[i].new_ring = NULL;
-		xhci_debugfs_create_endpoint_mtk(xhci, virt_dev, i);
+		xhci_debugfs_create_endpoint(xhci, virt_dev, i);
 	}
 command_cleanup:
 	kfree(command->completion);
@@ -3251,7 +3251,7 @@ void xhci_reset_bandwidth_(struct usb_hcd *hcd, struct usb_device *udev)
 	/* Free any rings allocated for added endpoints */
 	for (i = 0; i < 31; i++) {
 		if (virt_dev->eps[i].new_ring) {
-			xhci_debugfs_remove_endpoint_mtk(xhci, virt_dev, i);
+			xhci_debugfs_remove_endpoint(xhci, virt_dev, i);
 			if (xhci_vendor_is_usb_offload_enabled(xhci, virt_dev, i))
 				xhci_vendor_free_transfer_ring(xhci, virt_dev->eps[i].new_ring, i);
 			else
@@ -3820,7 +3820,7 @@ static int xhci_alloc_streams(struct usb_hcd *hcd, struct usb_device *udev,
 
 	for (i = 0; i < num_eps; i++) {
 		ep_index = xhci_get_endpoint_index_(&eps[i]->desc);
-		xhci_debugfs_create_stream_files_mtk(xhci, vdev, ep_index);
+		xhci_debugfs_create_stream_files(xhci, vdev, ep_index);
 	}
 	/* Subtract 1 for stream 0, which drivers can't use */
 	return num_streams - 1;
@@ -3955,7 +3955,7 @@ void xhci_free_device_endpoint_resources_mtk(struct xhci_hcd *xhci,
 	}
 	xhci->num_active_eps -= num_dropped_eps;
 	if (num_dropped_eps)
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Dropped %u ep ctxs, flags = 0x%x, "
 				"%u now active.",
 				num_dropped_eps, drop_flags,
@@ -4050,7 +4050,7 @@ static int xhci_discover_or_reset_device(struct usb_hcd *hcd,
 		return ret;
 	}
 
-	trace_xhci_discover_or_reset_device_(slot_ctx);
+	trace_xhci_discover_or_reset_device(slot_ctx);
 
 	xhci_dbg(xhci, "Resetting device with slot ID %u\n", slot_id);
 	/* Allocate the command structure that holds the struct completion.
@@ -4143,7 +4143,7 @@ static int xhci_discover_or_reset_device(struct usb_hcd *hcd,
 		if (ep->ring) {
 			if (ep->sideband)
 				xhci_sideband_notify_ep_ring_free_(ep->sideband, i);
-			xhci_debugfs_remove_endpoint_mtk(xhci, virt_dev, i);
+			xhci_debugfs_remove_endpoint(xhci, virt_dev, i);
 			xhci_free_endpoint_ring_mtk(xhci, virt_dev, i);
 		}
 		if (!list_empty(&virt_dev->eps[i].bw_endpoint_list))
@@ -4195,7 +4195,7 @@ static void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 
 	virt_dev = xhci->devs[udev->slot_id];
 	slot_ctx = xhci_get_slot_ctx_(xhci, virt_dev->out_ctx);
-	trace_xhci_free_dev_(slot_ctx);
+	trace_xhci_free_dev(slot_ctx);
 
 	/* Stop any wayward timer functions (which may grab the lock) */
 	for (i = 0; i < 31; i++)
@@ -4220,7 +4220,7 @@ int xhci_disable_slot_mtk(struct xhci_hcd *xhci, u32 slot_id)
 	if (!command)
 		return -ENOMEM;
 
-	xhci_debugfs_remove_slot_mtk(xhci, slot_id);
+	xhci_debugfs_remove_slot(xhci, slot_id);
 
 	spin_lock_irqsave(&xhci->lock, flags);
 	/* Don't disable the slot if the host controller is dead. */
@@ -4272,14 +4272,14 @@ int xhci_disable_and_free_slot_(struct xhci_hcd *xhci, u32 slot_id)
 static int xhci_reserve_host_control_ep_resources(struct xhci_hcd *xhci)
 {
 	if (xhci->num_active_eps + 1 > xhci->limit_active_eps) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Not enough ep ctxs: "
 				"%u active, need to add 1, limit is %u.",
 				xhci->num_active_eps, xhci->limit_active_eps);
 		return -ENOMEM;
 	}
 	xhci->num_active_eps += 1;
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_quirks_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 			"Adding 1 ep ctx, %u now active.",
 			xhci->num_active_eps);
 	return 0;
@@ -4359,11 +4359,11 @@ int xhci_alloc_dev_mtk(struct usb_hcd *hcd, struct usb_device *udev)
 
 	vdev = xhci->devs[slot_id];
 	slot_ctx = xhci_get_slot_ctx_(xhci, vdev->out_ctx);
-	trace_xhci_alloc_dev_(slot_ctx);
+	trace_xhci_alloc_dev(slot_ctx);
 
 	udev->slot_id = slot_id;
 
-	xhci_debugfs_create_slot_mtk(xhci, slot_id);
+	xhci_debugfs_create_slot(xhci, slot_id);
 
 	/*
 	 * If resetting upon resume, we can't put the controller into runtime
@@ -4413,7 +4413,7 @@ static int xhci_setup_device(struct usb_hcd *hcd, struct usb_device *udev,
 	}
 
 	if (!udev->slot_id) {
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 				"Bad Slot ID %d", udev->slot_id);
 		ret = -EINVAL;
 		goto out;
@@ -4433,7 +4433,7 @@ static int xhci_setup_device(struct usb_hcd *hcd, struct usb_device *udev,
 		goto out;
 	}
 	slot_ctx = xhci_get_slot_ctx_(xhci, virt_dev->out_ctx);
-	trace_xhci_setup_device_slot_(slot_ctx);
+	trace_xhci_setup_device_slot(slot_ctx);
 
 	if (setup == SETUP_CONTEXT_ONLY) {
 		if (GET_SLOT_STATE(le32_to_cpu(slot_ctx->dev_state)) ==
@@ -4473,17 +4473,17 @@ static int xhci_setup_device(struct usb_hcd *hcd, struct usb_device *udev,
 	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
 	ctrl_ctx->drop_flags = 0;
 
-	trace_xhci_address_ctx_(xhci, virt_dev->in_ctx,
+	trace_xhci_address_ctx(xhci, virt_dev->in_ctx,
 				le32_to_cpu(slot_ctx->dev_info) >> 27);
 
-	trace_xhci_address_ctrl_ctx_(ctrl_ctx);
+	trace_xhci_address_ctrl_ctx(ctrl_ctx);
 	spin_lock_irqsave(&xhci->lock, flags);
-	trace_xhci_setup_device_(virt_dev);
+	trace_xhci_setup_device(virt_dev);
 	ret = xhci_queue_address_device_mtk(xhci, command, virt_dev->in_ctx->dma,
 					udev->slot_id, setup);
 	if (ret) {
 		spin_unlock_irqrestore(&xhci->lock, flags);
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 				"FIXME: allocate a command ring segment");
 		goto out;
 	}
@@ -4534,38 +4534,38 @@ static int xhci_setup_device(struct usb_hcd *hcd, struct usb_device *udev,
 		ret = -ENODEV;
 		break;
 	case COMP_SUCCESS:
-		xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+		xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 			       "Successful setup %s command", act);
 		break;
 	default:
 		xhci_err(xhci,
 			 "ERROR: unexpected setup %s command completion code 0x%x.\n",
 			 act, command->status);
-		trace_xhci_address_ctx_(xhci, virt_dev->out_ctx, 1);
+		trace_xhci_address_ctx(xhci, virt_dev->out_ctx, 1);
 		ret = -EINVAL;
 		break;
 	}
 	if (ret)
 		goto out;
 	temp_64 = xhci_read_64(xhci, &xhci->op_regs->dcbaa_ptr);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 			"Op regs DCBAA ptr = %#016llx", temp_64);
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 		"Slot ID %d dcbaa entry @%p = %#016llx",
 		udev->slot_id,
 		&xhci->dcbaa->dev_context_ptrs[udev->slot_id],
 		(unsigned long long)
 		le64_to_cpu(xhci->dcbaa->dev_context_ptrs[udev->slot_id]));
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 			"Output Context DMA address = %#08llx",
 			(unsigned long long)virt_dev->out_ctx->dma);
-	trace_xhci_address_ctx_(xhci, virt_dev->in_ctx,
+	trace_xhci_address_ctx(xhci, virt_dev->in_ctx,
 				le32_to_cpu(slot_ctx->dev_info) >> 27);
 	/*
 	 * USB core uses address 1 for the roothubs, so we add one to the
 	 * address given back to us by the HC.
 	 */
-	trace_xhci_address_ctx_(xhci, virt_dev->out_ctx,
+	trace_xhci_address_ctx(xhci, virt_dev->out_ctx,
 				le32_to_cpu(slot_ctx->dev_info) >> 27);
 	/* Zero the input context control for later use */
 	ctrl_ctx->add_flags = 0;
@@ -4573,7 +4573,7 @@ static int xhci_setup_device(struct usb_hcd *hcd, struct usb_device *udev,
 	slot_ctx = xhci_get_slot_ctx_(xhci, virt_dev->out_ctx);
 	udev->devaddr = (u8)(le32_to_cpu(slot_ctx->dev_state) & DEV_ADDR_MASK);
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_address_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_address,
 		       "Internal device address = %d",
 		       le32_to_cpu(slot_ctx->dev_state) & DEV_ADDR_MASK);
 out:
@@ -4665,7 +4665,7 @@ static int __maybe_unused xhci_change_max_exit_latency(struct xhci_hcd *xhci,
 	slot_ctx->dev_info2 |= cpu_to_le32(max_exit_latency);
 	slot_ctx->dev_state = 0;
 
-	xhci_dbg_trace_(xhci, trace_xhci_dbg_context_change_,
+	xhci_dbg_trace(xhci, trace_xhci_dbg_context_change,
 			"Set up evaluate context for LPM MEL change.");
 
 	/* Issue and wait for the evaluate context command. */
