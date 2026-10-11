@@ -367,8 +367,9 @@ static inline void eenv_init(struct energy_env *eenv, struct task_struct *p,
 		pd_idx = cpu = cpumask_first(cpus);
 		eenv->gear_idx = topology_cluster_id(pd_idx);
 		cpu_thermal_cap = arch_scale_cpu_capacity(cpu);
-		/* copy arch_scale_thermal_pressure() code and add read_once to avoid data-racing */
-		cpu_thermal_cap -= READ_ONCE(per_cpu(thermal_pressure, cpu));
+		/* copy arch_scale_hw_pressure() code and add read_once to avoid data-racing
+		 * （6.6 的 per-CPU thermal_pressure 在 6.18 上游改名为 hw_pressure，同一变量） */
+		cpu_thermal_cap -= READ_ONCE(per_cpu(hw_pressure, cpu));
 
 		eenv->pds_cpu_cap[pd_idx] = cpu_thermal_cap;
 		eenv->pds_cap[pd_idx] = 0;
@@ -1721,7 +1722,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 
 	/* Change fit status from 1 to -1 only if uclamp min raise util. */
 	uclamp_min = min(uclamp_min, uclamp_max);
-	capacity_orig_thermal = min(cap_after_ceiling, (capacity_orig - READ_ONCE(per_cpu(thermal_pressure, cpu))));
+	capacity_orig_thermal = min(cap_after_ceiling, (capacity_orig - READ_ONCE(per_cpu(hw_pressure, cpu))));
 	if (fit && (util < uclamp_min) && (uclamp_min > capacity_orig_thermal))
 		fit = -1;
 
@@ -1763,7 +1764,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	fit = fits_capacity(util, capacity, sugov_margin);
 
 	/* Change fit status from 0 to 1 only if uclamp max restrict util. */
-	capacity_orig_thermal = (capacity_orig - READ_ONCE(per_cpu(thermal_pressure, cpu)));
+	capacity_orig_thermal = (capacity_orig - READ_ONCE(per_cpu(hw_pressure, cpu)));
 	uclamp_max_fits = (capacity_orig == SCHED_CAPACITY_SCALE) && (uclamp_max == SCHED_CAPACITY_SCALE);
 	uclamp_max_fits = !uclamp_max_fits && (uclamp_max <= capacity_orig);
 	fit = fit || uclamp_max_fits;

@@ -178,47 +178,45 @@ int fpsgo_arch_nr_clusters(void)
 	return num;
 }
 
+/*
+ * rodin 6.18：cpufreq_get_policy(policy, cpu) 已被 6.18 上游删除；其 6.6 实现即
+ * cpufreq_cpu_get(cpu) + memcpy(policy) + cpufreq_cpu_put()（6.6 cpufreq.c:2587）。
+ * 本函数只读 freq_table ⇒ 直接持引用读活 policy 等价（同一对象、get/put 配对；
+ * 成功判据由 ret == 0 变为 policy != NULL，语义相同）。
+ */
 int fpsgo_arch_nr_get_opp_cpu(int cpu)
 {
-	struct cpufreq_policy *curr_policy = NULL;
+	struct cpufreq_policy *curr_policy;
 	struct cpufreq_frequency_table *pos, *table;
 	int idx;
 	int nr_opp = 0;
-	int ret = 0;
 
-	curr_policy = kzalloc(sizeof(struct cpufreq_policy), GFP_KERNEL);
+	curr_policy = cpufreq_cpu_get(cpu);
 	if (!curr_policy)
 		goto out;
 
-	ret = cpufreq_get_policy(curr_policy, cpu);
-	if (ret == 0) {
-		table = curr_policy->freq_table;
-		if (table) {
-			cpufreq_for_each_valid_entry_idx(pos, table, idx) {
-				nr_opp++;
-			}
+	table = curr_policy->freq_table;
+	if (table) {
+		cpufreq_for_each_valid_entry_idx(pos, table, idx) {
+			nr_opp++;
 		}
 	}
 
+	cpufreq_cpu_put(curr_policy);
 out:
-	kfree(curr_policy);
 	return nr_opp;
 }
 
+/* rodin 6.18：同上，cpufreq_get_policy() → cpufreq_cpu_get()/cpufreq_cpu_put() 配对。 */
 int fpsgo_arch_nr_max_opp_cpu(void)
 {
 	int num_opp = 0, max_opp = 0;
 	int cpu;
-	int ret = 0;
-	struct cpufreq_policy *curr_policy = NULL;
-
-	curr_policy = kzalloc(sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!curr_policy)
-		goto out;
+	struct cpufreq_policy *curr_policy;
 
 	for_each_possible_cpu(cpu) {
-		ret = cpufreq_get_policy(curr_policy, cpu);
-		if (ret != 0)
+		curr_policy = cpufreq_cpu_get(cpu);
+		if (!curr_policy)
 			continue;
 
 		num_opp = fpsgo_arch_nr_get_opp_cpu(cpu);
@@ -226,10 +224,10 @@ int fpsgo_arch_nr_max_opp_cpu(void)
 
 		if (max_opp < num_opp)
 			max_opp = num_opp;
+
+		cpufreq_cpu_put(curr_policy);
 	}
 
-out:
-	kfree(curr_policy);
 	return max_opp;
 }
 

@@ -470,15 +470,16 @@ static unsigned long mtk_scale_rt_capacity(int cpu)
 	used = READ_ONCE(rq->avg_rt.util_avg);
 	used += READ_ONCE(rq->avg_dl.util_avg);
 	/*
-	 * rodin 6.9 降级论证：6.6 的 thermal_load_avg(rq) 读 PELT 平均的
-	 * rq->avg_thermal.load_avg；6.18 把热压力模型换成 per-CPU hw_pressure +
-	 * topology_get_hw_pressure()，**没有** PELT 平均版（全树 grep avg_thermal
-	 * 0 命中）。这里改用同一来源的瞬时值 per_cpu(thermal_pressure)（本树
-	 * compat 符号，由 topology_update_hw_pressure() 与 hw_pressure 同步写入）。
-	 * 差别：从"平滑值"变成"瞬时值"，热压力抖动时 rt 容量扣减更敏感 —— 方向与
-	 * 6.18 mainline 的 hw_pressure 用法一致，属跟随上游的取值口径变化。
+	 * rodin 6.18：6.6 的 thermal_load_avg(rq) 读 PELT 平均的 rq->avg_thermal，
+	 * 本树内核没有该对象（6.18 上游把 per-CPU 热压力变量改名为 hw_pressure：
+	 * commit d4dbc991714e "sched/cpufreq: Rename arch_update_thermal_pressure()
+	 * => arch_update_hw_pressure()" —— 同一 per-CPU 变量、同一写入方
+	 * topology_update_hw_pressure()、同一读出方 arch_scale_hw_pressure()）。
+	 * 本处按 6.18 口径直接读该 per-CPU 变量的瞬时值（与内核 pelt.c:510 把
+	 * arch_scale_hw_pressure() 喂给 update_hw_load_avg() 同源）；差别仅是
+	 * 不经 PELT 平滑，热压力抖动时 rt 容量扣减更敏感。
 	 */
-	used += READ_ONCE(per_cpu(thermal_pressure, cpu));
+	used += READ_ONCE(per_cpu(hw_pressure, cpu));
 
 	if (unlikely(used >= max))
 		return 1;
@@ -517,7 +518,7 @@ void hook_update_cpu_capacity(void *data, int cpu, unsigned long *capacity)
 	cap_ceiling = min_t(unsigned long, *capacity, get_cpu_gear_uclamp_max_capacity(cpu));
 	*capacity = clamp_t(unsigned long, cap_ceiling,
 		READ_ONCE(per_cpu(min_freq_scale, cpu)), READ_ONCE(per_cpu(max_freq_scale, cpu)));
-	*capacity = min_t(unsigned long, *capacity, capacity_orig - READ_ONCE(per_cpu(thermal_pressure, cpu)));
+	*capacity = min_t(unsigned long, *capacity, capacity_orig - READ_ONCE(per_cpu(hw_pressure, cpu)));
 }
 
 #if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)

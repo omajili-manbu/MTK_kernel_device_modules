@@ -1022,17 +1022,23 @@ static void probe_android_rvh_rtmutex_prepare_setprio(void *ignore, struct task_
 	}
 }
 
+/*
+ * rodin 6.18：6.6 的 android_rvh_set_user_nice(p, nice, allowed) 在 6.18 上游 ACK 拆成
+ * 两个钩子：android_rvh_set_user_nice(p, nice)（锁前，无 allowed，syscalls.c:74）与
+ * android_rvh_set_user_nice_locked(p, nice, allowed)（锁后，syscalls.c:86）。
+ * 本 handler 只需锁前语义（把 turbo 魔数 nice 0xbeef/0xbeee 改写为备份/rlimit nice），
+ * 且改写后 nice 恒落 [MIN_NICE, MAX_NICE]：6.6 里 *allowed 仅用于绕过随后"nice 越界
+ * 或与现值相等"的早退，而越界分支在改写后不可能命中、相等早退本身是 no-op（本树也
+ * 无人注册 _locked 钩子）⇒ 去掉 allowed 输出零功能损失、行为等效。
+ */
 static void probe_android_rvh_set_user_nice(void *ignore, struct task_struct *p,
-						long *nice, bool *allowed)
+						long *nice)
 {
 	struct task_turbo_t *turbo_data;
 	bool p_turbo;
 
-	if ((*nice < MIN_NICE || *nice > MAX_NICE) && !task_turbo_nice(*nice)) {
-		*allowed = false;
+	if ((*nice < MIN_NICE || *nice > MAX_NICE) && !task_turbo_nice(*nice))
 		return;
-	} else
-		*allowed = true;
 
 
 	turbo_data = get_task_turbo_t(p);
@@ -1175,10 +1181,17 @@ static void probe_android_vh_binder_set_priority(void *ignore, struct binder_tra
 		binder_start_vip_inherit(t->from ? t->from->task : NULL, task);
 }
 
+/*
+ * rodin 6.18：6.6 的 android_vh_binder_restore_priority(t, task) 在 6.18 上游去掉 task
+ * 形参（本树为 (struct binder_transaction *t)）。6.6 内核三个调用点（binder.c:3933/
+ * 4066/4935）传入的第二个实参一律是 current ⇒ 钩子同步回调、同一上下文，用 current
+ * 取代形参等价（cur 恒非 NULL，下方两个 cur && 判断保留不删）。
+ */
 static void probe_android_vh_binder_restore_priority(void *ignore,
-		struct binder_transaction *in_reply_to, struct task_struct *cur)
+		struct binder_transaction *in_reply_to)
 {
 	struct task_struct *inherit_task;
+	struct task_struct *cur = current;
 
 	if (in_reply_to) {
 		inherit_task = get_inherit_task(in_reply_to);
@@ -2096,16 +2109,15 @@ static void remove_turbo_list(struct task_struct *p)
 	spin_unlock(&TURBO_SPIN_LOCK);
 }
 
-/* rodin 6.9（D3）：6.18 的 android_vh_cgroup_set_task 是
+/* rodin 6.18：6.6 的 android_vh_cgroup_set_task(ret, task) 在 6.18 上游扩为
  * (int ret, struct cgroup *cgrp, struct task_struct *task, bool threadgroup)
- * （include/trace/hooks/cgroup.h:14-16，比 6.6 的 (ret, task) 新），
- * handler 必须补上这两个形参才能注册。本 handler 的判据是"目标任务的 st group id"，
- * 由 p 直接读出（get_st_group_id(p)），不依赖 cgrp/threadgroup ⇒ 二者仅作 ABI 占位、
- * 不参与判断，不是降级（信息面没有损失）。 */
-/* rodin 6.9 (D3)：内核侧保留 6.6 两参 ABI（永久闭源 blob metis.ko 按 2 参编译并
- * 解引用第 2 参），本 handler 随之回到 2 参。cgrp/threadgroup 在原 handler 里从未被
- * 使用（判据取自 get_st_group_id(p)）⇒ 零功能损失。 */
-static void probe_android_vh_cgroup_set_task(void *ignore, int ret, struct task_struct *p)
+ * （include/trace/hooks/cgroup.h:14-16），handler 必须补齐形参才能注册。
+ * 本 handler 的判据是"目标任务的 st group id"，由 p 直接读出（get_st_group_id(p)），
+ * 不依赖 cgrp/threadgroup ⇒ 二者仅作 ABI 占位、不参与判断，不是降级（信息面没有损失）。
+ * （port 树曾因内核侧 rodin 兼容层保留两参 ABI 而回退成两参；本树内核无该兼容层、
+ * 且树内不存在 metis 预编译模块，端口 ABI 以上游四参为准。） */
+static void probe_android_vh_cgroup_set_task(void *ignore, int ret,
+		struct cgroup *cgrp, struct task_struct *p, bool threadgroup)
 {
 	struct task_turbo_t *turbo_data;
 
@@ -2408,6 +2420,21 @@ static int __init init_task_turbo(void)
 	}
 
 	ret = register_trace_android_vh_binder_restore_priority(
+			probe_android_vh_binder_restore_priority, NULL);
+	if (ret) {
+		ret_erri_line = __LINE__;
+		goto failed;
+	}
+
+	/*
+	 * rodin 6.18：6.6 内核在 binder.c:4935 的第三个调用点（wait_for_proc_work 分支，
+	 * 实参 (NULL, current)）在 6.18 上游改由 android_vh_binder_before_restore_priority(NULL)
+	 * 承担（binder.c:5021，同一位置同一实参），restore_priority 只剩两个非 NULL 调用点。
+	 * 为保住 6.6 在该点"停止 turbo/vip 继承"的行为（本 handler 的 NULL 分支），此处用
+	 * 同一 handler 兼注册 before_restore_priority —— 与 port 树内核兼容层同时保留两处
+	 * 调用的做法在本树内行为等效。
+	 */
+	ret = register_trace_android_vh_binder_before_restore_priority(
 			probe_android_vh_binder_restore_priority, NULL);
 	if (ret) {
 		ret_erri_line = __LINE__;

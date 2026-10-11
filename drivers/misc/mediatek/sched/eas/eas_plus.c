@@ -543,7 +543,7 @@ inline void update_thermal_pressure_capacity(bool update_all, int this_cpu)
 		thermal_max_capacity = pd_freq2util(first_cpu, freq_thermal, true, wl, NULL, 0);
 		max_capacity = arch_scale_cpu_capacity(first_cpu);
 		th_pressure = max_capacity - thermal_max_capacity;
-		last_th_pressure = READ_ONCE(per_cpu(thermal_pressure, first_cpu));
+		last_th_pressure = READ_ONCE(per_cpu(hw_pressure, first_cpu));
 
 		if (trace_sched_update_thermal_pressure_capacity_enabled())
 			trace_sched_update_thermal_pressure_capacity(first_cpu,
@@ -552,8 +552,10 @@ inline void update_thermal_pressure_capacity(bool update_all, int this_cpu)
 		if (th_pressure == last_th_pressure)
 			continue;
 
+		/* 6.6 的 per-CPU thermal_pressure 在 6.18 上游改名为 hw_pressure（同一
+		 * 变量；内核 arch_scale_hw_pressure() 读它做 CPU 容量热扣减） */
 		for_each_cpu(cpu, cpus)
-			WRITE_ONCE(per_cpu(thermal_pressure, cpu), th_pressure);
+			WRITE_ONCE(per_cpu(hw_pressure, cpu), th_pressure);
 	}
 }
 #endif

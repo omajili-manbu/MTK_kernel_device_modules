@@ -1419,9 +1419,13 @@ void register_vip_hooks(void)
 	if (ret)
 		pr_info("register cpu_cgroup_online hooks failed, returned %d\n", ret);
 
-	ret = register_trace_android_rvh_check_preempt_wakeup(vip_check_preempt_wakeup, NULL);
-	if (ret)
-		pr_info("register check_preempt_wakeup hooks failed, returned %d\n", ret);
+	/*
+	 * rodin 6.18：android_rvh_check_preempt_wakeup 是 port 树内核兼容层（7747f66eeaf2）
+	 * 新增的 MTK 私有 rvh 钩子 —— 独立钩子，比本树已有的 android_rvh_check_preempt_wakeup_fair
+	 * 多一个 next_buddy_marked 形参（port 树 kernel/sched/fair.c:9188/9190 两钩分别调用）。
+	 * 本树内核无该声明、无该调用点 ⇒ 注册函数不存在、回调永不会被触发，此处不再注册
+	 * （本树内行为等效：钩子调用点缺失时回调同样是死码）。vip_check_preempt_wakeup 本体保留。
+	 */
 
 	ret = register_trace_android_vh_scheduler_tick(vip_scheduler_tick, NULL);
 	if (ret)

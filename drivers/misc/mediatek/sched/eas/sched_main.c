@@ -998,7 +998,11 @@ static int __init mtk_scheduler_init(void)
 	struct proc_dir_entry *pe, *parent;
 	int ret = 0;
 
-	/* compile time checks for vendor data size */
+	/* compile time checks for vendor data size
+	 * rodin 6.18：本断言要求 task_struct vendor 数据槽 >= sizeof(struct mtk_task)
+	 * （实测 352 字节，mtk_tg 24 字节）；本树内核侧以 P2 例外提交把槽位恢复成 6.6
+	 * 布局的 64 槽（= port 树 rodin 补丁 bab062d943d5），该补丁回退时此断言立即失败。
+	 */
 	MTK_VENDOR_DATA_SIZE_TEST(struct mtk_task, struct task_struct);
 	MTK_VENDOR_DATA_SIZE_TEST(struct mtk_tg, struct task_group);
 
@@ -1067,20 +1071,19 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		return ret;
 
-	ret = register_trace_android_rvh_find_busiest_group(
-			mtk_find_busiest_group, NULL);
-	if (ret)
-		pr_info("register android_rvh_find_busiest_group failed\n");
-
+	/*
+	 * rodin 6.18：android_rvh_find_busiest_group 与 android_rvh_find_energy_efficient_cpu
+	 * 是 port 树内核兼容层（7747f66eeaf2）新加进 include/trace/hooks/sched.h 的 MTK 私有
+	 * rvh 钩子：本树内核（纯上游 android17-6.18-lts）既无声明也无调用点（调用点在 port 树
+	 * kernel/sched/fair.c:11744 / 8680）⇒ 注册函数不存在、回调在本树内永不会被触发，
+	 * 此处不再注册（本树内行为等效：调用点缺失时回调同样是死码）。回调本体保留：
+	 * mtk_find_energy_efficient_cpu 仍被 vip.c:1343 直接调用，mtk_find_busiest_group 作为
+	 * EAS 组选择实现留待钩子可用时复用。
+	 */
 	ret = register_trace_android_rvh_can_migrate_task(
 			mtk_can_migrate_task, NULL);
 	if (ret)
 		pr_info("register android_rvh_can_migrate_task failed\n");
-
-	ret = register_trace_android_rvh_find_energy_efficient_cpu(
-			mtk_find_energy_efficient_cpu, NULL);
-	if (ret)
-		pr_info("register android_rvh_find_energy_efficient_cpu failed\n");
 
 	ret = register_trace_android_rvh_cpu_overutilized(
 			mtk_cpu_overutilized, NULL);

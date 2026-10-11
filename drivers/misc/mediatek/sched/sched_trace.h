@@ -130,7 +130,9 @@ TRACE_EVENT(sched_fits_cap_ceiling,
 		__entry->uclamp_min			= uclamp_min;
 		__entry->uclamp_max			= uclamp_max;
 		__entry->cap				= cap;
-		__entry->thermal_pressure	= READ_ONCE(per_cpu(thermal_pressure, cpu));
+		/* 源符号：6.6 的 per-CPU thermal_pressure 在 6.18 上游改名为 hw_pressure
+		 * （同一变量；trace 字段名与打印格式保持不变） */
+		__entry->thermal_pressure	= READ_ONCE(per_cpu(hw_pressure, cpu));
 		__entry->ceiling			= ceiling;
 		__entry->sugov_margin	= sugov_margin;
 		__entry->capacity_dn_margin	= capacity_dn_margin;
