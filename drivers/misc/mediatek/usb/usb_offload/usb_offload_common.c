@@ -253,18 +253,18 @@ static void adsp_ee_recovery(void)
 
 	USB_OFFLOAD_INFO("ADSP EE ++ op:0x%08x, iman:0x%08X, erdp:0x%llX\n",
 			readl(&uodev->xhci->op_regs->status),
-			readl(&ir_set->irq_pending),
+			readl(&ir_set->iman),
 			xhci_read_64(uodev->xhci, &ir_set->erst_dequeue));
 
 	USB_OFFLOAD_INFO("// Disabling event ring interrupts\n");
 	temp = readl(&uodev->xhci->op_regs->status);
 	writel((temp & ~0x1fff) | STS_EINT, &uodev->xhci->op_regs->status);
-	temp = readl(&ir_set->irq_pending);
-	writel(ER_IRQ_DISABLE(temp), &ir_set->irq_pending);
+	temp = readl(&ir_set->iman);
+	writel(ER_IRQ_DISABLE(temp), &ir_set->iman);
 
-	irq_pending = readl(&ir_set->irq_pending);
+	irq_pending = readl(&ir_set->iman);
 	irq_pending |= IMAN_IP;
-	writel(irq_pending, &ir_set->irq_pending);
+	writel(irq_pending, &ir_set->iman);
 
 	temp_64 = xhci_read_64(uodev->xhci, &ir_set->erst_dequeue);
 	/* Clear the event handler busy flag (RW1C) */
@@ -275,7 +275,7 @@ static void adsp_ee_recovery(void)
 
 	USB_OFFLOAD_INFO("ADSP EE -- op:0x%08x, iman:0x%08X, erdp:0x%llX\n",
 			readl(&uodev->xhci->op_regs->status),
-			readl(&ir_set->irq_pending),
+			readl(&ir_set->iman),
 			xhci_read_64(uodev->xhci, &ir_set->erst_dequeue));
 }
 
@@ -2034,7 +2034,8 @@ static struct xhci_ring *xhci_mtk_alloc_ring(struct xhci_hcd *xhci,
 		ring->last_seg->trbs[USB_OFFLOAD_TRBS_PER_SEGMENT - 1].link.control |=
 			cpu_to_le32(LINK_TOGGLE);
 	}
-	xhci_initialize_ring_info_(ring, cycle_state);
+	xhci_initialize_ring_info_(ring);
+	ring->cycle_state = cycle_state;
 	return ring;
 
 fail:
@@ -2129,7 +2130,7 @@ static struct xhci_ring *xhci_mtk_alloc_transfer_ring(struct xhci_hcd *xhci,
 		/* place transfer ring on native dram
 		 * to prevent from occupying sram in non-offload mode
 		 */
-		ring = xhci_ring_alloc_(xhci, 2, 1, ring_type, max_packet, mem_flags);
+		ring = xhci_ring_alloc_(xhci, 2, ring_type, max_packet, mem_flags);
 		if (ring && ring->first_seg)
 			USB_OFFLOAD_MEM_DBG("(native ring) vir:%p phy:0x%llx\n", ring, ring->first_seg->dma);
 		return ring;
@@ -2376,10 +2377,18 @@ NOT_UNDER_MANAGED:
 static int xhci_mtk_create_sideband(struct usb_device *udev)
 {
 	struct xhci_sideband *sb;
+	struct usb_interface *intf;
 	int ret = 0;
 
-	/* register a sideband for this usb device */
-	sb = xhci_sideband_register_(udev);
+	/* 6.18 sideband API registers per usb_interface; offload tracks the
+	 * whole device, so bind to interface 0 (notifier is unused here).
+	 */
+	intf = usb_ifnum_to_if(udev, 0);
+	if (!intf) {
+		USB_OFFLOAD_ERR("no intf for sideband registration\n");
+		return -EINVAL;
+	}
+	sb = xhci_sideband_register_(intf, XHCI_SIDEBAND_VENDOR, NULL);
 	if (!sb) {
 		USB_OFFLOAD_ERR("fail creating sideband\n");
 		ret = -ENOMEM;
@@ -2389,14 +2398,17 @@ static int xhci_mtk_create_sideband(struct usb_device *udev)
 	/* 1. allocate a interrupter (including event ring and erst)
 	 * 2. set erst size and erst base in ir_set
 	 */
-	ret = xhci_sideband_create_interrupter_(sb, 1, XHCI1_INTR_TARGET, true);
+	ret = xhci_sideband_create_interrupter_(sb, 1, true,
+						uodev->xhci->imod_interval,
+						XHCI1_INTR_TARGET);
 	if (ret) {
 		USB_OFFLOAD_ERR("fail creating ir:%d, ret:%d\n", XHCI1_INTR_TARGET, ret);
 		goto error;
 	}
 
-	/* set imod's interval & set iman's IE(interrupter enable) */
-	ret = xhci_sideband_enable_interrupt_(sb, uodev->xhci->imod_interval);
+	/* imod interval is programmed by create_interrupter; 6.18 has no
+	 * sideband enable_interrupt, enable the interrupter IE directly */
+	ret = xhci_enable_interrupter_(sb->ir);
 	if (ret) {
 		USB_OFFLOAD_ERR("fail to enabling ir:%d, ret:%d\n",
 			xhci_sideband_interrupter_id_(sb), ret);
@@ -2429,10 +2441,8 @@ static void xhci_mtk_remove_sideband(struct xhci_sideband *sb)
 			USB_OFFLOAD_INFO("remove ir%d:%p\n", sb->ir->intr_num, sb->ir);
 			ir = sb->ir;
 			/* clear iman's IE(interrupter enable) */
-			xhci_disable_interrupter_(ir);
+			xhci_disable_interrupter_(xhci, ir);
 			mdelay(2);
-			/* set skip_events to clean pending event starting from last acked event */
-			ir->skip_events = true;
 			/* last acked event was erdp */
 			erdp_reg = xhci_read_64(xhci, &ir->ir_set->erst_dequeue);
 			deq = (dma_addr_t)(erdp_reg & ERST_PTR_MASK);

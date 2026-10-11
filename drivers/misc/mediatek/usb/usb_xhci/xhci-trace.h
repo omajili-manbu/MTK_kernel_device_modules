@@ -3,7 +3,6 @@
  * xHCI host controller driver
  *
  * Copyright (C) 2013 Xenia Ragiadakou
- * Copyright (C) 2022 MediaTek Inc.
  *
  * Author: Xenia Ragiadakou
  * Email : burzalodowa@gmail.com
@@ -36,12 +35,12 @@ DECLARE_EVENT_CLASS(xhci_log_msg,
 	TP_printk("%s", __get_str(msg))
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_address_mtk,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_address_,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_context_change_mtk,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_context_change_,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
@@ -51,12 +50,12 @@ DEFINE_EVENT(xhci_log_msg, xhci_dbg_quirks_,
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_reset_ep_mtk,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_reset_ep_,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_cancel_urb_mtk,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_cancel_urb_,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
@@ -66,7 +65,7 @@ DEFINE_EVENT(xhci_log_msg, xhci_dbg_init_,
 	TP_ARGS(vaf)
 );
 
-DEFINE_EVENT(xhci_log_msg, xhci_dbg_ring_expansion_mtk,
+DEFINE_EVENT(xhci_log_msg, xhci_dbg_ring_expansion_,
 	TP_PROTO(struct va_format *vaf),
 	TP_ARGS(vaf)
 );
@@ -102,16 +101,17 @@ DECLARE_EVENT_CLASS(xhci_log_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_ctx, xhci_address_ctx_mtk,
+DEFINE_EVENT(xhci_log_ctx, xhci_address_ctx_,
 	TP_PROTO(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx,
 		 unsigned int ep_num),
 	TP_ARGS(xhci, ctx, ep_num)
 );
 
 DECLARE_EVENT_CLASS(xhci_log_trb,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb),
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma),
 	TP_STRUCT__entry(
+		__field(dma_addr_t, dma)
 		__field(u32, type)
 		__field(u32, field0)
 		__field(u32, field1)
@@ -119,51 +119,54 @@ DECLARE_EVENT_CLASS(xhci_log_trb,
 		__field(u32, field3)
 	),
 	TP_fast_assign(
+		__entry->dma = dma;
 		__entry->type = ring->type;
 		__entry->field0 = le32_to_cpu(trb->field[0]);
 		__entry->field1 = le32_to_cpu(trb->field[1]);
 		__entry->field2 = le32_to_cpu(trb->field[2]);
 		__entry->field3 = le32_to_cpu(trb->field[3]);
 	),
-	TP_printk("%s: %s", xhci_ring_type_string(__entry->type),
+	TP_printk("%s: @%pad %s",
+		  xhci_ring_type_string(__entry->type), &__entry->dma,
 		  xhci_decode_trb(__get_buf(XHCI_MSG_MAX), XHCI_MSG_MAX, __entry->field0,
 				  __entry->field1, __entry->field2, __entry->field3)
 	)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_handle_event_mtk,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+DEFINE_EVENT(xhci_log_trb, xhci_handle_event_,
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_handle_command_mtk,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+DEFINE_EVENT(xhci_log_trb, xhci_handle_command_,
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
 );
 
 DEFINE_EVENT(xhci_log_trb, xhci_handle_transfer_,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_queue_trb_mtk,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+DEFINE_EVENT(xhci_log_trb, xhci_queue_trb_,
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
+
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_event_mtk,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_event_,
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_transfer_mtk,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+DEFINE_EVENT(xhci_log_trb, xhci_dbc_handle_transfer_,
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
 );
 
-DEFINE_EVENT(xhci_log_trb, xhci_dbc_gadget_ep_queue_mtk,
-	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb),
-	TP_ARGS(ring, trb)
+DEFINE_EVENT(xhci_log_trb, xhci_dbc_gadget_ep_queue_,
+	TP_PROTO(struct xhci_ring *ring, struct xhci_generic_trb *trb, dma_addr_t dma),
+	TP_ARGS(ring, trb, dma)
 );
 
 DECLARE_EVENT_CLASS(xhci_log_free_virt_dev,
@@ -173,8 +176,7 @@ DECLARE_EVENT_CLASS(xhci_log_free_virt_dev,
 		__field(void *, vdev)
 		__field(unsigned long long, out_ctx)
 		__field(unsigned long long, in_ctx)
-		__field(u8, fake_port)
-		__field(u8, real_port)
+		__field(int, slot_id)
 		__field(u16, current_mel)
 
 	),
@@ -182,17 +184,16 @@ DECLARE_EVENT_CLASS(xhci_log_free_virt_dev,
 		__entry->vdev = vdev;
 		__entry->in_ctx = (unsigned long long) vdev->in_ctx->dma;
 		__entry->out_ctx = (unsigned long long) vdev->out_ctx->dma;
-		__entry->fake_port = (u8) vdev->fake_port;
-		__entry->real_port = (u8) vdev->real_port;
+		__entry->slot_id = (int) vdev->slot_id;
 		__entry->current_mel = (u16) vdev->current_mel;
 		),
-	TP_printk("vdev %p ctx %llx | %llx fake_port %d real_port %d current_mel %d",
-		__entry->vdev, __entry->in_ctx, __entry->out_ctx,
-		__entry->fake_port, __entry->real_port, __entry->current_mel
+	TP_printk("vdev %p slot %d ctx %llx | %llx current_mel %d",
+		__entry->vdev, __entry->slot_id, __entry->in_ctx,
+		__entry->out_ctx, __entry->current_mel
 	)
 );
 
-DEFINE_EVENT(xhci_log_free_virt_dev, xhci_free_virt_device_mtk,
+DEFINE_EVENT(xhci_log_free_virt_dev, xhci_free_virt_device_,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
@@ -229,22 +230,22 @@ DECLARE_EVENT_CLASS(xhci_log_virt_dev,
 	)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_alloc_virt_device_mtk,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_alloc_virt_device_,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_device_mtk,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_device_,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_addressable_virt_device_mtk,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_setup_addressable_virt_device_,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
 
-DEFINE_EVENT(xhci_log_virt_dev, xhci_stop_device_mtk,
+DEFINE_EVENT(xhci_log_virt_dev, xhci_stop_device_,
 	TP_PROTO(struct xhci_virt_device *vdev),
 	TP_ARGS(vdev)
 );
@@ -253,6 +254,7 @@ DECLARE_EVENT_CLASS(xhci_log_urb,
 	TP_PROTO(struct urb *urb),
 	TP_ARGS(urb),
 	TP_STRUCT__entry(
+		__string(devname, dev_name(&urb->dev->dev))
 		__field(void *, urb)
 		__field(unsigned int, pipe)
 		__field(unsigned int, stream)
@@ -268,6 +270,7 @@ DECLARE_EVENT_CLASS(xhci_log_urb,
 		__field(int, slot_id)
 	),
 	TP_fast_assign(
+		__assign_str(devname);
 		__entry->urb = urb;
 		__entry->pipe = urb->pipe;
 		__entry->stream = urb->stream_id;
@@ -282,7 +285,8 @@ DECLARE_EVENT_CLASS(xhci_log_urb,
 		__entry->type = usb_endpoint_type(&urb->ep->desc);
 		__entry->slot_id = urb->dev->slot_id;
 	),
-	TP_printk("ep%d%s-%s: urb %p pipe %u slot %d length %d/%d sgs %d/%d stream %d flags %08x",
+	TP_printk("%s ep%d%s-%s: urb %p pipe %u slot %d length %d/%d sgs %d/%d stream %d flags %08x",
+			__get_str(devname),
 			__entry->epnum, __entry->dir_in ? "in" : "out",
 			__print_symbolic(__entry->type,
 				   { USB_ENDPOINT_XFER_INT,	"intr" },
@@ -310,6 +314,37 @@ DEFINE_EVENT(xhci_log_urb, xhci_urb_dequeue_,
 	TP_ARGS(urb)
 );
 
+DECLARE_EVENT_CLASS(xhci_log_stream_ctx,
+	TP_PROTO(struct xhci_stream_info *info, unsigned int stream_id),
+	TP_ARGS(info, stream_id),
+	TP_STRUCT__entry(
+		__field(unsigned int, stream_id)
+		__field(u64, stream_ring)
+		__field(dma_addr_t, ctx_array_dma)
+
+	),
+	TP_fast_assign(
+		__entry->stream_id = stream_id;
+		__entry->stream_ring = le64_to_cpu(info->stream_ctx_array[stream_id].stream_ring);
+		__entry->ctx_array_dma = info->ctx_array_dma + stream_id * 16;
+
+	),
+	TP_printk("stream %u ctx @%pad: SCT %llu deq %llx", __entry->stream_id,
+		&__entry->ctx_array_dma, CTX_TO_SCT(__entry->stream_ring),
+		__entry->stream_ring
+	)
+);
+
+DEFINE_EVENT(xhci_log_stream_ctx, xhci_alloc_stream_info_ctx_,
+	TP_PROTO(struct xhci_stream_info *info, unsigned int stream_id),
+	TP_ARGS(info, stream_id)
+);
+
+DEFINE_EVENT(xhci_log_stream_ctx, xhci_handle_cmd_set_deq_stream_,
+	TP_PROTO(struct xhci_stream_info *info, unsigned int stream_id),
+	TP_ARGS(info, stream_id)
+);
+
 DECLARE_EVENT_CLASS(xhci_log_ep_ctx,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx),
@@ -330,22 +365,22 @@ DECLARE_EVENT_CLASS(xhci_log_ep_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_stop_ep_mtk,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_stop_ep_,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_set_deq_ep_mtk,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_set_deq_ep_,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_reset_ep_mtk,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_reset_ep_,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_config_ep_mtk,
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_config_ep_,
 	TP_PROTO(struct xhci_ep_ctx *ctx),
 	TP_ARGS(ctx)
 );
@@ -376,47 +411,47 @@ DECLARE_EVENT_CLASS(xhci_log_slot_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_alloc_dev_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_alloc_dev_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_free_dev_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_free_dev_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_disable_slot_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_disable_slot_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_discover_or_reset_device_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_discover_or_reset_device_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_setup_device_slot_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_setup_device_slot_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_addr_dev_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_addr_dev_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_reset_dev_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_reset_dev_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_set_deq_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_set_deq_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
 
-DEFINE_EVENT(xhci_log_slot_ctx, xhci_configure_endpoint_mtk,
+DEFINE_EVENT(xhci_log_slot_ctx, xhci_configure_endpoint_,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
 );
@@ -436,12 +471,12 @@ DECLARE_EVENT_CLASS(xhci_log_ctrl_ctx,
 	)
 );
 
-DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_address_ctrl_ctx_mtk,
+DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_address_ctrl_ctx_,
 	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
 	TP_ARGS(ctrl_ctx)
 );
 
-DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_configure_endpoint_ctrl_ctx_mtk,
+DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_configure_endpoint_ctrl_ctx_,
 	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
 	TP_ARGS(ctrl_ctx)
 );
@@ -454,8 +489,6 @@ DECLARE_EVENT_CLASS(xhci_log_ring,
 		__field(void *, ring)
 		__field(dma_addr_t, enq)
 		__field(dma_addr_t, deq)
-		__field(dma_addr_t, enq_seg)
-		__field(dma_addr_t, deq_seg)
 		__field(unsigned int, num_segs)
 		__field(unsigned int, stream_id)
 		__field(unsigned int, cycle_state)
@@ -466,17 +499,15 @@ DECLARE_EVENT_CLASS(xhci_log_ring,
 		__entry->type = ring->type;
 		__entry->num_segs = ring->num_segs;
 		__entry->stream_id = ring->stream_id;
-		__entry->enq_seg = ring->enq_seg->dma;
-		__entry->deq_seg = ring->deq_seg->dma;
 		__entry->cycle_state = ring->cycle_state;
 		__entry->bounce_buf_len = ring->bounce_buf_len;
 		__entry->enq = xhci_trb_virt_to_dma_(ring->enq_seg, ring->enqueue);
 		__entry->deq = xhci_trb_virt_to_dma_(ring->deq_seg, ring->dequeue);
 	),
-	TP_printk("%s %p: enq %pad(%pad) deq %pad(%pad) segs %d stream %d bounce %d cycle %d",
+	TP_printk("%s %p: enq %pad deq %pad segs %d stream %d bounce %d cycle %d",
 			xhci_ring_type_string(__entry->type), __entry->ring,
-			&__entry->enq, &__entry->enq_seg,
-			&__entry->deq, &__entry->deq_seg,
+			&__entry->enq,
+			&__entry->deq,
 			__entry->num_segs,
 			__entry->stream_id,
 			__entry->bounce_buf_len,
@@ -494,51 +525,54 @@ DEFINE_EVENT(xhci_log_ring, xhci_ring_free_,
 	TP_ARGS(ring)
 );
 
-DEFINE_EVENT(xhci_log_ring, xhci_ring_expansion_mtk,
+DEFINE_EVENT(xhci_log_ring, xhci_ring_expansion_,
 	TP_PROTO(struct xhci_ring *ring),
 	TP_ARGS(ring)
 );
 
-DEFINE_EVENT(xhci_log_ring, xhci_inc_enq_mtk,
+DEFINE_EVENT(xhci_log_ring, xhci_inc_enq_,
 	TP_PROTO(struct xhci_ring *ring),
 	TP_ARGS(ring)
 );
 
-DEFINE_EVENT(xhci_log_ring, xhci_inc_deq_mtk,
+DEFINE_EVENT(xhci_log_ring, xhci_inc_deq_,
 	TP_PROTO(struct xhci_ring *ring),
 	TP_ARGS(ring)
 );
 
 DECLARE_EVENT_CLASS(xhci_log_portsc,
-		    TP_PROTO(u32 portnum, u32 portsc),
-		    TP_ARGS(portnum, portsc),
-		    TP_STRUCT__entry(
-				     __field(u32, portnum)
-				     __field(u32, portsc)
-				     ),
-		    TP_fast_assign(
-				   __entry->portnum = portnum;
-				   __entry->portsc = portsc;
-				   ),
-		    TP_printk("port-%d: %s",
-			      __entry->portnum,
-			      xhci_decode_portsc(__get_buf(XHCI_MSG_MAX), __entry->portsc)
-			      )
+	TP_PROTO(struct xhci_port *port, u32 portsc),
+	TP_ARGS(port, portsc),
+	TP_STRUCT__entry(
+		__field(u32, busnum)
+		__field(u32, portnum)
+		__field(u32, portsc)
+	),
+	TP_fast_assign(
+		__entry->busnum = port->rhub->hcd->self.busnum;
+		__entry->portnum = port->hcd_portnum + 1;
+		__entry->portsc = portsc;
+	),
+	TP_printk("port %d-%d: %s",
+		__entry->busnum,
+		__entry->portnum,
+		xhci_decode_portsc(__get_buf(XHCI_MSG_MAX), __entry->portsc)
+	)
 );
 
-DEFINE_EVENT(xhci_log_portsc, xhci_handle_port_status_mtk,
-	     TP_PROTO(u32 portnum, u32 portsc),
-	     TP_ARGS(portnum, portsc)
+DEFINE_EVENT(xhci_log_portsc, xhci_handle_port_status_,
+	     TP_PROTO(struct xhci_port *port, u32 portsc),
+	     TP_ARGS(port, portsc)
 );
 
-DEFINE_EVENT(xhci_log_portsc, xhci_get_port_status_mtk,
-	     TP_PROTO(u32 portnum, u32 portsc),
-	     TP_ARGS(portnum, portsc)
+DEFINE_EVENT(xhci_log_portsc, xhci_get_port_status_,
+	     TP_PROTO(struct xhci_port *port, u32 portsc),
+	     TP_ARGS(port, portsc)
 );
 
-DEFINE_EVENT(xhci_log_portsc, xhci_hub_status_data_mtk,
-	     TP_PROTO(u32 portnum, u32 portsc),
-	     TP_ARGS(portnum, portsc)
+DEFINE_EVENT(xhci_log_portsc, xhci_hub_status_data_,
+	     TP_PROTO(struct xhci_port *port, u32 portsc),
+	     TP_ARGS(port, portsc)
 );
 
 DECLARE_EVENT_CLASS(xhci_log_doorbell,
@@ -557,12 +591,12 @@ DECLARE_EVENT_CLASS(xhci_log_doorbell,
 	)
 );
 
-DEFINE_EVENT(xhci_log_doorbell, xhci_ring_ep_doorbell_mtk,
+DEFINE_EVENT(xhci_log_doorbell, xhci_ring_ep_doorbell_,
 	     TP_PROTO(u32 slot, u32 doorbell),
 	     TP_ARGS(slot, doorbell)
 );
 
-DEFINE_EVENT(xhci_log_doorbell, xhci_ring_host_doorbell_mtk,
+DEFINE_EVENT(xhci_log_doorbell, xhci_ring_host_doorbell_,
 	     TP_PROTO(u32 slot, u32 doorbell),
 	     TP_ARGS(slot, doorbell)
 );
@@ -591,22 +625,22 @@ DECLARE_EVENT_CLASS(xhci_dbc_log_request,
 	)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_alloc_request_mtk,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_alloc_request_,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_free_request_mtk,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_free_request_,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_queue_request_mtk,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_queue_request_,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );
 
-DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_giveback_request_mtk,
+DEFINE_EVENT(xhci_dbc_log_request, xhci_dbc_giveback_request_,
 	TP_PROTO(struct dbc_request *req),
 	TP_ARGS(req)
 );

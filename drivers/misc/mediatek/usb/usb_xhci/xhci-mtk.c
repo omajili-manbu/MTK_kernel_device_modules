@@ -1222,7 +1222,7 @@ MODULE_DEVICE_TABLE(of, mtk_xhci_p2_of_match);
 
 static struct platform_driver mtk_xhci_p2_driver = {
 	.probe	= xhci_mtk_probe,
-	.remove_new	= xhci_mtk_remove,
+	.remove	= xhci_mtk_remove,
 	.driver	= {
 		.name = "xhci-mtk-p2",
 		.pm = DEV_PM_OPS,
@@ -1238,7 +1238,7 @@ MODULE_DEVICE_TABLE(of, mtk_xhci_p1_of_match);
 
 static struct platform_driver mtk_xhci_p1_driver = {
 	.probe	= xhci_mtk_probe,
-	.remove_new = xhci_mtk_remove,
+	.remove = xhci_mtk_remove,
 	.driver	= {
 		.name = "xhci-mtk-p1",
 		.pm = DEV_PM_OPS,
@@ -1256,7 +1256,7 @@ MODULE_DEVICE_TABLE(of, mtk_xhci_of_match);
 
 static struct platform_driver mtk_xhci_driver = {
 	.probe	= xhci_mtk_probe,
-	.remove_new = xhci_mtk_remove,
+	.remove = xhci_mtk_remove,
 	.driver	= {
 		.name = "xhci-mtk",
 		.pm = DEV_PM_OPS,

@@ -431,7 +431,7 @@ static void hid_giveback_urb(struct work_struct *work_struct)
 			}
 			hid_info("%s ring was abnormal, reset whole ring\n", hid->name);
 			xhci_stop_hid_ep(hid);
-			xhci_initialize_ring_info_(ring, 1);
+			xhci_initialize_ring_info_(ring);
 			hid->cur_enqueue = ring->enqueue;
 			hid->cycle_state = ring->cycle_state;
 			xhci_hid_move_deq(hid, ring->enq_seg, ring->enqueue, ring->cycle_state);
@@ -647,7 +647,7 @@ static void hid_reset(struct hid_ep_info *hid)
 	} else {
 		if (!ret || hid_direct_reset) {
 			hid_info("reset whole ring, hid_direct_reset=%d\n", hid_direct_reset);
-			xhci_initialize_ring_info_(ring, 1);
+			xhci_initialize_ring_info_(ring);
 			hid->cur_enqueue = ring->enqueue;
 			hid->cycle_state = ring->cycle_state;
 		} else

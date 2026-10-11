@@ -194,7 +194,7 @@ static void xhci_dbc_giveback(struct dbc_request *req, int status)
 	if (req->status == -EINPROGRESS)
 		req->status = status;
 
-	trace_xhci_dbc_giveback_request_mtk(req);
+	trace_xhci_dbc_giveback_request_(req);
 
 	dma_unmap_single(dev,
 			 req->dma,
@@ -257,7 +257,7 @@ dbc_alloc_request(struct xhci_dbc *dbc, unsigned int direction, gfp_t flags)
 	INIT_LIST_HEAD(&req->list_pool);
 	req->direction = direction;
 
-	trace_xhci_dbc_alloc_request_mtk(req);
+	trace_xhci_dbc_alloc_request_(req);
 
 	return req;
 }
@@ -265,7 +265,7 @@ dbc_alloc_request(struct xhci_dbc *dbc, unsigned int direction, gfp_t flags)
 void
 dbc_free_request(struct dbc_request *req)
 {
-	trace_xhci_dbc_free_request_mtk(req);
+	trace_xhci_dbc_free_request_(req);
 
 	kfree(req);
 }
@@ -282,7 +282,8 @@ xhci_dbc_queue_trb(struct xhci_ring *ring, u32 field1,
 	trb->generic.field[2]	= cpu_to_le32(field3);
 	trb->generic.field[3]	= cpu_to_le32(field4);
 
-	trace_xhci_dbc_gadget_ep_queue_mtk(ring, &trb->generic);
+	trace_xhci_dbc_gadget_ep_queue_(ring, &trb->generic,
+					xhci_trb_virt_to_dma_(ring->enq_seg, ring->enqueue));
 	ring->num_trbs_free--;
 	next = ++(ring->enqueue);
 	if (TRB_TYPE_LINK_LE32(next->link.control)) {
@@ -399,7 +400,7 @@ int dbc_ep_queue(struct dbc_request *req)
 
 	mod_delayed_work(system_wq, &dbc->event_work, 0);
 
-	trace_xhci_dbc_queue_request_mtk(req);
+	trace_xhci_dbc_queue_request_(req);
 
 	return ret;
 }
@@ -482,7 +483,7 @@ static void xhci_dbc_ring_init(struct xhci_ring *ring)
 		trb->link.segment_ptr = cpu_to_le64(ring->first_seg->dma);
 		trb->link.control = cpu_to_le32(LINK_TOGGLE | TRB_TYPE(TRB_LINK));
 	}
-	xhci_initialize_ring_info_(ring, 1);
+	xhci_initialize_ring_info_(ring);
 }
 
 static int xhci_dbc_reinit_ep_rings(struct xhci_dbc *dbc)
@@ -814,7 +815,7 @@ static void dbc_handle_xfer_event(struct xhci_dbc *dbc, union xhci_trb *event)
 		return;
 	}
 
-	trace_xhci_dbc_handle_transfer_mtk(ring, &req->trb->generic);
+	trace_xhci_dbc_handle_transfer_(ring, &req->trb->generic, req->trb_dma);
 
 	switch (comp_code) {
 	case COMP_SUCCESS:
@@ -967,7 +968,9 @@ static enum evtreturn xhci_dbc_do_handle_events(struct xhci_dbc *dbc)
 		 */
 		rmb();
 
-		trace_xhci_dbc_handle_event_mtk(dbc->ring_evt, &evt->generic);
+		trace_xhci_dbc_handle_event_(dbc->ring_evt, &evt->generic,
+					xhci_trb_virt_to_dma_(dbc->ring_evt->deq_seg,
+							     dbc->ring_evt->dequeue));
 
 		switch (le32_to_cpu(evt->event_cmd.flags) & TRB_TYPE_BITMASK) {
 		case TRB_TYPE(TRB_PORT_STATUS):
@@ -1478,7 +1481,7 @@ void xhci_dbc_remove(struct xhci_dbc *dbc)
 }
 
 
-int xhci_create_dbc_dev(struct xhci_hcd *xhci)
+int xhci_create_dbc_dev_(struct xhci_hcd *xhci)
 {
 	struct device		*dev;
 	void __iomem		*base;
@@ -1502,7 +1505,7 @@ int xhci_create_dbc_dev(struct xhci_hcd *xhci)
 	return ret;
 }
 
-void xhci_remove_dbc_dev(struct xhci_hcd *xhci)
+void xhci_remove_dbc_dev_(struct xhci_hcd *xhci)
 {
 	unsigned long		flags;
 
@@ -1516,7 +1519,7 @@ void xhci_remove_dbc_dev(struct xhci_hcd *xhci)
 }
 
 #ifdef CONFIG_PM
-int xhci_dbc_suspend(struct xhci_hcd *xhci)
+int xhci_dbc_suspend_(struct xhci_hcd *xhci)
 {
 	struct xhci_dbc		*dbc = xhci->dbc;
 
@@ -1538,7 +1541,7 @@ int xhci_dbc_suspend(struct xhci_hcd *xhci)
 	return 0;
 }
 
-int xhci_dbc_resume(struct xhci_hcd *xhci)
+int xhci_dbc_resume_(struct xhci_hcd *xhci)
 {
 	int			ret = 0;
 	struct xhci_dbc		*dbc = xhci->dbc;

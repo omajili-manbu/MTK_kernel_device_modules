@@ -232,8 +232,8 @@ static inline struct dbc_ep *get_out_ep(struct xhci_dbc *dbc)
 }
 
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_USB_XHCI_MTK)
-int xhci_create_dbc_dev(struct xhci_hcd *xhci);
-void xhci_remove_dbc_dev(struct xhci_hcd *xhci);
+int xhci_create_dbc_dev_(struct xhci_hcd *xhci);
+void xhci_remove_dbc_dev_(struct xhci_hcd *xhci);
 int xhci_dbc_init(void);
 void xhci_dbc_exit(void);
 int dbc_tty_init(void);
@@ -249,16 +249,16 @@ struct dbc_request *dbc_alloc_request(struct xhci_dbc *dbc,
 void dbc_free_request(struct dbc_request *req);
 int dbc_ep_queue(struct dbc_request *req);
 #ifdef CONFIG_PM
-int xhci_dbc_suspend(struct xhci_hcd *xhci);
-int xhci_dbc_resume(struct xhci_hcd *xhci);
+int xhci_dbc_suspend_(struct xhci_hcd *xhci);
+int xhci_dbc_resume_(struct xhci_hcd *xhci);
 #endif /* CONFIG_PM */
 #else
-static inline int xhci_create_dbc_dev(struct xhci_hcd *xhci)
+static inline int xhci_create_dbc_dev_(struct xhci_hcd *xhci)
 {
 	return 0;
 }
 
-static inline void xhci_remove_dbc_dev(struct xhci_hcd *xhci)
+static inline void xhci_remove_dbc_dev_(struct xhci_hcd *xhci)
 {
 }
 static inline int xhci_dbc_init(void)
@@ -268,12 +268,12 @@ static inline int xhci_dbc_init(void)
 static inline void xhci_dbc_exit(void)
 {
 }
-static inline int xhci_dbc_suspend(struct xhci_hcd *xhci)
+static inline int xhci_dbc_suspend_(struct xhci_hcd *xhci)
 {
 	return 0;
 }
 
-static inline int xhci_dbc_resume(struct xhci_hcd *xhci)
+static inline int xhci_dbc_resume_(struct xhci_hcd *xhci)
 {
 	return 0;
 }
