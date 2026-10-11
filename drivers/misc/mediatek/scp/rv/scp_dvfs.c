@@ -27,7 +27,7 @@
 #include <linux/sched.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h> /* for SMC ID table */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/suspend.h>

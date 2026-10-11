@@ -23,7 +23,7 @@
 #include <linux/sched/clock.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/signal.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h> /* for SMC ID table */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 #include <linux/spinlock.h>
 #include <linux/suspend.h>
 #include <linux/sysrq.h>
@@ -510,23 +510,16 @@ static void kwdt_time_sync(void)
 		(unsigned int)(tv_android.tv_nsec / 1000));
 }
 
-#if IS_ENABLED(CONFIG_ARM64)
-static int irq_to_ipi_type(int irq)
-{
-	struct irq_desc **ipi_desc = ipi_desc_get();
-	struct irq_desc *desc = irq_to_desc(irq);
-	int nr_ipi = nr_ipi_get();
-	int i = 0;
-
-	if (!ipi_desc || !desc)
-		return -1;
-
-	for (i = 0; i < nr_ipi; i++)
-		if (ipi_desc[i] == desc)
-			return i;
-	return -1;
-}
-#else
+/*
+ * rodin P1: 6.18 dropped arch/arm64's ipi_desc[] array and its
+ * ipi_desc_get() accessor (the 6.6/port kernels export both, nr_ipi_get()
+ * is still exported), so the arm64 fast path no longer builds.  Use this
+ * file's own portable enumeration instead: walk the irq descriptors and
+ * count those whose action is named "IPI".  On arm64/GICv3 the IPI
+ * descriptors are a single linear range installed in IPI enum order
+ * (set_smp_ipi_range -> ncpus == 0 -> ipi_setup_sgi, irq = ipi_irq_base + i),
+ * so the ordinal equals the index the old ipi_desc[i] loop returned.
+ */
 static int irq_to_ipi_type(int irq)
 {
 	int temp_irq = 0;
@@ -546,7 +539,6 @@ static int irq_to_ipi_type(int irq)
 	}
 	return -1;
 }
-#endif
 
 #define MAX_HWT_IRQ_FILE_SIZE SZ_128K
 #define MAX_HWT_IRQ_BUF_SIZE (MAX_HWT_IRQ_FILE_SIZE / 2)

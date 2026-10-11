@@ -7,7 +7,7 @@
 #define __MODEM_SECURE_BASE_H__
 
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 
 enum CCCI_SECURE_REQ_ID {
 	MD_DBGSYS_REG_DUMP = 0,

@@ -13,7 +13,7 @@
 #include <linux/sched/clock.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/of.h> /* rodin b4: 6.18 header pruning */
 
 #include <sound/soc.h>

@@ -21,7 +21,7 @@
 #include <linux/reset.h>
 #include <linux/pm_domain.h>
 #include <linux/regmap.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/mfd/syscon.h>
 
 #include "mtu3.h"

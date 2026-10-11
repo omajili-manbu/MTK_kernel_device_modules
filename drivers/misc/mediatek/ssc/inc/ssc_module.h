@@ -8,7 +8,7 @@
 #define __SSC_MODULE_H__
 
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/kobject.h>
 
 extern struct kobject *ssc_kobj;

@@ -27,7 +27,7 @@
 #include <linux/suspend.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/arm-smccc.h>
 #if IS_ENABLED(CONFIG_VHOST_CMDQ)
 #include <linux/libnvdimm.h>

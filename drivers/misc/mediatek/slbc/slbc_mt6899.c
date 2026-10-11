@@ -50,7 +50,7 @@
 #endif /* CONFIG_MTK_L3C_PART */
 
 #include <linux/arm-smccc.h>    /* for Kernel Native SMC API */
-#include <linux/soc/mediatek/mtk_sip_svc.h> /* for SMC ID table */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 
 enum mtk_slbc_kernel_ops {
 	MTK_SLBC_KERNEL_OP_CPU_DCC = 0,

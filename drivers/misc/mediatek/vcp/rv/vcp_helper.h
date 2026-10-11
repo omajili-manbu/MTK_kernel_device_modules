@@ -10,7 +10,7 @@
 #include <linux/notifier.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include "vcp_reg.h"
 #include "vcp_feature_define.h"
 #include "vcp_status.h"

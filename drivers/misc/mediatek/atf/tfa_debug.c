@@ -17,7 +17,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sched/clock.h>
 #include <linux/slab.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 

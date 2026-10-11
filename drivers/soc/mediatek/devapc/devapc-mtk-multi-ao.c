@@ -14,7 +14,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sched/debug.h>
 #include <linux/uaccess.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/soc/mediatek/devapc_public.h>
 #ifdef CONFIG_MTK_SERROR_HOOK
 #include <trace/hooks/traps.h>

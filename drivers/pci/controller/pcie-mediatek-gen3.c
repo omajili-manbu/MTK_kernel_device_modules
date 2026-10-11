@@ -32,7 +32,7 @@
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/spinlock.h>
 #if IS_ENABLED(CONFIG_ANDROID_FIX_PCIE_SLAVE_ERROR)
 #include <trace/hooks/traps.h>

@@ -11,7 +11,7 @@
 #include <linux/suspend.h>
 #include <linux/arm-smccc.h>    /* for Kernel Native SMC API */
 #include <linux/pm_domain.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h> /* for SMC ID table */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_DEVAPC)
 #include <linux/soc/mediatek/devapc_public.h>
 #endif
