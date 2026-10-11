@@ -1978,13 +1978,23 @@ struct xhci_hcd {
 
 /*
  * Layout guardrail: the MTK fork must stay byte-identical with the
- * kernel-tree (6.18) struct xhci_hcd across the whole shared prefix,
- * so a #118-class cross-unit layout drift becomes a compile error.
+ * kernel-tree struct xhci_hcd across the whole shared prefix, so a
+ * #118-class cross-unit layout drift becomes a compile error.
+ *
+ * 期望值随**本树内核布局**走：本树 = 纯上游 android17-6.18-lts（dbc 2768 / sizeof 2808）。
+ * port 树（bsp-rodin-c-port）同位置是 2824 / 2864，差的 56B 来自那边内核侧的 rodin
+ * 兼容层提交 7747f66eeaf2（M0+M1 6.6 厂商模块兼容层·结构体布局还原）：它给
+ * include/linux/{workqueue,timer,hrtimer,mutex}_types.h 等内核头补回了 6.6 时代的
+ * ANDROID_KABI_RESERVE 保留位（struct work_struct 48 vs 32、timer_list 56 vs 40 …），
+ * struct xhci_hcd 内嵌这些类型故整体大 56B。
+ * ⇒ 本树若引入该兼容层、或内核升级改动这些结构体，必须同步改下面两个数；
+ *   跨单元的真校验由 pahole 门禁承担（vendor xhci.o DWARF vs 内核 vmlinux BTF，
+ *   同一棵树内 config 自洽；port 树的 tools/_b244_xhci_align/layout_gate.sh 即此形态）。
  */
-_Static_assert(__builtin_offsetof(struct xhci_hcd, dbc) == 2824,
-	       "xhci_hcd.dbc offset drifted from the 6.18 kernel layout (2824)");
-_Static_assert(sizeof(struct xhci_hcd) == 2864,
-	       "xhci_hcd size drifted from the 6.18 kernel layout (2864)");
+_Static_assert(__builtin_offsetof(struct xhci_hcd, dbc) == 2768,
+	       "xhci_hcd.dbc offset drifted from this tree's kernel layout (2768)");
+_Static_assert(sizeof(struct xhci_hcd) == 2808,
+	       "xhci_hcd size drifted from this tree's kernel layout (2808)");
 
 /* Platform specific overrides to generic XHCI hc_driver ops */
 struct xhci_driver_overrides {
