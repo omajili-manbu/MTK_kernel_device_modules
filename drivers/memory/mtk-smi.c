@@ -17,7 +17,7 @@
 #include <linux/pm_opp.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 #include <dt-bindings/memory/mt2701-larb-port.h>
 #include <dt-bindings/memory/mtk-memory-port.h>
 #include <../misc/mediatek/include/mt-plat/aee.h>
@@ -730,7 +730,9 @@ mtk_smi_larb_bind(struct device *dev, struct device *master, void *data)
 				dev_notice(dev,
 					"[SMI]larb%d bind ptr_mmu:0x%lx val_mmu_32:0x%x bit32:%u\n",
 					i, (unsigned long)larb->mmu, *((unsigned int *)(larb->mmu)),
-					larb->bank[i]);
+					/* rodin stage1: bank[] is portid-indexed (portid <= 31);
+					 * keep the log intent (this larb's bank value). */
+					larb->bank[0]);
 			return 0;
 		}
 	}

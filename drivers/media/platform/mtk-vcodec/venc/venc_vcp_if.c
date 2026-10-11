@@ -9,7 +9,7 @@
 #include <linux/soc/mediatek/mtk_tinysys_ipi.h>
 #include <linux/mtk_vcu_controls.h>
 #include <linux/delay.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 #include <media/v4l2-mem2mem.h>
 #include <linux/sched.h>
 #include <uapi/linux/sched/types.h>

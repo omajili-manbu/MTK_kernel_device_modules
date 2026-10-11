@@ -6,6 +6,8 @@
 #ifndef __MTK_SMI_DEBUG_H
 #define __MTK_SMI_DEBUG_H
 
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
+
 #define MAX_MON_REQ	(4)
 
 enum smi_mon_id {

@@ -33,7 +33,7 @@
 #include <linux/soc/mediatek/infracfg.h>
 #include <linux/arm-smccc.h>
 #include <asm/barrier.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 #if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG)
 #include <../misc/mediatek/iommu/iommu_debug.h>
 #endif

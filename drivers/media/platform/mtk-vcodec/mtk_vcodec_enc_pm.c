@@ -11,7 +11,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/delay.h>
 #include <linux/jiffies.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 
 #include "mtk_vcodec_enc_pm.h"
 #include "mtk_vcodec_enc_pm_plat.h"

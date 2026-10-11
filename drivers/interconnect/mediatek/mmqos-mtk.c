@@ -19,7 +19,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/soc/mediatek/mtk_mmdvfs.h>
 #include <linux/sched/clock.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 #include <soc/mediatek/dramc.h>
 #include <soc/mediatek/mmdvfs_v3.h>
 #include "mtk_iommu.h"

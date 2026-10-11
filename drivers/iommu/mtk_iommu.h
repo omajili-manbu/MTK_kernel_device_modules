@@ -18,7 +18,7 @@
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
 #include <linux/dma-mapping.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 
 /* rodin: upstream smi.h gates struct mtk_smi_larb_iommu behind CONFIG_MTK_SMI;
  * the smi driver stays a blob and the kernel tree is untouched, so keep the
@@ -57,8 +57,9 @@ struct mtk_smi_larb_iommu {
 #undef MTK_LARB_NR_MAX
 #define MTK_LARB_NR_MAX		64
 
-/* rodin stage2: fallback removed -- the vendor smi.h is ported into
- * include/soc/mediatek/smi.h and always provides struct mtk_smi_larb_iommu. */
+/* rodin stage1: this fallback stays inert -- the internal header
+ * (soc/mediatek/mtk_smi_internal.h) defines the struct first and takes
+ * the shared MTK_SMI_LARB_IOMMU_RODIN_FALLBACK guard. */
 /* MTK_SMI_MMU_EN needs its own guard: the struct guard above may already
  * have been consumed by mtk-smmu-v3.h in the same TU. */
 #ifndef MTK_SMI_MMU_EN

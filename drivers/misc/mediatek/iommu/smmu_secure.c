@@ -12,6 +12,13 @@
 #include "smmu_secure.h"
 #include "iommu_debug.h"
 
+/* rodin stage1: the kernel tree's mtk_sip_svc.h (which wins the include race)
+ * lacks the vendor IOMMU SMC id; value mirrors the vendor copy
+ * (include/linux/soc/mediatek/mtk_sip_svc.h, == upstream name for 0x514). */
+#ifndef MTK_IOMMU_SECURE_CONTROL
+#define MTK_IOMMU_SECURE_CONTROL	MTK_SIP_SMC_CMD(0x514)
+#endif
+
 #define SMMU_SUCCESS			(0)
 #define SMMU_ID_ERR			(1)
 #define SMMU_CMD_ERR			(2)

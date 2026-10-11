@@ -18,7 +18,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/sched/clock.h>
 #include <linux/slab.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 #include "mtk-smi-dbg.h"
 #if IS_ENABLED(CONFIG_MTK_EMI)
 #include <soc/mediatek/emi.h>

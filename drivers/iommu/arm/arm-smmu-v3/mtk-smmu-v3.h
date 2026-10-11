@@ -13,7 +13,7 @@
 #include <linux/of_platform.h> /* rodin r25: of_find_device_by_node */
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <linux/interrupt.h>
-#include <soc/mediatek/smi.h>
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin stage1: vendor smi.h content moved here (kernel shadow) */
 
 #include <dt-bindings/memory/mtk-memory-port.h>
 #include "arm-smmu-v3.h"
@@ -40,8 +40,9 @@ struct mtk_smi_larb_iommu {
 /* rodin r25: 6.18 gates this struct behind CONFIG_MTK_SMI; the smi driver is
  * a blob in this batch, so keep the identical upstream layout available.
  * RODIN_..._FALLBACK is shared with mtk_iommu.h (same-TU collision). */
-/* rodin stage2: local fallback removed -- the vendor smi.h is now ported
- * into include/soc/mediatek/smi.h and always provides struct mtk_smi_larb_iommu. */
+/* rodin stage1: local copy inert -- the internal header
+ * (soc/mediatek/mtk_smi_internal.h) defines the struct first and takes
+ * the shared MTK_SMI_LARB_IOMMU_RODIN_FALLBACK guard. */
 
 #if (IS_ENABLED(CONFIG_DEVICE_MODULES_ARM_SMMU_V3) && \
 	IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG))
