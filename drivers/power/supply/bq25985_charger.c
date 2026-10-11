@@ -1412,7 +1412,11 @@ static int bq25985_power_supply_init(struct bq25985_device *bq,//?????
 							struct device *dev)
 {
 	struct power_supply_config psy_cfg = { .drv_data = bq,
-						.of_node = dev->of_node, };
+						/* rodin: 6.18 dropped of_node from power_supply_config; the core
+						 * now does device_set_node(dev, cfg->fwnode), so passing the
+						 * node's fwnode keeps the old OF association unchanged.
+						 */
+						.fwnode = of_fwnode_handle(dev->of_node), };
 
 	psy_cfg.supplied_to = bq25985_charger_supplied_to;
 	psy_cfg.num_supplicants = ARRAY_SIZE(bq25985_charger_supplied_to);

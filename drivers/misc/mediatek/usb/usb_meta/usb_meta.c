@@ -20,6 +20,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
+#include "android_configfs_uevent.h" /* android_set_unconfigured（-I./drivers/usb/gadget 在面） */
 #include <linux/of_device.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -40,9 +41,21 @@ MODULE_VERSION("2.0");
 extern void bootprof_log_boot(char *str);
 #endif
 
-#if !IS_BUILTIN(CONFIG_MTK_USB_META)
+/*
+ * rodin: 6.18 removed usb_remove_config() from the kernel entirely
+ * (upstream 227280ad66ac "usb: gadget: Remove unused usb_remove_config"),
+ * so no kernel build provides it anymore and the old "the kernel provides
+ * it when built-in" assumption no longer holds.  Keep the 6.6 copy in
+ * every configuration, as a file-local (static) helper so it can never
+ * clash with a kernel-provided definition.
+ */
 /****************************************************
  *   Begin - copy function from composite.c
+ *
+ * 同步契约（rodin b247 复审）：本块是 composite.c 的**手工副本**，内核演进
+ * 不会带动它。2026-10-12 复审实测 reset_config 曾落后内核两处行为
+ * （func_wakeup_armed 复位、android_set_unconfigured），已按内核 6.18 原文补齐；
+ * 此后任何"重开副本块/改一处"的改动，都必须对 composite.c 同名函数**逐行核对**。
  ****************************************************/
 static void reset_config(struct usb_composite_dev *cdev)
 {
@@ -54,9 +67,13 @@ static void reset_config(struct usb_composite_dev *cdev)
 		if (f->disable)
 			f->disable(f);
 
+		/* Section 9.1.1.6, disable remote wakeup when device is reset */
+		f->func_wakeup_armed = false;
+
 		bitmap_zero(f->endpoints, 32);
 	}
 	cdev->config = NULL;
+	android_set_unconfigured(&cdev->android_opts);
 	cdev->delayed_status = 0;
 }
 
@@ -79,7 +96,7 @@ static void remove_config(struct usb_composite_dev *cdev,
 	}
 }
 
-void usb_remove_config(struct usb_composite_dev *cdev,
+static void usb_meta_remove_config(struct usb_composite_dev *cdev,
 		      struct usb_configuration *config)
 {
 	unsigned long flags;
@@ -93,7 +110,6 @@ void usb_remove_config(struct usb_composite_dev *cdev,
 
 	remove_config(cdev, config);
 }
-#endif
 /****************************************************
  *   End - copy function from composite.c
  ****************************************************/
@@ -300,7 +316,7 @@ static void android_disable(struct android_dev *dev)
 		usb_gadget_disconnect(cdev->gadget);
 		/* Cancel pending control requests */
 		usb_ep_dequeue(cdev->gadget->ep0, cdev->req);
-		usb_remove_config(cdev, &android_config_driver);
+		usb_meta_remove_config(cdev, &android_config_driver);
 	}
 }
 

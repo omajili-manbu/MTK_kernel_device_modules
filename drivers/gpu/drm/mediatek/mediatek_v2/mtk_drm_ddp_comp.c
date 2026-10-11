@@ -22,6 +22,21 @@
 #include "iommu_debug.h"
 #endif
 #include <dt-bindings/memory/mtk-memory-port.h>
+/*
+ * rodin A-92: the kernel tree's dt-bindings/memory/mtk-memory-port.h caps
+ * MTK_M4U_TO_LARB at a 5-bit mask (0x1f, MTK_LARB_NR_MAX 32), while mt6899
+ * has larbs up to 42 (mt6899-larb-port.h: M4U_L32..M4U_L42) and the vendor
+ * value is a 6-bit mask.  In this build the vendor increment only reaches
+ * this TU transitively (iommu_debug.h -> mtk_iommu.h ->
+ * mtk_smi_internal.h, and only when CONFIG_MTK_IOMMU_MISC_DBG is on), so
+ * anchor it here and make the larb decode independent of that chain/config.
+ * (A bare #ifndef is not enough: the kernel copy does define the macro and
+ * would win silently.)  MTK_M4U_TO_PORT is (id & 0x1f) in both copies, so
+ * only TO_LARB needed the override; values for larb < 32 are unchanged
+ * (larb & 0x1f == larb & 0x3f, the DISP L21 case still decodes 21).
+ */
+#undef MTK_M4U_TO_LARB
+#define MTK_M4U_TO_LARB(id)		(((id) >> 5) & 0x3f)
 
 #include "mtk_drm_drv.h"
 #include "mtk_drm_plane.h"

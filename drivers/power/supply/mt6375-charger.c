@@ -3224,9 +3224,12 @@ static int mt6375_chg_get_iio_adc(struct mt6375_chg_data *ddata)
 static int mt6375_chg_init_psy(struct mt6375_chg_data *ddata)
 {
 	struct mt6375_chg_platform_data *pdata = dev_get_platdata(ddata->dev);
+	/* rodin: 6.18 dropped of_node from power_supply_config; the core now
+	 * does device_set_node(dev, cfg->fwnode) -> same OF association.
+	 */
 	struct power_supply_config cfg = {
 		.drv_data = ddata,
-		.of_node = ddata->dev->of_node,
+		.fwnode = of_fwnode_handle(ddata->dev->of_node),
 		.supplied_to = mt6375_psy_supplied_to,
 		.num_supplicants = ARRAY_SIZE(mt6375_psy_supplied_to),
 	};

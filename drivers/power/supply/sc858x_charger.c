@@ -826,7 +826,10 @@ static int sc858x_charger_is_writeable(struct power_supply *psy,
 static int sc858x_psy_register(struct sc858x_chip *sc)
 {
     sc->psy_cfg.drv_data = sc;
-    sc->psy_cfg.of_node = sc->dev->of_node;
+    /* rodin: 6.18 dropped of_node from power_supply_config; the core now does
+     * device_set_node(dev, cfg->fwnode) -> same OF association.
+     */
+    sc->psy_cfg.fwnode = of_fwnode_handle(sc->dev->of_node);
 
     sc->psy_desc.name = sc858x_psy_name[sc->mode];
 

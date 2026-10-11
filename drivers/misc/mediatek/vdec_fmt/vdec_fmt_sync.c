@@ -193,20 +193,16 @@ static bool timeline_fence_enable_signaling(struct dma_fence *dma_fence)
 	return true;
 }
 
-static void timeline_fence_value_str(struct dma_fence *dma_fence,
-				    char *str, int size)
-{
-	snprintf(str, size, "%llu", dma_fence->seqno);
-}
-
-static void timeline_fence_timeline_value_str(struct dma_fence *dma_fence,
-					     char *str, int size)
-{
-	struct sync_timeline *parent = fence_parent(dma_fence);
-
-	snprintf(str, size, "%d", parent->value);
-}
-
+/*
+ * rodin: 6.18 removed .fence_value_str / .timeline_value_str from
+ * struct dma_fence_ops (upstream 2ce07fea3cc8 "dma-buf/dma-fence: remove
+ * unnecessary callbacks"). The 6.18 core has no consumer for them anymore:
+ * sync_debug.c prints fence->seqno / parent->value directly and
+ * dma_fence_describe() prints "seq %llu", i.e. exactly the values these
+ * callbacks used to format. Upstream dropped them the same way from its
+ * in-tree sw_sync.c, so drop the callbacks here instead of keeping dead
+ * formatters.
+ */
 static const struct dma_fence_ops timeline_dma_fence_ops = {
 	.get_driver_name = timeline_fence_get_driver_name,
 	.get_timeline_name = timeline_fence_get_timeline_name,
@@ -214,8 +210,6 @@ static const struct dma_fence_ops timeline_dma_fence_ops = {
 	.signaled = timeline_fence_signaled,
 	.wait = dma_fence_default_wait,
 	.release = timeline_fence_release,
-	.fence_value_str = timeline_fence_value_str,
-	.timeline_value_str = timeline_fence_timeline_value_str,
 };
 
 /**
