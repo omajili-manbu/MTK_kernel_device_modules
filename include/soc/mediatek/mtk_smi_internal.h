@@ -36,6 +36,15 @@
 #undef MTK_LARB_NR_MAX
 #define MTK_LARB_NR_MAX			64
 
+/*
+ * rodin stage2: the kernel-tree mtk-memory-port.h (it wins the -I race)
+ * decodes larb with 0x1f, but the vendor encoding is 6-bit and mt6899 larb
+ * ids go up to 42 (mt6899-larb-port.h), so 0x1f aliases larb32..42 onto
+ * larb0..10.  Same placement rule as MTK_LARB_NR_MAX above: after the include.
+ */
+#undef MTK_M4U_TO_LARB
+#define MTK_M4U_TO_LARB(id)		(((id) >> 5) & 0x3f)
+
 #ifndef MTK_M4U_DOM_NR_MAX
 #define MTK_M4U_DOM_NR_MAX		16
 #endif

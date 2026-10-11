@@ -24,6 +24,9 @@
 #endif
 #include <linux/export.h>
 #include <dt-bindings/memory/mtk-memory-port.h>
+/* rodin stage2: MTK_M4U_TO_LARB must be the 6-bit vendor mask for the
+ * port_list larb_id lookup below (mt6899 larb ids reach 42). */
+#include <soc/mediatek/mtk_smi_internal.h>
 #include <trace/hooks/iommu.h>
 
 #include "mtk_iommu.h"

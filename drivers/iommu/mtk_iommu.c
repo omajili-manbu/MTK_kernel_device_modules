@@ -1669,7 +1669,7 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_domain *dom,
 			dom->iop = data_temp->m4u_dom->iop;
 			dom->cfg = data_temp->m4u_dom->cfg;
 			dom->ttbr = data_temp->m4u_dom->ttbr;
-			dom->domain.pgsize_bitmap = data_temp->m4u_dom->cfg.pgsize_bitmap;
+			dom->domain.pgsize_bitmap = data_temp->m4u_dom->domain.pgsize_bitmap;
 			goto update_iova_region;
 		}
 	}
@@ -1678,7 +1678,7 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_domain *dom,
 		.quirks = IO_PGTABLE_QUIRK_ARM_NS |
 			IO_PGTABLE_QUIRK_NO_PERMS |
 			IO_PGTABLE_QUIRK_ARM_MTK_EXT,
-		.pgsize_bitmap = mtk_iommu_ops.pgsize_bitmap,
+		.pgsize_bitmap = dom->domain.pgsize_bitmap,
 		.ias = MTK_IOMMU_HAS_FLAG(data->plat_data, IOVA_34_EN) ? 34 : 32,
 		.iommu_dev = data->dev,
 	};
@@ -1706,9 +1706,6 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_domain *dom,
 		return -ENOMEM;
 	}
 
-	/* Update our support page sizes bitmap */
-	dom->domain.pgsize_bitmap = dom->cfg.pgsize_bitmap;
-
 update_iova_region:
 	/* Update the iova region for this domain */
 	region = data->plat_data->iova_region + domid;
@@ -1724,16 +1721,21 @@ update_iova_region:
 	return 0;
 }
 
-static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+static struct iommu_domain *mtk_iommu_domain_alloc_paging(struct device *dev)
 {
 	struct mtk_iommu_domain *dom;
-
-	if (type != IOMMU_DOMAIN_DMA)
-		return NULL;
 
 	dom = kzalloc(sizeof(*dom), GFP_KERNEL);
 	if (!dom)
 		return NULL;
+
+	/*
+	 * rodin stage2: pgsize must be in place at alloc time.  6.18 core runs
+	 * iommu_create_device_direct_mappings() before attach and warns when a
+	 * DMA domain has no pgsize_bitmap; the 6.6 fallback that filled it in
+	 * from ops->pgsize_bitmap is gone.
+	 */
+	dom->domain.pgsize_bitmap = SZ_4K | SZ_64K | SZ_1M | SZ_16M;
 
 	return &dom->domain;
 }
@@ -2096,13 +2098,8 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
 static struct iommu_device *mtk_iommu_probe_device(struct device *dev)
 {
 	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
-	struct mtk_iommu_data *data;
+	struct mtk_iommu_data *data = dev_iommu_priv_get(dev);
 	unsigned int larbid, larbidx, i;
-
-	if (!fwspec || fwspec->ops != &mtk_iommu_ops)
-		return ERR_PTR(-ENODEV); /* Not a iommu client device */
-
-	data = dev_iommu_priv_get(dev);
 
 	if (MTK_IOMMU_HAS_FLAG(data->plat_data, LEGACY_MULTI_LARB))
 		return &data->iommu;
@@ -2257,14 +2254,13 @@ static void mtk_iommu_get_resv_regions(struct device *dev,
 }
 
 static const struct iommu_ops mtk_iommu_ops = {
-	.domain_alloc	= mtk_iommu_domain_alloc,
+	.domain_alloc_paging = mtk_iommu_domain_alloc_paging,
 	.probe_device	= mtk_iommu_probe_device,
 	.release_device	= mtk_iommu_release_device,
 	.device_group	= mtk_iommu_device_group,
 	.of_xlate	= mtk_iommu_of_xlate,
 	.get_resv_regions = mtk_iommu_get_resv_regions,
 	//.put_resv_regions = generic_iommu_put_resv_regions,
-	.pgsize_bitmap	= SZ_4K | SZ_64K | SZ_1M | SZ_16M,
 	.owner		= THIS_MODULE,
 	.default_domain_ops = &(const struct iommu_domain_ops) {
 		.attach_dev	= mtk_iommu_attach_device,
@@ -4418,7 +4414,7 @@ static const struct of_device_id mtk_iommu_of_ids[] = {
 
 static struct platform_driver mtk_iommu_driver = {
 	.probe	= mtk_iommu_probe,
-	.remove_new = mtk_iommu_remove,
+	.remove = mtk_iommu_remove,
 	.driver	= {
 		.name = "mtk-iommu",
 		.of_match_table = mtk_iommu_of_ids,
