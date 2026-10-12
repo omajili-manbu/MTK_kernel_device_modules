@@ -207,7 +207,20 @@ static struct cpufreq_driver mtk_cpufreq_driver = {
 	.init = mtk_cpufreq_init,
 	.exit = mtk_cpufreq_exit,
 	.name = "mtk-cpufreq",
-	.attr = cpufreq_generic_attr,
+	/*
+	 * rodin: .attr = cpufreq_generic_attr dropped for 6.18. The symbol is
+	 * gone (see mediatek-cpufreq-hw_main.c for the mechanism) and the
+	 * scaling_available_frequencies file the driver used to publish through
+	 * it is now created by cpufreq_add_dev_interface() itself for every
+	 * policy with a freq_table -- which this driver sets at
+	 * mtk_cpufreq_init() (line 179). Keeping the member would both fail to
+	 * link and, if re-provided non-empty, double-create that file (EEXIST ->
+	 * cpufreq_online failure); cpufreq_generic_attr also has no declaration
+	 * in this file's include set, so it cannot compile against 6.18.
+	 * NOTE: this file is not in any Makefile (not built); it still needs a
+	 * separate 6.18 pass for CPUFREQ_STICKY (removed upstream) before it can
+	 * be enabled.
+	 */
 };
 
 static int mt6873_get_version(struct platform_device *pdev, unsigned int *arr)

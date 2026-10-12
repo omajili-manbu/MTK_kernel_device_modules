@@ -33,7 +33,27 @@
 #include <pkvm_mgmt/pkvm_mgmt.h>
 #endif
 #include <public/trusted_mem_api.h>
-#include "page_pool.h"
+/* rodin: 6.18 removed the kernel's drivers/dma-buf/heaps/page_pool.c, which
+ * used to provide dmabuf_page_pool_{create,alloc,free,destroy}() to this heap
+ * (llvm-nm: mtk_sec_heap.o U dmabuf_page_pool_{alloc,create,free}; ld.lld:
+ * "undefined symbol" at the vmlinux link). The vendor tree already carries a
+ * 6.18-native page pool -- mtk_page_pool.c / mtk_dmabuf_page_pool_* -- which is
+ * built in with the system heap (system_heap-objs) and is where the rest of
+ * this directory gets its pages. The create/alloc/free bodies are the same
+ * algorithm as the removed page_pool.c (diff: only the mtk_ prefix, kzalloc,
+ * and a locked mtk_dmabuf_page_pool_total()); pools created here join the same
+ * global pool_list, so the pool shrinker registered by mtk_system_heap_init()
+ * keeps reclaiming them exactly as the kernel's pool_shrinker did in 6.6.
+ * Only the declarations are taken here on purpose: mtk_page_pool.h also defines
+ * file-scope order_flags[]/orders[]/NUM_ORDERS for the system heap, which would
+ * collide with -- and silently repoint NUM_ORDERS of -- this file's own order
+ * tables (a single order-2 pool below). */
+struct mtk_dmabuf_page_pool;
+struct mtk_dmabuf_page_pool *mtk_dmabuf_page_pool_create(gfp_t gfp_mask,
+							 unsigned int order);
+void mtk_dmabuf_page_pool_destroy(struct mtk_dmabuf_page_pool *pool);
+struct page *mtk_dmabuf_page_pool_alloc(struct mtk_dmabuf_page_pool *pool);
+void mtk_dmabuf_page_pool_free(struct mtk_dmabuf_page_pool *pool, struct page *page);
 #include "mtk_heap_priv.h"
 #include "mtk_heap.h"
 #include "mtk_sec_heap.h"
@@ -59,7 +79,7 @@ static gfp_t order_flags[] = { LOW_ORDER_GFP };
  */
 int orders[1] = { 2 };
 #define NUM_ORDERS ARRAY_SIZE(orders)
-struct dmabuf_page_pool *pools[NUM_ORDERS];
+struct mtk_dmabuf_page_pool *pools[NUM_ORDERS];
 
 static bool smmu_v3_enable;
 int tmem_api_ver;
@@ -439,7 +459,7 @@ static int page_base_free_v2(struct secure_heap_page *sec_heap,
 				break;
 		}
 		if (j < NUM_ORDERS)
-			dmabuf_page_pool_free(pools[j], page);
+			mtk_dmabuf_page_pool_free(pools[j], page);
 		else
 			pr_err("%s error: order %u\n", __func__,
 			       compound_order(page));
@@ -1296,7 +1316,7 @@ static struct page *alloc_largest_available(unsigned long size,
 			continue;
 		if (max_order < orders[i])
 			continue;
-		page = dmabuf_page_pool_alloc(pools[i]);
+		page = mtk_dmabuf_page_pool_alloc(pools[i]);
 		if (!page)
 			continue;
 		return page;
@@ -2216,11 +2236,11 @@ static int mtk_page_heap_create(void)
 
 	/* page pool */
 	for (i = 0; i < NUM_ORDERS; i++) {
-		pools[i] = dmabuf_page_pool_create(order_flags[i], orders[i]);
+		pools[i] = mtk_dmabuf_page_pool_create(order_flags[i], orders[i]);
 		if (IS_ERR(pools[i])) {
 			pr_err("%s: page pool creation failed!\n", __func__);
 			for (j = 0; j < i; j++)
-				dmabuf_page_pool_destroy(pools[j]);
+				mtk_dmabuf_page_pool_destroy(pools[j]);
 			return PTR_ERR(pools[i]);
 		}
 	}

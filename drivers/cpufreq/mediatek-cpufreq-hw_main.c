@@ -319,9 +319,22 @@ static void mtk_cpufreq_register_em(struct cpufreq_policy *policy)
 			true);
 }
 
-/* rodin: 6.18 dropped cpufreq_generic_attr; lib/compat-6.6-net.c re-exports
- * the 6.6 array, so only the declaration is missing here. */
-extern struct freq_attr *cpufreq_generic_attr[];
+/*
+ * rodin: 6.18 deleted cpufreq_generic_attr (6.6 defined it in
+ * drivers/cpufreq/freq_table.c:295 as {&cpufreq_freq_attr_scaling_available_freqs,
+ * NULL}) and moved the file it exposed into the core: cpufreq_add_dev_interface()
+ * now creates scaling_available_frequencies ("attributes that need freq_table",
+ * drivers/cpufreq/cpufreq.c:1075-1095) for every policy that has a freq_table.
+ * This driver sets policy->freq_table in mtk_cpufreq_hw_cpu_init() (line 255),
+ * so the sysfs surface is identical without the .attr member below -- and it
+ * must stay that way: re-providing the 6.6 array (or any array that contains
+ * cpufreq_freq_attr_scaling_available_freqs) makes the drv_attr loop create
+ * the same file a second time -> sysfs EEXIST -> cpufreq_online() fails ->
+ * every policy is torn down and cpufreq is dead for the whole boot. On-device
+ * proof from the port line, b517 #117:
+ * "cpufreq: cannot create duplicate filename ... scaling_available_frequencies"
+ * x8 + mbraink_policies_ready() stuck at 0 + power_throttling deferred forever.
+ */
 
 static struct cpufreq_driver cpufreq_mtk_hw_driver = {
 	.flags		= CPUFREQ_NEED_INITIAL_FREQ_CHECK |
@@ -335,7 +348,6 @@ static struct cpufreq_driver cpufreq_mtk_hw_driver = {
 	.register_em	= mtk_cpufreq_register_em,
 	.fast_switch	= mtk_cpufreq_hw_fast_switch,
 	.name		= "mtk-cpufreq-hw",
-	.attr		= cpufreq_generic_attr,
 };
 
 static int mtk_cpu_create_freq_table(struct platform_device *pdev,
