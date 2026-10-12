@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0
+config XIAOMI_BOOTMONITOR
+	tristate "Xiaomi boot monitor"
+	depends on MTPROF
+	default n
+	help
+	  Xiaomi boot-time monitor: follows the boot stage sequence recorded
+	  by the bootprof logger, keeps a per-stage timeout/error ledger and
+	  dumps the ramoops pmsg console plus the bootprof log into the
+	  blackbox partition when the unit boots after a boot failure.
+
+	  rodin: blob(6.6 bootmonitor.ko) 反汇编等价重建后 =y 内建；消费
+	  bootprof 三件导出（bootprof_lock/get_log_count/get_bootprof_pointer），
+	  故依赖 MTPROF。
