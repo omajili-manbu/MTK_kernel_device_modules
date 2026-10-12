@@ -347,9 +347,10 @@ static int partition_bm_write(loff_t pos, size_t len, const void *buf)
 			ret = PTR_ERR(page);
 			break;
 		}
-		folio_lock(page_folio(page));
 		va = kmap_local_page(page);
 		if (memcmp(va + off, buf + done, n)) {
+			/* stock unit: the page is only touched when it differs */
+			folio_lock(page_folio(page));
 			memcpy(va + off, buf + done, n);
 			changed = 1;
 		}
