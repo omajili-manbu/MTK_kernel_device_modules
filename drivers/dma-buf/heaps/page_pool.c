@@ -6,6 +6,16 @@
  *
  * Based on the ION page pool code
  * Copyright (C) 2011 Google, Inc.
+ *
+ * rodin b247 / A-107: 本文件是厂商树自持的 6.6 版 page-pool 实现（无前缀
+ * dmabuf_page_pool_*），由 CONFIG_DEVICE_MODULES_DMABUF_HEAPS_PAGE_POOL 打开
+ * （Makefile 原本就有该接线，只是从未启用）。之所以要启用它：唯一导入这组符号的
+ * 预编译 blob（mtk_sec_heap.ko）期望的正是这套名字与结构体布局；启用后 blob 与
+ * 内建的 mtk_dmabuf_page_pool_* 路径并存、互不冲突。
+ * 6.18 化改动两处（其余原样）：
+ *   ① register_shrinker(s, fmt, ...) 两参形式 6.18 已删除（本树无兼容层）⇒ 改与
+ *      同目录已 6.18 化的 mtk_page_pool.c 同款：shrinker_alloc + 字段 + shrinker_register；
+ *   ② pool->gfp_mask 的 __GFP_COMP 改为"仅 order>0 才加"（上游后续修正）。
  */
 
 #include "page_pool.h"
@@ -155,7 +165,8 @@ struct dmabuf_page_pool *dmabuf_page_pool_create(gfp_t gfp_mask, unsigned int or
 		pool->count[i] = 0;
 		INIT_LIST_HEAD(&pool->items[i]);
 	}
-	pool->gfp_mask = gfp_mask | __GFP_COMP;
+	/* 上游修正：order 0 不加 __GFP_COMP（与 port 树补回版一致）。 */
+	pool->gfp_mask = gfp_mask | (order ? __GFP_COMP : 0);
 	pool->order = order;
 	spin_lock_init(&pool->lock);
 
@@ -279,16 +290,23 @@ static unsigned long dmabuf_page_pool_shrink_scan(struct shrinker *shrinker,
 	return dmabuf_page_pool_shrink(sc->gfp_mask, sc->nr_to_scan);
 }
 
-struct shrinker pool_shrinker = {
-	.count_objects = dmabuf_page_pool_shrink_count,
-	.scan_objects = dmabuf_page_pool_shrink_scan,
-	.seeks = DEFAULT_SEEKS,
-	.batch = 0,
-};
-
 static int dmabuf_page_pool_init_shrinker(void)
 {
-	return register_shrinker(&pool_shrinker, "dmabuf-page-pool-shrinker");
+	struct shrinker *shrinker;
+
+	/* 6.18：register_shrinker() 两参形式已删除，改 alloc+注册两段式
+	 * （与同目录 mtk_page_pool.c 的 6.18 形态一致）。 */
+	shrinker = shrinker_alloc(0, "dmabuf-page-pool");
+	if (!shrinker)
+		return -ENOMEM;
+
+	shrinker->count_objects = dmabuf_page_pool_shrink_count;
+	shrinker->scan_objects = dmabuf_page_pool_shrink_scan;
+	shrinker->seeks = DEFAULT_SEEKS;
+	shrinker->batch = 0;
+	shrinker_register(shrinker);
+
+	return 0;
 }
 module_init(dmabuf_page_pool_init_shrinker);
 MODULE_LICENSE("GPL v2");
