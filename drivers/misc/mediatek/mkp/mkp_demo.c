@@ -9,7 +9,14 @@
 #include <trace/hooks/vendor_hooks.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <trace/hooks/avc.h>
+/* rodin b247: creds 族 vendor hook（android_rvh_{commit,exit,override,revert}_creds）
+ * 只存在于带 6.6 兼容层的内核树（调用点 kernel/cred.c + 声明 trace/hooks/creds.h，
+ * port 树实证）；纯上游 android17-6.18-lts 两者皆无 ⇒ 本树内该族注册无意义
+ * （hook 不存在 ⇒ 回调永不会被触发）。用 __has_include 守卫：换到带该族的内核树
+ * 自动恢复，无需回改本文件。 */
+#if __has_include(<trace/hooks/creds.h>)
 #include <trace/hooks/creds.h>
+#endif
 #include <trace/hooks/selinux.h>
 #include <trace/hooks/syscall_check.h>
 #include <linux/types.h> // for list_head
@@ -396,8 +403,10 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 		 * 不受影响。krn code/rodata/TASK_CRED/AVC 面保留（#159 boot
 		 * 5.57-6.37s cred 更新全程正常实证）。恢复：服务端票据路径
 		 * 真机稳定实证后按 b54-b57 方法回归再启用。 */
-		if (mod->rodin_66)
-			return;
+		/* rodin b247: 原此处对 mod->rodin_66（兼容层给 struct module 加的
+		 * "6.6 布局构建" 标记）早退，意图 = blob 页不停用本层保护。纯上游
+		 * android17-6.18-lts 无该字段 ⇒ 条件恒假，与该 if 之后的路径逐字等效
+		 * （即原注释"源码 =m 模块（rodin_66=false）不受影响"那一支）。 */
 		if (drv_skip((char *)mod->name))
 			return;
 		module_enable_ro(mod, false, MKP_POLICY_DRV);
@@ -409,6 +418,7 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 /* rodin b559: 五个生产者（四 RVH + task_newtask）的推送结果原先全部
  * 丢弃——任何一环丢写（含 secure 侧拒收）都让 check_cred 拿陈旧槽位
  * 误报且无痕迹（#197 盲区）；此处仅补失败可见性，不改推送语义。 */
+#if __has_include(<trace/hooks/creds.h>)
 static void probe_android_rvh_commit_creds(void *ignore, const struct task_struct *task,
 	const struct cred *new)
 {
@@ -539,6 +549,8 @@ static void probe_android_rvh_revert_creds(void *ignore, const struct task_struc
 
 	MKP_HOOK_END(__func__);
 }
+
+#endif /* __has_include(<trace/hooks/creds.h>) */
 
 static void __update_cpu_avc_sbuf(unsigned long key, int index)
 {
@@ -1259,6 +1271,7 @@ int __init mkp_demo_init(void)
 	if (policy_ctrl[MKP_POLICY_SELINUX_AVC])
 		avc_work = kmalloc(sizeof(struct work_struct), GFP_KERNEL);
 
+#if __has_include(<trace/hooks/creds.h>)
 	if (policy_ctrl[MKP_POLICY_TASK_CRED] != 0) {
 		// Create task cred sharebuf
 		size = 0x100000;
@@ -1297,6 +1310,7 @@ int __init mkp_demo_init(void)
 			goto failed;
 		}
 	}
+#endif /* __has_include(<trace/hooks/creds.h>) */
 
 	if (policy_ctrl[MKP_POLICY_SELINUX_STATE] != 0) {
 		// register selinux_state
