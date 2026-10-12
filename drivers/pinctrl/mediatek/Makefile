@@ -1,6 +1,51 @@
 # SPDX-License-Identifier: GPL-2.0
 ccflags-y += -I$(srctree)/drivers/pinctrl/mediatek
 
+# rodin b247（分区 B · 6.18 对齐）：vendor × 内核同名实现 → 链接期 duplicate symbol。
+# 内核树 drivers/pinctrl/mediatek/{mtk-eint,pinctrl-mtk-common-v2,pinctrl-paris}.c
+# 在本树打开（\.config 的 CONFIG_PINCTRL_MT6858/MT6878=y 经 Kconfig default ARM64
+# && ARCH_MEDIATEK 打开并 select PINCTRL_MTK_PARIS/V2/EINT_MTK），对 rodin 却是惰性
+# 死代码（mt6858/mt6878 无对应 DT 节点，永不 probe）。内核树零改动 ⇒ vendor 侧改名
+# 分流：本目录（该族全部 35 个符号的**全部引用面**逐符号实测都落在本目录内，1..14
+# 个文件）整体加 -D 前缀改名。用 ccflags-y 一处覆盖全目录 TU：不依赖 include 顺序、
+# 新增 TU 自动覆盖；内核侧那句 -I 仍保留（供 ../core.h 等上游头）。
+# 收尾判据：vmlinux 里旧名只由内核侧对象提供、新名只由 vendor 对象提供。
+ccflags-y += -Dmtk_eint_do_init=mtk_eint_do_init_rodin
+ccflags-y += -Dmtk_eint_do_suspend=mtk_eint_do_suspend_rodin
+ccflags-y += -Dmtk_eint_do_resume=mtk_eint_do_resume_rodin
+ccflags-y += -Dmtk_eint_set_debounce=mtk_eint_set_debounce_rodin
+ccflags-y += -Dmtk_eint_find_irq=mtk_eint_find_irq_rodin
+ccflags-y += -Dmtk_hw_set_value=mtk_hw_set_value_rodin
+ccflags-y += -Dmtk_hw_get_value=mtk_hw_get_value_rodin
+ccflags-y += -Dmtk_is_virt_gpio=mtk_is_virt_gpio_rodin
+ccflags-y += -Dmtk_build_eint=mtk_build_eint_rodin
+ccflags-y += -Dmtk_rmw=mtk_rmw_rodin
+ccflags-y += -Dmtk_pinconf_bias_disable_set=mtk_pinconf_bias_disable_set_rodin
+ccflags-y += -Dmtk_pinconf_bias_disable_get=mtk_pinconf_bias_disable_get_rodin
+ccflags-y += -Dmtk_pinconf_bias_set=mtk_pinconf_bias_set_rodin
+ccflags-y += -Dmtk_pinconf_bias_get=mtk_pinconf_bias_get_rodin
+ccflags-y += -Dmtk_pinconf_bias_disable_set_rev1=mtk_pinconf_bias_disable_set_rev1_rodin
+ccflags-y += -Dmtk_pinconf_bias_disable_get_rev1=mtk_pinconf_bias_disable_get_rev1_rodin
+ccflags-y += -Dmtk_pinconf_bias_set_rev1=mtk_pinconf_bias_set_rev1_rodin
+ccflags-y += -Dmtk_pinconf_bias_get_rev1=mtk_pinconf_bias_get_rev1_rodin
+ccflags-y += -Dmtk_pinconf_bias_set_combo=mtk_pinconf_bias_set_combo_rodin
+ccflags-y += -Dmtk_pinconf_bias_get_combo=mtk_pinconf_bias_get_combo_rodin
+ccflags-y += -Dmtk_pinconf_drive_set=mtk_pinconf_drive_set_rodin
+ccflags-y += -Dmtk_pinconf_drive_get=mtk_pinconf_drive_get_rodin
+ccflags-y += -Dmtk_pinconf_drive_set_rev1=mtk_pinconf_drive_set_rev1_rodin
+ccflags-y += -Dmtk_pinconf_drive_get_rev1=mtk_pinconf_drive_get_rev1_rodin
+ccflags-y += -Dmtk_pinconf_drive_set_raw=mtk_pinconf_drive_set_raw_rodin
+ccflags-y += -Dmtk_pinconf_drive_get_raw=mtk_pinconf_drive_get_raw_rodin
+ccflags-y += -Dmtk_pinconf_adv_pull_set=mtk_pinconf_adv_pull_set_rodin
+ccflags-y += -Dmtk_pinconf_adv_pull_get=mtk_pinconf_adv_pull_get_rodin
+ccflags-y += -Dmtk_pinconf_adv_drive_set=mtk_pinconf_adv_drive_set_rodin
+ccflags-y += -Dmtk_pinconf_adv_drive_get=mtk_pinconf_adv_drive_get_rodin
+ccflags-y += -Dmtk_pinconf_adv_drive_set_raw=mtk_pinconf_adv_drive_set_raw_rodin
+ccflags-y += -Dmtk_pinconf_adv_drive_get_raw=mtk_pinconf_adv_drive_get_raw_rodin
+ccflags-y += -Dmtk_paris_pinctrl_probe=mtk_paris_pinctrl_probe_rodin
+ccflags-y += -Dmtk_paris_pinctrl_pm_ops=mtk_paris_pinctrl_pm_ops_rodin
+ccflags-y += -Dmtk_pctrl_show_one_pin=mtk_pctrl_show_one_pin_rodin
+
 # Core
 ifeq ($(CONFIG_DEVICE_MODULES_EINT_MTK),m)
 obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += pinctrl-mtk-v2.o
