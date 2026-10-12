@@ -605,9 +605,36 @@ out:
 static int mt6899_apu_top_on(struct device *dev)
 {
 	int ret = 0;
+	u32 val;
 
 	if (apupw.env < MP)
 		return 0;
+
+	/*
+	 * RODIN: gate the whole power-on sequence on the RCX domain being
+	 * reachable. On stock the bootloader delivers RPC ready (stock 6.6
+	 * dmesg: __apu_wake_rpc_rcx reads APU_RPC_INTF_PWR_RDY @0x190f0044
+	 * == 0x3), so every readl() in this chain is safe. On a wedged warm
+	 * reboot the domain clock is gated and the very first diagnostic
+	 * readl() in __apu_wake_rpc_rcx hangs the INFRA bus forever (T1
+	 * dies with an INFRA lastbus timeout, MTK wdt HWT at 31s: no panic,
+	 * no backtrace, console-ramoops ends mid-boot). The vendor's own
+	 * wake-then-poll pattern posts the RPC wake command first (posted
+	 * write) and then polls the ready bit with a bounded timeout - do
+	 * exactly that before anything else touches the RPC registers. If
+	 * the domain refuses to come up, fail the runtime-PM call with
+	 * -EIO instead of hanging the whole boot: APU degrades, system
+	 * survives.
+	 */
+	apu_writel(0x00000100, apupw.regs[apu_rpc] + APU_RPC_TOP_CON);
+	ret = readl_relaxed_poll_timeout_atomic(
+			apupw.regs[apu_rpc] + APU_RPC_INTF_PWR_RDY,
+			val, (val & 0x1UL), 50, 1000);
+	if (ret) {
+		pr_info("%s: APU RPC not ready after wake poll (ret %d, RDY 0x%x)\n",
+			__func__, ret, val);
+		return ret;
+	}
 
 	if (log_lvl)
 		pr_info("%s +\n", __func__);
