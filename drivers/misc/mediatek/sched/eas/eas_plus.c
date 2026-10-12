@@ -1175,12 +1175,15 @@ int set_util_est_ctrl(bool enable)
 
 int set_cpus_allowed_ptr_by_kernel(struct task_struct *p, const struct cpumask *new_mask)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return -ENODEV;
 	struct cpumask *kernel_allowed_mask;
 	int ret;
 
 	if (!p)
 		return -EINVAL;
-	kernel_allowed_mask = &((struct mtk_task *) p->android_vendor_data1)->kernel_allowed_mask;
+	kernel_allowed_mask = &(mtk_task_of(p))->kernel_allowed_mask;
 	cpumask_copy(kernel_allowed_mask, new_mask);
 	ret = set_cpus_allowed_ptr(p, new_mask);
 	return ret;

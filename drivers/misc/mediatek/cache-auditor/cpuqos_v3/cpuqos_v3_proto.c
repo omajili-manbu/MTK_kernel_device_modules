@@ -149,7 +149,7 @@ int task_curr_clone(const struct task_struct *p)
 unsigned int get_task_pd(struct task_struct *p)
 {
 	unsigned int pd;
-	struct cpuqos_task_struct *cqts = &((struct mtk_task *)p->android_vendor_data1)->cpuqos_task;
+	struct cpuqos_task_struct *cqts = &(mtk_task_of(p))->cpuqos_task;
 
 	pd = READ_ONCE(cqts->pd);
 
@@ -159,7 +159,7 @@ unsigned int get_task_pd(struct task_struct *p)
 unsigned int get_task_rank(struct task_struct *p)
 {
 	unsigned int rank;
-	struct cpuqos_task_struct *cqts = &((struct mtk_task *)p->android_vendor_data1)->cpuqos_task;
+	struct cpuqos_task_struct *cqts = &(mtk_task_of(p))->cpuqos_task;
 
 	rank = READ_ONCE(cqts->rank);
 
@@ -338,7 +338,7 @@ static void cpuqos_v3_sync_current_mb(void *task)
 
 static void cpuqos_v3_kick_task(struct task_struct *p, int pd)
 {
-	struct cpuqos_task_struct *cqts = &((struct mtk_task *)p->android_vendor_data1)->cpuqos_task;
+	struct cpuqos_task_struct *cqts = &(mtk_task_of(p))->cpuqos_task;
 
 	if (pd >= 0)
 		WRITE_ONCE(cqts->pd, pd);
@@ -431,7 +431,7 @@ int set_task_pd(int pid, int pd)
 
 	if (p) {
 		get_task_struct(p);
-		cqts = &((struct mtk_task *)p->android_vendor_data1)->cpuqos_task;
+		cqts = &(mtk_task_of(p))->cpuqos_task;
 	}
 	rcu_read_unlock();
 
@@ -771,7 +771,7 @@ static void cpuqos_v3_hook_switch(void __always_unused *data,
 static void cpuqos_v3_task_newtask(void __always_unused *data,
 				struct task_struct *p, u64 clone_flags)
 {
-	struct cpuqos_task_struct *cqts = &((struct mtk_task *)p->android_vendor_data1)->cpuqos_task;
+	struct cpuqos_task_struct *cqts = &(mtk_task_of(p))->cpuqos_task;
 
 	WRITE_ONCE(cqts->pd, PD3); /* pd */
 	WRITE_ONCE(cqts->rank, GROUP_RANK); /* rank */
@@ -1144,6 +1144,14 @@ static const struct proc_ops cpuqos_ctl_Fops = {
 
 static int __init cpuqos_v3_proto_init(void)
 {
+	/* rodin 6.18（分区 A · 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
+	 * gki_defconfig 内置 android_arch_task_struct_size=512）⇒ 只能运行期校验；
+	 * 不足则本族钩子/节点全部不注册（安全降级；绝不越界写 task_struct 邻区）。
+	 */
+	if (MTK_TASK_DATA_ABSENT()) {
+		mtk_task_data_guard_fail("cpuqos_v3");
+		return -ENODEV;
+	}
 	int ret = 0;
 	struct proc_dir_entry *pe, *parent;
 

@@ -430,6 +430,9 @@ EXPORT_SYMBOL(sched_get_nr_over_thres_avg);
 
 static void over_thresh_chg_notify(void)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return;
 	int cpu;
 	unsigned long flags;
 	struct task_struct *p;
@@ -489,7 +492,7 @@ static void over_thresh_chg_notify(void)
 		 */
 		list_for_each_entry(p, &cpu_rq(cpu)->cfs_tasks, se.group_node) {
 			struct cc_task_struct *cc_ts =
-				&((struct mtk_task *) p->android_vendor_data1)->cc_task;
+				&(mtk_task_of(p))->cc_task;
 
 			over_type = is_task_over_thres(p);
 			WRITE_ONCE(cc_ts->over_type, (u64)over_type);
@@ -555,7 +558,7 @@ void sched_update_nr_over_thres_prod(struct task_struct *p, int cpu, int inc)
 	/* check if task is over threshold */
 	over_type = get_over_type(cpu_over_thres, util);
 	update_nr_over_thres_locked(cpu_over_thres, over_type, p, util, inc);
-	cc_ts = &((struct mtk_task *) p->android_vendor_data1)->cc_task;
+	cc_ts = &(mtk_task_of(p))->cc_task;
 	WRITE_ONCE(cc_ts->over_type, (u64)over_type);
 	spin_unlock_irqrestore(&per_cpu(nr_over_thres_lock, cpu), flags);
 }
@@ -653,7 +656,7 @@ void pelt_se_tp(void *data, struct sched_entity *se)
 		cpu = cpu_of(task_rq(p));
 
 		spin_lock_irqsave(&per_cpu(nr_over_thres_lock, cpu), flags);
-		cc_ts = &((struct mtk_task *) p->android_vendor_data1)->cc_task;
+		cc_ts = &(mtk_task_of(p))->cc_task;
 		old_type = READ_ONCE(cc_ts->over_type);
 
 		util = task_util(p);
@@ -930,6 +933,14 @@ static int init_attribs(void)
 
 int init_sched_avg(void)
 {
+	/* rodin 6.18（分区 A · 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
+	 * gki_defconfig 内置 android_arch_task_struct_size=512）⇒ 只能运行期校验；
+	 * 不足则本族钩子/节点全部不注册（安全降级；绝不越界写 task_struct 邻区）。
+	 */
+	if (MTK_TASK_DATA_ABSENT()) {
+		mtk_task_data_guard_fail("mtk_core_ctl/sched_avg");
+		return -ENODEV;
+	}
 	int ret, ret_error_line;
 
 	ret = init_thres_table();

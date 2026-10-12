@@ -26,9 +26,10 @@ enum {
 #define DEFAULT_VIP_PRIO_THRESHOLD  99
 
 #define mts_to_ts(mts) ({ \
-		void *__mptr = (void *)(mts); \
-		((struct task_struct *)(__mptr - \
-			offsetof(struct task_struct, android_vendor_data1))); })
+		struct mtk_task *__mtk_mts = (mts); \
+		((__mtk_mts == (struct mtk_task *)android_task_vendor_data(&init_task)) ? \
+			&init_task : (struct task_struct *) \
+			(void *)((char *)__mtk_mts - sizeof(struct task_struct))); })
 
 struct vip_rq {
 	struct list_head vip_tasks;

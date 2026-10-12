@@ -11,10 +11,12 @@
  * ⇒ 在共同头里一次性引入声明（6.18 头瘦身后这些不再被隐式带入）。 */
 #include <linux/topology.h>
 #include <linux/sched/topology.h>
+#include <linux/sched/task.h>	/* android_task_vendor_data(): GKI 动态 task_struct 尾部载体 */
 
 #define MTK_VENDOR_DATA_SIZE_TEST(mstruct, kstruct)		\
 	BUILD_BUG_ON(sizeof(mstruct) > (sizeof(u64) *		\
 		ARRAY_SIZE(((kstruct *)0)->android_vendor_data1)))
+
 
 /* rodin 6.18（A-75）：DELAY_DEQUEUE 僵尸语义下的"真在队列上"判定。
  *
@@ -168,6 +170,48 @@ struct mtk_tg {
 	struct cgrp_tg		cgrp_tg;
 	struct vip_task_group vtg;
 };
+
+/* rodin 6.18（分区 A · 载体迁移）：per-task 载体从 task_struct 静态槽
+ * （android_vendor_data1，6.18 上游缩到 6×u64=48B）迁到 GKI 动态尾部：
+ * CONFIG_GKI_DYNAMIC_TASK_STRUCT_SIZE=y 时 task_struct 按 arch_task_struct_size
+ * 分配，尾部由 android_task_vendor_data(p) 取得（init_task 特例 = vendor_data_pad[]）。
+ * 尾部大小 = boot cmdline `android_arch_task_struct_size=N`（本树 gki_defconfig 内置
+ * 512），上限 CONFIG_GKI_TASK_STRUCT_VENDOR_SIZE_MAX（1280）。
+ * 编译期只可断"需求 <= 上限"；真实可用量是运行期量 ⇒ 见 mtk_task_data_ok() 与各 init 守卫。
+ */
+/* 注：BUILD_BUG_ON 展开含 do{}while，只能用在函数内；头文件级用 static_assert()。 */
+#define MTK_VENDOR_DATA_SIZE_MAX_TEST(mstruct) \
+	static_assert(sizeof(mstruct) <= CONFIG_GKI_TASK_STRUCT_VENDOR_SIZE_MAX, \
+		      #mstruct " 超过 GKI 尾部上界（CONFIG_GKI_TASK_STRUCT_VENDOR_SIZE_MAX）")
+
+MTK_VENDOR_DATA_SIZE_MAX_TEST(struct mtk_task);
+
+static __always_inline struct mtk_task *mtk_task_of(const struct task_struct *p)
+{
+	return (struct mtk_task *)android_task_vendor_data((struct task_struct *)p);
+}
+
+/* 运行期实配校验：尾部（cmdline android_arch_task_struct_size）是否 >= 需求。
+ * 不足时调用方不得注册任何会触碰 mtk_task 的钩子（否则越界写 slab 邻区）。
+ */
+static __always_inline bool mtk_task_data_ok(void)
+{
+	return arch_task_struct_size >=
+	       (int)(sizeof(struct task_struct) + sizeof(struct mtk_task));
+}
+
+/* 载体不可用（= 尾部不足）：init 处统一 pr_err 报明原因；入口处静默退化。 */
+#define MTK_TASK_DATA_ABSENT()	unlikely(!mtk_task_data_ok())
+
+#define mtk_task_data_guard_fail(tag)							\
+do {												\
+	pr_err("%s: task_struct 尾部实配 %d 字节 < 需求 %d 字节 —— boot cmdline 需含 "\
+	       "android_arch_task_struct_size=%d（上限 %d）；本族钩子不注册（安全降级）\n", \
+	       (tag), arch_task_struct_size,				\
+	       (int)(sizeof(struct task_struct) + sizeof(struct mtk_task)),\
+	       (int)(sizeof(struct task_struct) + sizeof(struct mtk_task)),\
+	       CONFIG_GKI_TASK_STRUCT_VENDOR_SIZE_MAX);		\
+} while (0)
 
 struct sugov_rq_data {
 	short int uclamp[UCLAMP_CNT];

@@ -255,6 +255,9 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 
 inline int curr_clamp(struct rq *rq, unsigned long *util)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 非零返回（= 不施加 clamp）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return -EAGAIN;
 	struct task_struct *curr_task;
 	int u_min = 0, u_max = 1024;
 	int cpu = rq->cpu;
@@ -273,7 +276,7 @@ inline int curr_clamp(struct rq *rq, unsigned long *util)
 		return -1;
 	}
 
-	cu_ht = &((struct mtk_task *) curr_task->android_vendor_data1)->cu_hint;
+	cu_ht = &(mtk_task_of(curr_task))->cu_hint;
 	if (!cu_ht->hint) {
 		rcu_read_unlock();
 		return -1;

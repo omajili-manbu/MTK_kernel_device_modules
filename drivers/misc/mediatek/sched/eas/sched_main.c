@@ -225,7 +225,7 @@ void mtk_check_d_tasks(void *data, struct task_struct *p,
 {
 	unsigned long pending_stime = 0;
 	unsigned long switch_count = p->nvcsw + p->nivcsw;
-	struct mig_task_struct *migts = &((struct mtk_task *)p->android_vendor_data1)->mig_task;
+	struct mig_task_struct *migts = &(mtk_task_of(p))->mig_task;
 	struct cpumask cpus;
 	struct set_affinity_pending *my_pending = NULL;
 	struct task_struct *dest_task;
@@ -386,7 +386,7 @@ static void mtk_post_init_entity_util_avg(void *data, struct sched_entity *se)
 static void mtk_set_cpus_allowed_ptr(void *data, struct task_struct *p,
 	struct affinity_context *ctx, bool *skip_user_ptr)
 {
-	struct cpumask *kernel_allowed_mask = &((struct mtk_task *) p->android_vendor_data1)->kernel_allowed_mask;
+	struct cpumask *kernel_allowed_mask = &(mtk_task_of(p))->kernel_allowed_mask;
 	struct rq *rq = task_rq(p);
 	cpumask_t new_mask;
 
@@ -998,13 +998,20 @@ static int __init mtk_scheduler_init(void)
 	struct proc_dir_entry *pe, *parent;
 	int ret = 0;
 
-	/* compile time checks for vendor data size
-	 * rodin 6.18：本断言要求 task_struct vendor 数据槽 >= sizeof(struct mtk_task)
-	 * （实测 352 字节，mtk_tg 24 字节）；本树内核侧以 P2 例外提交把槽位恢复成 6.6
-	 * 布局的 64 槽（= port 树 rodin 补丁 bab062d943d5），该补丁回退时此断言立即失败。
+	/* rodin 6.18（分区 A）：mtk_task 的载体 = GKI 动态 task_struct 尾部
+	 * （CONFIG_GKI_DYNAMIC_TASK_STRUCT_SIZE=y，android_task_vendor_data()）。
+	 * 静态断言只能断"需求 <= 尾部上限"（sizeof(struct mtk_task)=352 <= 1280）；
+	 * 真实可用尾部尺寸是运行期量（boot cmdline android_arch_task_struct_size，
+	 * 本树 gki_defconfig 内置 512）⇒ 紧随其后的运行期守卫；mtk_tg 仍在
+	 * task_group 静态槽内（24B <= 32B，断言保留）。
 	 */
-	MTK_VENDOR_DATA_SIZE_TEST(struct mtk_task, struct task_struct);
+	MTK_VENDOR_DATA_SIZE_MAX_TEST(struct mtk_task);
 	MTK_VENDOR_DATA_SIZE_TEST(struct mtk_tg, struct task_group);
+	/* 运行期守卫：尾部不足 ⇒ pr_err 报明 + 本族（scheduler.o 全部钩子/节点）不注册。 */
+	if (MTK_TASK_DATA_ABSENT()) {
+		mtk_task_data_guard_fail("mtk_sched");
+		return -ENODEV;
+	}
 
 	/* build cpu_array for hints-based gear search*/
 	init_cpu_array();

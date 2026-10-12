@@ -2368,6 +2368,14 @@ static void tt_tick(void *data, struct rq *rq)
 
 static int __init init_task_turbo(void)
 {
+	/* rodin 6.18（分区 A · 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
+	 * gki_defconfig 内置 android_arch_task_struct_size=512）⇒ 只能运行期校验；
+	 * 不足则本族钩子/节点全部不注册（安全降级；绝不越界写 task_struct 邻区）。
+	 */
+	if (MTK_TASK_DATA_ABSENT()) {
+		mtk_task_data_guard_fail("task_turbo");
+		return -ENODEV;
+	}
 	int ret, ret_erri_line;
 
 	ret = register_trace_android_rvh_rtmutex_prepare_setprio(

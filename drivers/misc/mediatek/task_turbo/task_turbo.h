@@ -11,11 +11,11 @@
 #include <common.h>
 
 #define get_task_turbo_t(p)	\
-	(&((struct mtk_task *)&(p)->android_vendor_data1)->turbo_data)
+	(&mtk_task_of(p)->turbo_data)
 #define get_inherit_task(parent)	\
 	((struct task_struct *)((u64)(parent)->android_vendor_data1))
 #define get_vip_t(p)	\
-	(&((struct mtk_task *)&(p)->android_vendor_data1)->vip_task)
+	(&mtk_task_of(p)->vip_task)
 #define TOUCH_DOWN 1
 #define TOUCH_SUSTAIN_MS 2000
 #define INVALID_TGID -1

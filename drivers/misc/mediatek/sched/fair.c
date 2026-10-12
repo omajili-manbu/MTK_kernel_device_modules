@@ -714,8 +714,7 @@ EXPORT_SYMBOL_GPL(get_uclamp_min_ls);
 #if IS_ENABLED(CONFIG_MTK_EAS)
 static void __sched_fork_init(struct task_struct *p)
 {
-	struct soft_affinity_task *sa_task = &((struct mtk_task *)
-		p->android_vendor_data1)->sa_task;
+	struct soft_affinity_task *sa_task = &(mtk_task_of(p))->sa_task;
 
 	sa_task->latency_sensitive = false;
 	cpumask_copy(&sa_task->soft_cpumask, cpu_possible_mask);
@@ -910,6 +909,9 @@ EXPORT_SYMBOL_GPL(get_background_cpumask);
 
 void set_task_ls(int pid)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return;
 	struct task_struct *p;
 	struct soft_affinity_task *sa_task;
 
@@ -917,7 +919,7 @@ void set_task_ls(int pid)
 	p = find_task_by_vpid(pid);
 	if (p) {
 		get_task_struct(p);
-		sa_task = &((struct mtk_task *) p->android_vendor_data1)->sa_task;
+		sa_task = &(mtk_task_of(p))->sa_task;
 		sa_task->latency_sensitive = true;
 		put_task_struct(p);
 	}
@@ -927,6 +929,9 @@ EXPORT_SYMBOL_GPL(set_task_ls);
 
 void unset_task_ls(int pid)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return;
 	struct task_struct *p;
 	struct soft_affinity_task *sa_task;
 
@@ -934,7 +939,7 @@ void unset_task_ls(int pid)
 	p = find_task_by_vpid(pid);
 	if (p) {
 		get_task_struct(p);
-		sa_task = &((struct mtk_task *) p->android_vendor_data1)->sa_task;
+		sa_task = &(mtk_task_of(p))->sa_task;
 		sa_task->latency_sensitive = false;
 		put_task_struct(p);
 	}
@@ -952,7 +957,7 @@ void set_task_ls_prefer_cpus(int pid, unsigned int cpumask_val)
 	p = find_task_by_vpid(pid);
 	if (p) {
 		get_task_struct(p);
-		sa_task = &((struct mtk_task *) p->android_vendor_data1)->sa_task;
+		sa_task = &(mtk_task_of(p))->sa_task;
 		sa_task->latency_sensitive = true;
 		cpumask_copy(&sa_task->soft_cpumask, to_cpumask(&cpumask_ulval));
 		put_task_struct(p);
@@ -971,7 +976,7 @@ void unset_task_ls_prefer_cpus(int pid)
 	p = find_task_by_vpid(pid);
 	if (p) {
 		get_task_struct(p);
-		sa_task = &((struct mtk_task *) p->android_vendor_data1)->sa_task;
+		sa_task = &(mtk_task_of(p))->sa_task;
 		sa_task->latency_sensitive = false;
 		cpumask_copy(&sa_task->soft_cpumask, to_cpumask(&cpumask_ulval));
 		put_task_struct(p);
@@ -1015,10 +1020,13 @@ bool is_task_ls_uclamp(struct task_struct *p)
 
 inline bool is_task_latency_sensitive(struct task_struct *p)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口恒 false（= 零化载体语义）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return false;
 	struct soft_affinity_task *sa_task;
 	bool latency_sensitive = false;
 
-	sa_task = &((struct mtk_task *) p->android_vendor_data1)->sa_task;
+	sa_task = &(mtk_task_of(p))->sa_task;
 	rcu_read_lock();
 	latency_sensitive = sa_task->latency_sensitive || is_task_ls_uclamp(p);
 	rcu_read_unlock();
@@ -1045,7 +1053,7 @@ inline void compute_effective_softmask(struct task_struct *p,
 	tg = container_of(css, struct task_group, css);
 	tg_mask = &((struct mtk_tg *) tg->android_vendor_data1)->sa_tg.soft_cpumask;
 
-	task_mask = &((struct mtk_task *) p->android_vendor_data1)->sa_task.soft_cpumask;
+	task_mask = &(mtk_task_of(p))->sa_task.soft_cpumask;
 
 	if (!cpumask_and(dst_mask, task_mask, tg_mask)) {
 		cpumask_copy(dst_mask, tg_mask);
@@ -1383,7 +1391,7 @@ static inline bool task_can_skip_this_cpu(struct task_struct *p, unsigned long p
 {
 	bool cpu_in_bcpus;
 	unsigned long task_util;
-	struct task_gear_hints *ghts = &((struct mtk_task *) p->android_vendor_data1)->gear_hints;
+	struct task_gear_hints *ghts = &(mtk_task_of(p))->gear_hints;
 
 	if (prio_is_vip(vip_prio, NOT_VIP))
 		return 0;
@@ -1435,7 +1443,7 @@ void init_gear_hints(void)
 
 void __set_gear_indices(struct task_struct *p, int gear_start, int num_gear, int reverse)
 {
-	struct task_gear_hints *ghts = &((struct mtk_task *) p->android_vendor_data1)->gear_hints;
+	struct task_gear_hints *ghts = &(mtk_task_of(p))->gear_hints;
 
 	ghts->gear_start = gear_start;
 	ghts->num_gear   = num_gear;
@@ -1444,6 +1452,9 @@ void __set_gear_indices(struct task_struct *p, int gear_start, int num_gear, int
 
 int set_gear_indices(int pid, int gear_start, int num_gear, int reverse)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return -ENODEV;
 	struct task_struct *p;
 	int ret = 0;
 
@@ -1481,6 +1492,9 @@ EXPORT_SYMBOL_GPL(set_gear_indices);
 
 int unset_gear_indices(int pid)
 {
+	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return -ENODEV;
 	struct task_struct *p;
 	int ret = 0;
 
@@ -1505,7 +1519,7 @@ EXPORT_SYMBOL_GPL(unset_gear_indices);
 
 void __get_gear_indices(struct task_struct *p, int *gear_start, int *num_gear, int *reverse)
 {
-	struct task_gear_hints *ghts = &((struct mtk_task *) p->android_vendor_data1)->gear_hints;
+	struct task_gear_hints *ghts = &(mtk_task_of(p))->gear_hints;
 
 	*gear_start = ghts->gear_start;
 	*num_gear = ghts->num_gear;
@@ -1797,7 +1811,7 @@ void mtk_get_gear_indicies(struct task_struct *p, int *order_index, int *end_ind
 		int *reverse)
 {
 	int i = 0;
-	struct task_gear_hints *ghts = &((struct mtk_task *) p->android_vendor_data1)->gear_hints;
+	struct task_gear_hints *ghts = &(mtk_task_of(p))->gear_hints;
 	int max_num_gear = -1;
 
 	*order_index = 0;
@@ -2129,7 +2143,7 @@ void mtk_find_energy_efficient_cpu(void *data, struct task_struct *p, int prev_c
 	int vip_prio = NOT_VIP;
 	struct cpumask vip_candidate;
 #if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
-	struct vip_task_struct *vts = &((struct mtk_task *) p->android_vendor_data1)->vip_task;
+	struct vip_task_struct *vts = &(mtk_task_of(p))->vip_task;
 
 	vip_prio = get_vip_task_prio(p);
 	is_vip = prio_is_vip(vip_prio, NOT_VIP);
@@ -2450,8 +2464,7 @@ done:
 				latency_sensitive, sync, &effective_softmask);
 	}
 	if (trace_sched_effective_mask_enabled()) {
-		struct soft_affinity_task *sa_task = &((struct mtk_task *)
-			p->android_vendor_data1)->sa_task;
+		struct soft_affinity_task *sa_task = &(mtk_task_of(p))->sa_task;
 		struct cgroup_subsys_state *css = task_css(p, cpu_cgrp_id);
 		struct cpumask softmask;
 
