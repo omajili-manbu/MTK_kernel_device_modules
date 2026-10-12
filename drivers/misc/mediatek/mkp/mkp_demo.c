@@ -1310,6 +1310,11 @@ int __init mkp_demo_init(void)
 			goto failed;
 		}
 	}
+#else /* !__has_include(<trace/hooks/creds.h>) */
+	/* rodin b247 复审 D3: 策略被请求但本树无 creds vendor hook —— 明确可见，不静默。 */
+	if (policy_ctrl[MKP_POLICY_TASK_CRED] != 0)
+		MKP_ERR("TASK_CRED policy is enabled but this kernel has no creds vendor hooks "
+			"(trace/hooks/creds.h absent) -- cred policy stays inert\n");
 #endif /* __has_include(<trace/hooks/creds.h>) */
 
 	if (policy_ctrl[MKP_POLICY_SELINUX_STATE] != 0) {

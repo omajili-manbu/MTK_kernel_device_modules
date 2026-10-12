@@ -3110,6 +3110,13 @@ out:
 		dev_err(dev, "%s, can't find mediatek,larbs !\n", __func__);
 		return larb_nr;
 	}
+	/* rodin b247 复审 D2: 上游 6.18 mtk_iommu_mm_dts_parse 有、此处缺的两条校验——
+	 * larb_nr==0 会让循环后的 smi-supply 解析用未初始化的 larbnode；
+	 * larb_nr>MTK_LARB_NR_MAX 会越界。合法 DT 不会触发，纯加固。 */
+	if (larb_nr == 0 || larb_nr > MTK_LARB_NR_MAX) {
+		dev_err(dev, "%s, invalid larb count %d !\n", __func__, larb_nr);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < larb_nr; i++) {
 		u32 id;
@@ -3128,6 +3135,14 @@ out:
 		ret = of_property_read_u32(larbnode, "mediatek,larb-id", &id);
 		if (ret)/* The id is consecutive if there is no this property */
 			id = i;
+
+		/* rodin b247 复审 D2: 上游 6.18 有、此处缺 —— 防止 DT 给出越界 larb-id
+		 * 时 data->larb_imu[id] 越界写（数组 MTK_LARB_NR_MAX 项）。 */
+		if (id >= MTK_LARB_NR_MAX) {
+			dev_err(dev, "%s, larb-id %u out of range !\n", __func__, id);
+			of_node_put(larbnode);
+			return -EINVAL;
+		}
 
 		disp_power_on |= of_property_read_bool(larbnode, "init-power-on");
 

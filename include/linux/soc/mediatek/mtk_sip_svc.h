@@ -134,6 +134,9 @@
 #define MTK_SIP_SCP_DVFS_CONTROL \
 	MTK_SIP_SMC_CMD(0x232)
 
+/* rodin b247 复审 D1: 本 id 的权威源 = include/linux/soc/mediatek/mtk_sip_svc_internal.h
+ * （本文件仍被 apusys 3 个 TU 以无前缀 <mtk_sip_svc.h> 消费；两处取值必须一致，
+ *  iommu_secure.c/smmu_secure.c 侧已用 _Static_assert 锚住内核名同值）。 */
 /* IOMMU related SMC call */
 #define MTK_IOMMU_SECURE_CONTROL \
 	MTK_SIP_SMC_CMD(0x514)

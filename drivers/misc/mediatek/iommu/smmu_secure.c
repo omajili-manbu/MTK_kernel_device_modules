@@ -5,18 +5,19 @@
 
 #define pr_fmt(fmt)    "mtk_smmu: sec " fmt
 
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h>
 #include <linux/arm-smccc.h>
 
 #include "mtk-smmu-v3.h"
 #include "smmu_secure.h"
 #include "iommu_debug.h"
 
-/* rodin stage1: the kernel tree's mtk_sip_svc.h (which wins the include race)
- * lacks the vendor IOMMU SMC id; value mirrors the vendor copy
- * (include/linux/soc/mediatek/mtk_sip_svc.h, == upstream name for 0x514). */
-#ifndef MTK_IOMMU_SECURE_CONTROL
-#define MTK_IOMMU_SECURE_CONTROL	MTK_SIP_SMC_CMD(0x514)
+/* rodin b247 复审 D1: 值收敛到单一权威源 —— sip 内部头
+ * （其内先 include 内核版 mtk_sip_svc.h，故 vendor 名与内核名都在场），
+ * 此处不再本地定义，只留编译期等值锚（防两处取值漂移）。 */
+#ifdef MTK_SIP_KERNEL_IOMMU_CONTROL
+_Static_assert(MTK_IOMMU_SECURE_CONTROL == MTK_SIP_KERNEL_IOMMU_CONTROL,
+	       "vendor MTK_IOMMU_SECURE_CONTROL must equal kernel MTK_SIP_KERNEL_IOMMU_CONTROL (0x514)");
 #endif
 
 #define SMMU_SUCCESS			(0)

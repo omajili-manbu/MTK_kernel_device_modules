@@ -226,7 +226,12 @@ void init_ko_addr_list_late(void)
 }
 #endif
 
-/* copy from fs/binfmt_elf.c */
+/* copy from fs/binfmt_elf.c
+ * rodin b247 复审 A-104③: 本块是 6.6 时代手工副本，与 6.18 上游已分叉（上游
+ * fill_elf_header 增至 4 参并 memset、fill_elf_note_phdr 的 p_align=4、fill_note
+ * 改名 __fill_note 且吃 memelfnote）。本文件是自足的 dump 写入器（所有字段显式
+ * 赋值、不经上游 API），该分叉不影响 dump 正确性、且行为与既有解析工具一致；
+ * 将来若要改 dump 格式，须同时参照上游同名函数。 */
 static void fill_elf_header(struct elfhdr *elf, int segs)
 {
 	memcpy(elf->e_ident, ELFMAG, SELFMAG);
