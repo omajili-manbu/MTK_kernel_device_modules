@@ -62,6 +62,18 @@ void attach_tasks_clone(struct list_head *tasks, struct rq *rq)
 		p = list_first_entry(tasks, struct task_struct, se.group_node);
 		list_del_init(&p->se.group_node);
 
+		/*
+		 * 加固：idle 任务绝不能经 activate_task() 重挂——idle_sched_class
+		 * 没有 ->enqueue_task（见 kernel/sched/idle.c），命中 NULL 会在
+		 * CFI 校验处解引用 [NULL-4] 直接 Oops（本次 CPU7 崩溃）。正常
+		 * 路径下 migrate_tasks() 已拦下 idle，这里仅兜底：记一笔、恢复
+		 * on_rq 不变式（init_idle() 置为 QUEUED）后跳过。
+		 */
+		if (WARN_ON_ONCE(p == rq->idle)) {
+			WRITE_ONCE(p->on_rq, TASK_ON_RQ_QUEUED);
+			continue;
+		}
+
 		WARN_ON(task_rq(p) != rq);
 		activate_task(rq, p, 0);
 	}
@@ -128,6 +140,20 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
 			if (next && next != RETRY_TASK)
 				break;
 		}
+
+		/*
+		 * for_each_active_class() 的遍历范围含 idle 类（区间终点
+		 * __sched_class_lowest 在 idle 之后），而 pick_task_idle() 在没有
+		 * 其它可运行任务时无条件返回 rq->idle。idle 任务绝不能出队：
+		 * idle_sched_class 没有 ->enqueue_task，dequeue_task_idle() 也只
+		 * 会打印 "bad: scheduling from the idle thread!"。若在此摘掉 idle，
+		 * 收尾的 attach_tasks_clone() 会经 activate_task()->enqueue_task()
+		 * 解引用 NULL（CFI 校验读 [NULL-4]）而 Oops——即本次崩溃根因。
+		 * 走到 idle（或拿到空/RETRY_TASK）即已无可迁移任务，直接结束。
+		 */
+		if (!next || next == RETRY_TASK || next == rq->idle)
+			break;
+
 		/* prevent warn on rq_pin_lock() */
 		if (rq->balance_callback && rq->balance_callback != &balance_push_callback)
 			rq->balance_callback = NULL;
