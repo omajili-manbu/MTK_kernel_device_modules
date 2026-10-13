@@ -1126,7 +1126,7 @@ static int mml_m2m_enum_fmt_mplane(struct file *file, void *fh,
 static int mml_m2m_g_fmt_mplane(struct file *file, void *fh,
 				struct v4l2_format *f)
 {
-	struct mml_m2m_ctx *ctx = fh_to_ctx(fh);
+	struct mml_m2m_ctx *ctx = fh_to_ctx(file->private_data);
 	struct mml_m2m_frame *frame = ctx_get_frame(ctx, f->type);
 
 	*f = frame->format;
@@ -1243,7 +1243,7 @@ static void m2m_set_format(struct mml_frame_data *data, struct mml_buffer *buf,
 static int mml_m2m_s_fmt_mplane(struct file *file, void *fh,
 				struct v4l2_format *f)
 {
-	struct mml_m2m_ctx *ctx = fh_to_ctx(fh);
+	struct mml_m2m_ctx *ctx = fh_to_ctx(file->private_data);
 	struct mml_m2m_frame *frame = ctx_get_frame(ctx, f->type);
 	struct mml_frame_data *mml_frame = ctx_get_submit_frame(ctx, f->type);
 	struct mml_buffer *mml_buf = ctx_get_submit_buffer(ctx, f->type);
@@ -1312,7 +1312,7 @@ static int mml_m2m_s_fmt_mplane(struct file *file, void *fh,
 static int mml_m2m_try_fmt_mplane(struct file *file, void *fh,
 				  struct v4l2_format *f)
 {
-	struct mml_m2m_ctx *ctx = fh_to_ctx(fh);
+	struct mml_m2m_ctx *ctx = fh_to_ctx(file->private_data);
 
 	if (!m2m_try_fmt_mplane(f, ctx))
 		return -EINVAL;
@@ -1338,7 +1338,7 @@ static void v4l2_rect_to_mml_rect(struct v4l2_rect *src, struct mml_rect *dst)
 static int mml_m2m_g_selection(struct file *file, void *fh,
 			       struct v4l2_selection *s)
 {
-	struct mml_m2m_ctx *ctx = fh_to_ctx(fh);
+	struct mml_m2m_ctx *ctx = fh_to_ctx(file->private_data);
 	struct mml_m2m_frame *frame;
 	struct mml_frame_dest *dest;
 	bool valid = false;
@@ -1377,7 +1377,7 @@ static int mml_m2m_g_selection(struct file *file, void *fh,
 static int mml_m2m_s_selection(struct file *file, void *fh,
 			       struct v4l2_selection *s)
 {
-	struct mml_m2m_ctx *ctx = fh_to_ctx(fh);
+	struct mml_m2m_ctx *ctx = fh_to_ctx(file->private_data);
 	struct mml_m2m_frame *frame = ctx_get_frame(ctx, s->type);
 	struct mml_frame_dest *dest;
 	struct v4l2_rect r;
