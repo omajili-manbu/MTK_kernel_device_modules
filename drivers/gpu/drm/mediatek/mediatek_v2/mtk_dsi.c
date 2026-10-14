@@ -6080,12 +6080,13 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi, struct cmdq_pkt *cmdq_ha
 #ifdef CONFIG_MI_DISP_ESD_CHECK
 		mi_disp_err_flag_esd_check_switch(&dsi->ddp_comp.mtk_crtc->base, false);
 #endif
-		/* rodin: 6.18 drm_panel_disable is void */
+		/* 6.18 drm_panel_disable is void; on internal failure panel->enabled
+		 * is not cleared and stays sticky-true.  The next drm_panel_enable()
+		 * then early-returns ("already enabled"), the panel never receives
+		 * its display-on DCS command, and the pipeline freezes (no TE/vsync)
+		 * after rapid screen toggling.  Force-clear so enable always runs. */
 		drm_panel_disable(dsi->panel);
-		if (false) {
-			DRM_ERROR("failed to disable the panel\n");
-			return;
-		}
+		dsi->panel->enabled = false;
 	}
 	dsi->pending_switch = skip_panel_switch;
 
@@ -6133,8 +6134,10 @@ SKIP_WAIT_FRAME_DONE:
 	/* 3. turn off panel or set to doze mode */
 	if (dsi->panel) {
 		if ((!new_doze_state && !skip_panel_switch) || force_lcm_update) {
-			/* rodin: 6.18 drm_panel_unprepare is void */
+			/* 6.18 drm_panel_unprepare is void; force-clear prepared so the
+			 * next drm_panel_prepare() always re-initialises the panel. */
 			drm_panel_unprepare(dsi->panel);
+			dsi->panel->prepared = false;
 #ifdef CONFIG_MI_DISP
 			{
 				mi_dsi_panel_mi_cfg_state_update(dsi, MI_DISP_DPMS_POWERDOWN);
