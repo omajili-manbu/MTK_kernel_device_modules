@@ -24,7 +24,9 @@
  *     -I$(srctree)/kernel/sched：fair_policy/rt_policy 的真身（6.18 在
  *     kernel/sched/sched.h:208/225，include/linux/sched/prio.h 无）；
  *   - __assign_str 单参化（6.18 stage6 契约）；
- *   - module_init -> vseq_module_init（T1 同款 VSEQ 化）。
+ *   - module_init -> vseq_module_init（T1 同款 VSEQ 化）；
+ *   - 表尾 { } 空终止项删除（6.18 sysctl 检查器判 procname/proc_handler
+ *     双缺失拒收整表），register_sysctl 改 register_sysctl_sz+ARRAY_SIZE。
  */
 #include <linux/swap.h>
 #include "linux/sysctl.h"
@@ -258,7 +260,6 @@ struct ctl_table binder_prio_table[] = {
 		.proc_handler   = proc_dointvec,
 		.extra1         = SYSCTL_ZERO,
 	},
-	{ },
 };
 
 int __init binder_prio_init(void)
@@ -269,7 +270,8 @@ int __init binder_prio_init(void)
 
 	register_trace_android_vh_binder_proc_transaction_finish(extend_android_vh_binder_proc_transaction_finish, NULL);
 
-	sysctl_header = register_sysctl("binder_prio", binder_prio_table);
+	sysctl_header = register_sysctl_sz("binder_prio", binder_prio_table,
+				   ARRAY_SIZE(binder_prio_table));
 	if (!sysctl_header) {
 		pr_err("binder_prio: register_sysctl_table failed\n");
 	}
