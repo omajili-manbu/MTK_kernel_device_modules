@@ -283,6 +283,10 @@ static int scmi_tinysys_protocol_init(const struct scmi_protocol_handle *ph)
 const struct scmi_protocol scmi_tinysys_protocol = {
 	.id = SCMI_PROTOCOL_TINYSYS,
 	.owner = THIS_MODULE,
+	/* 6.18 起上游 scmi_vendor_protocol_check 强制厂商协议带 vendor_id，
+	 * 须与固件上报的 "mtk:mtk" 一致方能命中 scmi_vendor_protocol_lookup */
+	.vendor_id = "mtk",
+	.sub_vendor_id = "mtk",
 	.instance_init = &scmi_tinysys_protocol_init,
 	.ops = &tinysys_proto_ops,
 	.events = &tinysys_protocol_events,
