@@ -1749,19 +1749,30 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
 #endif
     fts_irq_read_report(ts_data);
 
-    /* _b582-INTA：按 blob 补 fts_irq_handler 内联的掌面读数块（①报告 §四.2，
-     * blob 0x5ea8-0x5f20，紧跟在 fts_irq_handler 内联的 touch 数据 fts_read(0x5ea4) 之后）：
-     *   0x5ea8  ldr w8,[x19,#0xbd8]  → 门控 ts_data->palm_status（blob +0xbd8；
+    /* _b582-INTA：按 blob 补 fts_irq_handler 内联的掌面读数块（①报告 §四.2；
+     * blob 真身 fts_irq_handler@0xED98，块 0xEEAC-0xEF18，紧跟内联 touch 数据
+     * fts_read(0xEEA8) 之后；旧注 0x5ea8-0x5f20 系漂移地址，已按真身复核）：
+     *   0xEEAC  ldr w8,[x19,#0xbd8]  → 门控 ts_data->palm_status（blob +0xbd8；
      *                                6.18 树侧 palm_status 为 +0x20b0，符号访问不受漂移影响）
-     *   0x5ec0  mov w0,#0x9b         → fts_read_reg(0x9B, &val)（val 初值 0）
-     *   0x5ecc  tbnz w0,#0x1f        → val 读失败：E "read palm data error\n"
-     *                                （blob 0x10f8f，引用点 +0xd44，门 cbnz lv ⇒ E 族）
-     *   0x5ed4  cmp w0,#0x1 / cbnz   → val∈{0,1} 才处理
-     *   0x5ee0  update_palm_sensor_value_common(val)（实参 = val，非恒 0）
-     *   0x5f00  I "update palm data:0x%02X"（blob 0x82ed，引用点 +0x16c，门 cmp w8,#3）
+     *   0xEEC4  mov w0,#0x9b         → fts_read_reg(0x9B, &val)（val 初值 0）
+     *   0xEED0  tbnz w0,#0x1f        → val 读失败走 loc_EFD4：门 cbnz
+     *                                debug_log_level ⇒ E "read palm data error\n"
+     *   0xEED8  cmp w0,#1 / b.eq+cbnz → val∈{0,1} 才处理
+     *   0xEEE4  update_palm_sensor_value_common(val)（实参 = val，非恒 0）
+     *   0xEEE8  cmp w3,#1 / b.hi     → 打印门一：val<=1
+     *   0xEEF4  ldr debug_log_level / cmp w8,#3 / b.cc → 打印门二：级别>=3
+     *                                （旧注"门 cmp w8,#3"即此——w8 是日志级别非 palm
+     *                                值；blob 默认 debug_log_level=3@0x3BBB8，与树侧
+     *                                fts_debug_log_level=FTS_LOG_INFO 同值）
+     *   0xEF04  I "\0016[FTS_TS_I]…update palm data:0x%02X"（fmt@0x46E55，
+     *           引用点 = fts_irq_handler+0x16c，func "fts_read_palm_data" L3442）
      * 成对性：本块内 update_palm_sensor_value_common 的调用面 = 1（与 blob 一致），
      * fts_read_reg = 1（blob fts_irq_handler 亦各 1；① gate_b582.txt 的
-     * "fts_read_reg:1 / update_palm_sensor_value_common:1" 残留即指本缺口）。 */
+     * "fts_read_reg:1 / update_palm_sensor_value_common:1" 残留即指本缺口）。
+     * 树侧唯一偏离（日志卫生）：blob 于 val=0 且级别>=3 时照打，stock 该态
+     * 不出现（palm ON 后屏幕即入 idle，窗口内零触屏中断）；6.18 实机 palm ON
+     * 期间亮屏连触且固件 0x9B 恒回 0x00 ⇒ 每 IRQ 一行（482 行）。故 I 打印只留
+     * val==1（真 palm 事件）；update 调用面不动（val∈{0,1} 全量，与 blob 同形）。 */
     if (ts_data->palm_status && fts_data) {
         u8 palm_value = 0;
 
@@ -1769,7 +1780,8 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
             FTS_ERROR("read palm data error\n");
         } else if (palm_value <= 1) {
             update_palm_sensor_value_common(palm_value);
-            FTS_INFO("update palm data:0x%02X", palm_value);
+            if (palm_value == 1)
+                FTS_INFO("update palm data:0x%02X", palm_value);
         }
     }
 
