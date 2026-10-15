@@ -3643,8 +3643,17 @@ void goodix_ic_switch_mode(u8 _gesture_type)
 	}
 #endif // TOUCH_TRUSTED_SUPPORT
 
-	/* _b573 scp 联动：blob 0xa654-0xa684 = SCP 托管手势（param0==3）时把手势类型同步给
-	 * SCP（ipi cmd 5）；Nonui 模式当前值作第 3 参一并下发 */
+	/* _b583b-GX2：blob 0x12640-0x12650 先做 EN 位重映射（UBFIZ W20,W0,#2,#1 =
+	 * bit0(LONGPRESS/FOD)→bit2=FOD_EN；BFXIL W20,W0,#1,#2 = bit2:1→bit1:0 =
+	 * DOUBLETAP→DOUBLE_TAP_EN@bit1、SINGLETAP→SINGLE_TAP_EN@bit0），ipi(5) 与
+	 * gesture_enabled 比较写回共用该值。树侧原映射在 ipi(5) 之后（下方三-if），
+	 * param0==3 时发的是恒 0 —— 每次模式变更把 SCP 手势掩码清零 ⇒ 灭屏手势
+	 * 全失效；按 blob 把映射提到 ipi(5) 前，删原三-if。原注释 blob 0xa654 为
+	 * 过时地址（真身 0x12620）。 */
+	gesture_type = ((_gesture_type & 0x1) << 2) | ((_gesture_type >> 1) & 0x3);
+
+	/* SCP 托管手势（param0==3）时把手势类型同步给 SCP（ipi cmd 5）；
+	 * Nonui 模式当前值作第 3 参一并下发 */
 	if (scp_tp_param.param0 == 3) {
 		ts_info("[scp-tp]: goodix_ic_switch_mode, cur_gesture=0x%x", gesture_type);
 		scp_tp_ipi_send(5, gesture_type,
@@ -3664,13 +3673,7 @@ void goodix_ic_switch_mode(u8 _gesture_type)
 	ts_debug("fod is 0x%x", driver_get_touch_mode_common(TOUCH_ID, Touch_Fod_Enable));
 	ts_debug("gesture enabled is 0x%x", core_data->gesture_enabled);
 	mutex_lock(&core_data->core_mutex);
-	if (_gesture_type & GESTURE_SINGLETAP_EVENT)
-		gesture_type |= SINGLE_TAP_EN;
-	if (_gesture_type & GESTURE_DOUBLETAP_EVENT)
-		gesture_type |= DOUBLE_TAP_EN;
-	if (_gesture_type & GESTURE_LONGPRESS_EVENT)
-		gesture_type |= FOD_EN;
-
+	/* 三-if EN 映射已按 blob（0x12640 UBFIZ/BFXIL）上移至 ipi(5) 前，见 _b583b-GX2 */
 	if (core_data->gesture_enabled != gesture_type) {
 		ts_info("gesture enable changed from 0x%x to 0x%x", core_data->gesture_enabled, gesture_type);
 		core_data->gesture_enabled = gesture_type;
@@ -4618,14 +4621,20 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	/* _b573 boost wiring: blob 0xe000-0xe008 = init_touch_irq(0, bus_interface->dev->of_node) */
 	init_touch_irq(TOUCH_ID, bus_interface->dev->of_node);
 
-	/* _b573 scp 接线：blob 0xe00c-0xe044 = 探针尾填 scp_tp_param 缺省后 scp_tp_init()。
-	 * blob 从 core_data 0xa7/0xbf/0xd3 读的三字节全模块零写入（kzalloc 后恒 0），按 0 种子化。 */
-	scp_tp_param.param0 = 1;
-	scp_tp_param.unknown_04 = 0;
-	scp_tp_param.field_08 = 0;
-	scp_tp_param.unknown_0c = 32;
-	scp_tp_param.unknown_14[2] = 0;
-	scp_tp_param.unknown_14[3] = 2500;
+	/* blob 0xe00c-0xe044 = 探针尾填 scp_tp_param 缺省后 scp_tp_init()。
+	 * 逐指令对照 blob 0x16010-0x16044（X9 = scp_tp_param+4，X19 = core_data）：
+	 *   STP  W8,W11,[X9]          W8=1, W11=cd->[0xD3]    → +0x04=1, +0x08=touch_data_addr
+	 *   STP  W10,W8,[X9,#0x08]    W10=cd->[0xA7], W8=0x20 → +0x0C=cmd_addr, +0x10=32
+	 *   STP  W8,W10,[X9,#0x1C]    W8=cd->[0xBF], W10=0x9C4 → +0x20=frame_data_addr, +0x24=2500
+	 * cd+0xA7=ic_info.misc.cmd_addr, cd+0xBF=ic_info.misc.frame_data_addr,
+	 * cd+0xD3=ic_info.misc.touch_data_addr（ic_info 在 core_data 偏移 0x2C，misc 在
+	 * ic_info 偏移 123，pahole 实证）。param0(+0x00) blob 不写、保持 .bss 零。 */
+	scp_tp_param.unknown_04 = 1;
+	scp_tp_param.field_08 = core_data->ic_info.misc.touch_data_addr;
+	scp_tp_param.unknown_0c = core_data->ic_info.misc.cmd_addr;
+	scp_tp_param.field_10 = 32;
+	scp_tp_param.unknown_14[3] = core_data->ic_info.misc.frame_data_addr;
+	scp_tp_param.unknown_14[4] = 2500;
 
 	/* _b582-INTD（A4-2）：blob goodix_ts_probe 0xe040 `cmp w12,#3; b.hs 0xe15c`（ts_info 级），
 	 * 0xe15c/0xe160 = adrp/add .rodata.str1.1+0x2db2 =
