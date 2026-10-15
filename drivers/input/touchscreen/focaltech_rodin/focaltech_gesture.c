@@ -327,24 +327,27 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 	int ret = 0;
 	int i = 0;
 	int index = 0;
-	u8 buf[FTS_GESTURE_DATA_LEN] = { 0 };
+	/* _b583b-T6：blob var_48 清零跨度 = 28B（STR WZR+STP XZR XZR+STR XZR，SP+8..SP+0x23），
+	 * 且 SCP/SPI 两分支都写 buf[2..27] ⇒ 数组按 blob 实际足迹开 28。 */
+	u8 buf[FTS_GESTURE_DATA_LEN + 2] = { 0 };
 	struct input_dev *input_dev = ts_data->input_dev;
 	struct fts_gesture_st *gesture = &fts_gesture_data;
 	if (!ts_data->gesture_support) {
 		FTS_ERROR("gesture no support");
 		return -EINVAL;
 	}
-	/* _b583-FTS（A2）：blob 0xE5CC 头部按 IDA/objdump 逐点补齐：
-	 *   0xE61C `cmp w8,#3; b.hs 0xE780` → 0xE780 = _printk(.rodata.str1.1+0x6065
-	 *     b'\x016[FTS_TS_I][%s:%d]: scptp_cur_state=%d\n'（classify ②b：blob 有树无，
-	 *     它在 blob 全模块**只**被本函数引用，refs 0xE784/0xE788）实参 = scp_tp_param.param0；
-	 *   0xE628 `ldr w8,[scp_tp_param]; cmp w8,#3` → 0xE634-0xE658 从 scp_tp_param+0x30
-	 *     （= gesture_data）拷 26B（ldp+ldp+ldrh = 0x1A）到 buf；
-	 *   0xE674 `cbz x20, 0xE6BC` = touch_buf == NULL 时跳过拷贝（树侧 focal_scp_gesture
-	 *     正是以 NULL 调用，原码会解引用 touch_buf+0xC30）。 */
+	/* _b583-FTS（A2）：blob 头部按 IDA/objdump 逐点补齐（真身 0x175D0，旧注释 0xE5CC
+	 * 系地址错引）：gesture_support 门 + scptp_cur_state 打印 + param0 三分支。
+	 * _b583b-T6：param0==3 分支 blob 0x17638-0x1765C = LDP X9,X10,[X8] + LDR X11,+0x10 +
+	 * LDRH W8,+0x18（26B 自 scp_tp_param+0x30），**四条 store 目的全带 +2**
+	 * （STUR X9,[var_48+2] / STUR X10,[var_40+2] / STUR X11,[var_38+2] /
+	 * STRH W8,[var_30+2]）⇒ 拷到 buf[2..27]，与 SPI 路径 fts_read(&buf[2],1,&buf[2],
+	 * 0x1A) 同布局 —— IC 手势缓冲 byte0=gesture_id，落 buf[2] 才与读点 buf[2] 对齐；
+	 * 树侧原拷 buf[0] 使 id 错位（读 buf[2] 得 0xff）⇒ 双击静默丢弃。
+	 * 真机实证：SCP DDR = 24 00 ff ff…（GESTURE_DOUBLECLICK=0x24@byte0，point_num=0）。 */
 	FTS_INFO("scptp_cur_state=%d\n", fts_scp_tp_param.param0);
 	if (fts_scp_tp_param.param0 == 3) {
-		memcpy(buf, fts_scp_tp_param.gesture_data, FTS_GESTURE_DATA_LEN);
+		memcpy(&buf[2], fts_scp_tp_param.gesture_data, FTS_GESTURE_DATA_LEN);
 	} else if (ts_data->gesture_bmode == GESTURE_BM_TOUCH) {
 		if (touch_buf)
 			memcpy(buf, touch_buf + FTS_TOUCH_DATA_LEN, FTS_GESTURE_DATA_LEN);
@@ -543,14 +546,14 @@ int fts_gesture_suspend(struct fts_ts_data *ts_data)
 		if (state == ENABLE)
 			break;
 	}
+	/* _b583b-T5：blob 0x18374/0x1838C 两条退出路径**均无条件**调
+	 * fts_fod_reg_write(0x01,1)（0xCF |= DOUBLETAP 位）；全函数对 ts_data 仅访问
+	 * [X19,#0x2A8](irq)，无 fod_status 读点 ⇒ 删树侧 fod_status 门（donor 遗留）。 */
 #ifdef FTS_TOUCHSCREEN_FOD
-	if (ts_data->fod_status != -1 && ts_data->fod_status != 0) {
-		ret = fts_fod_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);
-		if (ret) {
-			FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
-			// fts_gesture_data.active = DISABLE;
-			return -EIO;
-		}
+	ret = fts_fod_reg_write(FTS_REG_GESTURE_DOUBLETAP_ON, true);
+	if (ret) {
+		FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
+		return -EIO;
 	}
 #endif
 	if (i >= 5)

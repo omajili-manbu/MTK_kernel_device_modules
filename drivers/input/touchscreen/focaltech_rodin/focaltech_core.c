@@ -5290,15 +5290,20 @@ if (ts_data->fts_tp_class == NULL) {
 	 * blob 内 fts_fwupg_work（0x2f0ac 段）**无**该调用（INT-B 已按 blob 删除）⇒ 此处为唯一填充点。 */
 	fts_init_xiaomi_touchfeature_v3(ts_data);
 
-	/* _b573 scp 接线：blob 0x88b8-0x88f4 = 探针尾填 fts_scp_tp_param 缺省后 fts_scp_tp_init()。
-	 * blob 从 ts_data 0x434 读的一字全模块零写入（kzalloc 后恒 0），按 0 种子化。 */
-	fts_scp_tp_param.param0 = 2;
-	fts_scp_tp_param.unknown_04 = 211;
-	fts_scp_tp_param.unknown_0c = 26;
-	fts_scp_tp_param.unknown_14[0] = 225;
-	fts_scp_tp_param.unknown_14[1] = 9;
-	fts_scp_tp_param.unknown_14[2] = 1;
-	fts_scp_tp_param.unknown_14[3] = 0;
+	/* blob 0x88b8-0x88f0 = 探针尾填 fts_scp_tp_param 缺省后 fts_scp_tp_init()。
+	 * 逐指令对照 blob 0x118BC-0x118F0（X9 = scp_tp_param+4）：
+	 *   STR  X10,[X9]          X10=0xD3_0000_0002 → +0x04=2, +0x08=0xD3(211)
+	 *   STR  W10,[X9,#0x0C]    W10=0x1A           → +0x10=26
+	 *   STUR X11,[X9,#0x14]    X11=0x9_0000_00E1  → +0x18=0xE1(225), +0x1C=9
+	 *   STP  W10,W11,[X9,#0x1C] W10=1,W11=ts_data+0x434(touch_size) → +0x20=1, +0x24=touch_size
+	 * param0(+0x00)、unknown_0c(+0x0c)、unknown_14[0](+0x14) blob 不写、保持 .bss 零。 */
+	fts_scp_tp_param.unknown_04 = 2;
+	fts_scp_tp_param.field_08 = 211;
+	fts_scp_tp_param.field_10 = 26;
+	fts_scp_tp_param.unknown_14[1] = 225;
+	fts_scp_tp_param.unknown_14[2] = 9;
+	fts_scp_tp_param.unknown_14[3] = 1;
+	fts_scp_tp_param.unknown_14[4] = ts_data->touch_size;
 
 	/* _b582-INTD（A1）：blob ts_info 级打印补位 —— blob fts_ts_probe 0x88f0
 	 * `cmp w8,#3; b.hs 0x8aa4`（W 门 = FTS_LOG_INFO），0x8aa4/0x8aa8 = adrp/add
