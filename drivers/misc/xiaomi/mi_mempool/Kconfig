@@ -1,0 +1,8 @@
+config MI_MEMPOOL
+	tristate "MI_MEMPOOL page reserve pool (rodin blob rebuild)"
+	default n
+	help
+	  Preserve page pools served to whitelisted core processes on memory
+	  allocation failures or direct-reclaim throttle.  Rebuilt against the
+	  rodin device blob; sysfs: /sys/kernel/mi_mempool/{pids,config,
+	  direct_reclaim_threshold_mb,general_stat_info,process_use_count}.
