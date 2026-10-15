@@ -407,8 +407,10 @@ static int lcm_prepare(struct drm_panel *panel)
 
 	ret = ctx->error;
 
-	if (ret < 0)
+	if (ret < 0) {
 		lcm_unprepare(panel);
+		return ret;
+	}
 
 	ctx->prepared = true;
 	ctx->peak_hdr_status = 0;

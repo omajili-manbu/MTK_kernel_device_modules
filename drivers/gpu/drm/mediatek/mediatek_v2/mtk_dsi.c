@@ -6042,8 +6042,20 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi, struct cmdq_pkt *cmdq_ha
 	int blank;
 #endif
 	DDPINFO("%s+ doze_enabled:%d\n", __func__, new_doze_state);
-	if (!dsi->output_en)
+	if (!dsi->output_en) {
+		/* Race window: mtk_output_dsi_enable() already called
+		 * drm_panel_prepare() but has not yet set output_en=true.
+		 * If we bail here without clearing panel->prepared, the next
+		 * drm_panel_prepare() will skip lcm_prepare() ("already
+		 * prepared"), the panel never receives its display-on DCS
+		 * sequence, no TE is produced, and the pipeline freezes.
+		 * Force-clear so the next enable always re-initialises. */
+		if (dsi->panel) {
+			dsi->panel->enabled = false;
+			dsi->panel->prepared = false;
+		}
 		return;
+	}
 
 	mtk_drm_crtc_wait_blank(mtk_crtc);
 #ifdef CONFIG_MI_DISP_ESD_CHECK
