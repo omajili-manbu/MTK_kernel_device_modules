@@ -651,7 +651,16 @@ void pelt_se_tp(void *data, struct sched_entity *se)
 		return;
 	}
 
-	if (entity_is_task(se) && se->on_rq) {
+	/*
+	 * rodin 6.18（A-75 同形）：DELAY_DEQUEUE 下的阻塞任务仍满足 on_rq ——
+	 * dequeue_task_fair() 拒绝出队、置 se->sched_delayed = 1 就提前返回，
+	 * 只有后续的收尾路径才真正把 se->on_rq 清零；而本处理器还会被
+	 * __update_load_avg_blocked_se()（pelt.c）这条阻塞路径触发。只判 on_rq
+	 * 会把「逻辑上已阻塞、只是延迟出队」的僵尸计成超额运行任务，污染
+	 * nr_over_up/down_thres，而 core_ctl 正是拿它决定停/开核。按 6.18 的
+	 * se_runnable() 语义（sched.h）把 sched_delayed 排除掉。
+	 */
+	if (entity_is_task(se) && se->on_rq && !se->sched_delayed) {
 		p = task_of(se);
 		cpu = cpu_of(task_rq(p));
 

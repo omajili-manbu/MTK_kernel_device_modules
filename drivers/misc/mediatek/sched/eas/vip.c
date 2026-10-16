@@ -1075,8 +1075,14 @@ static void account_vip_runtime(struct rq *rq, struct task_struct *curr)
 	 * into vendor hook, it is possible that update flags are
 	 * reset by another rq lock and unlock. Do the update here
 	 * if required.
+	 *
+	 * rodin 6.18：判据必须写成 “< RQCF_UPDATED” 而不是位与非——sched.h 的
+	 * 「rq::clock_update_flags bits」段明写：__schedule() 内部会把该字段
+	 * **左移一位**（把 RQCF_REQ_SKIP 提升为 RQCF_ACT_SKIP），此时表示
+	 * “已更新”的是 0x08 而非 0x04，`& RQCF_UPDATED` 会判成未更新。本函数
+	 * 正是从 scheduler 掉锁后的 hook 进来（见上段注释），属于该窗口。
 	 */
-	if (!(rq->clock_update_flags & RQCF_UPDATED))
+	if (rq->clock_update_flags < RQCF_UPDATED)
 		update_rq_clock(rq);
 
 	/* sum_exec_snapshot can be ahead. See below increment */
@@ -1383,10 +1389,17 @@ void vip_push_runnable(struct rq *src_rq)
 	 * src_rq 锁、另持 dst_rq 锁（double_lock_balance），等价 core
 	 * __migrate_swap_task()/detach_task()+attach_task() 的锁形态，
 	 * 故只补 delayed 门，不动锁。
+	 *
+	 * 再补 is_migration_disabled 门：6.18 的 set_task_cpu() 自己带
+	 * WARN_ON_ONCE(is_migration_disabled(p))（core.c），迁移区内的任务只允许
+	 * 由 migration stopper 收尾；core 的所有迁移入口（can_migrate_task()、
+	 * migration_cpu_stop()、balance_push()）都先排除它，这里也必须排除，
+	 * 否则会踩断言并把一个仍在迁移区里的任务强行改 CPU。
 	 */
 	if ((task_rq(task_to_pushed) != src_rq) ||
 		(cpu_rq(task_cpu(task_to_pushed))->curr->pid == task_to_pushed->pid) ||
-		(!mtk_task_migratable(task_to_pushed)))
+		(!mtk_task_migratable(task_to_pushed)) ||
+		is_migration_disabled(task_to_pushed))
 		goto unlock;
 
 	/* de-queue from curr rq */
@@ -1402,8 +1415,21 @@ void vip_push_runnable(struct rq *src_rq)
 	update_rq_clock(dst_rq);
 	lockdep_assert_rq_held(dst_rq);
 	activate_task(dst_rq, task_to_pushed, ENQUEUE_NOCLOCK);
-	/* rodin 6.18: the 6.6 check_preempt_curr() entry is the wakeup_preempt class op. */
-	dst_rq->curr->sched_class->wakeup_preempt(dst_rq, task_to_pushed, 0);
+	/*
+	 * rodin 6.18：6.6 的 check_preempt_curr() 入口在 6.18 不是类方法，而是
+	 * 辅助函数 wakeup_preempt(rq, p, flags)（core.c，EXPORT_SYMBOL_GPL）：
+	 * 它按 rq->donor 选类、p 的类更高时直接 resched_curr()，并在确有必要时
+	 * 走 rq_clock_skip_update() 省掉一次重复的时钟更新；core 自己的迁移路径
+	 * （move_queued_task()、__migrate_swap_task()、attach_task()）走的都是它。
+	 *
+	 * 原先直接派发 dst_rq->curr->sched_class->wakeup_preempt() 有两个缺口：
+	 *   ① 跳过 helper 的跨类判定与时钟优化；
+	 *   ② CONFIG_SCHED_PROXY_EXEC=y 下取错上下文——6.18 把 rq->curr 拆成
+	 *      「执行上下文」rq->curr 与「调度上下文」rq->donor，两者可以不同
+	 *      （curr 可能是阻塞中的 proxy），抢占判定必须对 donor 做，helper 就是
+	 *      为此把字段读成 rq->donor（core.c:wakeup_preempt）。
+	 */
+	wakeup_preempt(dst_rq, task_to_pushed, 0);
 
 	trace_sched_force_migrate(task_to_pushed, new_cpu, MIGR_SWITCH_PUSH_VIP);
 
