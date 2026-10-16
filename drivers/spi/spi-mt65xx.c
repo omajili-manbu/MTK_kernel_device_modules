@@ -1939,7 +1939,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
 		}
 	}
 
-	ret = devm_spi_register_controller(&pdev->dev, master);
+	ret = spi_register_controller(master);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
 		goto err_put_master;
@@ -1962,6 +1962,8 @@ static void mtk_spi_remove(struct platform_device *pdev) /* rodin stage2: 6.18 .
 
 	struct spi_controller *master = platform_get_drvdata(pdev);
 	struct mtk_spi *mdata = spi_controller_get_devdata(master);
+
+	spi_unregister_controller(master);
 
 	pm_runtime_disable(&pdev->dev);
 
