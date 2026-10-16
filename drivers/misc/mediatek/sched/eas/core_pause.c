@@ -27,6 +27,7 @@
 #include "sched_sys_common.h"
 #include <linux/types.h>
 #include "eas_plus.h"
+#include "common.h"	/* mtk_task_migratable(): 6.18 delayed 僵尸判定 */
 #include "eas_trace.h"
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -44,39 +45,154 @@ struct pause_thread_data drain_data = {
 
 struct task_struct *pause_drain_thread;
 
-void detach_one_task_clone(struct task_struct *p, struct rq *rq, struct list_head *tasks)
+/*
+ * 「@p 是否允许在 @cpu 上运行」= 6.18 core is_cpu_allowed() 的同构判定。
+ *
+ * core 的实现是 kernel/sched/core.c 里的 static inline（厂商侧不可见），故按同构
+ * 重写；逐条语义一致，唯一差别是钩子调用点直接写 trace_android_rvh_is_cpu_allowed()
+ * ——core 的 is_cpu_allowed() 也正是这么调的 ⇒ 任何挂在该钩子上的模块（含本文件
+ * 的 hook_rvh_is_cpus_allowed）的行为都会同步反映到这里，判据只此一份。
+ *
+ * 暂停语义下本判定的作用：普通任务在暂停 CPU 上 allowed=false ⇒ 必须离开本 CPU；
+ * per-CPU kthread 恒为 cpu_online(cpu) ⇒ 允许留驻（与 balance_push() 对 per-CPU
+ * kthread 的处理完全一致）。
+ */
+static inline bool mtk_cpu_allowed(struct task_struct *p, int cpu)
 {
-	lockdep_assert_rq_held(rq);
+	bool allowed = true;
 
-	deactivate_task(rq, p, DEQUEUE_NOCLOCK);
-	list_add(&p->se.group_node, tasks);
+	/* 掩码里没有本 CPU 的（改掩码后尚未迁走的）也必须离开。 */
+	if (!task_allowed_on_cpu(p, cpu))
+		return false;
+
+	/* migration disabled 的任务必须允许其跑完。 */
+	if (is_migration_disabled(p))
+		return cpu_online(cpu);
+
+	trace_android_rvh_is_cpu_allowed(p, cpu, &allowed);
+
+	/* 普通任务：仅在 active 且未被暂停时允许。 */
+	if (!(p->flags & PF_KTHREAD))
+		return cpu_active(cpu) && allowed;
+
+	if (is_per_cpu_kthread(p))
+		return cpu_online(cpu);
+
+	if (!allowed)
+		return false;
+
+	if (cpu_dying(cpu))
+		return false;
+
+	return cpu_online(cpu);
 }
 
-void attach_tasks_clone(struct list_head *tasks, struct rq *rq)
+/*
+ * 排空面之一：CFS/IDLE（rq->cfs_tasks；core 的 fair.c 与厂商 fair.c 均以此为
+ * 本 rq 的任务链表，表项即 p->se.group_node）。
+ *
+ * 每轮都从链头重新派生、不留缓存指针——搬迁必定放开 rq->lock（见 drain_push），
+ * 期间别的 CPU 的负载均衡可能把某个任务摘走，缓存下来的指针会立刻失效。
+ */
+static struct task_struct *drain_pick_cfs(struct rq *rq)
 {
 	struct task_struct *p;
 
 	lockdep_assert_rq_held(rq);
 
-	while (!list_empty(tasks)) {
-		p = list_first_entry(tasks, struct task_struct, se.group_node);
-		list_del_init(&p->se.group_node);
-
-		/*
-		 * 加固：idle 任务绝不能经 activate_task() 重挂——idle_sched_class
-		 * 没有 ->enqueue_task（见 kernel/sched/idle.c），命中 NULL 会在
-		 * CFI 校验处解引用 [NULL-4] 直接 Oops（本次 CPU7 崩溃）。正常
-		 * 路径下 migrate_tasks() 已拦下 idle，这里仅兜底：记一笔、恢复
-		 * on_rq 不变式（init_idle() 置为 QUEUED）后跳过。
-		 */
-		if (WARN_ON_ONCE(p == rq->idle)) {
-			WRITE_ONCE(p->on_rq, TASK_ON_RQ_QUEUED);
-			continue;
-		}
-
-		WARN_ON(task_rq(p) != rq);
-		activate_task(rq, p, 0);
+	list_for_each_entry(p, &rq->cfs_tasks, se.group_node) {
+		if (task_on_cpu(rq, p))
+			continue;	/* 正在本 CPU 上跑；本处置只可能是 stopper */
+		if (!mtk_task_migratable(p))
+			continue;	/* delayed 僵尸：交 core 的唤醒/阻塞路径收尾 */
+		if (mtk_cpu_allowed(p, rq->cpu))
+			continue;	/* per-CPU kthread 等：允许留驻本 CPU */
+		return p;
 	}
+
+	return NULL;
+}
+
+/*
+ * 排空面之二：RT（rq->rt.active 优先级队列）。
+ *
+ * GKI 强制 RT_GROUP_SCHED=n（本树 .config 亦为 n）：此时 rt_se->rt_rq 恒等于
+ * &rq->rt，队列表项就是任务自己的 sched_rt_entity ⇒ 可直接 container_of 回
+ * task_struct（内核 rt.c 在 !CONFIG_RT_GROUP_SCHED 分支下的 rt_task_of() 正是
+ * 这一句）。RT_GROUP_SCHED=y 时顶层实体是组实体，本函数不适用——该配置下 RT
+ * 的带宽与推送另有整套语义，Android GKI 不支持。
+ */
+static struct task_struct *drain_pick_rt(struct rq *rq)
+{
+	struct rt_rq *rt_rq = &rq->rt;
+	struct sched_rt_entity *rt_se;
+	struct task_struct *p;
+	int prio;
+
+	lockdep_assert_rq_held(rq);
+
+	for_each_set_bit(prio, rt_rq->active.bitmap, MAX_RT_PRIO) {
+		list_for_each_entry(rt_se, &rt_rq->active.queue[prio], run_list) {
+			p = container_of(rt_se, struct task_struct, rt);
+
+			if (task_on_cpu(rq, p) || !mtk_task_migratable(p) ||
+			    mtk_cpu_allowed(p, rq->cpu))
+				continue;
+
+			return p;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+ * 排空面之三：DL（dl 类的 pick_task()）。
+ *
+ * 不能直接遍历 rq->dl：其 rb-tree 里可能坐着 fair/ext 带宽服务器
+ * （rq->fair_server / rq->ext_server），它们的 dl_se 不属于任何 task_struct，
+ * dl_task_of() 的 container_of 会算到垃圾地址。dl 类的 pick_task() 自身识别
+ * 服务器（服务器无候选时会 dl_server_stop() 后重取），返回的必是真实任务。
+ *
+ * DL 按 deadline 单链有序、内核没有「取下一个」接口，故候选留驻即停止
+ * （Android 用户态不使用 SCHED_DEADLINE，此为完备性兜底而非主路径）。
+ * pick_task() 可能与 fair 服务器交互（服务器即 CFS 的带宽代理）而 repin
+ * rq->lock ⇒ 传入本层真正的 @rf，与 core 的 __pick_next_task() 同一做法。
+ */
+static struct task_struct *drain_pick_dl(struct rq *rq, struct rq_flags *rf)
+{
+	struct task_struct *p;
+
+	lockdep_assert_rq_held(rq);
+
+	if (!sched_dl_runnable(rq))
+		return NULL;
+
+	p = dl_sched_class.pick_task(rq, rf);
+	if (!p || p == RETRY_TASK)
+		return NULL;
+
+	if (task_on_cpu(rq, p) || !mtk_task_migratable(p) ||
+	    mtk_cpu_allowed(p, rq->cpu))
+		return NULL;
+
+	return p;
+}
+
+/* 取 @rq 上「必须离开本 CPU」的下一个候选；调用者须持 rq->lock。 */
+static struct task_struct *drain_pick_task(struct rq *rq, struct rq_flags *rf)
+{
+	struct task_struct *p;
+
+	p = drain_pick_cfs(rq);
+	if (p)
+		return p;
+
+	p = drain_pick_rt(rq);
+	if (p)
+		return p;
+
+	return drain_pick_dl(rq, rf);
 }
 
 static inline void
@@ -87,32 +203,98 @@ rq_relock(struct rq *rq, struct rq_flags *rf)
 	rq_repin_lock(rq, rf);
 }
 
-static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
+/* drain_push() 的三种归宿。 */
+enum drain_act {
+	DRAIN_MOVED,	/* 已推到别的 CPU */
+	DRAIN_GONE,	/* 候选已失效（已离开本 rq / 转为可留驻）：重新派生即可 */
+	DRAIN_BLOCKED,	/* 仍须离开但没有可用目的地：停止排空，避免自旋 */
+};
+
+/*
+ * 把 @p 推离本 CPU。与 __balance_push_cpu_stop() 同构：pi_lock + rq->lock 双持下
+ * select_fallback_rq() 选目的地、__migrate_task() 搬迁。
+ *
+ * 锁序：内核惯例是 pi_lock 在外、rq->lock 在内（见 task_rq_lock()），故先放开
+ * rq->lock 再取 pi_lock，然后复锁并复核——复核前任务可能已被 core 或被别的迁移器
+ * 搬走。__migrate_task() 会把锁挪到目的地 rq 上，回来时按入口快照 @orf 复位：
+ * rf 里的 pin cookie 与时钟标记已被目的地那次加/解锁改写。
+ *
+ * @rqp 就地更新（搬迁后 rq 指针必换），调用者据此继续遍历。
+ */
+static enum drain_act drain_push(struct rq **rqp, struct rq_flags *rf,
+				 const struct rq_flags *orf, struct task_struct *p)
 {
-	struct rq *rq = dead_rq;
-	struct task_struct *next, *stop = rq->stop;
-	LIST_HEAD(percpu_kthreads);
-	unsigned int num_pinned_kthreads = 0;
-	struct rq_flags orf = *rf;
+	struct rq *dead_rq = *rqp;
+	struct rq *next_rq;
 	int dest_cpu;
-	const struct sched_class *class;
-	struct rq_flags prf = { };
+	enum drain_act act = DRAIN_MOVED;
+
+	rq_unlock(dead_rq, rf);
+	raw_spin_lock(&p->pi_lock);
+	rq_relock(dead_rq, rf);
+
+	if (task_rq(p) != dead_rq || !mtk_task_migratable(p) ||
+	    task_on_cpu(dead_rq, p)) {
+		act = DRAIN_GONE;
+		goto out_unlock;
+	}
 
 	/*
-	 * Fudge the rq selection such that the below task selection loop
-	 * doesn't get stuck on the currently eligible stop task.
-	 *
-	 * We're currently inside stop_machine() and the rq is either stuck
-	 * in the stop_machine_cpu_stop() loop, or we're executing this code,
-	 * either way we should never end up calling schedule() until we're
-	 * done here.
+	 * 目的地同样经 android_rvh_is_cpu_allowed 钩子（is_cpu_allowed() 内部）⇒
+	 * 天然避开暂停中的 CPU，无需在此另做过滤。
 	 */
-	rq->stop = NULL;
+	dest_cpu = select_fallback_rq(cpu_of(dead_rq), p);
+	if (dest_cpu == cpu_of(dead_rq)) {
+		/*
+		 * 无可用目的地（调用方可能把其它 CPU 也一并暂停了）：留驻本 CPU。
+		 * 不能重试——下一轮派生的还是同一个任务。
+		 */
+		act = DRAIN_BLOCKED;
+		goto out_unlock;
+	}
+
+	next_rq = __migrate_task(dead_rq, rf, p, dest_cpu);
+	if (next_rq == dead_rq) {
+		/* 目的地在此刻失去资格（并发下线等）：本轮放弃，避免自旋。 */
+		act = DRAIN_BLOCKED;
+		goto out_unlock;
+	}
+
+	rq_unlock(next_rq, rf);
+	*rf = *orf;
+	*rqp = dead_rq;
+	rq_relock(dead_rq, rf);
+
+out_unlock:
+	raw_spin_unlock(&p->pi_lock);
+	return act;
+}
+
+/*
+ * 排空 @rq：把「不允许在本 CPU 运行」的任务逐个推走。
+ *
+ * 与 v5.10 血统实现（for_each_active_class + class->pick_task()，把不可迁移的
+ * 任务摘出 rq、收尾再统一挂回）的区别：
+ *
+ *   - pick_task() 的遍历区间含 idle 类、兜底会返回 rq->idle；而 idle 任务没有
+ *     ->enqueue_task，摘出后重挂必然解引用 NULL（CFI 读 [NULL-4]，即本次 CPU7
+ *     事故根因）。
+ *   - per-CPU kthread / migration disabled 任务按 6.18 语义本就「允许留驻」，
+ *     摘出再挂回只是徒劳动它的 on_rq 记账——正是把摘出处的问题推迟到收尾处才
+ *     爆的放大器。
+ *
+ * 这里改为按类直接遍历各排空面、只推必须离开者，全程不摘挂 rq 上的任何任务：
+ * 每个候选要么被推走、要么下一轮不再匹配（判据与 drain_push() 复核同源），
+ * 故循环必然收敛。
+ */
+static void drain_rq(struct rq *rq, struct rq_flags *rf)
+{
+	struct rq_flags orf = *rf;
+	struct task_struct *p;
 
 	/*
-	 * put_prev_task() and pick_next_task() sched
-	 * class method both need to have an up-to-date
-	 * value of rq->clock[_task]
+	 * 推送路径上 __migrate_task() 以 DEQUEUE_NOCLOCK 出队、activate_task(0)
+	 * 入队，沿途记账都依赖 rq->clock[_task] 已推到当前。
 	 */
 	update_rq_clock(rq);
 
@@ -122,99 +304,13 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
 #endif
 
 	for (;;) {
-		/*
-		 * There's this thread running, bail when that's the only
-		 * remaining thread:
-		 */
-		if (rq->nr_running == 1)
+		p = drain_pick_task(rq, rf);
+		if (!p)
 			break;
 
-		/*
-		 * rodin 6.18: 6.6's pick_migrate_task() export is gone.  Peek the
-		 * next runnable task via the mandatory class->pick_task(); 6.18
-		 * made class->pick_next_task() optional (NULL on most classes).
-		 */
-		next = NULL;
-		for_each_active_class(class) {
-			next = class->pick_task(rq, &prf);
-			if (next && next != RETRY_TASK)
-				break;
-		}
-
-		/*
-		 * for_each_active_class() 的遍历范围含 idle 类（区间终点
-		 * __sched_class_lowest 在 idle 之后），而 pick_task_idle() 在没有
-		 * 其它可运行任务时无条件返回 rq->idle。idle 任务绝不能出队：
-		 * idle_sched_class 没有 ->enqueue_task，dequeue_task_idle() 也只
-		 * 会打印 "bad: scheduling from the idle thread!"。若在此摘掉 idle，
-		 * 收尾的 attach_tasks_clone() 会经 activate_task()->enqueue_task()
-		 * 解引用 NULL（CFI 校验读 [NULL-4]）而 Oops——即本次崩溃根因。
-		 * 走到 idle（或拿到空/RETRY_TASK）即已无可迁移任务，直接结束。
-		 */
-		if (!next || next == RETRY_TASK || next == rq->idle)
+		if (drain_push(&rq, rf, &orf, p) == DRAIN_BLOCKED)
 			break;
-
-		/* prevent warn on rq_pin_lock() */
-		if (rq->balance_callback && rq->balance_callback != &balance_push_callback)
-			rq->balance_callback = NULL;
-
-		/*
-		 * Argh ... no iterator for tasks, we need to remove the
-		 * kthread from the run-queue to continue.
-		 */
-
-		if (is_per_cpu_kthread(next)) {
-			detach_one_task_clone(next, rq, &percpu_kthreads);
-			num_pinned_kthreads += 1;
-			continue;
-		}
-
-		/*
-		 * Rules for changing task_struct::cpus_mask are holding
-		 * both pi_lock and rq->lock, such that holding either
-		 * stabilizes the mask.
-		 *
-		 * Drop rq->lock is not quite as disastrous as it usually is
-		 * because !cpu_active at this point, which means load-balance
-		 * will not interfere. Also, stop-machine.
-		 */
-		rq_unlock(rq, rf);
-		raw_spin_lock(&next->pi_lock);
-		rq_relock(rq, rf);
-
-		/*
-		 * Since we're inside stop-machine, _nothing_ should have
-		 * changed the task, WARN if weird stuff happened, because in
-		 * that case the above rq->lock drop is a fail too.
-		 */
-		if (task_rq(next) != rq || !task_on_rq_queued(next)) {
-			raw_spin_unlock(&next->pi_lock);
-			continue;
-		}
-
-		/* Find suitable destination for @next, with force if needed. */
-		dest_cpu = select_fallback_rq(dead_rq->cpu, next);
-
-		if (cpu_of(rq) != dest_cpu && !is_migration_disabled(next)) {
-			rq = __migrate_task(rq, rf, next, dest_cpu);
-			if (rq != dead_rq) {
-				rq_unlock(rq, rf);
-				rq = dead_rq;
-				*rf = orf;
-				rq_relock(rq, rf);
-			}
-		} else {
-			detach_one_task_clone(next, rq, &percpu_kthreads);
-			num_pinned_kthreads += 1;
-		}
-
-		raw_spin_unlock(&next->pi_lock);
 	}
-
-	if (num_pinned_kthreads > 0)
-		attach_tasks_clone(&percpu_kthreads, rq);
-
-	rq->stop = stop;
 }
 
 int drain_rq_cpu_stop(void *data)
@@ -223,7 +319,7 @@ int drain_rq_cpu_stop(void *data)
 	struct rq_flags rf;
 
 	rq_lock_irqsave(rq, &rf);
-	migrate_tasks(rq, &rf);
+	drain_rq(rq, &rf);
 	rq_unlock_irqrestore(rq, &rf);
 
 	return 0;
