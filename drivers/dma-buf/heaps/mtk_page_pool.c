@@ -49,22 +49,35 @@ void mtk_dmabuf_page_pool_add(struct mtk_dmabuf_page_pool *pool, struct page *pa
 }
 EXPORT_SYMBOL_GPL(mtk_dmabuf_page_pool_add);
 
+/* rodin b262 (A-113): split out of mtk_dmabuf_page_pool_remove so the
+ * reserve-pool consumers can hold pool->lock across the count peek and
+ * the removal, like the stock blob does (mtk_extend... 0xED44/0xEE40,
+ * enable_store drain 0xF824). */
+struct page *mtk_dmabuf_page_pool_remove_locked(struct mtk_dmabuf_page_pool *pool,
+						int index)
+{
+	struct page *page;
+
+	lockdep_assert_held(&pool->lock);
+	page = list_first_entry_or_null(&pool->items[index], struct page, lru);
+	if (page) {
+		pool->count[index]--;
+		list_del(&page->lru);
+		mod_node_page_state(page_pgdat(page), NR_KERNEL_MISC_RECLAIMABLE,
+				    -(1 << pool->order));
+	}
+	return page;
+}
+EXPORT_SYMBOL_GPL(mtk_dmabuf_page_pool_remove_locked);
+
 static struct page *mtk_dmabuf_page_pool_remove(struct mtk_dmabuf_page_pool *pool, int index)
 {
 	struct page *page;
 
 	spin_lock(&pool->lock);
-	page = list_first_entry_or_null(&pool->items[index], struct page, lru);
-	if (page) {
-		pool->count[index]--;
-		list_del(&page->lru);
-		spin_unlock(&pool->lock);
-		mod_node_page_state(page_pgdat(page), NR_KERNEL_MISC_RECLAIMABLE,
-				    -(1 << pool->order));
-		goto out;
-	}
+	page = mtk_dmabuf_page_pool_remove_locked(pool, index);
 	spin_unlock(&pool->lock);
-out:
+
 	return page;
 }
 
@@ -210,6 +223,8 @@ int mtk_dmabuf_page_pool_do_shrink(struct mtk_dmabuf_page_pool *pool, gfp_t gfp_
 
 	while (freed < nr_to_scan) {
 		struct page *page;
+		unsigned long floor;
+		int count;
 
 		/* Try to free low pages first */
 		page = mtk_dmabuf_page_pool_remove(pool, POOL_LOWPAGE);
@@ -221,6 +236,34 @@ int mtk_dmabuf_page_pool_do_shrink(struct mtk_dmabuf_page_pool *pool, gfp_t gfp_
 
 		mtk_dmabuf_page_pool_free_pages(pool, page);
 		freed += (1 << pool->order);
+
+		/* rodin b262 (A-113): stock blob 0x9FA8 keeps a floor inside the
+		 * dynamic order-0/order-4 pools once the reserve feature is on
+		 * and the box has more than 6G; the reserve pools themselves
+		 * (is_reserve_pool) are exempt and drain to empty. */
+		if (pool->is_reserve_pool)
+			continue;
+		if (totalram_pages() <= RESERVE_SMALLRAM_PAGES)
+			continue;
+		if (!reserve_pool_enable)
+			continue;
+		if (pool->order == 4)
+			floor = RESERVE_ORDER4_FLOOR;
+		else if (pool->order == 0)
+			floor = RESERVE_ORDER0_FLOOR;
+		else
+			continue;
+
+		spin_lock(&pool->lock);
+		count = pool->count[POOL_LOWPAGE];
+		if (high)
+			count += pool->count[POOL_HIGHPAGE];
+		spin_unlock(&pool->lock);
+
+		/* keep draining while the pool is still above the floor */
+		if ((count << pool->order) > floor)
+			continue;
+		break;
 	}
 
 	return freed;

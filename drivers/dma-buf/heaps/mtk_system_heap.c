@@ -23,6 +23,18 @@
 #include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include <linux/kernel.h>
+/* rodin b262 (A-113): reserve pool face (rebuilt against stock
+ * system_heap.ko, whose GPL drop predates the feature) */
+#include <linux/kthread.h>
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
+#include <linux/ktime.h>
+#include <linux/mmzone.h>
+#include <linux/pid.h>
+#include <linux/sched.h>
+#include <linux/sched/signal.h>
+#include <uapi/linux/sched/types.h>
+#include <trace/hooks/sched.h>
 
 #include "mtk_page_pool.h"
 #include "mtk-deferred-free-helper.h"
@@ -72,6 +84,861 @@ struct system_heap_buffer {
 	/* private part for system heap */
 	struct mtk_deferred_freelist_item deferred_free;
 };
+
+/*
+ * rodin b262 (A-113): reserve_pool face, rebuilt against the stock
+ * system_heap.ko machine code (Desktop system_heap.ko.asm:
+ * need_free_to_reserve_pool 0xE0E4 / mtk_sys_heap_reserve_pool_init 0xE1E4 /
+ * reserve_pool_refill_kthread 0xE570 / mtk_extend_sys_heap_alloc_largest_available
+ * 0xEAEC / clear_pid_from_pool_pid 0xF650 / sysfs block 0xF6E8..0x102C8).
+ * The vendor GPL drop of this file (commit bc2dfc0) predates the feature, so
+ * the stock ko is the only truth.  6.6 -> 6.18 drift rewritten with 6.18
+ * idioms (never "make it run"):
+ *   - tracepoint_probe_register      -> register_trace_android_vh_mmput
+ *   - raw task_struct offsets        -> named fields: group_leader / pid /
+ *     comm / flags(PF_EXITING) / signal->oom_score_adj
+ *     (blob 6.6 offsets 0x658/0x618/0x830/0x44 bit2/0x878+0x3CA via pahole)
+ *   - raw pglist_data offsets        -> NODE_DATA(0)->node_zones[],
+ *     wmark_pages(), lowmem_reserve[], nr_reserved_highatomic,
+ *     zone_page_state_snapshot() (blob vm_stat[0] + per-cpu vm_stat_diff[0]
+ *     sum with percpu_drift_mark shortcut) and NR_FREE_CMA_PAGES
+ *     (blob vm_stat[10]); free_area scan kept (order>0 pools)
+ *   - gfp flag arithmetic            -> (__GFP_NORETRY mask | __GFP_RECLAIM)
+ *   - sched_setattr import           -> still EXPORT_SYMBOL_GPL in 6.18
+ * Blob bits without any consumer are not carried: can_do_shrink (dead
+ * export) and the cached `totalram` global (replaced by totalram_pages()).
+ */
+
+#define RESERVE_INVALID_ADJ		(-1000)
+
+/* numeric truth lives in mtk_page_pool.h next to the shared externs */
+
+static int g_reserve_config[2][5] = {
+	/* { lowmark[order8], lowmark[order4], lowmark[order0], timeout_sec, slow_alloc_us } */
+	{ 15, 3200, 150, 100, 1000 },	/* totalram <= 8G */
+	{ 15, 3200, 300, 100, 1000 },	/* totalram  > 8G */
+};
+
+static int g_camera_reserve_config[2][5] = {
+	{ 15, 3200, 200, 100, 500 },
+	{ 15, 3200, 300, 100, 500 },
+};
+
+struct mtk_reserve_extend_info {
+	u8 enabled;
+	u32 debug_mask;
+	u32 timeout_sec;
+	u32 slow_alloc_us;
+	int scene;			/* 1 = camera, 2 = default */
+	u32 stat_plain_alloc;		/* order-0 fallback allocs, not whitelisted */
+	u32 stat_hit_alloc;		/* order-0 fallback allocs, whitelisted */
+	u32 stat_slow_alloc;
+	u32 used_order[NUM_ORDERS];	/* chunks served out of the reserve pools */
+	int lowmark[NUM_ORDERS];
+	u32 refill_count[NUM_ORDERS];
+	u32 refill_ok[NUM_ORDERS];
+	u32 refill_last[NUM_ORDERS];
+	u64 last_use_ms;		/* last order-0 reserve consumption (ms) */
+};
+
+static struct mtk_reserve_extend_info reserve_extend_info;
+static struct mtk_dmabuf_page_pool *system_reserve_pools[NUM_ORDERS];
+bool reserve_pool_enable;	/* blob ksymtab face: read by the page_pool shrinker floors */
+static u8 g_mem_type_index;
+static int pool_pid[3] = { -1, -1, -1 };
+static int pool_pid_usable_index;
+static bool use_name_cmp;
+static struct mtk_dmabuf_page_pool **config_show_pools;
+static struct task_struct *reserve_refill_task;
+
+static int reserve_slot_of_order(unsigned int order)
+{
+	/* blob form: orders[0]/orders[1] compare, otherwise the last slot */
+	if (orders[0] == order)
+		return 0;
+	if (orders[1] == order)
+		return 1;
+	return 2;
+}
+
+static int reserve_pool_total_chunks(struct mtk_dmabuf_page_pool *pool)
+{
+	int total;
+
+	if (!pool)
+		return 0;
+	spin_lock(&pool->lock);
+	total = pool->count[POOL_LOWPAGE] + pool->count[POOL_HIGHPAGE];
+	spin_unlock(&pool->lock);
+	return total;
+}
+
+/*
+ * blob 0xE0E4: called from system_heap_buf_free with the pool slot index;
+ * true when the freed chunk should be diverted into system_reserve_pools[]
+ * instead of the dynamic pool it came from.
+ */
+static bool need_free_to_reserve_pool(int index)
+{
+	struct mtk_dmabuf_page_pool *pool;
+	int total;
+
+	if (!reserve_extend_info.enabled || index >= NUM_ORDERS)
+		return false;
+
+	pool = system_reserve_pools[index];
+	if (!pool)
+		return false;
+
+	total = reserve_pool_total_chunks(pool);
+	if (total >= reserve_extend_info.lowmark[reserve_slot_of_order(pool->order)])
+		return false;
+
+	if (reserve_extend_info.debug_mask & BIT(5))
+		printk(KERN_INFO "%s order[%d %d]\n",
+		       "need_free_to_reserve_pool", index, pool->order);
+	return true;
+}
+
+/*
+ * blob 0xE570, per zone gate of the refill pass: every zone from
+ * gfp_zone(gfp) down to ZONE 0 (DMA32 skipped) must be above its watermark
+ * accounting, and for order>0 must hold an allocatable free_area chunk.
+ */
+static bool reserve_pool_watermark_ok(struct mtk_dmabuf_page_pool *pool, gfp_t gfp)
+{
+	int zone_idx = gfp_zone(gfp);
+	unsigned int order = pool->order;
+	int z, i, t;
+
+	for (z = zone_idx; z >= 0; z--) {
+		struct zone *zone = &NODE_DATA(0)->node_zones[z];
+		unsigned long avail, need;
+
+		if (!strcmp(zone->name, "DMA32"))
+			continue;
+
+		/* blob: free - nr_reserved_highatomic - (1 << order) - CMA
+		 *       > lowmem_reserve[gfp_zone] + (1 << order) + high + boost */
+		avail = zone_page_state_snapshot(zone, NR_FREE_PAGES) -
+			zone->nr_reserved_highatomic -
+			zone_page_state(zone, NR_FREE_CMA_PAGES);
+		need = zone->lowmem_reserve[zone_idx] + wmark_pages(zone, WMARK_HIGH);
+		if (avail + (1UL << order) <= need + (1UL << order))
+			return false;
+
+		/* order>0 only: a ready free_area chunk must exist (blob scans
+		 * free_area[order..9]) */
+		if (order > 0) {
+			bool has_chunk = false;
+
+			for (i = order; i < RESERVE_FREE_AREA_SCAN_MAX; i++) {
+				if (!zone->free_area[i].nr_free)
+					continue;
+				for (t = 0; t < MIGRATE_TYPES; t++) {
+					if (!list_empty(&zone->free_area[i].free_list[t])) {
+						has_chunk = true;
+						break;
+					}
+				}
+				if (has_chunk)
+					break;
+			}
+			if (!has_chunk)
+				return false;
+		}
+	}
+	return true;
+}
+
+/* blob 0xF3F8 / 0xF4AC: nudge both refill kthreads after a served alloc */
+static void reserve_pool_wake_refill(struct mtk_dmabuf_page_pool *dyn,
+				     struct mtk_dmabuf_page_pool *rsv, bool hit)
+{
+	int total, slot;
+
+	if (dyn && dyn->refill_kthread && dyn->order != 0 &&
+	    reserve_extend_info.scene != 1) {
+		total = reserve_pool_total_chunks(dyn);
+		slot = reserve_slot_of_order(dyn->order);
+		if (total < reserve_extend_info.lowmark[slot]) {
+			if (reserve_extend_info.debug_mask & BIT(1))
+				printk(KERN_INFO
+				       "system_pool_lowmark: current_proc-order<%d, %d> wakeupsystem_pool-2\n",
+				       dyn->order, total);
+			wake_up_process(dyn->refill_kthread);
+		}
+	}
+
+	if (hit && rsv && rsv->refill_kthread && rsv->order != 0 &&
+	    reserve_extend_info.scene != 1) {
+		total = reserve_pool_total_chunks(rsv);
+		slot = reserve_slot_of_order(rsv->order);
+		if (total < reserve_extend_info.lowmark[slot]) {
+			if (reserve_extend_info.debug_mask & BIT(1))
+				printk(KERN_INFO
+				       "reserve_pool_lowmark: current_proc-order<%d, %d> wakeupreserve_pool-1\n",
+				       rsv->order, total);
+			wake_up_process(rsv->refill_kthread);
+		}
+	}
+}
+
+static void reserve_pool_counts(struct mtk_dmabuf_page_pool *pool, int *lo, int *hi)
+{
+	*lo = *hi = 0;
+	if (!pool)
+		return;
+	spin_lock(&pool->lock);
+	*lo = pool->count[POOL_LOWPAGE];
+	*hi = pool->count[POOL_HIGHPAGE];
+	spin_unlock(&pool->lock);
+}
+
+/* blob 0xEAEC */
+static struct page *mtk_extend_sys_heap_alloc_largest_available(
+	struct mtk_dmabuf_page_pool **page_pools, unsigned long size,
+	unsigned int max_order)
+{
+	struct task_struct *leader = current->group_leader;
+	bool hit = false;
+	struct page *page;
+	int i;
+
+	/* only "unkillable" (oom_score_adj -1000) tasks may consume the
+	 * reserve pools; the pid/comm whitelist is fed from userspace via
+	 * /sys/kernel/reserve_pool/pid */
+	if (leader->signal->oom_score_adj == RESERVE_INVALID_ADJ) {
+		if (use_name_cmp) {
+			if (pool_pid[0] == leader->pid || pool_pid[1] == leader->pid ||
+			    pool_pid[2] == leader->pid)
+				hit = true;
+		} else if ((!strncmp(leader->comm, "camerahalserver", 15) &&
+			    pool_pid[0] == leader->pid) ||
+			   (!strncmp(leader->comm, "android.hardwar", 15) &&
+			    pool_pid[1] == leader->pid) ||
+			   (!strncmp(leader->comm, "composer@3.2-se", 15) &&
+			    pool_pid[2] == leader->pid)) {
+			hit = true;
+		}
+	}
+
+	for (i = 0; i < NUM_ORDERS; i++) {
+		struct mtk_dmabuf_page_pool *pool, *rsv_pool;
+		unsigned int order = orders[i];
+		bool rsv_empty;
+		int slo, shi, rlo, rhi;
+		u64 t1;
+
+		if (order > max_order)
+			continue;
+		if ((PAGE_SIZE << order) > size)
+			continue;
+		if (!page_pools)
+			return alloc_pages(order_flags[i], orders[i]);
+
+		pool = page_pools[i];
+		rsv_pool = system_reserve_pools[i];
+		page = NULL;
+
+		/* 1st: the dynamic pool (blob 0xED44; HIGHPAGE list first) */
+		spin_lock(&pool->lock);
+		if (pool->count[POOL_HIGHPAGE])
+			page = mtk_dmabuf_page_pool_remove_locked(pool, POOL_HIGHPAGE);
+		else if (pool->count[POOL_LOWPAGE])
+			page = mtk_dmabuf_page_pool_remove_locked(pool, POOL_LOWPAGE);
+		spin_unlock(&pool->lock);
+
+		/* 2nd: reserve pool fallback (blob 0xED84..0xF01C).  High
+		 * orders first try a plain alloc (blob 0xEDA0, debug bit0
+		 * print), then all orders share the reserve chain. */
+		if (!page && order != 0) {
+			page = alloc_pages(pool->gfp_mask, pool->order);
+			if (reserve_extend_info.debug_mask & BIT(0)) {
+				reserve_pool_counts(pool, &slo, &shi);
+				reserve_pool_counts(rsv_pool, &rlo, &rhi);
+				printk(KERN_INFO
+				       "%s: page %p %s[%s %d] order %d spool[%d %d] reserve_pool[%d %d] served_app %d\n",
+				       "high order alloc", page, leader->comm,
+				       current->comm, current->pid, order,
+				       slo, shi, rlo, rhi, hit);
+			}
+		}
+
+		rsv_empty = !system_reserve_pools[0] || !system_reserve_pools[1] ||
+			    !system_reserve_pools[2];
+		if (!page && rsv_empty) {
+			printk(KERN_ERR "%s: global reserve pool have NULL, order=%d\n",
+			       "reserve_pool_empty", i);
+		} else if (!page && hit) {
+			u64 elapsed_ms = 0;
+			bool cold = false, timeout = false;
+
+			if (rsv_pool && rsv_pool->order == 0) {
+				if (!reserve_extend_info.last_use_ms)
+					cold = true;
+				else
+					elapsed_ms = div_u64(ktime_get(), NSEC_PER_MSEC) -
+						     reserve_extend_info.last_use_ms;
+				timeout = elapsed_ms >= (u64)reserve_extend_info.timeout_sec;
+			}
+			if (cold) {
+				/* idle beyond the service window: leave it full */
+			} else if (timeout) {
+				reserve_extend_info.last_use_ms = 0;
+				if (reserve_extend_info.debug_mask & BIT(2)) {
+					reserve_pool_counts(pool, &slo, &shi);
+					reserve_pool_counts(rsv_pool, &rlo, &rhi);
+					printk(KERN_INFO
+					       "%s: page %p %s[%s %d] order %d spool[%d %d] reserve_pool[%d %d] served_app %d\n",
+					       "used reserve pool timeout", NULL,
+					       leader->comm, current->comm, current->pid,
+					       order, slo, shi, rlo, rhi, hit);
+				}
+			} else if (rsv_pool) {
+				spin_lock(&rsv_pool->lock);
+				if (rsv_pool->count[POOL_HIGHPAGE])
+					page = mtk_dmabuf_page_pool_remove_locked(rsv_pool, POOL_HIGHPAGE);
+				else if (rsv_pool->count[POOL_LOWPAGE])
+					page = mtk_dmabuf_page_pool_remove_locked(rsv_pool, POOL_LOWPAGE);
+				spin_unlock(&rsv_pool->lock);
+				if (page) {
+					reserve_extend_info.used_order[i]++;
+					if (reserve_extend_info.debug_mask & BIT(1)) {
+						reserve_pool_counts(pool, &slo, &shi);
+						reserve_pool_counts(rsv_pool, &rlo, &rhi);
+						printk(KERN_INFO
+						       "%s: page %p %s[%s %d] order %d spool[%d %d] reserve_pool[%d %d] served_app %d\n",
+						       "reserve pool", page,
+						       leader->comm, current->comm, current->pid,
+						       order, slo, shi, rlo, rhi, hit);
+					}
+				}
+			}
+		}
+
+		/* 3rd: plain alloc with slow-path instrumentation (blob 0xF034) */
+		if (!page) {
+			t1 = ktime_get();
+			page = alloc_pages(pool->gfp_mask, pool->order);
+			if (hit && div_u64(ktime_get() - t1, NSEC_PER_USEC) >
+				   (u64)reserve_extend_info.slow_alloc_us) {
+				reserve_extend_info.last_use_ms =
+					div_u64(ktime_get(), NSEC_PER_MSEC);
+				reserve_extend_info.stat_slow_alloc++;
+				if (reserve_extend_info.debug_mask & BIT(2)) {
+					reserve_pool_counts(pool, &slo, &shi);
+					reserve_pool_counts(rsv_pool, &rlo, &rhi);
+					printk(KERN_INFO
+					       "%s: page %p %s[%s %d] order %d spool[%d %d] reserve_pool[%d %d] served_app %d\n",
+					       "reserve-sp", page,
+					       leader->comm, current->comm, current->pid,
+					       order, slo, shi, rlo, rhi, hit);
+				}
+			}
+			if (reserve_extend_info.debug_mask & BIT(4)) {
+				reserve_pool_counts(pool, &slo, &shi);
+				reserve_pool_counts(rsv_pool, &rlo, &rhi);
+				printk(KERN_INFO
+				       "%s: page %p %s[%s %d] order %d spool[%d %d] reserve_pool[%d %d] served_app %d\n",
+				       "All alloc", page,
+				       leader->comm, current->comm, current->pid,
+				       order, slo, shi, rlo, rhi, hit);
+			}
+			if (order == 0) {
+				if (hit)
+					reserve_extend_info.stat_hit_alloc++;
+				else
+					reserve_extend_info.stat_plain_alloc++;
+			}
+		}
+
+		if (!page)
+			continue;
+
+		if (reserve_extend_info.debug_mask & BIT(3)) {
+			reserve_pool_counts(pool, &slo, &shi);
+			reserve_pool_counts(rsv_pool, &rlo, &rhi);
+			printk(KERN_INFO
+			       "%s: page %p %s[%s %d] order %d spool[%d %d] reserve_pool[%d %d] served_app %d\n",
+			       "All", page,
+			       leader->comm, current->comm, current->pid, order,
+			       slo, shi, rlo, rhi, hit);
+		}
+
+		reserve_pool_wake_refill(pool, rsv_pool, hit);
+		return page;
+	}
+	return NULL;
+}
+
+/* blob 0xE570; wakes only when a reserve pool drops below its lowmark */
+static int reserve_pool_refill_kthread(void *data)
+{
+	struct mtk_dmabuf_page_pool **pools = data;
+	int i = 0;
+
+	while (i < NUM_ORDERS) {
+		struct mtk_dmabuf_page_pool *pool = pools[i];
+		int lowmark, total;
+
+		lowmark = reserve_extend_info.lowmark[reserve_slot_of_order(pool->order)];
+		total = reserve_pool_total_chunks(pool);
+
+		if (total < lowmark && pool->order == 0 && reserve_extend_info.enabled) {
+			gfp_t gfp = (pool->gfp_mask & ~__GFP_NORETRY) | __GFP_RECLAIM;
+			bool session_start = true;
+
+			do {
+				struct page *page;
+				int slot = reserve_slot_of_order(pool->order);
+
+				total = reserve_pool_total_chunks(pool);
+				if (total >= lowmark)
+					break;
+				if (ktime_get() - pool->refill_time <
+				    RESERVE_REFILL_INTERVAL_NS)
+					break;
+				if (session_start) {
+					reserve_extend_info.refill_count[slot]++;
+					reserve_extend_info.refill_last[slot] = 0;
+					session_start = false;
+				}
+				if (!reserve_pool_watermark_ok(pool, pool->gfp_mask)) {
+					pool->refill_time = ktime_get();
+					break;
+				}
+				page = alloc_pages(gfp, pool->order);
+				if (!page)
+					break;
+				reserve_extend_info.refill_last[slot]++;
+				reserve_extend_info.refill_ok[slot]++;
+				mtk_dmabuf_page_pool_add(pool, page);
+			} while (reserve_extend_info.enabled);
+		}
+
+		if (reserve_extend_info.debug_mask & BIT(1)) {
+			int lo, hi;
+
+			spin_lock(&pool->lock);
+			lo = pool->count[POOL_LOWPAGE];
+			hi = pool->count[POOL_HIGHPAGE];
+			spin_unlock(&pool->lock);
+			printk(KERN_INFO
+			       "%s : pools<%d>  = POOL_LOWPAGE : %d + POOL_HIGHPAGE : %d\n",
+			       "reserve_pool_lowmark", pool->order, lo, hi);
+		}
+
+		i++;
+		if (i >= NUM_ORDERS) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			smp_mb();
+			if (kthread_should_stop()) {
+				__set_current_state(TASK_RUNNING);
+				break;
+			}
+			schedule();
+			__set_current_state(TASK_RUNNING);
+			i = 0;
+		}
+	}
+	return 0;
+}
+
+/* blob 0xF650: android_vh_mmput -- release the whitelist slot of a dying
+ * process; 6.6 blob keyed on group_leader->flags & PF_EXITING */
+static void clear_pid_from_pool_pid(void *unused, struct mm_struct *mm)
+{
+	struct task_struct *leader = current->group_leader;
+	int i;
+
+	if (!reserve_extend_info.enabled)
+		return;
+	if (!(leader->flags & PF_EXITING))
+		return;
+
+	for (i = 0; i < NUM_ORDERS; i++) {
+		if (pool_pid[i] == leader->pid) {
+			printk(KERN_INFO "pid %d from list\n", pool_pid[i]);
+			pool_pid[i] = -1;
+			break;
+		}
+	}
+}
+
+static ssize_t enable_show(struct kobject *kobj, struct kobj_attribute *attr,
+			   char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%u\n", reserve_extend_info.enabled);
+}
+
+static ssize_t enable_store(struct kobject *kobj, struct kobj_attribute *attr,
+			    const char *buf, size_t len)
+{
+	struct mtk_dmabuf_page_pool *pool;
+	struct page *page, *tmp;
+	int val, ret, i, n;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val) {
+		reserve_extend_info.enabled = 1;
+		reserve_pool_enable = 1;
+		return len;
+	}
+
+	reserve_extend_info.enabled = 0;
+	reserve_pool_enable = 0;
+
+	for (i = 0; i < NUM_ORDERS; i++) {
+		LIST_HEAD(free_list);
+
+		pool = system_reserve_pools[i];
+		if (!pool)
+			continue;
+
+		spin_lock(&pool->lock);
+		for (;;) {
+			page = mtk_dmabuf_page_pool_remove_locked(pool, POOL_LOWPAGE);
+			if (!page)
+				page = mtk_dmabuf_page_pool_remove_locked(pool, POOL_HIGHPAGE);
+			if (!page)
+				break;
+			list_add_tail(&page->lru, &free_list);
+		}
+		spin_unlock(&pool->lock);
+
+		n = 1;
+		list_for_each_entry_safe(page, tmp, &free_list, lru) {
+			list_del(&page->lru);
+			if (reserve_extend_info.debug_mask & BIT(6))
+				printk(KERN_INFO "reserve pool free %d order %d\n",
+				       n, pool->order);
+			__free_pages(page, pool->order);
+			n++;
+		}
+	}
+	return len;
+}
+
+static ssize_t debug_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%u\n", reserve_extend_info.debug_mask);
+}
+
+static ssize_t debug_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t len)
+{
+	int val, ret;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+	reserve_extend_info.debug_mask = val;
+	return len;
+}
+
+static const char * const reserve_config_show_name[] = {
+	"source_pool_free_order",
+	"reserve_pool_used_order",
+	"reserve_pool_free_order",
+	"reserve_pool_reserve_order",
+	"reserve_pool_refill_count",
+	"reserve_pool_refill_acount",
+	"reserve_pool_refill_last_amount",
+};
+
+static ssize_t config_show(struct kobject *kobj, struct kobj_attribute *attr,
+			   char *buf)
+{
+	int n = 0;
+	int i, j;
+
+	for (i = 0; i < ARRAY_SIZE(reserve_config_show_name); i++) {
+		int v[3] = { 0, 0, 0 };
+
+		for (j = 0; j < NUM_ORDERS; j++) {
+			switch (i) {
+			case 0:
+				v[j] = reserve_pool_total_chunks(config_show_pools ?
+								 config_show_pools[j] : NULL);
+				break;
+			case 1:
+				v[j] = reserve_extend_info.used_order[j];
+				break;
+			case 2:
+				v[j] = reserve_pool_total_chunks(system_reserve_pools[j]);
+				break;
+			case 3:
+				v[j] = reserve_extend_info.lowmark[j];
+				break;
+			case 4:
+				v[j] = reserve_extend_info.refill_count[j];
+				break;
+			case 5:
+				v[j] = reserve_extend_info.refill_ok[j];
+				break;
+			case 6:
+				v[j] = reserve_extend_info.refill_last[j];
+				break;
+			}
+		}
+		n += scnprintf(buf + n, PAGE_SIZE - n, "%s[%d %d %d]\n",
+			       reserve_config_show_name[i], v[0], v[1], v[2]);
+	}
+
+	n += scnprintf(buf + n, PAGE_SIZE - n,
+		       "reserve_slowpath[%d]\nreserve_long_slowpath[%d]\nslowpath[%d]\n"
+		       "pool_service_time[%d]\npool_start_service_alloc_time[%d]\n"
+		       "used_reserve_pool %d\n",
+		       reserve_extend_info.stat_hit_alloc,
+		       reserve_extend_info.stat_slow_alloc,
+		       reserve_extend_info.stat_plain_alloc,
+		       reserve_extend_info.timeout_sec,
+		       reserve_extend_info.slow_alloc_us,
+		       reserve_extend_info.enabled);
+	return n;
+}
+
+static ssize_t config_store(struct kobject *kobj, struct kobj_attribute *attr,
+			    const char *buf, size_t len)
+{
+	int lm0, lm1, lm2, to, slow;
+
+	if (sscanf(buf, "%d %d %d %d %d", &lm0, &lm1, &lm2, &to, &slow) != 5) {
+		printk(KERN_INFO
+		       "usage: total five args, three reserve, one used time and one alloc time\n");
+		return -EIO;
+	}
+
+	reserve_extend_info.lowmark[0] = lm0;
+	reserve_extend_info.lowmark[1] = lm1;
+	reserve_extend_info.lowmark[2] = lm2;
+	reserve_extend_info.timeout_sec = to;
+	reserve_extend_info.slow_alloc_us = slow;
+	return len;
+}
+
+static ssize_t pid_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	/* blob arg order kept: slot1 slot2 slot0 and the inverted cmp flag */
+	return scnprintf(buf, PAGE_SIZE, "%d %d %d cmp:%d\n",
+			 pool_pid[1], pool_pid[2], pool_pid[0],
+			 1 & !use_name_cmp);
+}
+
+static bool update_pool_pid(int new_pid)
+{
+	int i;
+
+	for (i = 0; i < NUM_ORDERS; i++) {
+		bool alive;
+
+		rcu_read_lock();
+		alive = pool_pid[i] >= 0 && find_task_by_vpid(pool_pid[i]);
+		rcu_read_unlock();
+		if (alive)
+			continue;
+		printk(KERN_INFO "pid update %d -> %d\n", pool_pid[i], new_pid);
+		pool_pid[i] = new_pid;
+		return true;
+	}
+	printk(KERN_INFO "no find index for %d\n", new_pid);
+	return false;
+}
+
+static ssize_t pid_store(struct kobject *kobj, struct kobj_attribute *attr,
+			 const char *buf, size_t len)
+{
+	struct task_struct *tsk, *leader;
+	int pid, ret;
+
+	ret = kstrtoint(buf, 0, &pid);
+	if (ret)
+		return ret;
+	if (pid < 1)
+		return len;
+
+	rcu_read_lock();
+	tsk = find_task_by_vpid(pid);
+	rcu_read_unlock();
+	if (!tsk)
+		return -ESRCH;
+
+	get_task_struct(tsk);
+	leader = tsk->group_leader;
+	printk(KERN_INFO "caller pid %d %s ppid %d\n",
+	       pid, current->comm, task_pid_nr(current));
+
+	if (pool_pid_usable_index <= 2) {
+		pool_pid[pool_pid_usable_index] = pid;
+		pool_pid_usable_index++;
+		printk(KERN_INFO "pid %d %s %d %s %d\n",
+		       pid, tsk->comm, leader->pid, leader->comm,
+		       pool_pid_usable_index);
+	} else {
+		printk(KERN_INFO "pid OVF! %d %s %d\n",
+		       pid, leader->comm, 3);
+		if (!update_pool_pid(pid))
+			printk(KERN_INFO "warning pid %d %s %d %s %d\n",
+			       pid, tsk->comm, leader->pid, leader->comm,
+			       pool_pid_usable_index);
+	}
+	put_task_struct(tsk);
+
+	use_name_cmp = pool_pid[0] && pool_pid[1] && pool_pid[2];
+	return len;
+}
+
+static ssize_t scene_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", reserve_extend_info.scene);
+}
+
+static ssize_t scene_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t len)
+{
+	const int *cfg;
+	int scene, ret;
+
+	ret = kstrtoint(buf, 0, &scene);
+	if (ret)
+		return ret;
+
+	if (scene == 1)
+		cfg = g_camera_reserve_config[g_mem_type_index];
+	else if (scene == 2)
+		cfg = g_reserve_config[g_mem_type_index];
+	else {
+		printk(KERN_INFO "error\n");
+		return len;
+	}
+
+	reserve_extend_info.scene = scene;
+	reserve_extend_info.lowmark[0] = cfg[0];
+	reserve_extend_info.lowmark[1] = cfg[1];
+	reserve_extend_info.lowmark[2] = cfg[2];
+	reserve_extend_info.timeout_sec = cfg[3];
+	reserve_extend_info.slow_alloc_us = cfg[4];
+	return len;
+}
+
+static struct kobj_attribute kobj_attr_enable =
+	__ATTR(enable, 0644, enable_show, enable_store);
+static struct kobj_attribute kobj_attr_debug =
+	__ATTR(debug, 0644, debug_show, debug_store);
+static struct kobj_attribute kobj_attr_config =
+	__ATTR(config, 0644, config_show, config_store);
+static struct kobj_attribute kobj_attr_pid =
+	__ATTR(pid, 0644, pid_show, pid_store);
+static struct kobj_attribute kobj_attr_scene =
+	__ATTR(scene, 0644, scene_show, scene_store);
+
+static struct attribute *reserve_pool_attrs[] = {
+	&kobj_attr_enable.attr,
+	&kobj_attr_debug.attr,
+	&kobj_attr_config.attr,
+	&kobj_attr_pid.attr,
+	&kobj_attr_scene.attr,
+	NULL,
+};
+
+static const struct attribute_group reserve_pool_attr_group = {
+	.attrs = reserve_pool_attrs,
+};
+
+/*
+ * blob 0xE1E4: three standalone pools at orders[]/order_flags[] plus the
+ * /sys/kernel/reserve_pool face and the reserve-refill kthread.  Called from
+ * mtk_heap_create("system"), i.e. inside the vseq replay wave, which keeps
+ * the stock 0.53s creation phase.
+ */
+static void mtk_sys_heap_reserve_pool_init(struct mtk_dmabuf_page_pool **page_pools)
+{
+	struct sched_attr attr = {
+		.sched_policy = SCHED_NORMAL,
+		.sched_nice = 10,
+	};
+	const int *cfg;
+	struct kobject *reserve_kobj;
+	int i, j, ret;
+
+	g_mem_type_index = totalram_pages() > RESERVE_BIGRAM_PAGES;
+
+	for (i = 0; i < NUM_ORDERS; i++) {
+		system_reserve_pools[i] = mtk_dmabuf_page_pool_create(order_flags[i],
+								     orders[i]);
+		if (!system_reserve_pools[i]) {
+			printk(KERN_ERR
+			       "%s: page pool creation failed for the order %u pool!\n",
+			       __func__, orders[i]);
+			for (j = 0; j < i; j++) {
+				mtk_dmabuf_page_pool_destroy(system_reserve_pools[j]);
+				system_reserve_pools[j] = NULL;
+			}
+			continue;
+		}
+		printk(KERN_INFO "%s: order<%d> reserve page pool create success!\n",
+		       __func__, orders[i]);
+		system_reserve_pools[i]->is_reserve_pool = true;
+		system_reserve_pools[i]->pool_list = system_reserve_pools;
+	}
+
+	cfg = g_reserve_config[g_mem_type_index];
+	reserve_extend_info.debug_mask = 0;
+	reserve_extend_info.lowmark[0] = cfg[0];
+	reserve_extend_info.lowmark[1] = cfg[1];
+	reserve_extend_info.lowmark[2] = cfg[2];
+	reserve_extend_info.timeout_sec = cfg[3];
+	reserve_extend_info.slow_alloc_us = cfg[4];
+	reserve_extend_info.scene = 2;
+
+	config_show_pools = page_pools;
+
+	/* blob ignored the register result; same here */
+	register_trace_android_vh_mmput(clear_pid_from_pool_pid, NULL);
+
+	reserve_extend_info.enabled = 1;
+	reserve_pool_enable = 1;
+
+	reserve_kobj = kobject_create_and_add("reserve_pool", kernel_kobj);
+	if (!reserve_kobj) {
+		printk(KERN_ERR "failed to create reserve pool node.\n");
+		goto kthread;
+	}
+	ret = sysfs_create_group(reserve_kobj, &reserve_pool_attr_group);
+	if (ret) {
+		printk(KERN_ERR "failed to create reserve pool attrs.\n");
+		kobject_put(reserve_kobj);
+	}
+
+kthread:
+	reserve_refill_task = kthread_create_on_node(reserve_pool_refill_kthread,
+						     system_reserve_pools,
+						     NUMA_NO_NODE, "reserve-refill");
+	if (IS_ERR(reserve_refill_task)) {
+		printk(KERN_ERR "%s: failed to create reserve-refill: %ld\n",
+		       __func__, PTR_ERR(reserve_refill_task));
+		reserve_refill_task = NULL;
+		return;
+	}
+	wake_up_process(reserve_refill_task);
+	ret = sched_setattr(reserve_refill_task, &attr);
+	if (ret) {
+		printk(KERN_WARNING "%s: failed to set task priority for ret = %d\n",
+		       __func__, ret);
+		kthread_stop(reserve_refill_task);
+	}
+	for (i = 0; i < NUM_ORDERS; i++) {
+		if (system_reserve_pools[i])
+			system_reserve_pools[i]->refill_kthread = reserve_refill_task;
+	}
+}
 
 static bool smmu_v3_enable;
 static const struct dma_map_ops *smmu_dma_ops;
@@ -799,16 +1666,35 @@ static void system_heap_buf_free(struct mtk_deferred_freelist_item *item,
 		if (reason == MTK_DF_UNDER_PRESSURE || !page_pools) {
 			__free_pages(page, compound_order(page));
 		} else {
+			struct mtk_dmabuf_page_pool *pool;
+			int total;
+
 			for (j = 0; j < NUM_ORDERS; j++) {
 				if (compound_order(page) == orders[j])
 					break;
 			}
 
-			if (j < NUM_ORDERS)
-				mtk_dmabuf_page_pool_free(page_pools[j], page);
-			else
+			if (j >= NUM_ORDERS) {
 				pr_info("%s error order:%u\n",
 					__func__, compound_order(page));
+			} else {
+				pool = page_pools[j];
+				spin_lock(&pool->lock);
+				total = pool->count[POOL_LOWPAGE] +
+					pool->count[POOL_HIGHPAGE];
+				spin_unlock(&pool->lock);
+
+				/* rodin b262 (A-113): blob 0x7EF8 -- a dynamic
+				 * pool at its 100MB cap overflows the freed
+				 * chunk into the reserve pool when that
+				 * pool's lowmark still has head-room */
+				if (total < (RESERVE_POOL_CAP_CHUNKS >> orders[j]) &&
+				    need_free_to_reserve_pool(j))
+					mtk_dmabuf_page_pool_free(system_reserve_pools[j],
+								  page);
+				else
+					mtk_dmabuf_page_pool_free(pool, page);
+			}
 		}
 	}
 
@@ -1215,7 +2101,15 @@ static struct dma_buf *system_heap_do_allocate(struct dma_heap *heap,
 			goto free_buffer;
 		}
 
-		page = alloc_largest_available(size_remaining, max_order, page_pools);
+		/* rodin b262 (A-113): blob 0x8BF4 -- when the reserve face is on,
+		 * allocations route through the reserve-pool-aware allocator
+		 * (whitelist gate + reserve fallback + slow-path instrumentation) */
+		if (reserve_extend_info.enabled)
+			page = mtk_extend_sys_heap_alloc_largest_available(
+					page_pools, size_remaining, max_order);
+		else
+			page = alloc_largest_available(size_remaining, max_order,
+						       page_pools);
 		if (!page) {
 			if (fatal_signal_pending(current)) {
 				ret = -EINTR;
@@ -1496,6 +2390,12 @@ static int mtk_heap_create(const char *name, const struct dma_heap_ops *ops,
 			goto out_free_heap;
 		}
 	}
+
+	/* rodin b262 (A-113): blob 0x869C -- the "system" heap owns the
+	 * global reserve pools; running inside mtk_system_heap_create keeps
+	 * the stock 0.53s creation phase (6.6 dmesg anchor). */
+	if (!strcmp(name, "system"))
+		mtk_sys_heap_reserve_pool_init(heap_priv->page_pools);
 	heap_priv->uncached = false;
 	heap_priv->buf_priv_dump = system_heap_buf_priv_dump;
 

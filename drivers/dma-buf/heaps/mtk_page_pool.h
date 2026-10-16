@@ -74,6 +74,11 @@ struct mtk_dmabuf_page_pool {
 	u64 refill_time;
 	u64 shrink_time;
 	u64 log_time;
+
+/* rodin b262 (A-113): stock system_heap.ko flags the reserve pools
+ * themselves (blob can_do_shrink/do_shrink byte at pool+0x50) so the
+ * shrinker floors below only ever apply to the dynamic pools. */
+	bool is_reserve_pool;
 };
 
 struct mtk_dmabuf_page_pool *mtk_dmabuf_page_pool_create(gfp_t gfp_mask,
@@ -99,5 +104,24 @@ int mtk_dmabuf_page_pool_do_shrink(struct mtk_dmabuf_page_pool *pool, gfp_t gfp_
 				   int nr_to_scan);
 
 int mtk_cache_pool_init(void);
+
+/* rodin b262 (A-113): reserve pool face shared with mtk_system_heap.c
+ * (rebuilt against stock system_heap.ko, see there for the drift log).
+ * Numeric truth from the blob; floors are chunk-weighted (chunks <<
+ * order), i.e. both orders encode a 100MB cap/floor. */
+#define RESERVE_ORDER0_FLOOR		0x6400
+#define RESERVE_ORDER4_FLOOR		0x780
+#define RESERVE_POOL_CAP_CHUNKS		0x6400
+#define RESERVE_SMALLRAM_PAGES		0x180000	/* shrink guard only above 6G */
+#define RESERVE_BIGRAM_PAGES		0x200000	/* big-RAM config only above 8G */
+#define RESERVE_REFILL_INTERVAL_NS	10000000LL	/* 10s re-arm throttle */
+#define RESERVE_FREE_AREA_SCAN_MAX	10	/* blob scans free_area[order, 10) */
+
+extern bool reserve_pool_enable;
+
+/* remove one page with pool->lock already held (blob callers do the
+ * count-peek and the removal inside one critical section) */
+struct page *mtk_dmabuf_page_pool_remove_locked(struct mtk_dmabuf_page_pool *pool,
+						int index);
 
 #endif /* _MTK_DMABUF_PAGE_POOL_H */
