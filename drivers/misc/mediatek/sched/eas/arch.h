@@ -34,7 +34,8 @@ unsigned long get_cpu_power(unsigned int mtk_em, unsigned int get_lkg,
 	unsigned long freq, unsigned long max_util)
 {
 	unsigned long sum_util;
-	struct em_perf_state *ps;
+	struct em_perf_state *states;
+	unsigned long cost;
 	int i;
 
 	if (get_cpu_power_hook) {
@@ -57,9 +58,18 @@ unsigned long get_cpu_power(unsigned int mtk_em, unsigned int get_lkg,
 	 * min/max 性能态由函数自己从 pd->min_perf_state/max_perf_state 读
 	 * （include/linux/energy_model.h:200-206），struct em_perf_domain 也已无
 	 * min_ps/max_ps 成员 ⇒ 按 mainline 调用形态改写（同头 :267 样例）。 */
-	i = em_pd_get_efficient_state(pd->em_table->state, pd, max_util);
-	ps = &pd->em_table->state[i];
-	return ps->cost * sum_util;
+	/*
+	 * rodin 6.18（A-61）：em_table 是 __rcu 指针（EM 表可热更新），读者
+	 * 必须持 rcu_read_lock() 并经 em_perf_state_from_pd() 取表；cost 在
+	 * 锁内读成标量，锁外不再触碰表内存。
+	 */
+	rcu_read_lock();
+	states = em_perf_state_from_pd(pd);
+	i = em_pd_get_efficient_state(states, pd, max_util);
+	cost = states[i].cost;
+	rcu_read_unlock();
+
+	return cost * sum_util;
 }
 
 unsigned long (*get_cpu_pwr_eff_hook)(int cpu, unsigned long pd_freq, int quant, int wl,

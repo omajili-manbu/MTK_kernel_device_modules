@@ -468,17 +468,37 @@ void (*sugov_grp_awr_update_cpu_tar_util_hook)(int cpu);
 EXPORT_SYMBOL(sugov_grp_awr_update_cpu_tar_util_hook);
 #endif
 
-static void sugov_get_util(struct sugov_cpu *sg_cpu)
+/*
+ * rodin 6.18（A-60）：上游 sugov 在 iowait boost 之后还有一步最终包络夹取 ——
+ * sugov_effective_cpu_perf(cpu, util, min, max)，其中 [min, max] 是
+ * effective_cpu_util() 的 uclamp/容量包络出参（max = min(cap, uclamp_max)）。
+ * 本树的 mtk_cpu_util() 只夹取 boost 之前的实际值，boost 因此可以越过
+ * uclamp_max —— 6.6 里对 boost 施加的那次 uclamp 夹取被删掉后，丢的正是这半边
+ * （请求频率高于包络夹取后的值）。
+ *
+ * 但不能直接调用 sugov_effective_cpu_perf()：它内含 map_util_perf() 的 DVFS
+ * headroom（×1.25），而本树该 headroom 由自有 mtk_map_util_freq() 的
+ * adaptive_margin / util_scale（1280/1024）在 CAP→FREQ 之前统一施加
+ * （DT eas-info version=650 ⇒ am_ctrl=1，走 mtk_map_util_freq_adap_grp()），
+ * 再叠一次就是 1.5625× 双计。故这里只补包络夹取，用本包的 uclamp 原语
+ * mtk_uclamp_rq_util_with()（min/max 反转与 !uclamp_is_used 都已处理）。
+ * boost == 0 时该夹取与 mtk_cpu_util() 内部那次同源同界，是空操作。
+ */
+static void sugov_get_util(struct sugov_cpu *sg_cpu, unsigned long boost)
 {
 	unsigned long cpu_util = mtk_cpu_util_cfs_boost(sg_cpu->cpu);
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
+	unsigned long util;
 
 	sg_cpu->max = arch_scale_cpu_capacity(sg_cpu->cpu);
 	sg_cpu->bw_dl = cpu_bw_dl(rq);
 
-	sg_cpu->util = mtk_cpu_util(sg_cpu->cpu, cpu_util, FREQUENCY_UTIL,
+	util = mtk_cpu_util(sg_cpu->cpu, cpu_util, FREQUENCY_UTIL,
 							(struct task_struct *)UINTPTR_MAX,
 							0, SCHED_CAPACITY_SCALE);
+	sg_cpu->util = mtk_uclamp_rq_util_with(rq, max(util, boost),
+							NULL, 0, SCHED_CAPACITY_SCALE,
+							NULL, NULL, false);
 #if IS_ENABLED(CONFIG_MTK_SCHED_GROUP_AWARE)
 	if (sugov_grp_awr_update_cpu_tar_util_hook && grp_dvfs_ctrl_mode)
 		sugov_grp_awr_update_cpu_tar_util_hook(sg_cpu->cpu);
@@ -571,19 +591,21 @@ static void sugov_iowait_boost(struct sugov_cpu *sg_cpu, u64 time,
  *
  * This mechanism is designed to boost high frequently IO waiting tasks, while
  * being more conservative on tasks which does sporadic IO operations.
+ *
+ * Return: the utilization boost to apply, in capacity scale, or 0.
  */
-static void sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
+static unsigned long sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
 								unsigned long max_cap)
 {
 	unsigned long boost;
 
 	/* No boost currently required */
 	if (!sg_cpu->iowait_boost)
-		return;
+		return 0;
 
 	/* Reset boost if the CPU appears to have been idle enough */
 	if (sugov_iowait_reset(sg_cpu, time, false))
-		return;
+		return 0;
 
 	if (!sg_cpu->iowait_boost_pending) {
 		/*
@@ -592,7 +614,7 @@ static void sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
 		sg_cpu->iowait_boost >>= 1;
 		if (sg_cpu->iowait_boost < IOWAIT_BOOST_MIN) {
 			sg_cpu->iowait_boost = 0;
-			return;
+			return 0;
 		}
 	}
 
@@ -604,15 +626,11 @@ static void sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
 	 */
 	boost = (sg_cpu->iowait_boost * max_cap) >> SCHED_CAPACITY_SHIFT;
 	/*
-	 * rodin 6.9：uclamp_rq_util_with() 在 6.18 已删除（uclamp 折叠进
-	 * effective_cpu_util() 的 min/max 出参，kernel/sched/fair.c:8424-8439）；
-	 * 6.18 sugov 的 iowait 路径也不再对 boost 施加 uclamp
-	 * （kernel/sched/cpufreq_schedutil.c:333-362 直接按 max_cap 折算，随后由
-	 * effective_cpu_util() 统一 clamp）⇒ 删此行。语义等价：6.18 的 boost 在
-	 * effective_cpu_util 之前施加，uclamp 最终仍会把它 clamp 住。
+	 * rodin 6.18（A-60）：与上游 cpufreq_schedutil.c 同形 —— boost 不再就地
+	 * 改写 sg_cpu->util，而是回传给 sugov_get_util()，在那里于最终 uclamp
+	 * 包络夹取之前施加（上游的 sugov_get_util(sg_cpu, boost) 形态）。
 	 */
-	if (sg_cpu->util < boost)
-		sg_cpu->util = boost;
+	return boost;
 }
 
 /*
@@ -705,8 +723,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 
 	/* Critical Task aware thermal throttling, notify thermal */
 	mtk_set_cpu_min_opp_single(sg_cpu);
-	sugov_get_util(sg_cpu);
-	sugov_iowait_apply(sg_cpu, time, max_cap);
+	sugov_get_util(sg_cpu, sugov_iowait_apply(sg_cpu, time, max_cap));
 	if (trace_sugov_ext_util_enabled()) {
 		rq = cpu_rq(sg_cpu->cpu);
 
@@ -757,8 +774,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 	for_each_cpu(j, policy->cpus) {
 		struct sugov_cpu *j_sg_cpu = &per_cpu(sugov_cpu, j);
 
-		sugov_get_util(j_sg_cpu);
-		sugov_iowait_apply(j_sg_cpu, time, max_cap);
+		sugov_get_util(j_sg_cpu, sugov_iowait_apply(j_sg_cpu, time, max_cap));
 
 		if (_ignore_idle_ctrl) {
 			sugov_data_ptr = &per_cpu(rq_data, j)->sugov_data;

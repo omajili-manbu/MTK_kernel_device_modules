@@ -766,8 +766,12 @@ void check_for_migration(struct task_struct *p)
 
 	if (rq->misfit_task_load) {
 		struct em_perf_domain *pd;
+		struct em_perf_state *em_states;
 		struct cpufreq_policy *policy;
 		int opp_curr = 0, thre = 0, thre_idx = 0;
+#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
+		int thre_rot = 0, thre_rot_idx = 0;
+#endif
 
 		if (rq->curr->__state != TASK_RUNNING ||
 			rq->curr->nr_cpus_allowed == 1)
@@ -777,9 +781,27 @@ void check_for_migration(struct task_struct *p)
 		if (!pd)
 			return;
 
+		/*
+		 * rodin 6.18（A-61）：em_perf_domain::em_table 是
+		 * struct em_perf_table __rcu *（EM 表可热更新/retable），上游读者
+		 * 一律 rcu_read_lock() + rcu_dereference()，这里直接用同头提供的
+		 * em_perf_state_from_pd() 访问器（与 em_cpu_energy() 同形）。
+		 * 两个门限一次在锁内取完，避免把 rcu 读侧区间拉到后面的
+		 * raw_spin_lock()/migrate_running_task() 上。
+		 */
+		rcu_read_lock();
+		em_states = em_perf_state_from_pd(pd);
+
 		thre_idx = (pd->nr_perf_states >> 3) - 1;
 		if (thre_idx >= 0)
-			thre = pd->em_table->state[thre_idx].frequency;
+			thre = em_states[thre_idx].frequency;
+
+#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
+		thre_rot_idx = (pd->nr_perf_states >> 1) - 1;
+		if (thre_rot_idx >= 0)
+			thre_rot = em_states[thre_rot_idx].frequency;
+#endif
+		rcu_read_unlock();
 
 		policy = cpufreq_cpu_get(cpu);
 		irq_log_store();
@@ -827,17 +849,10 @@ void check_for_migration(struct task_struct *p)
 			irq_log_store();
 		} else {
 #if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-			int thre_rot = 0, thre_rot_idx = 0;
-
-			thre_rot_idx = (pd->nr_perf_states >> 1) - 1;
-			if (thre_rot_idx >= 0)
-				thre_rot = pd->em_table->state[thre_rot_idx].frequency;
-
 			if (opp_curr > thre_rot) {
 				task_check_for_rotation(rq);
 				irq_log_store();
 			}
-
 #endif
 			raw_spin_unlock(&migration_lock);
 		}

@@ -1196,7 +1196,12 @@ void vip_cfs_tick(struct rq *rq)
 	 * If the current is not VIP means, we have to re-schedule to
 	 * see if we can run any other task including VIP tasks.
 	 */
-	if ((vrq->vip_tasks.next != &vts->vip_list) && rq->cfs.h_nr_queued > 1)
+	/*
+	 * rodin 6.18（A-62）：h_nr_queued 含 se.sched_delayed 的延迟出队僵尸
+	 * （挂队但不可运行），判"还有别的 CFS 任务可跑"须用 h_nr_runnable，
+	 * 否则多一次无谓的 resched_curr()。
+	 */
+	if ((vrq->vip_tasks.next != &vts->vip_list) && rq->cfs.h_nr_runnable > 1)
 		resched_curr(rq);
 
 out:

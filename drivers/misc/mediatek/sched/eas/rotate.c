@@ -42,21 +42,30 @@ struct task_rotate_work {
 	int dst_cpu;
 };
 
-int is_reserved(int cpu)
+/*
+ * Per-CPU rotation reservation.
+ *
+ * rq->active_balance belongs to core's active_load_balance_cpu_stop()
+ * protocol: it synchronizes the single per-rq active_balance_work, and fair.c
+ * arms it only while it is clear.  Using it as a rotation placeholder both
+ * suppressed core's active balance on the two reserved CPUs and let the flag
+ * be cleared while core's stopper was still queued, which arms the same
+ * active_balance_work a second time.  Keep the reservation on our own state.
+ */
+static DEFINE_PER_CPU(int, task_rotate_reserved);
+
+static bool is_reserved(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
-	int reserved = 0;
-	struct rq_flags rf;
 
 	irq_log_store();
-	rq_lock(rq, &rf);
-	irq_log_store();
-	reserved = rq->active_balance;
-	irq_log_store();
-	rq_unlock(rq, &rf);
-	irq_log_store();
-
-	return reserved;
+	/*
+	 * The read-only peek at rq->active_balance keeps the original intent of
+	 * not rotating a CPU whose current task core's active balance may be
+	 * moving right now.
+	 */
+	return READ_ONCE(per_cpu(task_rotate_reserved, cpu)) ||
+		READ_ONCE(rq->active_balance);
 }
 
 bool is_min_capacity_cpu(int cpu)
@@ -103,12 +112,16 @@ static void task_rotate_work_func(struct work_struct *work)
 	src_rq = cpu_rq(wr->src_cpu);
 	dst_rq = cpu_rq(wr->dst_cpu);
 
+	/*
+	 * Release the reservation under both rq locks, the same way it was
+	 * taken, so it stays ordered against task_check_for_rotation().
+	 */
 	irq_log_store();
 	local_irq_disable();
 	double_rq_lock(src_rq, dst_rq);
 	irq_log_store();
-	src_rq->active_balance = 0;
-	dst_rq->active_balance = 0;
+	WRITE_ONCE(per_cpu(task_rotate_reserved, wr->src_cpu), 0);
+	WRITE_ONCE(per_cpu(task_rotate_reserved, wr->dst_cpu), 0);
 	irq_log_store();
 	double_rq_unlock(src_rq, dst_rq);
 	local_irq_enable();
@@ -263,7 +276,15 @@ void task_check_for_rotation(struct rq *src_rq)
 		if (READ_ONCE(rq->curr->policy) != SCHED_NORMAL)
 			continue;
 
-		if (READ_ONCE(rq->nr_running) > 1)
+		/*
+		 * rodin 6.18（A-62）：nr_running 含 se.sched_delayed 的延迟出队
+		 * 僵尸（仍挂在队列上但不可运行），判"该核只有一个可运行任务"
+		 * 必须用可运行计数，否则漏选本应可用的大核。h_nr_runnable 只覆盖
+		 * CFS，rt/dl 各自另计。
+		 */
+		if (READ_ONCE(rq->cfs.h_nr_runnable) +
+			READ_ONCE(rq->rt.rt_nr_running) +
+			READ_ONCE(rq->dl.dl_nr_running) > 1)
 			continue;
 
 		if (is_reserved(i))
@@ -324,9 +345,9 @@ void task_check_for_rotation(struct rq *src_rq)
 			return;
 		}
 
-		if (!src_rq->active_balance && !dst_rq->active_balance) {
-			src_rq->active_balance = 1;
-			dst_rq->active_balance = 1;
+		if (!is_reserved(src_cpu) && !is_reserved(dst_cpu)) {
+			WRITE_ONCE(per_cpu(task_rotate_reserved, src_cpu), 1);
+			WRITE_ONCE(per_cpu(task_rotate_reserved, dst_cpu), 1);
 
 			irq_log_store();
 			get_task_struct(src_rq->curr);

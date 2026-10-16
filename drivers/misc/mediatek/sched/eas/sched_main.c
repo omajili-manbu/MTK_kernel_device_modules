@@ -387,7 +387,6 @@ static void mtk_set_cpus_allowed_ptr(void *data, struct task_struct *p,
 	struct affinity_context *ctx, bool *skip_user_ptr)
 {
 	struct cpumask *kernel_allowed_mask = &(mtk_task_of(p))->kernel_allowed_mask;
-	struct rq *rq = task_rq(p);
 	cpumask_t new_mask;
 
 	// not set or invalid cpu mask
@@ -400,12 +399,22 @@ static void mtk_set_cpus_allowed_ptr(void *data, struct task_struct *p,
 		return;
 	}
 
+	/*
+	 * rodin 6.18（A-59）：本钩子在 core 取 task_rq_lock() 之前触发，因此
+	 * 不得碰任何 rq 状态 —— rq->scratch_mask 的注释明写 "under rq_lock"，
+	 * core 自己紧接着就在锁内写它；而 task_rq(p) 在锁外解析还可能拿到已经
+	 * 过期的 rq。改成把我们自己持有的掩码交给 core：ctx->new_mask 此后只被
+	 * 读取（cpumask_copy / cpumask_weight / mm_set_cpus_allowed / trace），
+	 * 且 __do_set_cpus_allowed() 只在 SCA_MIGRATE_* 时把它写进 p->cpus_ptr，
+	 * 下面这个分支已把 SCA_MIGRATE_* / SCA_USER 全部排除 ⇒ 直接指向任务
+	 * 自持的 kernel_allowed_mask 是安全的。也免去 scratch 中转：原来
+	 * cpumask_and() 的结果随即被 cpumask_copy() 覆盖，取非空即可。
+	 */
 	if (p->user_cpus_ptr &&
 		!(ctx->flags & (SCA_USER | SCA_MIGRATE_ENABLE | SCA_MIGRATE_DISABLE)) &&
-		cpumask_and(rq->scratch_mask, ctx->new_mask, p->user_cpus_ptr)) {
+		cpumask_intersects(ctx->new_mask, p->user_cpus_ptr)) {
 		*skip_user_ptr = true;
-		cpumask_copy(rq->scratch_mask, kernel_allowed_mask);
-		ctx->new_mask = rq->scratch_mask;
+		ctx->new_mask = kernel_allowed_mask;
 		}
 	if (trace_sched_skip_user_enabled() && p->user_cpus_ptr && !cpumask_empty(kernel_allowed_mask)){
 		cpumask_copy(&new_mask, ctx->new_mask);
