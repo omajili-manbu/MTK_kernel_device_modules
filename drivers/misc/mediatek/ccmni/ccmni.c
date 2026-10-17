@@ -116,7 +116,9 @@ static struct ctl_table tcp_pacing_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 	},
-	{}
+	/* 6.18 sysctl checker: trailing {} sentinel dropped (binds procname/proc_handler
+	 * as missing and rejects the whole table). Pair with register_sysctl_sz() below;
+	 * same form as binder_prio.c:binder_prio_table (rodin stage6 适配). */
 };
 
 static int ccmni_rx_callback(unsigned int ccmni_idx, struct sk_buff *skb,
@@ -125,7 +127,8 @@ static struct ctl_table_header *sysctl_header;
 
 static int register_tcp_pacing_sysctl(void)
 {
-	sysctl_header = register_sysctl("net", tcp_pacing_table);
+	sysctl_header = register_sysctl_sz("net", tcp_pacing_table,
+					   ARRAY_SIZE(tcp_pacing_table));
 	if (sysctl_header == NULL) {
 		pr_info("CCCI:CCMNI:register tcp_pacing failed\n");
 		return -1;
