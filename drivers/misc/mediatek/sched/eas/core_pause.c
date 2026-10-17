@@ -360,16 +360,6 @@ int __ref try_drain_rqs(void *data)
 	while (!kthread_should_stop()) {
 		bool pending;
 
-		/*
-		 * rodin 6.18（S0/P-25）：标准的"先置睡眠态、后查条件"等待形态。
-		 * 原写法先放锁再 set_current_state(TASK_INTERRUPTIBLE)，pause_cpus()
-		 * 若恰好在这段窗口里补上待排空 CPU 并 wake_up_process()，唤醒会打在
-		 * 仍处于 RUNNING 的线程上（no-op），随后线程才入睡 —— 该轮排空丢失。
-		 * 现在睡眠态先置位，条件在 drain_pending_lock 内复查；靠 wake_up_process
-		 * 把 state 改回 RUNNING 来打断即将进入的 schedule()。
-		 */
-		set_current_state(TASK_INTERRUPTIBLE);
-
 		raw_spin_lock_irqsave(&drain_pending_lock, flags);
 		pending = cpumask_weight(cpus_ptr) != 0;
 		if (pending) {
@@ -386,7 +376,24 @@ int __ref try_drain_rqs(void *data)
 		}
 		raw_spin_unlock_irqrestore(&drain_pending_lock, flags);
 
-		if (!pending)
+		if (pending)
+			continue;
+
+		/*
+		 * rodin 6.18（S0/P-25）：标准等待形态 —— 先置睡眠态，再在
+		 * drain_pending_lock 内复查条件，最后才 schedule()。
+		 * 原写法先放锁、再置睡眠态：pause_cpus() 若恰好落在这段窗口里
+		 * 补上待排空 CPU 并 wake_up_process()，唤醒打在仍 RUNNING 的线程
+		 * 上（no-op），随后线程才入睡 —— 整轮排空丢失。
+		 * 现在若唤醒发生在复查之后，wake_up_process() 已把 state 改回
+		 * RUNNING，schedule() 会立即返回，不会睡死。
+		 * 注意这段区间内只做锁操作，不跨越任何可能睡眠的工作。
+		 */
+		set_current_state(TASK_INTERRUPTIBLE);
+		raw_spin_lock_irqsave(&drain_pending_lock, flags);
+		pending = cpumask_weight(cpus_ptr) != 0;
+		raw_spin_unlock_irqrestore(&drain_pending_lock, flags);
+		if (!pending && !kthread_should_stop())
 			schedule();
 		set_current_state(TASK_RUNNING);
 	}
