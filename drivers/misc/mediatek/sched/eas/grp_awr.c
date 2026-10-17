@@ -46,6 +46,13 @@ EXPORT_SYMBOL(grp_awr_update_cpu_tar_util_hook);
 
 void set_grp_awr_marg_ctrl(int val)
 {
+	/*
+	 * rodin 6.18（S0 补扫）：val == 100 会让 (100 - val) 为 0 触发除零；
+	 * val 超出 (0,100] 也会给出无意义的 margin。本函数当前无调用者、
+	 * blob 侧也零消费者，但它是 EXPORT_SYMBOL 面，按可传任意值的入口处理。
+	 */
+	if (val < 0 || val >= 100)
+		return;
 	grp_awr_marg_ctrl = val; /* 20 for 20% margin */
 	grp_awr_marg = ((SCHED_CAPACITY_SCALE * 100) / (100 - val));
 }
@@ -168,10 +175,17 @@ void set_grp_awr_thr(int gear_id, int group_id, int freq)
 	unsigned int cpu_idx;
 	int opp;
 
+	/*
+	 * rodin 6.18（S0 补扫）：原守卫只挡了 group_id >= GROUP_ID_RECORD_MAX，
+	 * 漏了负值。本函数是 EXPORT_SYMBOL，实参经
+	 * /proc/easmgr/eas_ioctl 的 EAS_SET_GAS_MARG_THR 从用户空间
+	 * copy_from_user 而来（sched_main.c:889-895），且该结构的默认初值
+	 * 就是 .group_id = -1 ⇒ 负下标会写到 kcalloc 块头部之前。
+	 */
 	if (grp_awr_init_finished == false ||
 		gear_id == -1 ||
 		gas_force_ctrl == 1 ||
-		group_id >= GROUP_ID_RECORD_MAX)
+		group_id < 0 || group_id >= GROUP_ID_RECORD_MAX)
 		return;
 	for (cpu_idx = 0; cpu_idx < FLT_NR_CPUS; cpu_idx++)
 		if (map_cpu_ger[cpu_idx] == gear_id) {
@@ -191,7 +205,8 @@ int get_grp_awr_thr(int gear_id, int group_id)
 {
 	int cpu_idx;
 
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		group_id < 0 || group_id >= GROUP_ID_RECORD_MAX)
 		return -1;
 	for (cpu_idx = 0; cpu_idx < FLT_NR_CPUS; cpu_idx++)
 		if (map_cpu_ger[cpu_idx] == gear_id)
@@ -203,7 +218,8 @@ int get_grp_awr_thr_freq(int gear_id, int group_id)
 {
 	int cpu_idx;
 
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		group_id < 0 || group_id >= GROUP_ID_RECORD_MAX)
 		return -1;
 	for (cpu_idx = 0; cpu_idx < FLT_NR_CPUS; cpu_idx++)
 		if (map_cpu_ger[cpu_idx] == gear_id)
@@ -216,10 +232,11 @@ void set_grp_awr_min_opp_margin(int gear_id, int group_id, int val)
 {
 	int cpu_idx;
 
+	/* rodin 6.18（S0 补扫）：同上，补 group_id < 0 守卫。 */
 	if (grp_awr_init_finished == false ||
 		gear_id == -1 ||
 		gas_force_ctrl == 1 ||
-		group_id >= GROUP_ID_RECORD_MAX)
+		group_id < 0 || group_id >= GROUP_ID_RECORD_MAX)
 		return;
 	for (cpu_idx = 0; cpu_idx < FLT_NR_CPUS; cpu_idx++)
 		if (map_cpu_ger[cpu_idx] == gear_id) {
@@ -240,7 +257,8 @@ int get_grp_awr_min_opp_margin(int gear_id, int group_id)
 {
 	int cpu_idx;
 
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		group_id < 0 || group_id >= GROUP_ID_RECORD_MAX)
 		return -1;
 	for (cpu_idx = 0; cpu_idx < FLT_NR_CPUS; cpu_idx++)
 		if (map_cpu_ger[cpu_idx] == gear_id)
@@ -373,7 +391,8 @@ void grp_awr_update_grp_awr_util(void)
 int grp_awr_get_grp_tar_util(int grp_idx)
 {
 
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return 0;
 
 	return pgrp_tar_u_m[grp_idx];
@@ -396,9 +415,17 @@ void grp_awr_update_cpu_tar_util(int cpu)
 			fsrq->group_nr_running, pcpu_o_u[cpu]);
 }
 
+/*
+ * rodin 6.18（S0 补扫）：下列 6 个导出 setter 的 grp_idx / cpu 都是直接下标，
+ * 原实现只判了 grp_awr_init_finished，没有任何边界检查。它们对
+ * MTK_kernel_modules-rodin 与 blob 都无消费者（全树 grep + ko 符号面零命中），
+ * 但仍是 EXPORT_SYMBOL 面 —— 补对称的上下界守卫，避免将来接入方传入
+ * 越界值即踩 heap。行为对合法入参零变化。
+ */
 void set_group_target_active_ratio_pct(int grp_idx, int val)
 {
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return;
 	pgrp_tar_act_rto_cap[grp_idx] = ((clamp_val(val, 1, 100) << SCHED_CAPACITY_SHIFT) / 100);
 }
@@ -406,7 +433,8 @@ EXPORT_SYMBOL(set_group_target_active_ratio_pct);
 
 void set_group_target_active_ratio_cap(int grp_idx, int val)
 {
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return;
 	pgrp_tar_act_rto_cap[grp_idx] = clamp_val(val, 1, SCHED_CAPACITY_SCALE);
 }
@@ -414,7 +442,9 @@ EXPORT_SYMBOL(set_group_target_active_ratio_cap);
 
 void set_cpu_group_active_ratio_pct(int cpu, int grp_idx, int val)
 {
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		cpu < 0 || cpu >= FLT_NR_CPUS ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return;
 	if (val < 0)
 		userdefined_pcpu_pgrp_act_rto_cap[cpu][grp_idx] = -1;
@@ -426,7 +456,9 @@ EXPORT_SYMBOL(set_cpu_group_active_ratio_pct);
 
 void set_cpu_group_active_ratio_cap(int cpu, int grp_idx, int val)
 {
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		cpu < 0 || cpu >= FLT_NR_CPUS ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return;
 	if (val < 0)
 		userdefined_pcpu_pgrp_act_rto_cap[cpu][grp_idx] = -1;
@@ -440,7 +472,8 @@ void set_group_active_ratio_pct(int grp_idx, int val)
 {
 	int cpu_idx;
 
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return;
 	for_each_possible_cpu(cpu_idx) {
 		if (val < 0)
@@ -456,7 +489,8 @@ void set_group_active_ratio_cap(int grp_idx, int val)
 {
 	int cpu_idx;
 
-	if (grp_awr_init_finished == false)
+	if (grp_awr_init_finished == false ||
+		grp_idx < 0 || grp_idx >= GROUP_ID_RECORD_MAX)
 		return;
 	for_each_possible_cpu(cpu_idx) {
 		if (val < 0)
