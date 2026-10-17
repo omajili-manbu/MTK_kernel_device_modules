@@ -6,6 +6,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
+#include <linux/cpu.h>
 #include <linux/percpu.h>
 #include <linux/sort.h>
 #include <linux/sched/cputime.h>
@@ -997,26 +998,52 @@ int init_legacy_capacity_table(void)
 	long next_cap, k;
 	struct pd_capacity_info *pd_info;
 	struct em_perf_domain *pd;
-	struct em_perf_state *states;
 	struct upower_tbl *tbl = NULL;
-	unsigned long power_res, cost, opp_freq;
 
 	ret = alloc_capacity_table();
 	if (ret)
 		return ret;
 
 	for (i = 0; i < legacy_pd_count; i++) {
+		struct device *dev;
+		struct em_perf_table *new_tbl;
+		unsigned long opp_freq;
+
 		pd_info = &pd_capacity_tbl[i];
 		cpu = cpumask_first(&pd_info->cpus);
 		pd = em_cpu_get(cpu);
 		if (!pd)
 			goto err;
 
+		/*
+		 * rodin 6.18（S1b/P-09）：EM 表是 __rcu 且可热更新，6.18 唯一的
+		 * 合法写入口是 em_dev_update_perf_domain()（dup → 重算 cost →
+		 * RCU 发布 → 释放本地引用）。原来就地覆写 pd->em_table->state[]
+		 * 既绕过该协议，也绕过了换表后的 kref 生命周期。
+		 * device 句柄取 get_cpu_device(cpu)：EM 注册方
+		 * （drivers/opp/of.c、mediatek-cpufreq-hw.c）用的是同一个句柄，
+		 * 且 em_cpu_get() 非 NULL 已隐含 dev->em_pd 存在。
+		 */
+		dev = get_cpu_device(cpu);
+		if (!dev)
+			goto err;
+
+		new_tbl = em_table_alloc(pd);
+		if (!new_tbl)
+			goto nomem;
+
+		rcu_read_lock();
+		memcpy(new_tbl->state, em_perf_state_from_pd(pd),
+		       sizeof(struct em_perf_state) * pd->nr_perf_states);
+		rcu_read_unlock();
+
 #if IS_ENABLED(CONFIG_MTK_UNIFIED_POWER)
 		tbl = upower_get_core_tbl(cpu);
 #endif
-		if (!tbl)
+		if (!tbl) {
+			em_table_free(new_tbl);
 			goto err;
+		}
 
 		for (j = 0; j < pd_info->nr_caps; j++) {
 			cap = tbl->row[pd_info->nr_caps - j - 1].cap;
@@ -1025,44 +1052,37 @@ int init_legacy_capacity_table(void)
 			else
 				next_cap = tbl->row[pd_info->nr_caps - j - 2].cap;
 
-			if (cap == 0 || next_cap == 0)
+			if (cap == 0 || next_cap == 0) {
+				em_table_free(new_tbl);
 				goto err;
+			}
 
 			pd_info->caps[j] = cap;
-
-			/*
-			 * rodin 6.18（A-61′）：em_perf_domain::em_table 是
-			 * struct em_perf_table __rcu *（EM 表可热更新），任何
-			 * state[] 访问都必须持 rcu_read_lock() 并经
-			 * em_perf_state_from_pd() 取表。这里逐 j 进出读侧区间：
-			 * 后面的 kcalloc(GFP_KERNEL) 可能睡眠，不能跨过去。
-			 */
-			rcu_read_lock();
-			states = em_perf_state_from_pd(pd);
-			states[pd_info->nr_caps - j - 1].performance = pd_info->caps[j];
-			power_res = states[pd_info->nr_caps - j - 1].power * 10;
-			cost = power_res / states[pd_info->nr_caps - j - 1].performance;
-			states[pd_info->nr_caps - j - 1].cost = cost;
-			opp_freq = states[pd->nr_perf_states - j - 1].frequency;
-			rcu_read_unlock();
+			new_tbl->state[pd_info->nr_caps - j - 1].performance =
+				pd_info->caps[j];
 
 			if (!pd_info->util_opp) {
 				pd_info->util_opp = kcalloc(cap + 1, sizeof(unsigned int),
-										GFP_KERNEL);
-				if (!pd_info->util_opp)
+							    GFP_KERNEL);
+				if (!pd_info->util_opp) {
+					em_table_free(new_tbl);
 					goto nomem;
+				}
 			}
 
 			if (!pd_info->util_freq) {
 				pd_info->util_freq = kcalloc(cap + 1, sizeof(unsigned int),
-										GFP_KERNEL);
-				if (!pd_info->util_freq)
+							     GFP_KERNEL);
+				if (!pd_info->util_freq) {
+					em_table_free(new_tbl);
 					goto nomem;
+				}
 			}
 
 			if (j == pd_info->nr_caps - 1)
 				next_cap = -1;
 
+			opp_freq = new_tbl->state[pd->nr_perf_states - j - 1].frequency;
 			for (k = cap; k > next_cap; k--) {
 				pd_info->util_opp[k] = j;
 				pd_info->util_freq[k] = opp_freq;
@@ -1070,6 +1090,17 @@ int init_legacy_capacity_table(void)
 
 			count += 1;
 		}
+
+		ret = em_dev_compute_costs(dev, new_tbl->state, pd->nr_perf_states);
+		if (ret) {
+			em_table_free(new_tbl);
+			goto err;
+		}
+
+		ret = em_dev_update_perf_domain(dev, new_tbl);
+		em_table_free(new_tbl);
+		if (ret)
+			goto err;
 
 		for_each_cpu(cpu, &pd_info->cpus) {
 			if (per_cpu(cpu_scale, cpu) != tbl->row[tbl->row_num - 1].cap) {
