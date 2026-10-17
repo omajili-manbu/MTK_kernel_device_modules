@@ -718,6 +718,16 @@ void inc_nr_over_thres_running(void *data, struct rq *rq, struct task_struct *p,
 	if (!p)
 		return;
 
+	/*
+	 * rodin 6.18（A-62 家族）：新任务复用一个仍是 delayed 的实体时
+	 * （task_new && se->sched_delayed），6.18 本轮不把它计入可运行
+	 * （kernel/sched/fair.c:7243-7244 把 h_nr_runnable 置 0，实体留待
+	 * requeue_delayed_entity() 清延迟后才重新计数）。本钩子同步跳过，
+	 * 否则超额运行计数会比 cfs_rq 多一个僵尸。
+	 */
+	if (!(flags & ENQUEUE_WAKEUP) && p->se.sched_delayed)
+		return;
+
 #if IS_ENABLED(CONFIG_CFS_BANDWIDTH)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;

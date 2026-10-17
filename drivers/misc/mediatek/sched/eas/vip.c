@@ -1280,8 +1280,23 @@ void vip_dequeue_task(void *unused, struct rq *rq, struct task_struct *p, int fl
 			bool *dequeue_task_result)
 {
 	struct vip_task_struct *vts = &(mtk_task_of(p))->vip_task;
+	bool delayed;
+
 	if (unlikely(!vip_enable))
 		return;
+
+	/*
+	 * rodin 6.18（A-62 家族）：6.18 的 DELAY_DEQUEUE 允许 dequeue 只把实体
+	 * 标成 sched_delayed（dequeue_entities() 返回 -1，任务仍挂在 rq 上、
+	 * 只是不可运行），此时 dequeue_task_fair() 返回 false。
+	 *
+	 * 延迟出队仍须把任务从"可运行 VIP 链"摘掉——vip_replace_next_task_fair()
+	 * 会直接拿链头当 next，链上留着延迟实体等于把不可运行的任务交出去。
+	 * 但它不是一次真正的睡眠：total_exec 不能清零，否则 ENQUEUE_DELAYED
+	 * 唤醒时 VIP slice 会从头重算，与 6.18 保留 lag/vruntime 的语义相反。
+	 */
+	delayed = !dequeue_task_result || !*dequeue_task_result ||
+		  p->se.sched_delayed;
 
 	if (link_with_others(&vts->vip_list))
 		deactivate_vip_task(p, rq);
@@ -1293,7 +1308,7 @@ void vip_dequeue_task(void *unused, struct rq *rq, struct task_struct *p, int fl
 	 * runqueue.
 	 */
 
-	if (READ_ONCE(p->__state) != TASK_RUNNING)
+	if (!delayed && READ_ONCE(p->__state) != TASK_RUNNING)
 		vts->total_exec = 0;
 }
 
@@ -1453,7 +1468,14 @@ void vip_sched_switch(struct task_struct *prev, struct task_struct *next, struct
 	if (!task_is_vip(prev, NOT_VIP))
 		return;
 
-	if (READ_ONCE(prev->__state) != TASK_RUNNING)
+	/*
+	 * rodin 6.18（A-62 家族）：原判据 READ_ONCE(prev->__state) != TASK_RUNNING
+	 * 把"是否还能被推走"混在任务状态上。DELAY_DEQUEUE 下延迟出队僵尸的
+	 * __state 已不是 RUNNING、实体却仍挂在 rq 上，状态位既不能证明它在队、
+	 * 也不能证明它可运行。统一走 mtk_task_migratable()（on_rq==QUEUED 且
+	 * !se.sched_delayed），与 vip_push_runnable() 的入口门同源。
+	 */
+	if (!mtk_task_migratable(prev))
 		return;
 
 	if (next->prio == 0)

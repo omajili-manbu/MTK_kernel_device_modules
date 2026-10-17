@@ -79,7 +79,13 @@ static inline bool check_has_overutilize_cpu(struct cpumask *grp)
 	int cpu;
 
 	for_each_cpu(cpu, grp) {
-		if (cpu_rq(cpu)->nr_running >= 2 &&
+		/*
+		 * rodin 6.18（A-62 家族）：nr_running 含 se.sched_delayed 的延迟
+		 * 出队僵尸（挂队但不可运行），拿它当"≥2 个可运行任务"会制造虚假
+		 * overutilize、多触发 newidle balance。6.18 的可运行计数是
+		 * cfs_rq->h_nr_runnable（set_delayed() 递减、clear_delayed() 递增）。
+		 */
+		if (cpu_rq(cpu)->cfs.h_nr_runnable >= 2 &&
 			!fits_capacity(mtk_cpu_util_cfs(cpu), capacity_of(cpu),
 				get_adaptive_margin(cpu)))
 			return true;

@@ -158,7 +158,12 @@ static void remove_task_from_group(struct task_struct *p)
 	rq = __task_rq_lock(p, &rf);
 	rcu_assign_pointer(gts->grp, NULL);
 	/* take care of flt group */
-	queued = task_on_rq_queued(p);
+	/*
+	 * rodin 6.18（A-62 家族）：task_on_rq_queued() 对延迟出队僵尸也返回真，
+	 * 但僵尸不占 group_nr_running 的名额（flt 的 enqueue/dequeue 钩子已按
+	 * sched_delayed 口径记账），这里改用同源的 mtk_task_migratable()。
+	 */
+	queued = mtk_task_migratable(p);
 	fsrq = &per_cpu(flt_rq, rq->cpu);
 	if (queued && fsrq->group_nr_running[flt_groupid] > 0)
 		fsrq->group_nr_running[flt_groupid]--;
@@ -186,7 +191,8 @@ add_task_to_group(struct task_struct *p, struct grp *grp)
 	rcu_assign_pointer(gts->grp, grp);
 	/* take care of flt group */
 	fsrq = &per_cpu(flt_rq, rq->cpu);
-	queued = task_on_rq_queued(p);
+	/* rodin 6.18（A-62 家族）：同上，延迟出队僵尸不计入 group_nr_running。 */
+	queued = mtk_task_migratable(p);
 	if (queued)
 		fsrq->group_nr_running[flt_groupid]++;
 	__task_rq_unlock(rq, &rf);

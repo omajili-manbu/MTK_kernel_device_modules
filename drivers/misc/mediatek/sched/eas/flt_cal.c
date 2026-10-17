@@ -587,6 +587,15 @@ void flt_rvh_enqueue_task(void *data, struct rq *rq,
 
 	lockdep_assert_rq_held(rq);
 
+	/*
+	 * rodin 6.18（A-62 家族）：DELAY_DEQUEUE 下实体可以"挂着队但不可运行"。
+	 * 口径照 core uclamp_rq_inc()（kernel/sched/core.c:1914）：延迟实体只有
+	 * 在 ENQUEUE_DELAYED 这次真唤醒时才重新计入可运行；其余情形跳过，
+	 * 否则 group_nr_running 会把僵尸算成在跑，污染 grp_awr 的目标 util。
+	 */
+	if (p->se.sched_delayed && !(flags & ENQUEUE_DELAYED))
+		return;
+
 	if (task_cpu(p) != cpu_of(rq))
 		FLT_LOGI("enqueuing on rq %d when task->cpu is %d\n",
 				cpu_of(rq), task_cpu(p));
@@ -622,6 +631,14 @@ void flt_rvh_dequeue_task(void *data, struct rq *rq,
 		return;
 
 	lockdep_assert_rq_held(rq);
+
+	/*
+	 * rodin 6.18（A-62 家族）：与 uclamp_rq_dec()（kernel/sched/core.c:1941）
+	 * 对称——已是延迟出队僵尸的实体不再占"可运行"名额：首次延迟出队
+	 * （sched_delayed 尚未置位）已经减过一次，此后对它的 dequeue 一律跳过。
+	 */
+	if (p->se.sched_delayed)
+		return;
 
 	if (fts->prev_on_rq_cpu >= 0 && fts->prev_on_rq_cpu != cpu_of(rq))
 		FLT_LOGI("dequeue cpu %d not same as enqueue %d\n",
