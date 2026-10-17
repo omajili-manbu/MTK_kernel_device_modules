@@ -151,6 +151,17 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 	if (unlikely(sg_policy->limits_changed)) {
 		sg_policy->limits_changed = false;
 		sg_policy->need_freq_update = true;
+
+		/*
+		 * rodin 6.18（A-116/S5）：limits_changed 的清零必须先于
+		 * cpufreq_driver_resolve_freq() 对 policy 限制的读取，否则可能
+		 * 丢掉一次限制更新；与 sugov_limits() 的 smp_wmb() 配对。
+		 */
+		smp_mb();
+
+		return true;
+	} else if (sg_policy->need_freq_update) {
+		/* rodin 6.18：ignore_dl_rate_limit() 要求立即重算一次频率。 */
 		return true;
 	}
 	/* No need to recalculate next freq for min_rate_limit_us
@@ -709,8 +720,15 @@ static unsigned long sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
  */
 static inline void ignore_dl_rate_limit(struct sugov_cpu *sg_cpu)
 {
-	if (cpu_bw_dl(cpu_rq(sg_cpu->cpu)) > sg_cpu->bw_dl)
-		sg_cpu->sg_policy->limits_changed = true;
+	/*
+	 * rodin 6.18（A-116/S5）：比较对象是包络下限 bw_min（本次预测将要施加的
+	 * DL 带宽地板），不是上一次记录的实际带宽 bw_dl；副作用改为
+	 * need_freq_update（6.18 cpufreq_schedutil.c:400-404）——它是"本次必须
+	 * 重算"的请求，由 sugov_should_update_freq() 直接放行，不再伪造
+	 * limits_changed（那会让 sugov_limits() 的屏障配对语义失真）。
+	 */
+	if (cpu_bw_dl(cpu_rq(sg_cpu->cpu)) > sg_cpu->bw_min)
+		sg_cpu->sg_policy->need_freq_update = true;
 }
 
 #if IS_ENABLED(CONFIG_MTK_OPP_MIN)
@@ -1302,6 +1320,13 @@ static void sugov_limits(struct cpufreq_policy *policy)
 		cpufreq_policy_apply_limits(policy);
 		mutex_unlock(&sg_policy->work_lock);
 	}
+
+	/*
+	 * rodin 6.18（A-116/S5）：limits_changed 的置位必须先于
+	 * cpufreq_set_policy() 对 policy 限制的更新，否则可能丢掉一次限制变更；
+	 * 与 sugov_should_update_freq() 的 smp_mb() 配对。
+	 */
+	smp_wmb();
 
 	WRITE_ONCE(sg_policy->limits_changed, true);
 	if (trace_sugov_ext_limits_changed_enabled())
