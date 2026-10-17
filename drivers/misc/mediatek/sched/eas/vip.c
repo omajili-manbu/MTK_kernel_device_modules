@@ -1124,6 +1124,14 @@ static void account_vip_runtime(struct rq *rq, struct task_struct *curr)
 	insert_vip_task(rq, vts, false, true, NOT_VIP);
 }
 
+/*
+ * rodin 6.18（S8/P-22 · §4-10 裁决 (b)）：本函数在本树是死码 ——
+ * android_rvh_check_preempt_wakeup 是 port 树兼容层新增的 MTK 私有钩子，
+ * 本树内核既无声明也无调用点，register_vip_hooks() 里已明确不注册
+ * （见该函数内的说明）。按裁决保留本体（不删），但两处读 rq->curr 改为
+ * rq->donor：CONFIG_SCHED_PROXY_EXEC=y 时 donor 才是调度上下文，将来该钩子
+ * 若回归，判据已经是对的对象。
+ */
 void vip_check_preempt_wakeup(void *unused, struct rq *rq, struct task_struct *p,
 				bool *preempt, bool *nopreempt, int wake_flags,
 				struct sched_entity *se, struct sched_entity *pse,
@@ -1131,12 +1139,12 @@ void vip_check_preempt_wakeup(void *unused, struct rq *rq, struct task_struct *p
 {
 	struct vip_rq *vrq = &per_cpu(vip_rq, cpu_of(rq));
 	struct vip_task_struct *vts_p = &(mtk_task_of(p))->vip_task;
-	struct task_struct *c = rq->curr;
+	struct task_struct *c = rq->donor;
 	struct vip_task_struct *vts_c;
 	bool resched = false;
 	bool p_is_vip, curr_is_vip;
 
-	vts_c = &(mtk_task_of(rq->curr))->vip_task;
+	vts_c = &(mtk_task_of(rq->donor))->vip_task;
 
 	if (unlikely(!vip_enable))
 		return;
