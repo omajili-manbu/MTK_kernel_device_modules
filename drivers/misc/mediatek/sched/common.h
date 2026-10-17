@@ -286,7 +286,6 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_rq,
 				struct task_struct *p,
 				unsigned long min_cap, unsigned long max_cap,
 				unsigned long *min_out, unsigned long *max_out);
-int dequeue_idle_cpu(int cpu);
 #endif
 __always_inline
 unsigned long mtk_uclamp_rq_util_with(struct rq *rq, unsigned long util,

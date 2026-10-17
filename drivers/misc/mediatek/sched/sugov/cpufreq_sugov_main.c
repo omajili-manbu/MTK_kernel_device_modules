@@ -255,6 +255,14 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	if (next_freq) {
 		freq = next_freq;
 	} else {
+		/*
+		 * rodin 6.18（S6/P-07）：core 的 map_util_freq() 只在
+		 * mtk_map_util_freq() 不产出频率时才可达，即
+		 * am_ctrl==0 && grp_dvfs_ctrl_mode==0 && turn_point_util==0；
+		 * 本树默认配置（DT eas-info version=650）下是死支。保留它是
+		 * 6.18 原样的兜底，不改逻辑；tail 的 headroom 已由 vendor
+		 * 的 adaptive_margin/util_scale 在别处施加，这里不重复。
+		 */
 		freq = map_util_freq(util, freq, max);
 		if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 			return sg_policy->next_freq;

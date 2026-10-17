@@ -193,7 +193,12 @@ static inline void eenv_pd_busy_time(struct energy_env *eenv,
 		busy_time += mtk_cpu_util(cpu, util, ENERGY_UTIL,
 					NULL, 0, 1024, NULL, NULL);
 #else
-		busy_time += effective_cpu_util(cpu, util, ENERGY_UTIL, NULL);
+		/*
+		 * rodin 6.18（S6/P-14）：enum cpu_util_type 已被 6.18 删除，
+		 * effective_cpu_util() 改收 min/max 出参 —— 原写法在
+		 * CONFIG_MTK_CPUFREQ_SUGOV_EXT=n 时编不过。此处只要 util。
+		 */
+		busy_time += effective_cpu_util(cpu, util, NULL, NULL);
 #endif
 	}
 
@@ -245,7 +250,20 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 						0, 1024, &util_min, &util_max);
 			cpu_util = max(util_min, min(cpu_util, util_max));
 #else
-			cpu_util = effective_cpu_util(cpu, util, FREQUENCY_UTIL, tsk);
+			/*
+			 * rodin 6.18（S6/P-14）：原写法沿用已删除的
+			 * enum cpu_util_type 形参，SUGOV_EXT=n 时编不过；按 6.18
+			 * 出参形态改写并做同源出口夹取。
+			 */
+			cpu_util = effective_cpu_util(cpu, util,
+						      &util_min, &util_max);
+			if (tsk && uclamp_is_used()) {
+				util_min = max(util_min,
+					uclamp_eff_value(p, UCLAMP_MIN));
+				util_max = max(util_max,
+					uclamp_eff_value(p, UCLAMP_MAX));
+			}
+			cpu_util = max(util_min, min(cpu_util, util_max));
 #endif
 			eenv->cpu_max_util[cpu][dst_idx] = cpu_util;
 		} else
@@ -268,7 +286,19 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 			cpu_util_base = mtk_cpu_util(cpu, util_base, FREQUENCY_UTIL, NULL,
 					0, 1024, NULL, NULL);
 #else
-			cpu_util_base = effective_cpu_util(cpu, util, FREQUENCY_UTIL, tsk);
+			/*
+			 * rodin 6.18（S6/P-14）：原写法既用了已删除的
+			 * enum cpu_util_type 形参，又把 dst 的 util 传进 base 计算
+			 * （应为 util_base）。按 6.18 出参形态改写。
+			 */
+			{
+				unsigned long base_min, base_max;
+
+				cpu_util_base = effective_cpu_util(cpu, util_base,
+								   &base_min, &base_max);
+				cpu_util_base = max(base_min,
+						    min(cpu_util_base, base_max));
+			}
 #endif
 			eenv->cpu_max_util[cpu][0] = cpu_util_base;
 			if (trace_sched_max_util_enabled())
@@ -1098,6 +1128,14 @@ void mtk_can_migrate_task(void *data, struct task_struct *p,
 		}
 	}
 
+	/*
+	 * rodin 6.18（S6/P-15）：6.18 的等价判据是
+	 * is_rd_overutilized() = !sched_energy_enabled() || READ_ONCE(rd->overutilized)。
+	 * 本树不补前半句：真机绑 sugov_ext，sched_energy_enabled() 恒为 false，
+	 * 补上等于把 vendor 的 misfit 迁移判据永久短路。此处只保留 READ_ONCE
+	 * 的宽松读，与 core 在 rq lock 内写该字段的事实并不冲突（判据本身是
+	 * 启发式起点，后续决策各自复核）。
+	 */
 	if (READ_ONCE(cpu_rq(src_cpu)->rd->overutilized)) {
 		*can_migrate = 1;
 		return;
@@ -2509,7 +2547,7 @@ static struct task_struct *detach_a_hint_task(struct rq *src_rq, int dst_cpu)
 	lockdep_assert_rq_held(src_rq);
 
 	rcu_read_lock();
-	in_many_heavy_tasks = rd->android_vendor_data1;
+	in_many_heavy_tasks = READ_ONCE(rd->android_vendor_data1);
 	src_capacity = arch_scale_cpu_capacity(src_rq->cpu);
 	dst_capacity = cpu_cap_ceiling(dst_cpu);
 	list_for_each_entry_reverse(p,

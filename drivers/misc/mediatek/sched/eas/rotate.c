@@ -219,7 +219,8 @@ void task_check_for_rotation(struct rq *src_rq)
 		return;
 	}
 
-	if (!(rd->android_vendor_data1)) {
+	/* rodin 6.18（S6/P-40）：写侧在 tick 钩子里无锁写，读侧用 READ_ONCE。 */
+	if (!READ_ONCE(rd->android_vendor_data1)) {
 		irq_log_store();
 		return;
 	}

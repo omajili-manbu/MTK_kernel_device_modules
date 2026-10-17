@@ -295,12 +295,18 @@ int pd_get_efficient_state_opp(struct em_perf_domain *pd, int cpu,
 	/*
 	 * Find the lowest performance state of the Energy Model above the
 	 * requested frequency.
+	 *
+	 * rodin 6.18：6.18 已删掉 em_perf_domain::table（表改为
+	 * struct em_perf_table __rcu *），这条 !OPP_CAP_INFO 分支必须走
+	 * em_perf_state_from_pd() 并在 rcu 读侧区间内读。
 	 */
+	rcu_read_lock();
+	ps = em_perf_state_from_pd(pd);
 	for (i = 0; i < pd->nr_perf_states; i++) {
-		ps = &pd->table[i];
-		if (ps->frequency >= freq)
+		if (ps[i].frequency >= freq)
 			break;
 	}
+	rcu_read_unlock();
 
 	i = min(i, pd->nr_perf_states - 1);
 	opp = pd->nr_perf_states - i - 1;
@@ -337,16 +343,21 @@ unsigned long estimate_energy(struct em_perf_domain *pd,
 	cap = pd_opp2cap(cpu, opp, false, eenv->wl_cpu, eenv->val_s,
 			false, DPT_CALL_MTK_EM_CPU_ENERGY);
 #else
-	ps = &pd->table[pd->nr_perf_states - 1];
+	/* rodin 6.18：em_perf_domain::table 已删除，改 __rcu 访问器。 */
+	rcu_read_lock();
+	ps = &em_perf_state_from_pd(pd)[pd->nr_perf_states - 1];
 	cap = freq * scale_cpu / ps->frequency;
+	rcu_read_unlock();
 #endif
 
 #if IS_ENABLED(CONFIG_MTK_OPP_CAP_INFO)
 	mtk_em = 1;
 #else
 	mtk_em = 0;
-	ps = &pd->table[pd->nr_perf_states - opp - 1];
+	rcu_read_lock();
+	ps = &em_perf_state_from_pd(pd)[pd->nr_perf_states - opp - 1];
 	output[2] = ps->cost;
+	rcu_read_unlock();
 #endif
 
 #if IS_ENABLED(CONFIG_MTK_LEAKAGE_AWARE_TEMP)
@@ -888,8 +899,15 @@ void hook_scheduler_tick(void *data, struct rq *rq)
 
 	struct root_domain *rd = rq->rd;
 
+	/*
+	 * rodin 6.18（S6/P-40）：rd->android_vendor_data1 在这里被当作
+	 * "本 rd 上有多个重载任务"的 bool 标量使用，写侧在 rq lock 之外
+	 * （tick 钩子），读侧两处（fair.c 的迁移挑任务、rotate.c 的旋转门）。
+	 * 标量语义只需 WRITE_ONCE/READ_ONCE 证伪撕裂与重排，不要挪进
+	 * rq lock —— 那样等于持锁做 O(n) 跨核扫描。
+	 */
 	rcu_read_lock();
-	rd->android_vendor_data1 = system_has_many_heavy_task();
+	WRITE_ONCE(rd->android_vendor_data1, system_has_many_heavy_task());
 	rcu_read_unlock();
 
 	if (rq->curr->policy == SCHED_NORMAL)
@@ -1173,7 +1191,13 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 
 	*need_update = false;
 
-	if (!p || p->nr_cpus_allowed == 1) {
+	/*
+	 * rodin 6.18（S6/F4）：补 core 的"已经在本任务允许的最大核上"早退
+	 * （kernel/sched/fair.c:5389）。少了这一条，同容量域里的 tick 会把
+	 * 任务反复标成 misfit，白跑一次 task_h_load()。
+	 */
+	if (!p || p->nr_cpus_allowed == 1 ||
+	    arch_scale_cpu_capacity(cpu_of(rq)) == p->max_allowed_capacity) {
 		rq->misfit_task_load = 0;
 		return;
 	}

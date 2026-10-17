@@ -196,6 +196,12 @@ static void fixup_busy_time(struct task_struct *p, int new_cpu)
 	if (task_rq(p) != src_rq) {
 		FLT_LOGI("on CPU %d task %s(%d) not on src_rq %d",
 			raw_smp_processor_id(), p->comm, p->pid, src_rq->cpu);
+		/*
+		 * rodin 6.18（S6/P-31）：任务已不在 src_rq 上，后面的
+		 * flt_update_task_ravg() 会按错的 rq 记账；只打日志不早退等于
+		 * 把一次失配变成两次污染。仍须先解锁再走。
+		 */
+		goto out;
 	}
 
 	flt_update_task_ravg(task_rq(p)->curr, task_rq(p),
@@ -203,6 +209,7 @@ static void fixup_busy_time(struct task_struct *p, int new_cpu)
 	flt_update_task_ravg(p, task_rq(p), TASK_MIGRATE,
 			 wallclock, 0);
 
+out:
 	if (state == TASK_WAKING)
 		double_rq_unlock(src_rq, dest_rq);
 }

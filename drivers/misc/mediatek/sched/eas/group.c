@@ -26,6 +26,19 @@
 #include "flt_cal.h"
 #include "eas_trace.h"
 #include <sugov/cpufreq.h>
+
+/*
+ * rodin 6.18（S6/P-29）：struct mtk_tg 借 task_group::android_vendor_data1 存放
+ * （kernel/sched/sched.h:533 ANDROID_VENDOR_DATA_ARRAY(1, 4) = 32B）。该坑位
+ * 只在 CONFIG_UCLAMP_TASK_GROUP=y 时存在，且容量是编译期常量 —— 用断言把
+ * "切配置后越界"挡在编译期，而不是运行期踩邻居字段。
+ */
+#if !IS_ENABLED(CONFIG_UCLAMP_TASK_GROUP)
+#error "mtk_tg 依赖 task_group::android_vendor_data1（需 CONFIG_UCLAMP_TASK_GROUP=y）"
+#endif
+static_assert(sizeof(struct mtk_tg) <=
+	      sizeof_field(struct task_group, android_vendor_data1),
+	      "struct mtk_tg 超出 task_group::android_vendor_data1");
 #if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)
 #include "mtk_energy_model/v3/energy_model.h"
 #else
@@ -82,6 +95,14 @@ EXPORT_SYMBOL(lookup_grp);
 inline struct grp *task_grp(struct task_struct *p)
 {
 	struct gp_task_struct *gts = &(mtk_task_of(p))->gp_task;
+
+	/*
+	 * rodin 6.18（S6/P-30）：gts->grp 是 __rcu 指针（写侧在
+	 * add/remove_task_to_group() 里 rcu_assign_pointer）。读侧必须在
+	 * rcu 读侧区间内，加锁依赖检查把违约点显式暴露（无 PROVE_RCU 时为空）。
+	 */
+	RCU_LOCKDEP_WARN(!rcu_read_lock_any_held(),
+			 "task_grp() called outside rcu_read_lock()");
 
 	return rcu_dereference(gts->grp);
 }

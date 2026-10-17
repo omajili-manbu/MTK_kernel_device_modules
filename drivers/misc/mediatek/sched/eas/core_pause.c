@@ -165,6 +165,14 @@ static struct task_struct *drain_pick_rt(struct rq *rq)
  * （Android 用户态不使用 SCHED_DEADLINE，此为完备性兜底而非主路径）。
  * pick_task() 可能与 fair 服务器交互（服务器即 CFS 的带宽代理）而 repin
  * rq->lock ⇒ 传入本层真正的 @rf，与 core 的 __pick_next_task() 同一做法。
+ *
+ * rodin 6.18（S0 复核 · §4-10 裁决 (b)）：dl_sched_class.pick_task() 不是纯
+ * 只读 —— 命中带宽服务器时它会改写 rq->dl_server，必要时还 dl_server_stop()；
+ * core 因此每次进 __pick_next_task() 都先 rq->dl_server = NULL
+ * （core.c:6660）。本排空路径不照做：（1）排空期间本 CPU 已被暂停、不会再
+ * 走真实调度选择，残留值在下次 __pick_next_task() 就被清掉；（2）在此清
+ * 会改变服务器状态机的既有行为，属策略变更而非缺陷修复。若将来 dl 服务器
+ * 语义收紧，这里要跟着 core 补清空。
  */
 static struct task_struct *drain_pick_dl(struct rq *rq, struct rq_flags *rf)
 {
@@ -350,8 +358,21 @@ int __ref try_drain_rqs(void *data)
 	unsigned long flags;
 
 	while (!kthread_should_stop()) {
+		bool pending;
+
+		/*
+		 * rodin 6.18（S0/P-25）：标准的"先置睡眠态、后查条件"等待形态。
+		 * 原写法先放锁再 set_current_state(TASK_INTERRUPTIBLE)，pause_cpus()
+		 * 若恰好在这段窗口里补上待排空 CPU 并 wake_up_process()，唤醒会打在
+		 * 仍处于 RUNNING 的线程上（no-op），随后线程才入睡 —— 该轮排空丢失。
+		 * 现在睡眠态先置位，条件在 drain_pending_lock 内复查；靠 wake_up_process
+		 * 把 state 改回 RUNNING 来打断即将进入的 schedule()。
+		 */
+		set_current_state(TASK_INTERRUPTIBLE);
+
 		raw_spin_lock_irqsave(&drain_pending_lock, flags);
-		if (cpumask_weight(cpus_ptr)) {
+		pending = cpumask_weight(cpus_ptr) != 0;
+		if (pending) {
 			cpumask_t local_cpus;
 
 			cpumask_copy(&local_cpus, cpus_ptr);
@@ -364,8 +385,9 @@ int __ref try_drain_rqs(void *data)
 			cpumask_andnot(cpus_ptr, cpus_ptr, &local_cpus);
 		}
 		raw_spin_unlock_irqrestore(&drain_pending_lock, flags);
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();
+
+		if (!pending)
+			schedule();
 		set_current_state(TASK_RUNNING);
 	}
 

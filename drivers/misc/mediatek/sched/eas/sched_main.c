@@ -173,7 +173,7 @@ static void sched_queue_task_hook(void *data, struct rq *rq, struct task_struct 
 
 			uclamp_diff = (uclamp_diff
 				|| (READ_ONCE(sugov_data_ptr->uclamp[UCLAMP_MAX])
-				!= READ_ONCE(rq->uclamp[UCLAMP_MIN].value)));
+				!= READ_ONCE(rq->uclamp[UCLAMP_MAX].value)));
 
 			if (uclamp_diff) {
 				int this_cpu = smp_processor_id();
@@ -219,6 +219,14 @@ struct set_affinity_pending {
 	struct cpu_stop_work	stop_work;
 	struct migration_arg	arg;
 };
+/*
+ * rodin 6.18（S6/P-42）：本函数从未注册 —— 对应注册点在
+ * register_sched_hooks() 里被注释掉（见文件末尾的
+ * "register_trace_android_vh_check_uninterrupt_tasks" 注释行），因此是死代码。
+ * 它涉及的 struct set_affinity_pending / migration_pending 是 core 私有实现
+ * 细节，6.18 未导出；保留在此仅供排障参考，新增调用前必须先确认 6.18 的
+ * 迁移收尾语义（set_cpus_allowed_ptr 的 pending 协议已改写）。
+ */
 //static void mtk_check_d_tasks(void *data, struct task_struct *p,
 void mtk_check_d_tasks(void *data, struct task_struct *p,
 				unsigned long t, bool *need_check)
