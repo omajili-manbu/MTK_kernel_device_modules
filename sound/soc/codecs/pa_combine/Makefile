@@ -21,4 +21,3 @@ snd-soc-aw882xx-objs += fs19xx/fs1958.o
 snd-soc-aw882xx-objs += fs19xx/fsm_i2c.o
 
 obj-$(CONFIG_DEVICE_MODULES_SND_SOC_AW882XX) += snd-soc-aw882xx.o
-obj-m += snd-soc-aw882xx.o
