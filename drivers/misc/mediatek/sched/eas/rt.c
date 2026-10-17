@@ -152,7 +152,8 @@ inline unsigned long mtk_sched_cpu_util(int cpu)
 	unsigned long util;
 
 	irq_log_store();
-	util = mtk_cpu_util(cpu, mtk_cpu_util_cfs(cpu), ENERGY_UTIL, NULL, 0, SCHED_CAPACITY_SCALE);
+	util = mtk_cpu_util(cpu, mtk_cpu_util_cfs(cpu), ENERGY_UTIL, NULL, 0,
+			    SCHED_CAPACITY_SCALE, NULL, NULL);
 	irq_log_store();
 
 	return util;
@@ -164,7 +165,8 @@ inline unsigned long mtk_sched_max_util(struct task_struct *p, int cpu,
 	unsigned long util;
 
 	irq_log_store();
-	util = mtk_cpu_util(cpu, mtk_cpu_util_cfs(cpu), FREQUENCY_UTIL, p, min_cap, max_cap);
+	util = mtk_cpu_util(cpu, mtk_cpu_util_cfs(cpu), FREQUENCY_UTIL, p,
+			    min_cap, max_cap, NULL, NULL);
 	irq_log_store();
 
 	return util;

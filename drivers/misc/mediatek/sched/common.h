@@ -284,7 +284,8 @@ DECLARE_PER_CPU(spinlock_t, cpufreq_idle_cpu_lock);
 unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_rq,
 				enum cpu_util_type type,
 				struct task_struct *p,
-				unsigned long min_cap, unsigned long max_cap);
+				unsigned long min_cap, unsigned long max_cap,
+				unsigned long *min_out, unsigned long *max_out);
 int dequeue_idle_cpu(int cpu);
 #endif
 __always_inline

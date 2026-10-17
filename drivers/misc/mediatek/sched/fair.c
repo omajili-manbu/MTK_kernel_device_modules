@@ -191,7 +191,7 @@ static inline void eenv_pd_busy_time(struct energy_env *eenv,
 
 #if IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
 		busy_time += mtk_cpu_util(cpu, util, ENERGY_UTIL,
-					NULL, 0, 1024);
+					NULL, 0, 1024, NULL, NULL);
 #else
 		busy_time += effective_cpu_util(cpu, util, ENERGY_UTIL, NULL);
 #endif
@@ -218,6 +218,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 	for_each_cpu_and(cpu, get_gear_cpumask(eenv->gear_idx), cpu_active_mask) {
 		struct task_struct *tsk = (cpu == dst_cpu) ? p : NULL;
 		unsigned long util = -1, cpu_util = -1;
+		unsigned long util_min = 0, util_max = SCHED_CAPACITY_SCALE;
 
 		dst_idx = (cpu == dst_cpu) ? 1 : 0;
 		if (eenv->cpu_max_util[cpu][dst_idx] == -1) {
@@ -229,13 +230,20 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 			 * of the performance domain frequency.
 			 * NOTE: in case RT tasks are running, by default the
 			 * FREQUENCY_UTIL's utilization can be max OPP.
+			 *
+			 * rodin 6.18（A-116）：包络由 mtk_cpu_util() 出参给出，
+			 * 出口夹一次（对应 fair.c:8595 sugov_effective_cpu_perf()
+			 * 的包络半边；headroom 仍归 mtk_map_util_freq()，不在此计）。
 			 */
 #if IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
 			if (tsk)
 				cpu_util = mtk_cpu_util(cpu, util, FREQUENCY_UTIL, tsk,
-						eenv->min_cap, eenv->max_cap);
+						eenv->min_cap, eenv->max_cap,
+						&util_min, &util_max);
 			else
-				cpu_util = mtk_cpu_util(cpu, util, FREQUENCY_UTIL, tsk, 0, 1024);
+				cpu_util = mtk_cpu_util(cpu, util, FREQUENCY_UTIL, tsk,
+						0, 1024, &util_min, &util_max);
+			cpu_util = max(util_min, min(cpu_util, util_max));
 #else
 			cpu_util = effective_cpu_util(cpu, util, FREQUENCY_UTIL, tsk);
 #endif
@@ -258,7 +266,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 
 #if IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
 			cpu_util_base = mtk_cpu_util(cpu, util_base, FREQUENCY_UTIL, NULL,
-					0, 1024);
+					0, 1024, NULL, NULL);
 #else
 			cpu_util_base = effective_cpu_util(cpu, util, FREQUENCY_UTIL, tsk);
 #endif

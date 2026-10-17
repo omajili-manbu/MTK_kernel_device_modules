@@ -56,6 +56,7 @@ struct sugov_cpu {
 	u64			last_update;
 	unsigned long		util;
 	unsigned long		bw_dl;
+	unsigned long		bw_min;
 	unsigned long		max;
 
 	/* The field below is for single-CPU policies only: */
@@ -253,7 +254,12 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	return freq;
 }
 
-inline int curr_clamp(struct rq *rq, unsigned long *util)
+/*
+ * rodin 6.18（A-116）：包络出参化后，本函数既可直接夹 @util（出参为 NULL 的
+ * 旧路径），也可只回传 [u_min, u_max] 让消费者在出口夹一次（min_out 非空）。
+ */
+inline int curr_clamp(struct rq *rq, unsigned long *util,
+		      unsigned long *u_min_out, unsigned long *u_max_out)
 {
 	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 非零返回（= 不施加 clamp）*/
 	if (MTK_TASK_DATA_ABSENT())
@@ -261,7 +267,9 @@ inline int curr_clamp(struct rq *rq, unsigned long *util)
 	struct task_struct *curr_task;
 	int u_min = 0, u_max = 1024;
 	int cpu = rq->cpu;
-	unsigned long util_ori = *util;
+	unsigned long util_ori = util ? *util : 0;
+	unsigned long util_clamped;
+	pid_t pid = 0;
 	struct curr_uclamp_hint *cu_ht;
 
 	rcu_read_lock();
@@ -283,12 +291,19 @@ inline int curr_clamp(struct rq *rq, unsigned long *util)
 	}
 	u_min = curr_task->uclamp_req[UCLAMP_MIN].value;
 	u_max = curr_task->uclamp_req[UCLAMP_MAX].value;
+	pid = curr_task->pid;
 	rcu_read_unlock();
 
-	*util = clamp_val(*util, u_min, u_max);
+	util_clamped = clamp_val(util_ori, u_min, u_max);
+	if (util)
+		*util = util_clamped;
+	if (u_min_out)
+		*u_min_out = u_min;
+	if (u_max_out)
+		*u_max_out = u_max;
 	if (trace_sugov_ext_curr_uclamp_enabled())
-		trace_sugov_ext_curr_uclamp(cpu, curr_task->pid,
-		util_ori, *util, u_min, u_max);
+		trace_sugov_ext_curr_uclamp(cpu, pid,
+		util_ori, util_clamped, u_min, u_max);
 	return 0;
 }
 
@@ -315,18 +330,16 @@ inline int curr_clamp(struct rq *rq, unsigned long *util)
 unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_cfs,
 				 enum cpu_util_type type,
 				 struct task_struct *p,
-				 unsigned long min_cap, unsigned long max_cap)
+				 unsigned long min_cap, unsigned long max_cap,
+				 unsigned long *min_out, unsigned long *max_out)
 {
 	unsigned long dl_util, util, irq, max;
 	unsigned long util_ori;
+	unsigned long env_min, env_max;
+	bool env_override = false;
 	struct rq *rq = cpu_rq(cpu);
 
 	max = arch_scale_cpu_capacity(cpu);
-
-	if (!uclamp_is_used() &&
-	    type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt)) {
-		return max;
-	}
 
 	/*
 	 * Early check to see if IRQ/steal time saturates the CPU, can be
@@ -334,8 +347,32 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_cfs,
 	 * update_irq_load_avg().
 	 */
 	irq = cpu_util_irq(rq);
-	if (unlikely(irq >= max))
+	if (unlikely(irq >= max)) {
+		if (min_out)
+			*min_out = max;
+		if (max_out)
+			*max_out = max;
 		return max;
+	}
+
+	/*
+	 * rodin 6.18（A-116）：包络先算、util 后算 —— 6.18 把 uclamp/容量约束
+	 * 拆成 effective_cpu_util() 的 min/max 出参（fair.c:8424-8455），由消费者
+	 * 在出口夹一次。min 的地板是 IRQ + DL 预留带宽（fair.c:8431），不再是
+	 * 加进 util 的一项；max 是 min(容量, uclamp_max)（fair.c:8454-8455）。
+	 */
+	env_min = max(irq + cpu_bw_dl(rq), READ_ONCE(rq->uclamp[UCLAMP_MIN].value));
+	env_max = min(max, READ_ONCE(rq->uclamp[UCLAMP_MAX].value));
+
+	if (!uclamp_is_used() &&
+	    type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt)) {
+		/* 6.18：RT 可运行且 uclamp 未启用 ⇒ min 抬到满容量（fair.c:8437） */
+		if (min_out)
+			*min_out = max;
+		if (max_out)
+			*max_out = env_max;
+		return max;
+	}
 
 	/*
 	 * Because the time spend on RT/DL tasks is visible as 'lost' time to
@@ -375,22 +412,59 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_cfs,
 			WRITE_ONCE(sugov_data_ptr->uclamp[UCLAMP_MIN], umin);
 			WRITE_ONCE(sugov_data_ptr->uclamp[UCLAMP_MAX], umax);
 			p = NULL;
-			if (cu_ctrl && curr_clamp(rq, &util) == 0)
-				goto skip_rq_uclamp;
-			else if (gu_ctrl) {
-				unsigned long umax_with_gear;
 
-				umax_with_gear = min_t(unsigned long,
-					umax, get_cpu_gear_uclamp_max(cpu));
-				util = clamp_val(util, umin, umax_with_gear);
+			/*
+			 * vendor 扩展包络（6.18 无对应物）：
+			 * cu_ctrl = 用当前任务的 uclamp_req 取代 rq 聚合值；
+			 * gu_ctrl = 把 gear 上限并进 max。
+			 * 出参非空时只回传界，由消费者出口夹；否则就地夹（旧语义）。
+			 */
+			if (cu_ctrl && curr_clamp(rq, min_out ? NULL : &util,
+						  &umin, &umax) == 0) {
+				env_min = max(env_min, umin);
+				env_max = min(max, umax);
+				env_override = true;
+			} else if (gu_ctrl) {
+				unsigned long util_clamped;
+
+				umax = min_t(unsigned long, umax,
+					     get_cpu_gear_uclamp_max(cpu));
+				env_min = max(env_min, umin);
+				env_max = min(max, umax);
+				env_override = true;
+
+				util_clamped = clamp_val(util, umin, umax);
+				if (!min_out)
+					util = util_clamped;
 				if (trace_sugov_ext_gear_uclamp_enabled())
 					trace_sugov_ext_gear_uclamp(cpu, util_ori,
-						umin, umax, util, get_cpu_gear_uclamp_max(cpu));
-				goto skip_rq_uclamp;
+						umin, umax, util_clamped,
+						get_cpu_gear_uclamp_max(cpu));
 			}
 		}
-		util = mtk_uclamp_rq_util_with(rq, util, p, min_cap, max_cap, NULL, NULL, false);
-skip_rq_uclamp:
+
+		if (!env_override) {
+			if (min_out) {
+				/*
+				 * 只算包络、不夹 util：与 mtk_uclamp_rq_util_with()
+				 * 的 min/max 聚合逐项一致（common.c:69-79）。
+				 */
+				if (p) {
+					env_min = max(env_min, min_cap);
+#if IS_ENABLED(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
+					env_max = !rq->nr_running ? max_cap :
+						  max(env_max, max_cap);
+#else
+					env_max = max(env_max, max_cap);
+#endif
+					env_max = min(max, env_max);
+				}
+			} else {
+				util = mtk_uclamp_rq_util_with(rq, util, p,
+						min_cap, max_cap, NULL, NULL, false);
+			}
+		}
+
 		if (sbb_trigger && trace_sugov_ext_sbb_enabled()) {
 			int pid = -1;
 			struct task_struct *curr;
@@ -412,23 +486,19 @@ skip_rq_uclamp:
 	dl_util = cpu_util_dl(rq);
 
 	/*
-	 * For frequency selection we do not make cpu_util_dl() a permanent part
-	 * of this sum because we want to use cpu_bw_dl() later on, but we need
-	 * to check if the CFS+RT+DL sum is saturated (ie. no idle time) such
-	 * that we select f_max when there is no idle time.
-	 *
-	 * NOTE: numerical errors or stop class might cause us to not quite hit
-	 * saturation when we should -- something for later.
+	 * rodin 6.18（A-116）：DL 的实际运行时间无条件并入 util
+	 * （fair.c:8447-8448）；DL 预留带宽 cpu_bw_dl() 已改作 min 地板
+	 * （fair.c:8431），不再加进 util。stop 类造成的数值误差同上游处理。
 	 */
-	if (util + dl_util >= max)
-		return max;
+	util += dl_util;
 
-	/*
-	 * OTOH, for energy computation we need the estimated running time, so
-	 * include util_dl and ignore dl_bw.
-	 */
-	if (type == ENERGY_UTIL)
-		util += dl_util;
+	if (util >= max) {
+		if (min_out)
+			*min_out = env_min;
+		if (max_out)
+			*max_out = env_max;
+		return max;
+	}
 
 	/*
 	 * There is still idle time; further improve the number by using the
@@ -446,18 +516,10 @@ skip_rq_uclamp:
 	util = scale_irq_capacity(util, irq, max);
 	util += irq;
 
-	/*
-	 * Bandwidth required by DEADLINE must always be granted while, for
-	 * FAIR and RT, we use blocked utilization of IDLE CPUs as a mechanism
-	 * to gracefully reduce the frequency when no tasks show up for longer
-	 * periods of time.
-	 *
-	 * Ideally we would like to set bw_dl as min/guaranteed freq and util +
-	 * bw_dl as requested freq. However, cpufreq is not yet ready for such
-	 * an interface. So, we only do the latter for now.
-	 */
-	if (type == FREQUENCY_UTIL)
-		util += cpu_bw_dl(rq);
+	if (min_out)
+		*min_out = env_min;
+	if (max_out)
+		*max_out = env_max;
 
 	return min(max, util);
 }
@@ -488,17 +550,25 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu, unsigned long boost)
 {
 	unsigned long cpu_util = mtk_cpu_util_cfs_boost(sg_cpu->cpu);
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
-	unsigned long util;
+	unsigned long util, min, max;
 
 	sg_cpu->max = arch_scale_cpu_capacity(sg_cpu->cpu);
 	sg_cpu->bw_dl = cpu_bw_dl(rq);
 
 	util = mtk_cpu_util(sg_cpu->cpu, cpu_util, FREQUENCY_UTIL,
 							(struct task_struct *)UINTPTR_MAX,
-							0, SCHED_CAPACITY_SCALE);
-	sg_cpu->util = mtk_uclamp_rq_util_with(rq, max(util, boost),
-							NULL, 0, SCHED_CAPACITY_SCALE,
-							NULL, NULL, false);
+							0, SCHED_CAPACITY_SCALE,
+							&min, &max);
+	/*
+	 * rodin 6.18（A-116）：包络在消费者出口夹一次（对应上游
+	 * sugov_effective_cpu_perf() 的 max(min, min(actual, max)) 半边）。
+	 * headroom 仍由 mtk_map_util_freq() 的 adaptive_margin/util_scale 在
+	 * CAP→FREQ 之前施加，这里不引 map_util_perf()（否则双计 1.5625×）。
+	 * boost 先并入 util 再夹 ⇒ iowait boost 不再越过 uclamp_max/gear 上限。
+	 */
+	util = max(util, boost);
+	sg_cpu->bw_min = min;
+	sg_cpu->util = max(min, min(util, max));
 #if IS_ENABLED(CONFIG_MTK_SCHED_GROUP_AWARE)
 	if (sugov_grp_awr_update_cpu_tar_util_hook && grp_dvfs_ctrl_mode)
 		sugov_grp_awr_update_cpu_tar_util_hook(sg_cpu->cpu);
