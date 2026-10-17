@@ -69,6 +69,7 @@
 static void __iomem *toprgu_base;
 #endif
 static bool nowayout = WATCHDOG_NOWAYOUT;
+static bool disable_extrst;
 static unsigned int timeout;
 
 struct mtk_wdt_dev {
@@ -233,7 +234,18 @@ static void mtk_wdt_init(struct watchdog_device *wdt_dev)
 	wdt_base = mtk_wdt->wdt_base;
 
 	if (readl(wdt_base + WDT_MODE) & WDT_MODE_EN) {
+		u32 reg = ioread32(wdt_base + WDT_MODE);
+
 		set_bit(WDOG_HW_RUNNING, &wdt_dev->status);
+		/*
+		 * The bootloader may have started the WDT without the external
+		 * reset output armed. With no bark IRQ in DT, an expired
+		 * timeout produces no visible effect unless EXRST_EN is set.
+		 */
+		if (!disable_extrst)
+			reg |= WDT_MODE_EXRST_EN;
+		reg |= WDT_MODE_KEY;
+		iowrite32(reg, wdt_base + WDT_MODE);
 		mtk_wdt_set_timeout(wdt_dev, wdt_dev->timeout);
 	}
 }
@@ -270,6 +282,8 @@ static int mtk_wdt_start(struct watchdog_device *wdt_dev)
 		reg |= (WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);
 	else
 		reg &= ~(WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);
+	if (!disable_extrst)
+		reg |= WDT_MODE_EXRST_EN;
 	reg |= (WDT_MODE_EN | WDT_MODE_KEY);
 	iowrite32(reg, wdt_base + WDT_MODE);
 
@@ -410,8 +424,11 @@ static int mtk_wdt_probe(struct platform_device *pdev)
 	if (unlikely(err))
 		return err;
 
-	dev_info(dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)\n",
-		 mtk_wdt->wdt_dev.timeout, nowayout);
+	dev_info(dev,
+		 "Watchdog enabled (timeout=%d sec, nowayout=%d, mode=0x%08x, len=0x%08x)\n",
+		 mtk_wdt->wdt_dev.timeout, nowayout,
+		 ioread32(mtk_wdt->wdt_base + WDT_MODE),
+		 ioread32(mtk_wdt->wdt_base + WDT_LENGTH));
 
 	wdt_data = of_device_get_match_data(dev);
 	if (wdt_data) {
@@ -481,6 +498,10 @@ MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");
 module_param(nowayout, bool, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+
+module_param(disable_extrst, bool, 0644);
+MODULE_PARM_DESC(disable_extrst,
+		 "Do not set WDT_MODE_EXRST_EN (external reset output) when starting the watchdog");
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Matthias Brugger <matthias.bgg@gmail.com>");
