@@ -997,8 +997,9 @@ int init_legacy_capacity_table(void)
 	long next_cap, k;
 	struct pd_capacity_info *pd_info;
 	struct em_perf_domain *pd;
+	struct em_perf_state *states;
 	struct upower_tbl *tbl = NULL;
-	unsigned long power_res, cost;
+	unsigned long power_res, cost, opp_freq;
 
 	ret = alloc_capacity_table();
 	if (ret)
@@ -1028,10 +1029,22 @@ int init_legacy_capacity_table(void)
 				goto err;
 
 			pd_info->caps[j] = cap;
-			pd->em_table->state[pd_info->nr_caps - j - 1].performance = pd_info->caps[j];
-			power_res = pd->em_table->state[pd_info->nr_caps - j - 1].power * 10;
-			cost = power_res / pd->em_table->state[pd_info->nr_caps - j - 1].performance;
-			pd->em_table->state[pd_info->nr_caps - j - 1].cost = cost;
+
+			/*
+			 * rodin 6.18（A-61′）：em_perf_domain::em_table 是
+			 * struct em_perf_table __rcu *（EM 表可热更新），任何
+			 * state[] 访问都必须持 rcu_read_lock() 并经
+			 * em_perf_state_from_pd() 取表。这里逐 j 进出读侧区间：
+			 * 后面的 kcalloc(GFP_KERNEL) 可能睡眠，不能跨过去。
+			 */
+			rcu_read_lock();
+			states = em_perf_state_from_pd(pd);
+			states[pd_info->nr_caps - j - 1].performance = pd_info->caps[j];
+			power_res = states[pd_info->nr_caps - j - 1].power * 10;
+			cost = power_res / states[pd_info->nr_caps - j - 1].performance;
+			states[pd_info->nr_caps - j - 1].cost = cost;
+			opp_freq = states[pd->nr_perf_states - j - 1].frequency;
+			rcu_read_unlock();
 
 			if (!pd_info->util_opp) {
 				pd_info->util_opp = kcalloc(cap + 1, sizeof(unsigned int),
@@ -1052,8 +1065,7 @@ int init_legacy_capacity_table(void)
 
 			for (k = cap; k > next_cap; k--) {
 				pd_info->util_opp[k] = j;
-				pd_info->util_freq[k] =
-					pd->em_table->state[pd->nr_perf_states - j - 1].frequency;
+				pd_info->util_freq[k] = opp_freq;
 			}
 
 			count += 1;
@@ -1093,6 +1105,8 @@ err:
 int em_opp2freq(int cpu, int opp)
 {
 	struct em_perf_domain *pd;
+	struct em_perf_state *states;
+	unsigned long freq;
 
 	pd = em_cpu_get(cpu);
 	if (!pd) {
@@ -1100,16 +1114,24 @@ int em_opp2freq(int cpu, int opp)
 		return 1;
 	}
 	opp = clamp_val(opp, 0, pd->nr_perf_states - 1);
-	if (pd->em_table->state[0].frequency > pd->em_table->state[1].frequency)
-		return pd->em_table->state[opp].frequency;
+
+	/* rodin 6.18（A-61′）：__rcu 表一次取表、锁内读成标量。 */
+	rcu_read_lock();
+	states = em_perf_state_from_pd(pd);
+	if (states[0].frequency > states[1].frequency)
+		freq = states[opp].frequency;
 	else
-		return pd->em_table->state[pd->nr_perf_states - 1 - opp].frequency;
+		freq = states[pd->nr_perf_states - 1 - opp].frequency;
+	rcu_read_unlock();
+
+	return freq;
 }
 
 int em_opp2cap(int cpu, int opp)
 {
 	struct em_perf_domain *pd;
 	struct pd_capacity_info *pd_info;
+	struct em_perf_state *states;
 	int i;
 	int cap = 0;
 	int opp_freq;
@@ -1136,13 +1158,19 @@ int em_opp2cap(int cpu, int opp)
 			return 1;
 		}
 		opp = clamp_val(opp, 0, pd->nr_perf_states - 1);
-		if (pd->em_table->state[0].frequency > pd->em_table->state[1].frequency) {
-			max_freq = pd->em_table->state[0].frequency;
-			opp_freq = pd->em_table->state[opp].frequency;
+
+		/* rodin 6.18（A-61′）：__rcu 表一次取表、锁内读成标量。 */
+		rcu_read_lock();
+		states = em_perf_state_from_pd(pd);
+		if (states[0].frequency > states[1].frequency) {
+			max_freq = states[0].frequency;
+			opp_freq = states[opp].frequency;
 		} else {
-			max_freq = pd->em_table->state[pd->nr_perf_states - 1].frequency;
-			opp_freq = pd->em_table->state[pd->nr_perf_states - 1 - opp].frequency;
+			max_freq = states[pd->nr_perf_states - 1].frequency;
+			opp_freq = states[pd->nr_perf_states - 1 - opp].frequency;
 		}
+		rcu_read_unlock();
+
 		cap = (opp_freq * per_cpu(cpu_scale, cpu)) / max_freq;
 	}
 	return cap;
@@ -1151,6 +1179,8 @@ int em_opp2cap(int cpu, int opp)
 int em_opp2pwr_eff(int cpu, int opp)
 {
 	struct em_perf_domain *pd;
+	struct em_perf_state *states;
+	unsigned long cost;
 
 	pd = em_cpu_get(cpu);
 	if (!pd) {
@@ -1158,10 +1188,17 @@ int em_opp2pwr_eff(int cpu, int opp)
 		return 1;
 	}
 	opp = clamp_val(opp, 0, pd->nr_perf_states - 1);
-	if (pd->em_table->state[0].frequency > pd->em_table->state[1].frequency)
-		return pd->em_table->state[opp].cost;
+
+	/* rodin 6.18（A-61′）：__rcu 表一次取表、锁内读成标量。 */
+	rcu_read_lock();
+	states = em_perf_state_from_pd(pd);
+	if (states[0].frequency > states[1].frequency)
+		cost = states[opp].cost;
 	else
-		return pd->em_table->state[pd->nr_perf_states - 1 - opp].cost;
+		cost = states[pd->nr_perf_states - 1 - opp].cost;
+	rcu_read_unlock();
+
+	return cost;
 }
 
 int em_freq2opp(int cpu, int freq)

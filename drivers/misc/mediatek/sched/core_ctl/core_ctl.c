@@ -2136,9 +2136,23 @@ static int ppm_data_init(struct cluster_data *cluster)
 
 	/* get power and capacity and calculate efficiency */
 	for (i = 0; i < opp_nr; i++) {
-		ps = &pd->em_table->state[opp_nr-1-i];
-		ppm_tbl[i].power = ps->power;
-		ppm_tbl[i].freq = ps->frequency;
+		unsigned long power, freq;
+
+		/*
+		 * rodin 6.18（A-61′）：em_perf_domain::em_table 是
+		 * struct em_perf_table __rcu *，必须持 rcu_read_lock() 并经
+		 * em_perf_state_from_pd() 取表。只把两个标量取进锁内：
+		 * pd_get_opp_capacity_legacy() 会派发 vendor 私有 hook，
+		 * 不能把读侧区间跨到它上面。
+		 */
+		rcu_read_lock();
+		ps = &em_perf_state_from_pd(pd)[opp_nr - 1 - i];
+		power = ps->power;
+		freq = ps->frequency;
+		rcu_read_unlock();
+
+		ppm_tbl[i].power = power;
+		ppm_tbl[i].freq = freq;
 		ppm_tbl[i].capacity = pd_get_opp_capacity_legacy(first_cpu, i);
 		ppm_tbl[i].thermal_eff = ppm_tbl[i].eff = div64_u64(ppm_tbl[i].power, ppm_tbl[i].capacity);
 	}
