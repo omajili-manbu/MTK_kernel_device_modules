@@ -1460,6 +1460,16 @@ put_task:
 }
 
 DEFINE_PER_CPU(struct balance_callback, vip_push_head);
+/*
+ * rodin 6.18（S4/P-20 改判）：调研报告建议把这里的 prev 换成 rq->donor，
+ * 但 android_rvh_schedule 的投递点在 core.c:7819，而 rq->donor 已在
+ * :7774/:7810 rq_set_donor(rq, next) 里推进成 next —— 钩子内读 rq->donor
+ * 拿到的是"要切进来的任务"，会推错对象；切换前的旧 donor 在 core 局部变量
+ * prev_donor（:7769）里，钩子不可见。
+ * PROXY_EXEC=y 下 prev 是真正丢掉 CPU 的执行上下文：它若仍 on_rq 就是可推的
+ * 候选（proxy 本身也是本 rq 上合法的可运行任务），若已阻塞则由紧随其后的
+ * mtk_task_migratable() 判据滤掉。故保留 prev，不换成 rq->donor。
+ */
 void vip_sched_switch(struct task_struct *prev, struct task_struct *next, struct rq *rq)
 {
 	if (in_interrupt())

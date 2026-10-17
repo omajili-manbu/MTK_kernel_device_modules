@@ -20,6 +20,7 @@
 #include <trace/events/sched.h>
 #include <trace/hooks/sched.h>
 #include <linux/cpu.h>
+#include <linux/kthread.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/sched/cputime.h>
@@ -75,7 +76,13 @@ static inline bool mtk_cpu_allowed(struct task_struct *p, int cpu)
 	if (!(p->flags & PF_KTHREAD))
 		return cpu_active(cpu) && allowed;
 
-	if (is_per_cpu_kthread(p))
+	/*
+	 * rodin 6.18（A-116/S4）：is_per_cpu_kthread() 只按
+	 * PF_KTHREAD + nr_cpus_allowed==1 判，会把"被临时绑到单 CPU 的普通
+	 * kthread"误当成 per-CPU 线程允许留驻暂停核。6.18 的判据是
+	 * kthread_is_per_cpu()（查 KTHREAD_IS_PER_CPU，core.c:2668 同源）。
+	 */
+	if (kthread_is_per_cpu(p))
 		return cpu_online(cpu);
 
 	if (!allowed)
@@ -526,7 +533,8 @@ EXPORT_SYMBOL(sched_resume_cpu);
 void hook_rvh_is_cpus_allowed(void *unused, struct task_struct *p, int cpu, bool *allowed)
 {
 	if (cpu_paused(cpu)) {
-		if (is_per_cpu_kthread(p))
+		/* rodin 6.18（S4）：同 mtk_cpu_allowed()，按 KTHREAD_IS_PER_CPU 判。 */
+		if (kthread_is_per_cpu(p))
 			*allowed = true;
 		else
 			*allowed = false;

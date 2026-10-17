@@ -767,10 +767,25 @@ void check_for_migration(struct task_struct *p)
 	int new_cpu = -1, better_idle_cpu = -1;
 	int cpu = task_cpu(p);
 	struct rq *rq = cpu_rq(cpu);
+	struct task_struct *curr;
+	unsigned long misfit_load;
 
 	irq_log_store();
 
-	if (rq->misfit_task_load) {
+	/*
+	 * rodin 6.18（S4/P-39）：本函数由 android_vh_scheduler_tick 调用
+	 * （core.c:6338，位于 rq_unlock 之后），入口这几处读都没有 rq lock
+	 * 保护，而 core 在 fair.c:5392/5400 的锁内写 rq->misfit_task_load。
+	 * 这些读只是启发式决策的起点，真正的迁移在后面的
+	 * migration_lock/pi_lock/rq lock 内复核，故按宽松快照处理：READ_ONCE
+	 * 防撕裂与重排即可。不能整函数持 rq lock —— 函数内
+	 * migrate_running_task() 会对同一 rq 再加 raw_spin_rq_lock，
+	 * task_check_for_rotation() 会 double_rq_lock(src_rq, src_rq) 自锁。
+	 */
+	curr = READ_ONCE(rq->curr);
+	misfit_load = READ_ONCE(rq->misfit_task_load);
+
+	if (misfit_load) {
 		struct em_perf_domain *pd;
 		struct em_perf_state *em_states;
 		struct cpufreq_policy *policy;
@@ -779,8 +794,8 @@ void check_for_migration(struct task_struct *p)
 		int thre_rot = 0, thre_rot_idx = 0;
 #endif
 
-		if (rq->curr->__state != TASK_RUNNING ||
-			rq->curr->nr_cpus_allowed == 1)
+		if (READ_ONCE(curr->__state) != TASK_RUNNING ||
+			READ_ONCE(curr->nr_cpus_allowed) == 1)
 			return;
 
 		pd = em_cpu_get(cpu);
