@@ -11,6 +11,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
+#include <linux/cpu.h>
 #include <linux/seq_file.h>
 #include <linux/energy_model.h>
 #include <linux/jump_label.h>
@@ -126,8 +127,59 @@ static void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
 							int prev_cpu, int sd_flag,
 							int wake_flags, int *target_cpu)
 {
+	struct root_domain *rd;
+	int sync, new_cpu;
+
 	if (trace_sched_domain_flags_enabled())
 		trace_sched_domain_flags(p, prev_cpu, sd_flag, wake_flags, *target_cpu);
+
+	/*
+	 * rodin 6.18（S9/P-13）：只在普通唤醒路径接管。fork/exec 与
+	 * WF_CURRENT_CPU 由 core 自己处理；sd_flag 与 wake_flags 共用低半字节
+	 * （6.18 fair.c:8880-8881）。本钩子的投递点 core.c:8886-8889 在
+	 * p->pi_lock 内、IRQs off，且钩子可写 target_cpu 后立即返回。
+	 */
+	if (!(wake_flags & WF_TTWU) || (wake_flags & WF_CURRENT_CPU) ||
+	    (sd_flag & (SD_BALANCE_FORK | SD_BALANCE_EXEC)))
+		return;
+
+	if (!get_eas_hook())	/* 现成的运行期总开关 = kill switch */
+		return;
+
+	rd = cpu_rq(smp_processor_id())->rd;
+
+	/*
+	 * 过载时不接管，交 core 做负载均衡 —— 对应 6.18 fair.c:8902
+	 * !is_rd_overutilized() 里 rd->overutilized 的那一半。
+	 * 不并入其 !sched_energy_enabled() 半边：真机绑 sugov_ext，
+	 * cpufreq_ready_for_eas() 指针比较直接判 false（cpufreq.c:3078），
+	 * sched_energy_enabled() 恒为 false，补上这一条等于把本接管永久关死。
+	 * 代价是该字段只在 EAS 开启时才被维护（fair.c:7135 set_rd_overutilized()
+	 * 首行早退），当前配置下恒为 0，过载门实际不生效。
+	 */
+	if (READ_ONCE(rd->overutilized))
+		return;
+
+	/*
+	 * vendor EAS 的能量扫描以 rd->pd 为输入（fair.c:2212/2222）；rd->pd 只有
+	 * 上游 EAS 域建起来时才非空（topology.c:419 build_perf_domains()）。
+	 * 没有 perf domain 时 mtk_find_energy_efficient_cpu() 会落进 LB_FAIL 的
+	 * 备份选择（wake_affine + idle 选核），那条路与 core 自己的选核重复且
+	 * 更激进 —— 此时直接交还 core，不做接管。
+	 */
+	if (!rcu_access_pointer(rd->pd))
+		return;
+
+	sync = (wake_flags & WF_SYNC) && !(current->flags & PF_EXITING);
+	new_cpu = -1;
+	mtk_find_energy_efficient_cpu(NULL, p, prev_cpu, sync, &new_cpu);
+
+	/* 结果硬校验：任一不满足就放弃接管，让 core 走原路 */
+	if (new_cpu < 0 || new_cpu >= nr_cpu_ids || !cpu_active(new_cpu) ||
+	    !cpumask_test_cpu(new_cpu, p->cpus_ptr))
+		return;
+
+	*target_cpu = new_cpu;
 }
 
 static void sched_rq_load_hook(void *data, struct cfs_rq *rq)
