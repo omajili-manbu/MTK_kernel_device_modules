@@ -4,6 +4,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/vseq.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -220,7 +221,7 @@ static int __init mt6893_qos_init(void)
 	return ret;
 }
 
-late_initcall(mt6893_qos_init)
+vseq_late_initcall(mt6893_qos_init)
 
 static void __exit mt6893_qos_exit(void)
 {
