@@ -1234,7 +1234,7 @@ static void hrtime_otg_work_func(struct work_struct *work)
 	chr_err("hrtime_otg_work_func enter\n");
 }
 
-static enum alarmtimer_restart rust_det_work_timer_handler(struct alarm *alarm, ktime_t now)
+static void rust_det_work_timer_handler(struct alarm *alarm, ktime_t now) /* rodin: 6.18 alarm callback is void */
 {
 	if(pinfo != NULL)
 	{
@@ -1242,7 +1242,6 @@ static enum alarmtimer_restart rust_det_work_timer_handler(struct alarm *alarm, 
 		schedule_delayed_work(&pinfo->hrtime_otg_work, 0);
 	}
 	chr_err("rust_det_work_timer_handler enter\n");
-    return ALARMTIMER_NORESTART;
 }
 
 int lpd_dp_res_get_from_charger(int i)
@@ -3882,12 +3881,11 @@ static void set_cc_drp_work_func(struct work_struct *work)
 	chr_err("set_cc_drp_work_func enter\n");
 }
 
-static enum alarmtimer_restart lpd_period_work_timer_handler(struct alarm *alarm, ktime_t now)
+static void lpd_period_work_timer_handler(struct alarm *alarm, ktime_t now) /* rodin: 6.18 alarm callback is void */
 {
 	struct mtk_charger *info = container_of(alarm, struct mtk_charger, lpd_plug_det_work_timer);
 	info->lpd_flag = false;
 	chr_err("lpd_period_work_timer_handler enter\n");
-    return ALARMTIMER_NORESTART;
 }
 
 static int rust_det_notifier_call(struct notifier_block *nb,
