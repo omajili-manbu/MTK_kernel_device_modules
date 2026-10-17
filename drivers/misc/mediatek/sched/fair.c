@@ -248,7 +248,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 			else
 				cpu_util = mtk_cpu_util(cpu, util, FREQUENCY_UTIL, tsk,
 						0, 1024, &util_min, &util_max);
-			cpu_util = max(util_min, min(cpu_util, util_max));
+			cpu_util = mtk_eff_perf(cpu_util, util_min, util_max);
 #else
 			/*
 			 * rodin 6.18（S6/P-14）：原写法沿用已删除的
@@ -263,7 +263,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 				util_max = max(util_max,
 					uclamp_eff_value(p, UCLAMP_MAX));
 			}
-			cpu_util = max(util_min, min(cpu_util, util_max));
+			cpu_util = mtk_eff_perf(cpu_util, util_min, util_max);
 #endif
 			eenv->cpu_max_util[cpu][dst_idx] = cpu_util;
 		} else
@@ -296,8 +296,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 
 				cpu_util_base = effective_cpu_util(cpu, util_base,
 								   &base_min, &base_max);
-				cpu_util_base = max(base_min,
-						    min(cpu_util_base, base_max));
+				cpu_util_base = mtk_eff_perf(cpu_util_base, base_min, base_max);
 			}
 #endif
 			eenv->cpu_max_util[cpu][0] = cpu_util_base;

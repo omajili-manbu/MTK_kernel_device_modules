@@ -12,6 +12,7 @@
 #include <linux/topology.h>
 #include <linux/sched/topology.h>
 #include <linux/sched/task.h>	/* android_task_vendor_data(): GKI 动态 task_struct 尾部载体 */
+#include <linux/minmax.h>
 
 #define MTK_VENDOR_DATA_SIZE_TEST(mstruct, kstruct)		\
 	BUILD_BUG_ON(sizeof(mstruct) > (sizeof(u64) *		\
@@ -287,6 +288,23 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_rq,
 				unsigned long min_cap, unsigned long max_cap,
 				unsigned long *min_out, unsigned long *max_out);
 #endif
+
+/*
+ * rodin 6.18（A-116/B2）：消费面出口的包络夹取原语 —— 6.18
+ * sugov_effective_cpu_perf()（kernel/sched/cpufreq_schedutil.c:216-231）去掉
+ * map_util_perf() headroom 的本树等价形：
+ *
+ *	max(min, min(util, max))   ←  max(min, min(1.25 * util, max)) 去掉 1.25
+ *
+ * 本树 headroom（adaptive_margin / util_scale）归 mtk_map_util_freq()，在
+ * CAP→FREQ 之前统一施加 ⇒ 此处不得再乘 1.25（否则双计 1.5625×）。
+ * [min, max] 来自 mtk_cpu_util() 的 min_out/max_out（出参非空路径）。
+ */
+static inline unsigned long mtk_eff_perf(unsigned long util,
+					 unsigned long min, unsigned long max)
+{
+	return max(min, min(util, max));
+}
 __always_inline
 unsigned long mtk_uclamp_rq_util_with(struct rq *rq, unsigned long util,
 				  struct task_struct *p,

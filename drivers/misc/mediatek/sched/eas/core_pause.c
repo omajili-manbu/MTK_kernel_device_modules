@@ -301,6 +301,17 @@ out_unlock:
  * 这里改为按类直接遍历各排空面、只推必须离开者，全程不摘挂 rq 上的任何任务：
  * 每个候选要么被推走、要么下一轮不再匹配（判据与 drain_push() 复核同源），
  * 故循环必然收敛。
+ *
+ * 收敛判据（A2 评审）：不采用 core hotplug 的「nr_running == 1 &&
+ * !rq_has_pinned_tasks(rq)」轮询（core.c:9161 balance_hotplug_wait()、
+ * core.c:9483 sched_cpu_dying()）。rq_has_pinned_tasks() 只数 rq->nr_pinned
+ * —— 即 migration_disabled 的任务（include/linux/sched.h:2481/:2500 的
+ * this_rq_pinned 增减），不含 per-CPU kthread；而 pause 语义下 CPU 保持
+ * online、只清 active 位（pause_cpus() 的 set_cpu_active_bitmask()），
+ * per-CPU kthread 与 pinned 任务本就合法留驻 ⇒ 计数形态永不成立。
+ * 本实现的判据是「无任务再匹配『必须离开』」这一不动点，逐任务由
+ * mtk_cpu_allowed() 给出（覆盖 cpus_mask / migration_disabled / per-CPU
+ * kthread / rvh 钩子四类），严格覆盖计数形态，故不另加该检查。
  */
 static void drain_rq(struct rq *rq, struct rq_flags *rf)
 {

@@ -561,8 +561,8 @@ EXPORT_SYMBOL(sugov_grp_awr_update_cpu_tar_util_hook);
  * headroom（×1.25），而本树该 headroom 由自有 mtk_map_util_freq() 的
  * adaptive_margin / util_scale（1280/1024）在 CAP→FREQ 之前统一施加
  * （DT eas-info version=650 ⇒ am_ctrl=1，走 mtk_map_util_freq_adap_grp()），
- * 再叠一次就是 1.5625× 双计。故这里只补包络夹取，用本包的 uclamp 原语
- * mtk_uclamp_rq_util_with()（min/max 反转与 !uclamp_is_used 都已处理）。
+ * 再叠一次就是 1.5625× 双计。故这里只补包络夹取：mtk_cpu_util() 的
+ * min/max 出参 + mtk_eff_perf()（common.h，= 上式去掉 1.25）。
  * boost == 0 时该夹取与 mtk_cpu_util() 内部那次同源同界，是空操作。
  */
 static void sugov_get_util(struct sugov_cpu *sg_cpu, unsigned long boost)
@@ -587,7 +587,7 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu, unsigned long boost)
 	 */
 	util = max(util, boost);
 	sg_cpu->bw_min = min;
-	sg_cpu->util = max(min, min(util, max));
+	sg_cpu->util = mtk_eff_perf(util, min, max);
 #if IS_ENABLED(CONFIG_MTK_SCHED_GROUP_AWARE)
 	if (sugov_grp_awr_update_cpu_tar_util_hook && grp_dvfs_ctrl_mode)
 		sugov_grp_awr_update_cpu_tar_util_hook(sg_cpu->cpu);
