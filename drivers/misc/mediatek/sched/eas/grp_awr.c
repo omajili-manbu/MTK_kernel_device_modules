@@ -402,7 +402,13 @@ void grp_awr_update_cpu_tar_util(int cpu)
 {
 	struct flt_rq *fsrq;
 
-	if (grp_awr_init_finished == false)
+	/*
+	 * rodin 6.18（S0 补扫）：本函数挂到导出的
+	 * sugov_grp_awr_update_cpu_tar_util_hook 上，cpu 来自外部调用方；
+	 * per_cpu(flt_rq, cpu) 与后面的 pcpu_pgrp_tar_u[cpu] 都要求 cpu 合法。
+	 */
+	if (grp_awr_init_finished == false ||
+		cpu < 0 || cpu >= nr_cpu_ids)
 		return;
 	fsrq = &per_cpu(flt_rq, cpu);
 
@@ -507,6 +513,21 @@ int grp_awr_init(void)
 	unsigned int cpu_idx, grp_idx;
 
 	pr_info("group aware init\n");
+
+	/*
+	 * rodin 6.18（S0 补扫）：下面所有 per-CPU 表都按 FLT_NR_CPUS（=
+	 * CONFIG_MAX_NR_CPUS，本树 8）分配，而遍历用 for_each_possible_cpu
+	 * （上界是 nr_cpu_ids，不受 MAX_NR_CPUS 约束）⇒ 若 CPU 数超过
+	 * FLT_NR_CPUS，分配阶段就会数组越界写 kcalloc 块的下一行。gki_defconfig
+	 * 里的 8 是本批关键项（MAX_NR_CPUS = 本机 CPU 数），这里加一道断言
+	 * 把"换 DT 上更多核"这一情形挡住。
+	 */
+	if (nr_cpu_ids > FLT_NR_CPUS) {
+		pr_err("grp_awr: nr_cpu_ids %d > FLT_NR_CPUS %d, refuse to init\n",
+		       nr_cpu_ids, FLT_NR_CPUS);
+		return -ERANGE;
+	}
+
 	/* per cpu per group data*/
 	pcpu_pgrp_u = kcalloc(FLT_NR_CPUS, sizeof(int *), GFP_KERNEL);
 	pger_pgrp_u = kcalloc(FLT_NR_CPUS, sizeof(int *), GFP_KERNEL);
