@@ -171,7 +171,12 @@ _Static_assert(offsetof(struct mi_mempool, oom_use_failure_count) == 0x4c, "memp
 _Static_assert(offsetof(struct mi_mempool, whitelist_check_num) == 0x78, "mempool layout drift vs blob");
 _Static_assert(sizeof(struct proc_node) == 0x20, "proc_node layout drift vs blob");
 _Static_assert(offsetof(struct proc_node, pid) == 0x18, "proc_node layout drift vs blob");
-_Static_assert(PAGE_SHIFT == 12, "blob threshold arithmetic assumes 4K pages");
+/*
+ * blob 的阈值 sysfs 以“页数右移 8”当 MB 输出（4K 页语义）；这里按 PAGE_SHIFT
+ * 推导同一换算，4K 下与 blob 逐位等价，16K/64K 下仍是页数 -> MB。
+ */
+#define MI_PAGES_TO_MB_SHIFT (20 - PAGE_SHIFT)
+_Static_assert(MI_PAGES_TO_MB_SHIFT >= 0, "page size exceeds 1MB");
 
 static struct mi_mempool g_mi_mempool;
 static struct mi_mempool *pg_mi_mempool;
@@ -1093,14 +1098,16 @@ static ssize_t direct_reclaim_threshold_mb_show(struct kobject *kobj,
 		"# id = 0, modify try_to_free_pages_threshold, id = 1, modify direct_reclaim_threshold\n"
 		"# if try_to_free_pages_threshold == -1, then use max(try_to_free_pages_threshold, min_plus_10mb)\n");
 	len += snprintf(buf + len, PAGE_SIZE - len, "try_to_free_pages_threshold:%dmb\n",
-			(int)(pg_mi_mempool->try_to_free_pages_threshold >> 8));
+			(int)(pg_mi_mempool->try_to_free_pages_threshold >> MI_PAGES_TO_MB_SHIFT));
 	if (direct >= 0)
-		direct = (pg_mi_mempool->direct_reclaim_threshold >> 8) & 0xffffff;
+		direct = (pg_mi_mempool->direct_reclaim_threshold >> MI_PAGES_TO_MB_SHIFT) & 0xffffff;
 	len += snprintf(buf + len, PAGE_SIZE - len, "direct_reclaim_threshold:%dmb\n",
 			direct);
 	len += snprintf(buf + len, PAGE_SIZE - len,
 			"min:%dmb, low:%dmb, high:%dmb, min_plus_10mb:%dmb\n",
-			minimum >> 8, low >> 8, high >> 8, (minimum + 0xa00) >> 8);
+			minimum >> MI_PAGES_TO_MB_SHIFT, low >> MI_PAGES_TO_MB_SHIFT,
+			high >> MI_PAGES_TO_MB_SHIFT,
+			(minimum + (10 << MI_PAGES_TO_MB_SHIFT)) >> MI_PAGES_TO_MB_SHIFT);
 	return len;
 }
 
@@ -1114,7 +1121,7 @@ static ssize_t direct_reclaim_threshold_mb_store(struct kobject *kobj,
 		return -EINVAL;
 	if (id == 1) {
 		if (mb < -1 || (mb >= 0 && mb <
-		    (int)((pg_mi_mempool->try_to_free_pages_threshold >> 8) & 0xfffffffffffUL)))
+		    (int)((pg_mi_mempool->try_to_free_pages_threshold >> MI_PAGES_TO_MB_SHIFT) & 0xfffffffffffUL)))
 			return -EINVAL;
 		pg_mi_mempool->direct_reclaim_threshold = mb == -1 ?
 			~0UL : mb_to_pages(mb);
