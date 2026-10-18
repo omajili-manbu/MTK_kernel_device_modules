@@ -1620,6 +1620,7 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct mtk_dvfsrc *dvfsrc;
 	int ret;
+	int irq;
 #ifdef DVFSRC_PROPERTY_ENABLE
 	u32 is_bringup = 0;
 	u32 dvfsrc_flag = 0;
@@ -1689,14 +1690,23 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 	if (dvfsrc->dvd->num_domains)
 		pstate_notifier_register(dvfsrc);
 
-	ret = devm_request_threaded_irq(dvfsrc->dev, platform_get_irq(pdev, 0),
-					NULL, mtk_dvfsrc_irq_handler_thread,
-					IRQF_ONESHOT | IRQF_TRIGGER_NONE,
-					"dvfsrc", dvfsrc);
-	if (!ret) {
-		dvfsrc->irq_counter = 0;
-		dvfsrc_write(dvfsrc, DVFSRC_INT_EN, dvfsrc_read(dvfsrc, DVFSRC_INT_EN) | 0x2);
-		dev_info(dvfsrc->dev, "DVFSRC IRQ Enable\n");
+	irq = platform_get_irq_optional(pdev, 0);
+	if (irq == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
+
+	if (irq > 0) {
+		ret = devm_request_threaded_irq(dvfsrc->dev, irq,
+						NULL, mtk_dvfsrc_irq_handler_thread,
+						IRQF_ONESHOT | IRQF_TRIGGER_NONE,
+						"dvfsrc", dvfsrc);
+		if (!ret) {
+			dvfsrc->irq_counter = 0;
+			dvfsrc_write(dvfsrc, DVFSRC_INT_EN,
+				     dvfsrc_read(dvfsrc, DVFSRC_INT_EN) | 0x2);
+			dev_info(dvfsrc->dev, "DVFSRC IRQ Enable\n");
+		}
+	} else {
+		dev_info(dvfsrc->dev, "no IRQ in DT, skip\n");
 	}
 
 	dvfsrc->regulator = platform_device_register_data(dvfsrc->dev,
