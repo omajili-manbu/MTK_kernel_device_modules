@@ -274,7 +274,7 @@ static long memory_send(bool share, bool involve_sp,
 		 * have a single page and consume the maximum space possible in the
 		 * memory region descriptor.
 		 */
-		__u64 va = (__u64)mem_region + ((__u64)index * 2 * 4096);
+		__u64 va = (__u64)mem_region + ((__u64)index * 2 * PAGE_SIZE);
 
 		pages[index] = virt_to_page(va);
 		FFA_DEBUG("Page: %d at 0x%p (0x%llx)\n", index,
@@ -282,7 +282,7 @@ static long memory_send(bool share, bool involve_sp,
 	}
 	retval = sg_alloc_table_from_pages(&sgt, pages,
 				  page_entries, 0,
-				  page_entries * 4096, GFP_KERNEL);
+				  page_entries * PAGE_SIZE, GFP_KERNEL);
 	if (retval) {
 		FFA_ERR("sg_alloc_table_from_pages failed, ret=%d %s:%d\n", retval,
 			   __FILE__, __LINE__);
@@ -427,7 +427,7 @@ static int ffa_memory_send_write(struct args *args, void * __user user_args)
 
 	ptr = ffa_memory_ptr;
 	for (i = 0; i < mem_size; i++)
-		ptr[i] = i / 4096;
+		ptr[i] = i / PAGE_SIZE;
 
 	args->arg[4] = ffa_memory_handle;
 	if (user_args != NULL) {
@@ -618,10 +618,10 @@ static int gz_ffa_memory_reclaim(struct args *args)
 	 *		for (i = 0; i < share_memory_size; i++) {
 	 *			* Only even pages are set to share, so only even pages are cleared,
 	 *			 * while the odd pages is kept the value of CA's *
-	 *			if (i / 4096 % 2 == 0)
+	 *			if (i / PAGE_SIZE % 2 == 0)
 	 *				v = 0x00;
 	 *			else
-	 *				v = i / 4096;
+	 *				v = i / PAGE_SIZE;
 	 *			if (ptr[i] != v) {
 	 *				FFA_ERR("%s %d Test failed on ptr[%u],
 	 *						expect=%x, real=%x\n", __func__,
