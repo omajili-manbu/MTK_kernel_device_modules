@@ -284,7 +284,7 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		nr_pages = (addr_end-addr_start)>>PAGE_SHIFT;
 		phys_addr = __pa_symbol((void *)addr_start);
 		policy = MKP_POLICY_KERNEL_CODE;
-		handle = mkp_create_handle(policy, (unsigned long)phys_addr, nr_pages<<12);
+		handle = mkp_create_handle(policy, (unsigned long)phys_addr, nr_pages << PAGE_SHIFT);
 		if (handle == 0) {
 			MKP_ERR("%s:%d: Create handle fail\n", __func__, __LINE__);
 		} else {
@@ -315,7 +315,7 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		nr_pages = (addr_end-addr_start)>>PAGE_SHIFT;
 		phys_addr = __pa_symbol((void *)addr_start);
 		policy = MKP_POLICY_KERNEL_RODATA;
-		handle = mkp_create_handle(policy, (unsigned long)phys_addr, nr_pages<<12);
+		handle = mkp_create_handle(policy, (unsigned long)phys_addr, nr_pages << PAGE_SHIFT);
 		if (handle == 0)
 			MKP_ERR("%s:%d: Create handle fail\n", __func__, __LINE__);
 		else {
