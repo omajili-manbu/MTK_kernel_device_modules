@@ -44,7 +44,7 @@ MODULE_PARM_DESC(path, "Vendor firmware directory used as the mount gate");
 module_param_named(timeout_ms, rodin_fw_gate_timeout_ms, uint, 0644);
 MODULE_PARM_DESC(timeout_ms, "Milliseconds to wait for the vendor firmware directory");
 
-static struct completion rodin_fw_gate_done;
+static DECLARE_COMPLETION(rodin_fw_gate_done);
 static atomic_t rodin_fw_gate_state = ATOMIC_INIT(RODIN_FW_GATE_CLOSED);
 static void rodin_fw_gate_poll(struct work_struct *work);
 static DECLARE_DELAYED_WORK(rodin_fw_gate_work, rodin_fw_gate_poll);
