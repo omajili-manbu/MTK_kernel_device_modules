@@ -116,6 +116,8 @@ static int aputop_pwr_off_rpm_cb(struct device *dev)
 
 static int apu_top_probe(struct platform_device *pdev)
 {
+	int ret;
+
 	dev_info(&pdev->dev, "%s +\n", __func__);
 	pwr_data = of_device_get_match_data(&pdev->dev);
 
@@ -131,7 +133,16 @@ static int apu_top_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 
-	return pwr_data->plat_aputop_pb(pdev);
+	ret = pwr_data->plat_aputop_pb(pdev);
+	if (ret) {
+		dev_info(&pdev->dev,
+			 "%s: early init failed %d, defer until dependencies ready\n",
+			 __func__, ret);
+		pm_runtime_disable(&pdev->dev);
+		return -EPROBE_DEFER;
+	}
+
+	return 0;
 }
 
 static void apu_top_remove(struct platform_device *pdev) /* rodin: 6.18 remove void */{
