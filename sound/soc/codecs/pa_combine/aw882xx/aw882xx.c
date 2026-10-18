@@ -14,6 +14,7 @@
 
 /*#define DEBUG*/
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -2633,7 +2634,7 @@ static int __init aw882xx_i2c_init(void)
 	aw_pr_info("aw882xx i2c init done %s", AW882XX_DRIVER_VERSION);
 	return ret;
 }
-module_init(aw882xx_i2c_init);
+vseq_module_init(aw882xx_i2c_init);
 
 
 static void __exit aw882xx_i2c_exit(void)
