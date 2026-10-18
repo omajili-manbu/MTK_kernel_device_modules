@@ -18930,8 +18930,8 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
 		cb_data->msync2_enable = 1;
 
 		DDPDBG("[Msync]cmdq pkt size = %zu\n", cmdq_handle->cmd_buf_size);
-		if (cmdq_handle->cmd_buf_size >= 4096) {
-			/*ToDo: if larger than 4096 need consider change pages*/
+		if (cmdq_handle->cmd_buf_size >= PAGE_SIZE) {
+			/*ToDo: if larger than PAGE_SIZE need consider change pages*/
 			DDPPR_ERR("[Msync]cmdq pkt size = %zu\n", cmdq_handle->cmd_buf_size);
 		}
 	}
