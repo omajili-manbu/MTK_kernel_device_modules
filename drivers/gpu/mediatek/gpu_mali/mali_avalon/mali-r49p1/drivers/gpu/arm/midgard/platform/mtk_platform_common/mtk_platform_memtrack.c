@@ -134,7 +134,7 @@ static unsigned int mtk_memtrack_gpu_memory_total(void)
 
 	used_pages = atomic_read(&(kbdev->memdev.used_pages));
 
-	return used_pages * 4096;
+	return used_pages << PAGE_SHIFT;
 }
 
 int mtk_memtrack_init(struct kbase_device *kbdev)
