@@ -10,6 +10,8 @@
 #include <linux/rtc.h>
 #include <linux/sched/clock.h>
 #include <linux/regulator/consumer.h>
+#include <linux/notifier.h>
+#include <linux/workqueue.h>
 #include <mtk_low_battery_throttling.h>
 #include <mtk_battery_oc_throttling.h>
 #include <mtk_peak_power_budget_mbrain.h>
@@ -33,6 +35,7 @@
 
 #if IS_ENABLED(CONFIG_MTK_SWPM_MODULE)
 
+#include <swpm_module.h>
 #include <swpm_module_psp.h>
 
 #include "mbraink_sys_res_mbrain_dbg.h"
@@ -745,6 +748,41 @@ static int mbraink_v6899_power_get_pmic_voltage_info(
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_MTK_SWPM_MODULE)
+static bool mbraink_sys_res_swpm_retried;
+
+static int mbraink_sys_res_swpm_event(struct notifier_block *nb,
+				      unsigned long val, void *v);
+static struct notifier_block mbraink_sys_res_swpm_nb = {
+	.notifier_call = mbraink_sys_res_swpm_event,
+};
+
+static void mbraink_sys_res_swpm_retry(struct work_struct *work)
+{
+	int ret = mbraink_sys_res_plat_init();
+
+	if (!ret)
+		ret = mbraink_sys_res_mbrain_plat_init();
+	if (!ret)
+		pr_info("[Mbraink][SPM] sys_res ready after swpm init\n");
+	else
+		pr_info("[Mbraink][SPM] sys_res retry after swpm init failed (%d)\n", ret);
+	swpm_unregister_event_notifier(&mbraink_sys_res_swpm_nb);
+}
+static DECLARE_WORK(mbraink_sys_res_swpm_work, mbraink_sys_res_swpm_retry);
+
+static int mbraink_sys_res_swpm_event(struct notifier_block *nb,
+				      unsigned long val, void *v)
+{
+	if (val != SWPM_INIT_DONE_NOTIFY || mbraink_sys_res_swpm_retried)
+		return NOTIFY_OK;
+
+	mbraink_sys_res_swpm_retried = true;
+	schedule_work(&mbraink_sys_res_swpm_work);
+	return NOTIFY_OK;
+}
+#endif
+
 static int mbraink_v6899_power_sys_res_init(void)
 {
 	int ret = 0;
@@ -752,10 +790,13 @@ static int mbraink_v6899_power_sys_res_init(void)
 	ret = mbraink_sys_res_plat_init();
 	if (!ret)
 		ret = mbraink_sys_res_mbrain_plat_init();
-	else
-		return -1;
+	if (!ret)
+		return 0;
 
-	return 0;
+#if IS_ENABLED(CONFIG_MTK_SWPM_MODULE)
+	swpm_register_event_notifier(&mbraink_sys_res_swpm_nb);
+#endif
+	return -1;
 }
 
 static int mbraink_v6899_power_sys_res_deinit(void)

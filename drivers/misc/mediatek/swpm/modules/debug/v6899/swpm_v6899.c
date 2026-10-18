@@ -41,6 +41,7 @@ struct share_wrap *wrap_d;
  *  Local Variables
  ****************************************************************************/
 static unsigned int swpm_init_state;
+static bool swpm_init_done_notified;
 static void swpm_init_retry(struct work_struct *work);
 static struct workqueue_struct *swpm_init_retry_work_queue;
 DECLARE_WORK(swpm_init_retry_work, swpm_init_retry);
@@ -126,8 +127,13 @@ static void swpm_init_retry(struct work_struct *work)
 		swpm_pass_to_sspm();
 #endif
 	/* check swpm_init_state again since it could be changed in swpm_pass_to_sspm() */
-	if (swpm_init_state)
+	if (swpm_init_state) {
 		swpm_v6899_ext_init();
+		if (!swpm_init_done_notified) {
+			swpm_init_done_notified = true;
+			swpm_call_event_notifier(SWPM_INIT_DONE_NOTIFY, NULL);
+		}
+	}
 }
 
 static void swpm_log_loop(struct timer_list *t)

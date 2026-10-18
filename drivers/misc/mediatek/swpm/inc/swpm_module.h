@@ -93,6 +93,7 @@ enum swpm_ext_cmd_type {
 
 enum swpm_notifier_event {
 	SWPM_LOG_DATA_NOTIFY,
+	SWPM_INIT_DONE_NOTIFY,
 
 	NR_SWPM_NOTIFIER_EVENT,
 };

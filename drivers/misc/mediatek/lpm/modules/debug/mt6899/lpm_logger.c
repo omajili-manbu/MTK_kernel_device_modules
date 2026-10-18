@@ -16,6 +16,8 @@
 #include <linux/syscore_ops.h>
 #include <linux/suspend.h>
 #include <linux/spinlock.h>
+#include <linux/notifier.h>
+#include <linux/workqueue.h>
 
 #include <lpm.h>
 #include <lpm_module.h>
@@ -31,6 +33,9 @@
 #include <lpm_timer.h>
 #include <mtk_lpm_sysfs.h>
 #include <mtk_cpupm_dbg.h>
+#if IS_ENABLED(CONFIG_MTK_SWPM_MODULE)
+#include <swpm_module.h>
+#endif
 #if IS_ENABLED(CONFIG_MTK_SYS_RES_DBG_SUPPORT)
 #include <lpm_sys_res.h>
 #include <lpm_sys_res_plat.h>
@@ -912,6 +917,37 @@ static struct lpm_logger_mbrain_dbg_ops lpm_logger_mbrain_ops = {
 	.get_last_suspend_wakesrc = lpm_get_last_suspend_wakesrc,
 };
 
+#if IS_ENABLED(CONFIG_MTK_SWPM_MODULE)
+static bool lpm_sys_res_swpm_retried;
+
+static int lpm_sys_res_swpm_event(struct notifier_block *nb,
+				  unsigned long val, void *v);
+static struct notifier_block lpm_sys_res_swpm_nb = {
+	.notifier_call = lpm_sys_res_swpm_event,
+};
+
+static void lpm_sys_res_swpm_retry(struct work_struct *work)
+{
+	if (!lpm_sys_res_plat_init())
+		pr_info("[name:spm&][SPM] sys_res ready after swpm init\n");
+	else
+		pr_info("[name:spm&][SPM] sys_res retry after swpm init failed\n");
+	swpm_unregister_event_notifier(&lpm_sys_res_swpm_nb);
+}
+static DECLARE_WORK(lpm_sys_res_swpm_work, lpm_sys_res_swpm_retry);
+
+static int lpm_sys_res_swpm_event(struct notifier_block *nb,
+				  unsigned long val, void *v)
+{
+	if (val != SWPM_INIT_DONE_NOTIFY || lpm_sys_res_swpm_retried)
+		return NOTIFY_OK;
+
+	lpm_sys_res_swpm_retried = true;
+	schedule_work(&lpm_sys_res_swpm_work);
+	return NOTIFY_OK;
+}
+#endif
+
 static int __init mt6899_dbg_device_initcall(void)
 {
 	int ret;
@@ -925,8 +961,12 @@ static int __init mt6899_dbg_device_initcall(void)
 	lpm_spm_fs_init(pwr_ctrl_str, PW_MAX_COUNT);
 #if IS_ENABLED(CONFIG_MTK_SYS_RES_DBG_SUPPORT)
 	ret = lpm_sys_res_plat_init();
-	if(ret)
+	if (ret) {
 		pr_info("[name:spm&][SPM] Failed to init sys_res plat\n");
+#if IS_ENABLED(CONFIG_MTK_SWPM_MODULE)
+		swpm_register_event_notifier(&lpm_sys_res_swpm_nb);
+#endif
+	}
 #endif
 
 	ret = register_lpm_logger_mbrain_dbg_ops(&lpm_logger_mbrain_ops);
