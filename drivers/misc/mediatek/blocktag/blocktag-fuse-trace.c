@@ -192,19 +192,23 @@ static u64 total_unlink_cnt, prev_total_unlink_cnt;
 #endif
 static DEFINE_SPINLOCK(stat_lock);
 
-static void btag_fuse_queue_request_and_unlock(void *data,
-		struct wait_queue_head *wq, bool sync)
+static void btag_fuse_request_send(void *data, const struct fuse_req *req)
 {
-	struct fuse_iqueue *fiq = container_of(wq, struct fuse_iqueue, waitq);
-	struct fuse_req *rq = (struct fuse_req *)fiq->pending.prev;
-	u32 opcode = rq->in.h.opcode & FUSE_OPCODE_FILTER;
-	u32 filter = rq->in.h.opcode & ~FUSE_OPCODE_FILTER;
+	const struct fuse_req *rq = req;
+	u32 opcode;
+	u32 filter;
 	struct btag_fuse_entry *e;
 	unsigned long flags;
 	unsigned int idx;
 #if IS_ENABLED(CONFIG_CGROUP_SCHED)
 	struct cgroup *grp;
 #endif
+
+	if (!rq)
+		return;
+
+	opcode = rq->in.h.opcode & FUSE_OPCODE_FILTER;
+	filter = rq->in.h.opcode & ~FUSE_OPCODE_FILTER;
 
 	spin_lock_irqsave(&fuse_log.lock, flags);
 	if (fuse_log.enable) {
@@ -372,8 +376,8 @@ struct tracepoints_table {
 
 static struct tracepoints_table interests[] = {
 	{
-		.name = "android_vh_queue_request_and_unlock",
-		.func = btag_fuse_queue_request_and_unlock
+		.name = "fuse_request_send",
+		.func = btag_fuse_request_send
 	},
 };
 
@@ -410,11 +414,11 @@ static int install_tracepoints(void)
 
 	FOR_EACH_INTEREST(i) {
 		if (interests[i].tp == NULL) {
-			pr_info("tracepoints %s not found\n",
+			pr_info("tracepoint %s not found, feature disabled\n",
 				interests[i].name);
 			/* Unload previously loaded */
 			uninstall_tracepoints();
-			return -EINVAL;
+			return 0;
 		}
 
 		tracepoint_probe_register(interests[i].tp,
