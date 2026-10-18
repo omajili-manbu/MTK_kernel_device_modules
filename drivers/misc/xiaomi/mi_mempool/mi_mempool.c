@@ -168,7 +168,14 @@ _Static_assert(offsetof(struct mi_mempool, try_to_free_pages_threshold) == 0x20,
 _Static_assert(offsetof(struct mi_mempool, wakeup_lock) == 0x34, "mempool layout drift vs blob");
 _Static_assert(offsetof(struct mi_mempool, config) == 0x3c, "mempool layout drift vs blob");
 _Static_assert(offsetof(struct mi_mempool, oom_use_failure_count) == 0x4c, "mempool layout drift vs blob");
+/*
+ * blob 偏移锚只在 4K 页配置（MAX_PAGE_ORDER=10 ⇒ ORDER_COUNT=11）下成立：
+ * 16K 页内核 ORDER_COUNT=12，oom_use_failure_count[] 多一个 atomic_t，
+ * whitelist_check_num 及其后字段整体后移 4 字节。
+ */
+#if ORDER_COUNT == 11
 _Static_assert(offsetof(struct mi_mempool, whitelist_check_num) == 0x78, "mempool layout drift vs blob");
+#endif
 _Static_assert(sizeof(struct proc_node) == 0x20, "proc_node layout drift vs blob");
 _Static_assert(offsetof(struct proc_node, pid) == 0x18, "proc_node layout drift vs blob");
 /*
@@ -718,8 +725,9 @@ static void mi_mempool_alloc_oom(void *unused, gfp_t gfp_mask, int order,
 		}
 	}
 	if (!*page) {
-		/* stock bound permits order 11, aliasing whitelist_check_num */
-		if (order == ORDER_COUNT)
+	/* stock bound permits order 11, aliasing whitelist_check_num; 16K 页下
+	 * ORDER_COUNT=12，order 11 落回数组内，别名分支自然消失 */
+	if (order == ORDER_COUNT)
 			atomic_inc(&pg_mi_mempool->whitelist_check_num);
 		else if (order >= 0 && order < ORDER_COUNT)
 			atomic_inc(&pg_mi_mempool->oom_use_failure_count[order]);
