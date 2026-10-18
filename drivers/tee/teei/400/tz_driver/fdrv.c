@@ -40,10 +40,10 @@ int create_fdrv(struct teei_fdrv *fdrv)
 
 #ifdef UT_DMA_ZONE
 	temp_addr = (unsigned long) __get_free_pages(GFP_KERNEL | GFP_DMA,
-				get_order(ROUND_UP(fdrv->buff_size, SZ_4K)));
+				get_order(ROUND_UP(fdrv->buff_size, PAGE_SIZE)));
 #else
 	temp_addr = (unsigned long) __get_free_pages(GFP_KERNEL,
-				get_order(ROUND_UP(fdrv->buff_size, SZ_4K)));
+				get_order(ROUND_UP(fdrv->buff_size, PAGE_SIZE)));
 #endif
 	if ((unsigned char *)temp_addr == NULL) {
 		IMSG_ERROR("[%s][%d]: Faile to alloc fdrv buffer failed.\n",
@@ -76,7 +76,7 @@ int create_fdrv(struct teei_fdrv *fdrv)
 
 free_memory:
 	free_pages((unsigned long)temp_addr,
-			get_order(ROUND_UP(fdrv->buff_size, SZ_4K)));
+			get_order(ROUND_UP(fdrv->buff_size, PAGE_SIZE)));
 
 	return retVal;
 }

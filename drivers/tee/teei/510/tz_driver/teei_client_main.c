@@ -269,10 +269,10 @@ void *tz_malloc_shared_mem(size_t size, int flags)
 {
 #ifdef UT_DMA_ZONE
 	return (void *) __get_free_pages(flags | GFP_DMA,
-					get_order(ROUND_UP(size, SZ_4K)));
+					get_order(ROUND_UP(size, PAGE_SIZE)));
 #else
 	return (void *) __get_free_pages(flags,
-					get_order(ROUND_UP(size, SZ_4K)));
+					get_order(ROUND_UP(size, PAGE_SIZE)));
 #endif
 }
 
@@ -595,10 +595,10 @@ static int init_teei_framework(void)
 
 #ifdef UT_DMA_ZONE
 	boot_vfs_addr = (unsigned long)__get_free_pages(GFP_KERNEL | GFP_DMA,
-					get_order(ROUND_UP(VFS_SIZE, SZ_4K)));
+					get_order(ROUND_UP(VFS_SIZE, PAGE_SIZE)));
 #else
 	boot_vfs_addr = (unsigned long) __get_free_pages(GFP_KERNEL,
-					get_order(ROUND_UP(VFS_SIZE, SZ_4K)));
+					get_order(ROUND_UP(VFS_SIZE, PAGE_SIZE)));
 #endif
 	if ((unsigned char *)boot_vfs_addr == NULL)
 		return TEEI_BOOT_ERROR_CREATE_VFS_ADDR;
@@ -630,7 +630,7 @@ static int init_teei_framework(void)
 
 	TEEI_BOOT_FOOTPRINT("TEEI BOOT Stage1 Completed");
 
-	order = get_order(ROUND_UP(VFS_SIZE, SZ_4K));
+	order = get_order(ROUND_UP(VFS_SIZE, PAGE_SIZE));
 	free_pages(boot_vfs_addr, order);
 
 	boot_soter_flag = END_STATUS;
@@ -751,7 +751,7 @@ static long teei_alloc_shm_handle(unsigned long arg)
 	size = param.size;
 
 	shm_buff = (void *)__get_free_pages(GFP_KERNEL,
-					get_order(ROUND_UP(size, SZ_4K)));
+					get_order(ROUND_UP(size, PAGE_SIZE)));
 	if (shm_buff == NULL) {
 		IMSG_ERROR("Failed to alloc shm!\n");
 		retVal = -ENOMEM;
@@ -767,7 +767,7 @@ static long teei_alloc_shm_handle(unsigned long arg)
 
 #ifdef TEEI_FFA_SUPPORT
 	retVal = soter_ffa_shm_register((unsigned long)virt_to_page(shm_buff),
-				ROUND_UP(size, SZ_4K), 0,
+				ROUND_UP(size, PAGE_SIZE), 0,
 				&handle_id);
 	if (retVal != 0) {
 		IMSG_ERROR("Failed to register shm, retVal = %d\n", retVal);
@@ -778,7 +778,7 @@ static long teei_alloc_shm_handle(unsigned long arg)
 
 	INIT_LIST_HEAD(&(entry->list));
 	entry->handle_id = handle_id;
-	entry->size = ROUND_UP(size, SZ_4K);
+	entry->size = ROUND_UP(size, PAGE_SIZE);
 	entry->addr = (unsigned long)shm_buff;
 
 	mutex_lock(&shm_handle_mutex);
@@ -807,7 +807,7 @@ free_list:
 #endif
 
 free_shm_buff:
-	free_pages((unsigned long)shm_buff, get_order(ROUND_UP(size, SZ_4K)));
+	free_pages((unsigned long)shm_buff, get_order(ROUND_UP(size, PAGE_SIZE)));
 
 out:
 	return retVal;
@@ -854,7 +854,7 @@ static long teei_release_shm_handle(unsigned long arg)
 	soter_ffa_reclaim_buffer(handle_id);
 #endif
 
-	free_pages((unsigned long)shm_buff, get_order(ROUND_UP(size, SZ_4K)));
+	free_pages((unsigned long)shm_buff, get_order(ROUND_UP(size, PAGE_SIZE)));
 
 	kfree(entry);
 

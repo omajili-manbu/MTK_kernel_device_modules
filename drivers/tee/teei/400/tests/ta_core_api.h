@@ -138,9 +138,9 @@ extern int compare_array_with_pattern(unsigned char *buffer,
 #define free kfree
 #define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 #define tz_malloc(size) __get_free_pages(GFP_KERNEL, \
-					get_order(ROUND_UP(size, SZ_4K)))
+					get_order(ROUND_UP(size, PAGE_SIZE)))
 #define tz_free(addr, size) free_pages((unsigned long)addr, \
-					get_order(ROUND_UP(size, SZ_4K)))
+					get_order(ROUND_UP(size, PAGE_SIZE)))
 extern int case_res;
 
 #define UNUSED(x) ((void)(x))

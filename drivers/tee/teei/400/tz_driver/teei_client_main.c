@@ -263,16 +263,16 @@ void *tz_malloc_shared_mem(size_t size, int flags)
 {
 #ifdef UT_DMA_ZONE
 	return (void *) __get_free_pages(flags | GFP_DMA,
-					get_order(ROUND_UP(size, SZ_4K)));
+					get_order(ROUND_UP(size, PAGE_SIZE)));
 #else
 	return (void *) __get_free_pages(flags,
-					get_order(ROUND_UP(size, SZ_4K)));
+					get_order(ROUND_UP(size, PAGE_SIZE)));
 #endif
 }
 
 void tz_free_shared_mem(void *addr, size_t size)
 {
-	free_pages((unsigned long)addr, get_order(ROUND_UP(size, SZ_4K)));
+	free_pages((unsigned long)addr, get_order(ROUND_UP(size, PAGE_SIZE)));
 }
 
 int teei_move_cpu_context(int target_cpu_id, int original_cpu_id)
@@ -540,10 +540,10 @@ static int init_teei_framework(void)
 
 #ifdef UT_DMA_ZONE
 	boot_vfs_addr = (unsigned long)__get_free_pages(GFP_KERNEL | GFP_DMA,
-					get_order(ROUND_UP(VFS_SIZE, SZ_4K)));
+					get_order(ROUND_UP(VFS_SIZE, PAGE_SIZE)));
 #else
 	boot_vfs_addr = (unsigned long) __get_free_pages(GFP_KERNEL,
-					get_order(ROUND_UP(VFS_SIZE, SZ_4K)));
+					get_order(ROUND_UP(VFS_SIZE, PAGE_SIZE)));
 #endif
 	if ((unsigned char *)boot_vfs_addr == NULL)
 		return TEEI_BOOT_ERROR_CREATE_VFS_ADDR;
@@ -563,7 +563,7 @@ static int init_teei_framework(void)
 
 	TEEI_BOOT_FOOTPRINT("TEEI BOOT Stage1 Completed");
 
-	free_pages(boot_vfs_addr, get_order(ROUND_UP(VFS_SIZE, SZ_4K)));
+	free_pages(boot_vfs_addr, get_order(ROUND_UP(VFS_SIZE, PAGE_SIZE)));
 
 	boot_soter_flag = END_STATUS;
 	if (soter_error_flag == 1)

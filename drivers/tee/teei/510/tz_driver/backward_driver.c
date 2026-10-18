@@ -61,10 +61,10 @@ static long register_shared_param_buf(struct service_handler *handler)
 
 #ifdef UT_DMA_ZONE
 	handler->param_buf = (void *)__get_free_pages(GFP_KERNEL | GFP_DMA,
-				get_order(ROUND_UP(handler->size, SZ_4K)));
+				get_order(ROUND_UP(handler->size, PAGE_SIZE)));
 #else
 	handler->param_buf = (void *)__get_free_pages(GFP_KERNEL,
-				get_order(ROUND_UP(handler->size, SZ_4K)));
+				get_order(ROUND_UP(handler->size, PAGE_SIZE)));
 #endif
 	if ((unsigned char *)(handler->param_buf) == NULL) {
 		IMSG_ERROR("[%s][%d]: kmalloc vdrv_buffer failed.\n",
@@ -74,7 +74,7 @@ static long register_shared_param_buf(struct service_handler *handler)
 #ifdef TEEI_FFA_SUPPORT
 	retVal = soter_ffa_shm_register(
 				(unsigned long)virt_to_page(handler->param_buf),
-				ROUND_UP(handler->size, SZ_4K), 0, &shared_ID);
+				ROUND_UP(handler->size, PAGE_SIZE), 0, &shared_ID);
 	if (retVal != 0) {
 		IMSG_ERROR("[%s][%d]Failed to register memory from ff-a!\n",
 						__func__, __LINE__);
@@ -116,7 +116,7 @@ static long register_shared_param_buf(struct service_handler *handler)
 free_memory:
 	/* Release the resource and return. */
 	free_pages((unsigned long)(handler->param_buf),
-				get_order(ROUND_UP(handler->size, SZ_4K)));
+				get_order(ROUND_UP(handler->size, PAGE_SIZE)));
 	handler->param_buf = NULL;
 
 	return retVal;

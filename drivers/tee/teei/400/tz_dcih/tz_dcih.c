@@ -124,10 +124,10 @@ int tz_create_share_buffer(unsigned int driver_id, unsigned int buff_size)
 
 #ifdef UT_DMA_ZONE
 	tmp_addr = __get_free_pages(GFP_KERNEL | GFP_DMA,
-					get_order(ROUND_UP(buff_size, SZ_4K)));
+					get_order(ROUND_UP(buff_size, PAGE_SIZE)));
 #else
 	tmp_addr = __get_free_pages(GFP_KERNEL,
-					get_order(ROUND_UP(buff_size, SZ_4K)));
+					get_order(ROUND_UP(buff_size, PAGE_SIZE)));
 #endif
 	if ((void *)tmp_addr == NULL) {
 		IMSG_ERROR("failed to get free pages from linux kernel\n");
@@ -154,7 +154,7 @@ int tz_create_share_buffer(unsigned int driver_id, unsigned int buff_size)
 
 fail:
 	if (tmp_addr)
-		free_pages(tmp_addr, get_order(ROUND_UP(buff_size, SZ_4K)));
+		free_pages(tmp_addr, get_order(ROUND_UP(buff_size, PAGE_SIZE)));
 
 	kfree(info);
 	return ret;
@@ -177,7 +177,7 @@ int tz_free_share_buffer(unsigned int driver_id)
 
 	if (info->virt_addr)
 		free_pages(info->virt_addr,
-				get_order(ROUND_UP(info->buf_size, SZ_4K)));
+				get_order(ROUND_UP(info->buf_size, PAGE_SIZE)));
 
 	list_del(&info->list);
 	kfree(info);
