@@ -81,3 +81,6 @@ obj-$(CONFIG_MTK_MMDVFS) += mtk-mmdvfs-v3.o
 endif
 obj-$(CONFIG_DEVICE_MODULES_MTK_MMSYS) += mtk-mutex.o
 obj-$(CONFIG_MTK_SOCINFO) += mtk-socinfo.o
+
+# rodin A-119: shared gate for built-in drivers that load files from /vendor
+obj-y += rodin_vendor_fw.o

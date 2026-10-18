@@ -23,6 +23,7 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/firmware.h>
+#include <linux/rodin_vendor_fw.h>
 #include <linux/debugfs.h>
 #include <linux/version.h>
 #include <linux/workqueue.h>
@@ -842,6 +843,13 @@ static void aw882xx_request_firmware(struct work_struct *work)
 	}
 
 	aw882xx->fw_status = AW_DEV_FW_FAILED;
+	/*
+	 * The built-in codec probe can run before first-stage init
+	 * mounts /vendor.  Wait for the shared firmware gate here
+	 * (work context) instead of spending the retry budget on
+	 * -ENOENT.
+	 */
+	rodin_vendor_fw_wait();
 	ret = request_firmware(&cont, acf_bin_name, aw882xx->dev);
 	if ((ret) || (!cont)) {
 		aw_dev_info(aw882xx->dev, "load [%s] failed!", acf_bin_name);
@@ -1471,7 +1479,19 @@ static void aw882xx_add_widgets(struct aw882xx *aw882xx)
 static void aw882xx_load_fw(struct aw882xx *aw882xx)
 {
 #if defined (AW_QCOM_PLATFORM) || defined (AW_SYNC_LOAD)
-	aw882xx_request_firmware(&aw882xx->fw_work.work);
+	/*
+	 * A synchronous load is fine once the vendor partition is
+	 * up, but the built-in probe may run before first-stage init
+	 * mounts it.  Never block the probe on that mount: hand the
+	 * load to the driver workqueue, which waits on the shared
+	 * firmware gate instead.
+	 */
+	if (rodin_vendor_fw_ready()) {
+		aw882xx_request_firmware(&aw882xx->fw_work.work);
+		return;
+	}
+	queue_delayed_work(aw882xx->work_queue, &aw882xx->fw_work,
+			msecs_to_jiffies(AW882XX_LOAD_FW_DELAY_TIME));
 #else
 	queue_delayed_work(aw882xx->work_queue,
 			&aw882xx->fw_work,
