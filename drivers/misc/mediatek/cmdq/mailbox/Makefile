@@ -48,7 +48,9 @@ ccflags-y += -DCMDQ_DCACHE_INVAL
 obj-$(CONFIG_MTK_CMDQ_MBOX_EXT) += mtk-cmdq-drv-ext.o
 mtk-cmdq-drv-ext-y := mtk-cmdq-mailbox-ext.o mtk-cmdq-helper-ext.o cmdq-util.o
 
-obj-$(CONFIG_MTK_CMDQ_MBOX_EXT) += cmdq-test.o
+# rodin: cmdq-test 是纯测试驱动，6.6 以 .ko 形态从未加载；
+# 内建后 probe 真跑并报缺测试时钟，停编该对象。
+#obj-$(CONFIG_MTK_CMDQ_MBOX_EXT) += cmdq-test.o
 
 ifeq ($(CONFIG_MTK_CMDQ_MBOX_EXT), y)
 obj-$(CONFIG_MTK_CMDQ_MBOX_EXT_MT6768) += cmdq-platform-mt6768.o
