@@ -697,7 +697,7 @@ static int monitor_get_pmsg(void)
 
 	pr_info(">>>enter  %s: line: 489.\n", __func__);
 
-	npages = (size + (base & 0xfff) + 0xfff) >> 12;
+	npages = (size + offset_in_page(base) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	arr = kmalloc_array(npages, sizeof(*arr), GFP_KERNEL);
 	if (!arr) {
 		pr_err("%s: Failed to allocate array for %u pages\n", "ram_vmap",
@@ -710,7 +710,7 @@ static int monitor_get_pmsg(void)
 	va = vmap(arr, npages, VM_MAP | VM_IOREMAP, PAGE_KERNEL);
 	kfree(arr);
 
-	off = base & 0xfff;
+	off = offset_in_page(base);
 	sig = *(u32 *)(va + off);
 	if (sig != BM_PMSG_SIG) {
 		pr_err("<monitor info>mtdoops: read pmsg failed sig = 0x%x \n",
