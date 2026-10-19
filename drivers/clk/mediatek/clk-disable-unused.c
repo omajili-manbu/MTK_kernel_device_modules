@@ -39,7 +39,7 @@ static int disable_unused_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 	retval = pm_runtime_get_sync(&pdev->dev);
-	pr_notice("disable-unused %s: get_sync=%d pm_domain=%d\n",
+	pr_debug("disable-unused %s: get_sync=%d pm_domain=%d\n",
 			dev_name(&pdev->dev), retval,
 			pdev->dev.pm_domain ? 1 : 0);
 	for (i = 0; i < clk_con; i++) {
@@ -48,7 +48,7 @@ static int disable_unused_probe(struct platform_device *pdev)
 			long ret = PTR_ERR(clk);
 
 			if (ret == -EPROBE_DEFER)
-				pr_notice("clk [%d] is not ready\n", i);
+				pr_debug("clk [%d] is not ready\n", i);
 			else
 				pr_notice("get clk [%d] fail, ret=%d, clk_con=%d\n",
 						i,  (int)ret, clk_con);
@@ -59,7 +59,7 @@ static int disable_unused_probe(struct platform_device *pdev)
 			 * 掐断, store 不 retire 即总线挂死。CON3 保持 free-run 0x0 = 6.6
 			 * 开机稳态, 跳过即等效。 */
 			if (node_reg == 0x8f && i >= 44) {
-				pr_notice("ddu-skip %s [%d] %s\n",
+				pr_debug("ddu-skip %s [%d] %s\n",
 					  dev_name(&pdev->dev), i,
 					  __clk_get_name(clk));
 				clk_put(clk);
@@ -68,14 +68,14 @@ static int disable_unused_probe(struct platform_device *pdev)
 #if DUMP_UNUSED_CLKS
 			/* enable parent clk first because of clk dependency */
 			if (i == 44)
-				pr_notice("ddu-pre %s [%d] %s: parent-enable begin\n",
+				pr_debug("ddu-pre %s [%d] %s: parent-enable begin\n",
 					  dev_name(&pdev->dev), i, __clk_get_name(clk));
 			retval = clk_prepare_enable(clk_get_parent(clk));
 			if (i == 44)
-				pr_notice("ddu-aft %s [%d] %s: parent-enable ret %d\n",
+				pr_debug("ddu-aft %s [%d] %s: parent-enable ret %d\n",
 					  dev_name(&pdev->dev), i, __clk_get_name(clk), retval);
 			if (retval) {
-				pr_info("parent of clk %s clk_prepare_enable failed, err:%d\n",
+				pr_warn("parent of clk %s clk_prepare_enable failed, err:%d\n",
 					__clk_get_name(clk), retval);
 				return 0;
 			}
@@ -87,7 +87,7 @@ static int disable_unused_probe(struct platform_device *pdev)
 			/* enable then disable clk to turn off unused clks */
 			retval = clk_prepare_enable(clk);
 			if (retval) {
-				pr_info("clk %s clk_prepare_enable failed, err:%d\n",
+				pr_warn("clk %s clk_prepare_enable failed, err:%d\n",
 					__clk_get_name(clk), retval);
 				return 0;
 			}
@@ -104,9 +104,9 @@ static int disable_unused_probe(struct platform_device *pdev)
 
 			/* if clk before/after state is different, then it's been disabled */
 			if (pp1 != pp2 || en1 != en2)
-				pr_notice("disable_unused clk [%d]: %s done\n",
+				pr_debug("disable_unused clk [%d]: %s done\n",
 					i, __clk_get_name(clk));
-			pr_notice("ddu-clk %s [%d] %s: en %d->%d pp %d->%d\n",
+			pr_debug("ddu-clk %s [%d] %s: en %d->%d pp %d->%d\n",
 				dev_name(&pdev->dev), i, __clk_get_name(clk),
 				en1, en2, pp1, pp2);
 #endif
