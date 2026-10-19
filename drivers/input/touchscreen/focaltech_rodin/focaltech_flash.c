@@ -34,6 +34,7 @@
 *****************************************************************************/
 #include "focaltech_core.h"
 #include "focaltech_flash.h"
+#include <linux/rodin_vendor_fw.h>
 
 
 
@@ -2087,6 +2088,14 @@ static void fts_fwupg_retry_workfn(struct work_struct *work)
 
     if (!upg || !upg->ts_data || !upg->ts_data->ts_workqueue)
         return;
+    /*
+     * The shared gate covers only the pre-mount window: first failure
+     * was almost surely -ENOENT because /vendor wasn't mounted yet.
+     * Wait for the gate here (own workqueue, off the probe path), then
+     * hand back to fwupg_work for the first real request.  The 30x2s
+     * retry loop below still covers files that are genuinely missing.
+     */
+    rodin_vendor_fw_wait();
     queue_work(upg->ts_data->ts_workqueue, &upg->ts_data->fwupg_work);
 }
 
