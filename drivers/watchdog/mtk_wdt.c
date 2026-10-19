@@ -28,6 +28,10 @@
 #include <linux/types.h>
 #include <linux/watchdog.h>
 #include <linux/interrupt.h>
+#include <linux/irqdomain.h>
+#include <linux/smp.h>
+#include <linux/sched/debug.h>
+
 
 #define WDT_MAX_TIMEOUT		31
 #define WDT_MIN_TIMEOUT		2
@@ -78,6 +82,24 @@ struct mtk_wdt_dev {
 	spinlock_t lock; /* protects WDT_SWSYSRST reg */
 	struct reset_controller_dev rcdev;
 };
+
+/*
+ * Bark forensic hook：本板 DT 不带 watchdog bark IRQ（probe 打印
+ * "IRQ index 0 not found"），但 bootloader 起狗时置了 IRQ_EN|DUAL_EN，
+ * WDT 第一次到期时 bark 在 GIC 上挂起无人应答，第二次到期由 EXRST
+ * 硬复位——整机级 wedge 因此完全无声。 bark SPI 号不在任何本地源里，
+ * 故 ISR 以模块参数在运行期补注册：先用 WDT_STATUS 超时位拒绝非本
+ * 设备的误触发，再异步 IPI 探测各核可响应性（关中断自旋的核不会置
+ * 位），最后打印 D 态任务栈，全部落入 console-ramoops 供死后取证。
+ * arming: echo <spi> > /sys/module/mtk_wdt/parameters/bark_irq_spi
+ * 极性 bark_level_low 先设；闸门误判可用 bark_gate_disable 逃生。
+ */
+static struct mtk_wdt_dev *bark_wdt;	/* 全板唯一 toprgu */
+static atomic_t bark_alive = ATOMIC_INIT(0);
+
+/* WDT_STATUS(0x0C) bit0: 定时器超时发生（bark/bite 待处理） */
+#define WDT_STATUS_REG		0x0C
+#define WDT_STATUS_TOUT_STA	(1 << 0)
 
 struct mtk_wdt_data {
 	int toprgu_sw_rst_num;
@@ -414,6 +436,7 @@ static int mtk_wdt_probe(struct platform_device *pdev)
 	watchdog_set_restart_priority(&mtk_wdt->wdt_dev, 128);
 
 	watchdog_set_drvdata(&mtk_wdt->wdt_dev, mtk_wdt);
+	bark_wdt = mtk_wdt;
 
 	mtk_wdt_init(&mtk_wdt->wdt_dev);
 
@@ -491,6 +514,98 @@ static struct platform_driver mtk_wdt_driver = {
 };
 
 vseq_module_platform_driver(mtk_wdt_driver);
+
+static void bark_ipi_mark(void *info)
+{
+	atomic_or(1 << smp_processor_id(), &bark_alive);
+}
+
+static int bark_irq_spi = -1;
+static bool bark_level_low = true;
+static bool bark_gate_disable;
+static bool bark_armed;
+
+static irqreturn_t mtk_wdt_bark_isr(int irq, void *arg)
+{
+	struct watchdog_device *wdd = arg;
+	struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdd);
+	u32 status;
+
+	if (!mtk_wdt)
+		return IRQ_NONE;
+	status = ioread32(mtk_wdt->wdt_base + WDT_STATUS_REG);
+	if (!bark_gate_disable && !(status & WDT_STATUS_TOUT_STA))
+		return IRQ_NONE;
+
+	pr_emerg("wdt_bark: cpu%d status=0x%08x online=%*pbl\n",
+		 smp_processor_id(), status, cpumask_pr_args(cpu_online_mask));
+
+	atomic_set(&bark_alive, 0);
+	smp_call_function(bark_ipi_mark, NULL, 0);
+	mdelay(100);
+	pr_emerg("wdt_bark: responsive cpus=0x%02x (bits set = cores taking IPIs)\n",
+		 atomic_read(&bark_alive));
+	show_state_filter(TASK_UNINTERRUPTIBLE);
+	pr_emerg("wdt_bark: forensic dump done, EXRST reset due in <=31s\n");
+
+	return IRQ_HANDLED;
+}
+
+static int mtk_wdt_bark_arm(void)
+{
+	struct mtk_wdt_dev *mtk_wdt = bark_wdt;
+	unsigned long flags = bark_level_low ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH;
+	int virq, ret;
+
+	if (bark_armed)
+		return 0;
+	if (!mtk_wdt || bark_irq_spi < 0 || bark_irq_spi > 1023)
+		return -EINVAL;
+	virq = irq_create_mapping(NULL, 32 + bark_irq_spi);
+	if (!virq) {
+		pr_err("mtk-wdt: bark arm: map SPI %d failed\n", bark_irq_spi);
+		return -EINVAL;
+	}
+	ret = request_irq(virq, mtk_wdt_bark_isr, flags, "wdt_bark_forensic",
+			  &mtk_wdt->wdt_dev);
+	if (ret) {
+		pr_err("mtk-wdt: bark arm: request_irq %d failed %d\n", virq, ret);
+		return ret;
+	}
+	bark_armed = true;
+	pr_info("mtk-wdt: bark forensic hook armed: SPI %d virq %d %s gate=%d\n",
+		bark_irq_spi, virq,
+		bark_level_low ? "level-low" : "level-high", !bark_gate_disable);
+	return 0;
+}
+
+static int bark_irq_spi_set(const char *val, const struct kernel_param *kp)
+{
+	bool was = bark_armed;
+	int ret;
+
+	ret = param_set_int(val, kp);
+	if (ret)
+		return ret;
+	if (!was && bark_irq_spi >= 0) {
+		ret = mtk_wdt_bark_arm();
+		if (ret)
+			bark_armed = false;
+	}
+	return ret;
+}
+
+static const struct kernel_param_ops bark_irq_spi_ops = {
+	.set = bark_irq_spi_set,
+	.get = param_get_int,
+};
+module_param_cb(bark_irq_spi, &bark_irq_spi_ops, &bark_irq_spi, 0644);
+MODULE_PARM_DESC(bark_irq_spi,
+		 "GIC SPI index of toprgu bark (DT lacks it); set >0 at runtime to arm");
+module_param(bark_level_low, bool, 0644);
+MODULE_PARM_DESC(bark_level_low, "bark IRQ polarity (default level-low)");
+module_param(bark_gate_disable, bool, 0644);
+MODULE_PARM_DESC(bark_gate_disable, "skip WDT_STATUS gate in bark ISR (escape hatch)");
 
 module_param(timeout, uint, 0);
 MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");
