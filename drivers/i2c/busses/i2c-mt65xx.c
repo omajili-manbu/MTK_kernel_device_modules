@@ -30,6 +30,7 @@
 #include <linux/spinlock.h>
 #include <linux/sched/clock.h>
 #include <linux/pm_qos.h>
+#include <linux/timer.h>
 
 #define I2C_CONFERR			(1 << 9)
 #define I2C_RS_TRANSFER			(1 << 4)
@@ -390,6 +391,9 @@ struct mtk_i2c {
 	unsigned long complete_ns;
 	u16 last_addr;
 	struct pm_qos_request i2c_qos_request;
+	spinlock_t qos_lock;
+	struct timer_list qos_relax_timer;
+	bool qos_held;
 };
 
 /**
@@ -2241,6 +2245,50 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 	return 0;
 }
 
+/* QoS debounce: keep the 20us CPU-DMA latency request across back-to-back
+ * transfers and release it only after the bus has been idle for a while, so
+ * a polling burst arms/disarms the request once instead of per transfer. */
+#define MTK_I2C_QOS_LATENCY_US	20
+#define MTK_I2C_QOS_RELAX_MS	20
+
+static void mtk_i2c_qos_relax_timer_fn(struct timer_list *t)
+{
+	struct mtk_i2c *i2c = timer_container_of(i2c, t, qos_relax_timer);
+	unsigned long flags;
+
+	spin_lock_irqsave(&i2c->qos_lock, flags);
+	if (i2c->qos_held) {
+		i2c->qos_held = false;
+		cpu_latency_qos_update_request(&i2c->i2c_qos_request,
+					       PM_QOS_DEFAULT_VALUE);
+	}
+	spin_unlock_irqrestore(&i2c->qos_lock, flags);
+}
+
+static void mtk_i2c_qos_hold(struct mtk_i2c *i2c)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&i2c->qos_lock, flags);
+	timer_delete(&i2c->qos_relax_timer);
+	if (!i2c->qos_held) {
+		i2c->qos_held = true;
+		cpu_latency_qos_update_request(&i2c->i2c_qos_request,
+					       MTK_I2C_QOS_LATENCY_US);
+	}
+	spin_unlock_irqrestore(&i2c->qos_lock, flags);
+}
+
+static void mtk_i2c_qos_relax(struct mtk_i2c *i2c)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&i2c->qos_lock, flags);
+	mod_timer(&i2c->qos_relax_timer,
+		  jiffies + msecs_to_jiffies(MTK_I2C_QOS_RELAX_MS));
+	spin_unlock_irqrestore(&i2c->qos_lock, flags);
+}
+
 static int mtk_i2c_transfer(struct i2c_adapter *adap,
 			    struct i2c_msg msgs[], int num)
 {
@@ -2262,8 +2310,8 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
 		}
 	}
 
-	/* update qos to prevent deep idle during transfer */
-	cpu_latency_qos_update_request(&i2c->i2c_qos_request, 20);
+	/* hold qos to prevent deep idle during transfer (debounced) */
+	mtk_i2c_qos_hold(i2c);
 
 	ret = mtk_i2c_clock_enable(i2c);
 	if (ret)
@@ -2379,7 +2427,7 @@ err_clk:
 		if (result)
 			dev_info(i2c->dev, "%s: scp_wake_release error\n", __func__);
 	}
-	cpu_latency_qos_update_request(&i2c->i2c_qos_request, PM_QOS_DEFAULT_VALUE);
+	mtk_i2c_qos_relax(i2c);
 	return ret;
 }
 
@@ -2707,6 +2755,10 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 #endif
 	/* register qos to prevent deep idle during transfer */
 	cpu_latency_qos_add_request(&i2c->i2c_qos_request, PM_QOS_DEFAULT_VALUE);
+	spin_lock_init(&i2c->qos_lock);
+	i2c->qos_held = false;
+	timer_setup(&i2c->qos_relax_timer, mtk_i2c_qos_relax_timer_fn, 0);
+	i2c->qos_relax_timer.flags |= TIMER_DEFERRABLE;
 
 	ret = devm_request_irq(&pdev->dev, irq, mtk_i2c_irq,
 			       IRQF_NO_SUSPEND | IRQF_TRIGGER_NONE,
