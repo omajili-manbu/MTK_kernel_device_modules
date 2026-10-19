@@ -743,7 +743,11 @@ static int __init swpm_v6899_dbg_late_initcall(void)
 		swpm_v6899_ext_init();
 	swpm_v6899_dbg_fs_init();
 
-	pr_notice("swpm init success\n");
+	/* the real init may have bailed on qos-not-ready; say so truthfully */
+	if (ret)
+		pr_notice("swpm init deferred (ret=%d), retry work will finish it\n", ret);
+	else
+		pr_notice("swpm init success\n");
 
 	return 0;
 }

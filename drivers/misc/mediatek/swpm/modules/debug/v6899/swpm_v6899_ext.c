@@ -23,6 +23,9 @@
 #include <swpm_v6899.h>
 #include <swpm_v6899_ext.h>
 
+/* set in swpm_v6899.c once swpm init fully succeeded */
+extern bool swpm_init_done_notified;
+
 
 #define SWPM_INTERNAL_TEST (0)
 #define DEFAULT_UPDATE_MS (10000)
@@ -663,6 +666,17 @@ void swpm_v6899_ext_init(void)
 	swpm_register_event_notifier(&swpm_sub_data_notifier);
 	mtk_register_swpm_ops(&plat_ops);
 	pr_notice("swpm ext init done\n");
+
+	/*
+	 * Both success paths (late initcall direct call and the init
+	 * retry work) funnel through here, so fire the init-done event
+	 * at the single funnel point.  First success wins; listeners
+	 * registered after it only miss the event they registered late.
+	 */
+	if (!swpm_init_done_notified) {
+		swpm_init_done_notified = true;
+		swpm_call_event_notifier(SWPM_INIT_DONE_NOTIFY, NULL);
+	}
 }
 
 void swpm_v6899_ext_exit(void)
