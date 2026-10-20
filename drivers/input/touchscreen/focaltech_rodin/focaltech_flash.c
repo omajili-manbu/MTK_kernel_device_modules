@@ -2122,6 +2122,18 @@ static void fts_fwupg_work(struct work_struct *work)
     /* get fw */
     ret = fts_fwupg_get_fw_file(upg);
     if (ret < 0) {
+        if (!rodin_vendor_fw_ready()) {
+            /*
+             * -ENOENT almost surely means /vendor/firmware is not
+             * mounted yet: skip the fixed 2s backoff and enter the
+             * retry workfn right away, which blocks on the vendor
+             * firmware gate and re-runs this work as soon as the
+             * directory shows up.
+             */
+            FTS_INFO("get file fail, vendor fw dir not ready, wait gate");
+            queue_delayed_work(system_wq, &fwupg_retry_work, 0);
+            return;
+        }
         fwupg_retry_cnt++;
         if (fwupg_retry_cnt <= FTS_FWUPG_RETRY_MAX) {
             FTS_ERROR("get file fail, can't upgrade, retry %d after %ds",
