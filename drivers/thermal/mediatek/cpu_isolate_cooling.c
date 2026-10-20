@@ -91,7 +91,7 @@ static int cpu_isolate_probe(struct platform_device *pdev)
 		cpu_isolate_devs[i].cur_state = 0;
 
 		ret = snprintf(cpu_isolate_devs[i].cooler_name, THERMAL_NAME_LENGTH, "%s-%d", name, i);
-		if (ret)
+		if (ret < 0)
 			pr_notice("%s:%d snprintf error\n", __func__, __LINE__);
 
 		cpu_isolate_devs[i].cdev = thermal_of_cooling_device_register(np, 
