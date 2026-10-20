@@ -1374,22 +1374,26 @@ static struct i2c_driver awinic_i2c_driver = {
 	.id_table = awinic_i2c_id,
 };
 
-static int __init awinic_i2c_init(void)
+/* A-142（R2 慢单元异步化）：本机无 awinic 器件，probe 走 pinctrl + 2×8ms i2c
+ * 重试 fail 路径（真机 ~40ms）；原厂 .ko 语境本单元在 vendor_dlkm 波（>2.8s），
+ * 无任何下游依赖（纯 input/misc 设备驱动）。=y 后 probe 在 vseq 重放线上串行
+ * 阻塞，故把 i2c_add_driver 投到 system_wq，vseq 行立即返回。 */
+static void awinic_async_register_workfn(struct work_struct *work)
 {
-	int ret = 0;
+	int ret = i2c_add_driver(&awinic_i2c_driver);
 
-	aw_info("%s awinic driver version %s\n", __func__, AW_DRIVER_VERSION);
+	if (ret)
+		aw_err("%s: async i2c_add_driver failed, ret=%d\n", __func__, ret);
+}
+static DECLARE_WORK(awinic_async_register_work, awinic_async_register_workfn);
 
-	ret = i2c_add_driver(&awinic_i2c_driver);
-	if (ret) {
-		aw_err("%s fail to add awinic device into i2c\n", __func__);
-		return ret;
-	}
-	aw_info("%s aw_i2c_init success", __func__);
+static int __init awinic_async_init(void)
+{
+	schedule_work(&awinic_async_register_work);
 	return 0;
 }
 
-vseq_module_init(awinic_i2c_init);
+vseq_module_init(awinic_async_init);
 
 static void __exit awinic_i2c_exit(void)
 {

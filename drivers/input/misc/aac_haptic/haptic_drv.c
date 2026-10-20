@@ -1804,7 +1804,25 @@ static struct i2c_driver ics_haptic_driver =
     .remove = ics_haptic_remove,
 };
 
-vseq_module_i2c_driver(ics_haptic_driver);
+/* A-142（R2 慢单元异步化）：本单元三地址 probe（1 成功 + 2 无器件 fail），
+ * 真机 ~3ms，与 aw/si 同簇统一后置（vseq 序列每省一段串行 i2c 等待即收益，
+ * 且保持马达三供应商驱动装载语义一体）；无下游依赖。 */
+static void ics_async_register_workfn(struct work_struct *work)
+{
+	int ret = i2c_add_driver(&ics_haptic_driver);
+
+	if (ret)
+		pr_err("%s: async i2c_add_driver failed, ret=%d\n", __func__, ret);
+}
+static DECLARE_WORK(ics_async_register_work, ics_async_register_workfn);
+
+static int __init ics_async_init(void)
+{
+	schedule_work(&ics_async_register_work);
+	return 0;
+}
+
+vseq_module_init(ics_async_init);
 
 MODULE_DESCRIPTION("ICS Haptic Driver");
 MODULE_AUTHOR("chenmaomao@icsense.com.cn, ICSense Semiconductor Co., Ltd");

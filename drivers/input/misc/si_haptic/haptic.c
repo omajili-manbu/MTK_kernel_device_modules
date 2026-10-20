@@ -3588,32 +3588,35 @@ static struct i2c_driver sih_i2c_driver = {
 	.id_table = sih_i2c_id,
 };
 
-static int __init sih_i2c_init(void)
-{
-	int ret = -1;
-
-	ret = i2c_add_driver(&sih_i2c_driver);
-
-	hp_info("%s:i2c_add_driver,ret = %d\n", __func__, ret);
-
-	if (ret) {
-		hp_err("%s:fail to add haptic device,ret = %d\n", __func__, ret);
-		return ret;
-	}
-	ret = sih_add_misc_dev();
-	if (ret) {
-		hp_err("%s:misc fail:%d\n", __func__, ret);
-		return ret;
-	}
-	return 0;
-}
-
 static void __exit sih_i2c_exit(void)
 {
 	i2c_del_driver(&sih_i2c_driver);
 }
 
-vseq_module_init(sih_i2c_init);
+/* A-142（R2 慢单元异步化）：本机无 si-in 器件，probe 走 7×~2.6ms i2c ACK
+ * fail 重试路径（真机 ~25ms）；无下游依赖。=y 后 probe 在 vseq 重放线上串行
+ * 阻塞，故把 i2c_add_driver + misc 注册投到 system_wq，vseq 行立即返回。 */
+static void sih_async_register_workfn(struct work_struct *work)
+{
+	int ret = i2c_add_driver(&sih_i2c_driver);
+
+	if (ret) {
+		hp_err("%s:i2c_add_driver fail,ret = %d\n", __func__, ret);
+		return;
+	}
+	ret = sih_add_misc_dev();
+	if (ret)
+		hp_err("%s:misc fail:%d\n", __func__, ret);
+}
+static DECLARE_WORK(sih_async_register_work, sih_async_register_workfn);
+
+static int __init sih_async_init(void)
+{
+	schedule_work(&sih_async_register_work);
+	return 0;
+}
+
+vseq_module_init(sih_async_init);
 module_exit(sih_i2c_exit);
 
 MODULE_AUTHOR("tianchi zheng <tianchi.zheng@si-in.com>");

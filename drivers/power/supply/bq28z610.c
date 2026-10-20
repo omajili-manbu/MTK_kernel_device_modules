@@ -3714,7 +3714,29 @@ static struct i2c_driver fg_driver = {
 	.shutdown	= fg_shutdown,
 };
 
-vseq_module_i2c_driver(fg_driver);
+/* A-142（R2 慢单元异步化）：原厂本单元 = bq28z610.ko，6.6 装载于 vendor_dlkm
+ * 波（>2.8s），下游消费面（mtk_charger 等）对 psy 缺席均有 NULL 守卫（真机
+ * dmesg "No battery_psy!" 同款，框架先行后补注册即原厂语义）。=y 后 vseq 重放
+ * 串行语义使 probe 提前到 1.09s 且独占推进线：probe 内 7 次 fg_mac_read/write
+ * i2c 命令（每次 ~30ms，check_device/shutdown_vol/update_status）合计 ~217ms
+ * 阻塞全序列。故把 i2c_add_driver 投到 system_wq，vseq 行立即返回；注册时点
+ * 仍远早于原厂 .ko 波，时序语义保持。 */
+static void fg_async_register_workfn(struct work_struct *work)
+{
+	int ret = i2c_add_driver(&fg_driver);
+
+	if (ret)
+		fg_err("%s: async i2c_add_driver failed, ret=%d\n", __func__, ret);
+}
+static DECLARE_WORK(fg_async_register_work, fg_async_register_workfn);
+
+static int __init fg_async_init(void)
+{
+	schedule_work(&fg_async_register_work);
+	return 0;
+}
+
+vseq_module_init(fg_async_init);
 
 MODULE_DESCRIPTION("TI GAUGE Driver");
 MODULE_LICENSE("GPL v2");
