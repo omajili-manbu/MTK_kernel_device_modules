@@ -1044,7 +1044,7 @@ static int mt6375_get_chg_status(struct mt6375_chg_data *ddata)
 	vbus = vbus / 1000;
 	if (vbus > 3600 && stat == 1)
 		stat = 4;
-	dev_err(ddata->dev, "%s, get mt6375 charger status=%d vbus = %d\n", __func__, stat, vbus);
+	dev_dbg(ddata->dev, "%s, get mt6375 charger status=%d vbus = %d\n", __func__, stat, vbus);
 
 	switch (stat) {
 	case CHG_STAT_OTG:
@@ -1548,7 +1548,7 @@ static int mt6375_chg_get_property(struct power_supply *psy,
 			val->intval = atomic_read(&ddata->attach[ddata->active_idx]);
 			mutex_unlock(&ddata->attach_lock);
 		}
-		dev_err(ddata->dev, "[%s]get POWER_SUPPLY_PROP_ONLINE:%d\n", __func__, val->intval);
+		dev_dbg(ddata->dev, "[%s]get POWER_SUPPLY_PROP_ONLINE:%d\n", __func__, val->intval);
 		return 0;
 	case POWER_SUPPLY_PROP_STATUS:
 		ret = mt6375_get_chg_status(ddata);

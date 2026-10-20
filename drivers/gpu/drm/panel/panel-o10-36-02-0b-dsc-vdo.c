@@ -1009,7 +1009,11 @@ static int panel_set_peak_hdr_status(struct mtk_dsi *dsi,dcs_write_gce cb,
 		ctx->peak_hdr_status = 0;
 	}
 
-	pr_info("%s: peak_hdr_status = %d ctx->gir_status = %d\n", __func__, ctx->peak_hdr_status, ctx->gir_status);
+	static int last_peak_hdr_status = -1;
+	if (ctx->peak_hdr_status != last_peak_hdr_status) {
+		last_peak_hdr_status = ctx->peak_hdr_status;
+		pr_info("%s: peak_hdr_status = %d ctx->gir_status = %d\n", __func__, ctx->peak_hdr_status, ctx->gir_status);
+	}
 err:
 	return 1;
 }

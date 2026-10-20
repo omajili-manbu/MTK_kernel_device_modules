@@ -610,8 +610,14 @@ static void monitor_thermal_limit(struct mtk_charger *info)
 		info->thermal_current = info->thermal_limit[1][thermal_level];
 		vote(info->fcc_votable, THERMAL_VOTER, true, info->thermal_limit[1][thermal_level]);
 		break;
-	default:
-		chr_err("not support psy_type to check charger parameters");
+	default: {
+		static bool printed;
+
+		if (!printed) {
+			printed = true;
+			chr_err("not support psy_type to check charger parameters");
+		}
+	}
 	}
 	// if (info->last_thermal_level == 15 && thermal_level < 15) {
 	// 	chr_err("[CHARGE_LOOP] disable TE\n");
@@ -950,8 +956,13 @@ static void check_dfx_param_data(struct mtk_charger *info)
 	}
 
 	if (!info->cp_slave) {
+		static bool printed;
+
 		info->cp_slave = get_charger_by_name("cp_slave");
-		chr_err("failed to get slave cp charger\n");
+		if (!printed) {
+			printed = true;
+			chr_err("failed to get slave cp charger\n");
+		}
 	}
 
 	ret = power_supply_get_property(info->bms_psy, POWER_SUPPLY_PROP_CAPACITY, &pval);

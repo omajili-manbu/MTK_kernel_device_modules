@@ -58,7 +58,7 @@ static int cpu_isolate_set_cur_state(struct thermal_cooling_device *cdev, unsign
 		ret = core_ctl_force_pause_cpu(dev->cpu_id, false);
 	}
 
-	if (ret != 0)
+	if (ret < 0)
 		pr_info("%s:%d set cpu%d iso %lu error %d\n", __func__, __LINE__, dev->cpu_id, state, ret);
 
 	return 0;
