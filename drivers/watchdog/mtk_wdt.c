@@ -583,6 +583,10 @@ static int mtk_wdt_bark_arm(void)
 	}
 	ret = request_irq(virq, mtk_wdt_bark_isr, flags, "wdt_bark_forensic",
 			  &mtk_wdt->wdt_dev);
+	if (ret == -ENOSYS)
+		/* GIC 不编程极性；该映射 chip 无 set_type（-ENOSYS），0 flags 默认 level 型即可送达 */
+		ret = request_irq(virq, mtk_wdt_bark_isr, 0, "wdt_bark_forensic",
+				  &mtk_wdt->wdt_dev);
 	if (ret) {
 		pr_err("mtk-wdt: bark arm: request_irq %d failed %d\n", virq, ret);
 		return ret;
