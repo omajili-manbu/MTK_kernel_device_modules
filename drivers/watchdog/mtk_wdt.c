@@ -555,13 +555,27 @@ static int mtk_wdt_bark_arm(void)
 {
 	struct mtk_wdt_dev *mtk_wdt = bark_wdt;
 	unsigned long flags = bark_level_low ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH;
+	struct device_node *gic_np;
+	struct irq_domain *dom;
 	int virq, ret;
 
 	if (bark_armed)
 		return 0;
 	if (!mtk_wdt || bark_irq_spi < 0 || bark_irq_spi > 1023)
 		return -EINVAL;
-	virq = irq_create_mapping(NULL, 32 + bark_irq_spi);
+	/* r143: NULL 域在 6.18 GICv3 下拿不到默认 domain（真机 map SPI failed），经 toprgu DT 的 interrupt-parent 显式解析 GIC domain。 */
+	gic_np = of_irq_find_parent(mtk_wdt->wdt_dev.parent->of_node);
+	if (!gic_np) {
+		pr_err("mtk-wdt: bark arm: no interrupt-parent\n");
+		return -EINVAL;
+	}
+	dom = irq_find_host(gic_np);
+	of_node_put(gic_np);
+	if (!dom) {
+		pr_err("mtk-wdt: bark arm: GIC domain not found\n");
+		return -EINVAL;
+	}
+	virq = irq_create_mapping(dom, 32 + bark_irq_spi);
 	if (!virq) {
 		pr_err("mtk-wdt: bark arm: map SPI %d failed\n", bark_irq_spi);
 		return -EINVAL;
