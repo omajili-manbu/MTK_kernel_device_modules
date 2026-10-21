@@ -26,7 +26,7 @@
 #define MTK_CCU_CAM_MAIN_NAME       "ccucammain"
 
 #if defined(SECURE_CCU)
-#define CCU_FW_NAME					"lib3a.ccu_dummy"
+#define CCU_FW_NAME					"lib3a.ccu"  /* r143: dummy(52B) 无法响应 IPC ⇒ 相机栈上电/复位/下电风暴，下电路径 ICC/clk 挂死总线（F5 冻结根因）；真固件 1.5MB 在 /vendor/firmware */
 #else
 #define CCU_FW_NAME					"lib3a.ccu"
 #endif
