@@ -60,3 +60,6 @@ obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += touch_boost/
 
 obj-$(CONFIG_MTK_LOAD_TRACKER) += load_track/
 obj-$(CONFIG_MTK_LOAD_TRACKER) += uload_ind/
+
+# rodin A-142 R1: boot-window all-core freq QoS floor, thermal-follow release
+obj-y += rodin_boot_boost.o
