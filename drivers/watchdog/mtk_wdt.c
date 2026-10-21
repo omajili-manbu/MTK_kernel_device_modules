@@ -643,19 +643,23 @@ MODULE_PARM_DESC(bark_gate_disable, "skip WDT_STATUS gate in bark ISR (escape ha
  * 是 arm,gic-v3 根域（零 ITS 节点），SPI 全部直挂根域，无需 ITS 解析；bark
  * 号不在 DT ⇒ 主动制造：LENGTH 压到 6s + IRQ_EN|DUAL_EN，bark 于 +6s、
  * bite 于 +12s，检测环毫秒级见 WDT_STATUS bit0 即回写原 LENGTH 踢狗，永远
- * 赶在 bite 前。以 GICD_ISPENDR 前后 diff 取 bark 瞬间新增 pending，三轮
- * 取交集滤掉窗口内巧合活跃线；交集唯一即自动喂给 bark_irq_spi arm 路径。
- * diff 全零 = bark 不进 GIC，此路判死。
- * usage: echo 1 > /sys/module/mtk_wdt/parameters/bark_probe（自动连测 3 轮）
- * 读取该参数 = 已完成轮数。
+ * 赶在 bite 前（单窗 7.5s 时限保险，无触发也安全回退重试，≤6 窗取 ≥3
+ * 命中轮）。以 GICD_ISPENDR 前后 diff 取 bark 瞬间新增 pending，轮间交集
+ * 滤掉窗口内巧合活跃线；交集唯一且至少一轮 TOUT_STA 佐证才自动喂给
+ * bark_irq_spi arm 路径。diff 全零 = bark 不进 GIC，此路判死。
+ * usage: echo 1 > /sys/module/mtk_wdt/parameters/bark_probe
+ * 读取该参数 = 命中轮数。
  */
 #define BARK_PEND_WORDS		24	/* GICD_ISPENDR word0..23 = SPI 0..767 */
 #define BARK_PROBE_SECS		6	/* bark 延时；bite = 2×此值 */
-#define BARK_PROBE_CAP_MS	25000	/* 上限：踢狗周期 15.5s + 延时 6s 之内必发 */
-#define BARK_PROBE_ROUNDS	3
+#define BARK_PROBE_CAP_MS	7500	/* 单窗时限 < bite（bark+6s）：无触发也安全回退 */
+#define BARK_PROBE_ISPENDR_WAIT_MS 5000	/* 仅 bark 预期时刻起启用 ISPENDR 备用触发 */
+#define BARK_PROBE_MAX_ATTEMPTS	6
+#define BARK_PROBE_HIT_ROUNDS	3
 
 static u32 bark_pend_and[BARK_PEND_WORDS];	/* 轮间交集累积 */
 static int bark_runs;
+static int bark_tout_rounds;
 static atomic_t bark_probe_busy = ATOMIC_INIT(0);
 static void __iomem *bark_gicd;
 
@@ -689,7 +693,7 @@ static int bark_probe_run(void)
 	void __iomem *base;
 	u32 before[BARK_PEND_WORDS], after[BARK_PEND_WORDS];
 	u32 diff[BARK_PEND_WORDS] = { 0 }, mode, length;
-	int round, i, hits, armed_ok = 0;
+	int round, i, hits, armed_ok = 0, any_fired = 0;
 
 	if (!mtk_wdt)
 		return -ENODEV;
@@ -709,9 +713,9 @@ static int bark_probe_run(void)
 	}
 
 	mode = ioread32(base + WDT_MODE);
-	for (round = 0; round < BARK_PROBE_ROUNDS && !armed_ok; round++) {
-		bool fired = false;
-		unsigned long deadline;
+	for (round = 0; round < BARK_PROBE_MAX_ATTEMPTS && !armed_ok; round++) {
+		bool fired = false, fired_tout = false;
+		unsigned long deadline, t0 = jiffies;
 
 		length = ioread32(base + WDT_LENGTH);
 		bark_ispendr_read(before);
@@ -724,29 +728,46 @@ static int bark_probe_run(void)
 
 		deadline = jiffies + msecs_to_jiffies(BARK_PROBE_CAP_MS);
 		while (time_before(jiffies, deadline)) {
-			usleep_range(500, 1500);
+			usleep_range(2000, 4000);
 			if (ioread32(base + WDT_STATUS_REG) &
 			    WDT_STATUS_TOUT_STA) {
 				fired = true;
+				fired_tout = true;
 				break;
+			}
+			/* 备用触发：仅在 bark 预期时刻（+5s 起）盯 ISPENDR，
+			 * TOUT_STA 位语义不符时仍能抓 bark；平时不盯，避免
+			 * 把窗口内普通中断流量当 bark。 */
+			if (time_after(jiffies, t0 +
+			    msecs_to_jiffies(BARK_PROBE_ISPENDR_WAIT_MS))) {
+				bark_ispendr_read(after);
+				for (i = 0; i < BARK_PEND_WORDS; i++)
+					if (after[i] & ~before[i]) {
+						fired = true;
+						break;
+					}
+				if (fired)
+					break;
 			}
 		}
 
 		if (fired) {
+			any_fired = 1;
 			msleep(10);
 			bark_ispendr_read(after);
 			for (i = 0; i < BARK_PEND_WORDS; i++)
 				diff[i] = after[i] & ~before[i];
 		}
 
-		/* 回写原 LENGTH 踢狗——bite 在 bark +6s，永远赶在它之前 */
+		/* 回写原 LENGTH 踢狗——bite 在 bark +6s，单窗 7.5s 时限恒在其前 */
 		iowrite32(length | WDT_LENGTH_KEY, base + WDT_LENGTH);
 		iowrite32(WDT_RST_RELOAD, base + WDT_RST);
 
 		if (!fired) {
-			pr_warn("mtk-wdt: bark probe: %dms 内未见 TOUT_STA，本轮作废可重试\n",
-				BARK_PROBE_CAP_MS);
-			break;
+			pr_warn("mtk-wdt: bark probe r%d: 7.5s 无触发，安全回退重试（bite 恒被赶超）\n",
+				round + 1);
+			msleep(2000);
+			continue;
 		}
 
 		hits = 0;
@@ -765,6 +786,8 @@ static int bark_probe_run(void)
 			break;
 		}
 		bark_runs++;
+		if (fired_tout)
+			bark_tout_rounds++;
 		if (bark_runs == 1)
 			memcpy(bark_pend_and, diff, sizeof(diff));
 		else
@@ -775,7 +798,8 @@ static int bark_probe_run(void)
 			hits += hweight32(bark_pend_and[i]);
 		pr_info("mtk-wdt: bark probe: %d 轮交集剩 %d 候选\n",
 			bark_runs, hits);
-		if (hits == 1 && bark_runs >= BARK_PROBE_ROUNDS) {
+		if (hits == 1 && bark_runs >= BARK_PROBE_HIT_ROUNDS &&
+		    bark_tout_rounds > 0) {
 			for (i = 0; i < BARK_PEND_WORDS; i++)
 				if (bark_pend_and[i])
 					break;
@@ -785,10 +809,13 @@ static int bark_probe_run(void)
 			armed_ok = mtk_wdt_bark_arm() == 0;
 		}
 	}
+	if (!any_fired)
+		pr_warn("mtk-wdt: bark probe: %d 窗全无触发（无 bite，安全回退）——TOUT_STA 位语义或 LENGTH 编码需 TRM 复核\n",
+			BARK_PROBE_MAX_ATTEMPTS);
 	msleep(50);
-	pr_info("mtk-wdt: bark probe done: runs=%d armed=%d status=0x%08x mode=0x%08x\n",
-		bark_runs, bark_armed, ioread32(base + WDT_STATUS_REG),
-		ioread32(base + WDT_MODE));
+	pr_info("mtk-wdt: bark probe done: hits=%d(tout %d) armed=%d status=0x%08x mode=0x%08x\n",
+		bark_runs, bark_tout_rounds, bark_armed,
+		ioread32(base + WDT_STATUS_REG), ioread32(base + WDT_MODE));
 	atomic_set(&bark_probe_busy, 0);
 	return armed_ok ? 0 : (bark_runs ? -EAGAIN : 0);
 }
