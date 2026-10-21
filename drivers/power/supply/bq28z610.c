@@ -59,6 +59,8 @@ do {								\
 			printk(KERN_ERR "" fmt, ##__VA_ARGS__);	\
 } while (0)
 
+static unsigned long tbat_log_jiffies;
+
 #define fg_dbg(fmt, ...)					\
 do {								\
 	if (log_level >= 2)					\
@@ -2681,7 +2683,12 @@ static int fg_get_property(struct power_supply *psy, enum power_supply_property 
 					bq->extreme_cold_temp = 0;
 			}
 		}
-		fg_info("%s update tbat=%d, extreme_cold_temp = %d\n", bq->log_tag, bq->tbat, bq->extreme_cold_temp);
+		/* r131: 该 getter 被用户态高频轮询，原每秒数条刷爆 console/ramoops 环
+		 * （冻结取证窗口 ~160s 被压缩），限频 1/s。 */
+		if (time_is_before_eq_jiffies(tbat_log_jiffies + HZ)) {
+			tbat_log_jiffies = jiffies;
+			fg_info("%s update tbat=%d, extreme_cold_temp = %d\n", bq->log_tag, bq->tbat, bq->extreme_cold_temp);
+		}
 		val->intval = bq->tbat - bq->extreme_cold_temp;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
