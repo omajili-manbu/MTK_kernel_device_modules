@@ -23,6 +23,9 @@
 #include <linux/moduleparam.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
+#include <linux/of_address.h>
+#include <linux/jiffies.h>
+#include <linux/atomic.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/reset-controller.h>
@@ -559,6 +562,7 @@ static int mtk_wdt_bark_arm(void)
 	struct device_node *gic_np;
 	struct irq_domain *dom;
 	int virq, ret;
+	u32 reg;
 
 	if (bark_armed)
 		return 0;
@@ -592,9 +596,17 @@ static int mtk_wdt_bark_arm(void)
 		return ret;
 	}
 	bark_armed = true;
-	pr_info("mtk-wdt: bark forensic hook armed: SPI %d virq %d %s gate=%d\n",
+	/*
+	 * 补开 bark 输出位：无 DT IRQ ⇒ info 无 PRETIMEOUT ⇒ start()/init()
+	 * 从不置 IRQ_EN|DUAL_EN，只挂 handler 则自然 wedge 时 bark 永不发声。
+	 */
+	reg = ioread32(mtk_wdt->wdt_base + WDT_MODE);
+	reg |= WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN | WDT_MODE_KEY;
+	iowrite32(reg, mtk_wdt->wdt_base + WDT_MODE);
+	pr_info("mtk-wdt: bark forensic hook armed: SPI %d virq %d %s gate=%d mode=0x%08x\n",
 		bark_irq_spi, virq,
-		bark_level_low ? "level-low" : "level-high", !bark_gate_disable);
+		bark_level_low ? "level-low" : "level-high", !bark_gate_disable,
+		ioread32(mtk_wdt->wdt_base + WDT_MODE));
 	return 0;
 }
 
@@ -625,6 +637,186 @@ module_param(bark_level_low, bool, 0644);
 MODULE_PARM_DESC(bark_level_low, "bark IRQ polarity (default level-low)");
 module_param(bark_gate_disable, bool, 0644);
 MODULE_PARM_DESC(bark_gate_disable, "skip WDT_STATUS gate in bark ISR (escape hatch)");
+
+/*
+ * Bark active probe：健康机上主动定案 bark SPI。真机全量 DT 唯一中断控制器
+ * 是 arm,gic-v3 根域（零 ITS 节点），SPI 全部直挂根域，无需 ITS 解析；bark
+ * 号不在 DT ⇒ 主动制造：LENGTH 压到 6s + IRQ_EN|DUAL_EN，bark 于 +6s、
+ * bite 于 +12s，检测环毫秒级见 WDT_STATUS bit0 即回写原 LENGTH 踢狗，永远
+ * 赶在 bite 前。以 GICD_ISPENDR 前后 diff 取 bark 瞬间新增 pending，三轮
+ * 取交集滤掉窗口内巧合活跃线；交集唯一即自动喂给 bark_irq_spi arm 路径。
+ * diff 全零 = bark 不进 GIC，此路判死。
+ * usage: echo 1 > /sys/module/mtk_wdt/parameters/bark_probe（自动连测 3 轮）
+ * 读取该参数 = 已完成轮数。
+ */
+#define BARK_PEND_WORDS		24	/* GICD_ISPENDR word0..23 = SPI 0..767 */
+#define BARK_PROBE_SECS		6	/* bark 延时；bite = 2×此值 */
+#define BARK_PROBE_CAP_MS	25000	/* 上限：踢狗周期 15.5s + 延时 6s 之内必发 */
+#define BARK_PROBE_ROUNDS	3
+
+static u32 bark_pend_and[BARK_PEND_WORDS];	/* 轮间交集累积 */
+static int bark_runs;
+static atomic_t bark_probe_busy = ATOMIC_INIT(0);
+static void __iomem *bark_gicd;
+
+static void bark_gicd_map(void)
+{
+	struct device_node *gic_np;
+	struct resource res;
+
+	if (bark_gicd || !bark_wdt || !bark_wdt->wdt_dev.parent ||
+	    !bark_wdt->wdt_dev.parent->of_node)
+		return;
+	gic_np = of_irq_find_parent(bark_wdt->wdt_dev.parent->of_node);
+	if (!gic_np)
+		return;
+	if (!of_address_to_resource(gic_np, 0, &res))
+		bark_gicd = ioremap(res.start, resource_size(&res));
+	of_node_put(gic_np);
+}
+
+static void bark_ispendr_read(u32 *words)
+{
+	int i;
+
+	for (i = 0; i < BARK_PEND_WORDS; i++)
+		words[i] = readl(bark_gicd + 0x200 + 4 * i);
+}
+
+static int bark_probe_run(void)
+{
+	struct mtk_wdt_dev *mtk_wdt = bark_wdt;
+	void __iomem *base;
+	u32 before[BARK_PEND_WORDS], after[BARK_PEND_WORDS];
+	u32 diff[BARK_PEND_WORDS] = { 0 }, mode, length;
+	int round, i, hits, armed_ok = 0;
+
+	if (!mtk_wdt)
+		return -ENODEV;
+	if (bark_armed) {
+		pr_info("mtk-wdt: bark probe: already armed SPI %d\n",
+			bark_irq_spi);
+		return 0;
+	}
+	if (atomic_cmpxchg(&bark_probe_busy, 0, 1))
+		return -EBUSY;
+
+	bark_gicd_map();
+	base = mtk_wdt->wdt_base;
+	if (!bark_gicd) {
+		atomic_set(&bark_probe_busy, 0);
+		return -ENXIO;
+	}
+
+	mode = ioread32(base + WDT_MODE);
+	for (round = 0; round < BARK_PROBE_ROUNDS && !armed_ok; round++) {
+		bool fired = false;
+		unsigned long deadline;
+
+		length = ioread32(base + WDT_LENGTH);
+		bark_ispendr_read(before);
+
+		iowrite32(WDT_LENGTH_TIMEOUT(BARK_PROBE_SECS << 6) |
+			  WDT_LENGTH_KEY, base + WDT_LENGTH);
+		iowrite32((mode | WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN |
+			   WDT_MODE_EXRST_EN) | WDT_MODE_KEY, base + WDT_MODE);
+		iowrite32(WDT_RST_RELOAD, base + WDT_RST);
+
+		deadline = jiffies + msecs_to_jiffies(BARK_PROBE_CAP_MS);
+		while (time_before(jiffies, deadline)) {
+			usleep_range(500, 1500);
+			if (ioread32(base + WDT_STATUS_REG) &
+			    WDT_STATUS_TOUT_STA) {
+				fired = true;
+				break;
+			}
+		}
+
+		if (fired) {
+			msleep(10);
+			bark_ispendr_read(after);
+			for (i = 0; i < BARK_PEND_WORDS; i++)
+				diff[i] = after[i] & ~before[i];
+		}
+
+		/* 回写原 LENGTH 踢狗——bite 在 bark +6s，永远赶在它之前 */
+		iowrite32(length | WDT_LENGTH_KEY, base + WDT_LENGTH);
+		iowrite32(WDT_RST_RELOAD, base + WDT_RST);
+
+		if (!fired) {
+			pr_warn("mtk-wdt: bark probe: %dms 内未见 TOUT_STA，本轮作废可重试\n",
+				BARK_PROBE_CAP_MS);
+			break;
+		}
+
+		hits = 0;
+		for (i = 0; i < BARK_PEND_WORDS; i++) {
+			u32 m = diff[i];
+
+			while (m) {
+				pr_info("mtk-wdt: bark probe r%d: new pending SPI %d\n",
+					round + 1, i * 32 + ffs(m) - 1);
+				m &= m - 1;
+				hits++;
+			}
+		}
+		if (!hits) {
+			pr_warn("mtk-wdt: bark probe: bark 已发但 GICD 零新增 pending —— bark 不进 GIC，此路判死\n");
+			break;
+		}
+		bark_runs++;
+		if (bark_runs == 1)
+			memcpy(bark_pend_and, diff, sizeof(diff));
+		else
+			for (i = 0; i < BARK_PEND_WORDS; i++)
+				bark_pend_and[i] &= diff[i];
+		hits = 0;
+		for (i = 0; i < BARK_PEND_WORDS; i++)
+			hits += hweight32(bark_pend_and[i]);
+		pr_info("mtk-wdt: bark probe: %d 轮交集剩 %d 候选\n",
+			bark_runs, hits);
+		if (hits == 1 && bark_runs >= BARK_PROBE_ROUNDS) {
+			for (i = 0; i < BARK_PEND_WORDS; i++)
+				if (bark_pend_and[i])
+					break;
+			bark_irq_spi = i * 32 + ffs(bark_pend_and[i]) - 1;
+			pr_info("mtk-wdt: bark probe: SPI %d 交集唯一，自动 arm\n",
+				bark_irq_spi);
+			armed_ok = mtk_wdt_bark_arm() == 0;
+		}
+	}
+	msleep(50);
+	pr_info("mtk-wdt: bark probe done: runs=%d armed=%d status=0x%08x mode=0x%08x\n",
+		bark_runs, bark_armed, ioread32(base + WDT_STATUS_REG),
+		ioread32(base + WDT_MODE));
+	atomic_set(&bark_probe_busy, 0);
+	return armed_ok ? 0 : (bark_runs ? -EAGAIN : 0);
+}
+
+static int bark_probe_set(const char *val, const struct kernel_param *kp)
+{
+	int v, ret;
+
+	ret = kstrtoint(val, 0, &v);
+	if (ret)
+		return ret;
+	if (v != 1)
+		return -EINVAL;
+	return bark_probe_run();
+}
+
+static int bark_probe_get(char *buf, const struct kernel_param *kp)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", bark_runs);
+}
+
+static const struct kernel_param_ops bark_probe_ops = {
+	.set = bark_probe_set,
+	.get = bark_probe_get,
+};
+module_param_cb(bark_probe, &bark_probe_ops, NULL, 0644);
+MODULE_PARM_DESC(bark_probe,
+		 "write 1: active bark SPI probe (3 rounds, auto-arm on unique intersection); read: completed runs");
 
 module_param(timeout, uint, 0);
 MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");
