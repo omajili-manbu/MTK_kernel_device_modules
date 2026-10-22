@@ -3346,6 +3346,13 @@ static int vcp_device_probe(struct platform_device *pdev)
 						, &vcpreg.secure_dump);
 	of_property_read_u32(pdev->dev.of_node, "vcp-excep-mode"
 						, &vcp_excep_mode);
+	/* rodin: stock closed-source vcp driver never reads this DT property and
+	 * stays silent; 6.18 reads it in, so a VCP firmware crash escalates to a
+	 * full kernel panic via BUG_ON in vcp_aed (vcp_excep.c:950). Clamp KE to
+	 * the AED path: keep the crash evidence in AEE DB without killing the AP.
+	 */
+	if (vcp_excep_mode == VCP_KE_ENABLE)
+		vcp_excep_mode = VCP_EE_ENABLE;
 
 	pr_notice("[VCP] vcpreg.secure_dump = %d, vcp_excep_mode = %d\n",
 			vcpreg.secure_dump, vcp_excep_mode);
