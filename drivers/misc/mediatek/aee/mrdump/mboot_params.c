@@ -364,13 +364,19 @@ static int __init mboot_params_init(struct mboot_params_buffer *buffer,
 	memset_io((void *)buffer + buffer->off_linux, 0,
 			buffer_size - buffer->off_linux);
 	mboot_params_init_desc(buffer->off_linux);
-#ifndef CONFIG_PSTORE
-	register_console(&mboot_params);
-#endif
-	mboot_params_init_val();
 	mbootlog_buf = kzalloc(SZ_128K, GFP_KERNEL);
 	if (!mbootlog_buf)
 		pr_notice("mboot_params: mbootlog_buf(SYS_LAST_KMSG) invalid");
+	/*
+	 * rodin forensics: keep the AEE ram console even with PSTORE enabled.
+	 * pstore lives in DRAM and is overwritten by the next boot, while this
+	 * 128KB mbootlog ring is captured into the mrdump mini dump and is
+	 * therefore the only copy of the dying boot last kernel messages.
+	 */
+#if !defined(CONFIG_PSTORE) || defined(CONFIG_MTK_AEE_RAM_CONSOLE)
+	register_console(&mboot_params);
+#endif
+	mboot_params_init_val();
 #ifdef MODULE
 	aee_rr_mboot_params_proc_init();
 #endif

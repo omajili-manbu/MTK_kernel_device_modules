@@ -28,6 +28,17 @@ config MTK_AEE_IPANIC
 	  combined with aee. It will do some hook function and get some
 	  kernel panic information for debug.
 
+config MTK_AEE_RAM_CONSOLE
+	bool "Enable AEE RAM console (SYS_LAST_KMSG ring)"
+	depends on MTK_AEE_IPANIC
+	default n
+	help
+	  Register the AEE mboot_params "ram" console even when PSTORE is
+	  enabled. Every kernel console write is mirrored into the 128 KiB
+	  mbootlog ring, which is included in the mrdump mini dump. Unlike
+	  pstore (overwritten on the next boot), this keeps the dying boot
+	  last kernel messages across a WDT/hang reset.
+
 config MTK_AEE_HANGDET
 	tristate "Enable AEE Kernel Hang Detector"
 	depends on MTK_AEE_FEATURE

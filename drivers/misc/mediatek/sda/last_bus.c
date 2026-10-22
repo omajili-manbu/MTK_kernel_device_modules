@@ -26,6 +26,8 @@
 #include <linux/sched/clock.h>
 #include <linux/seq_file.h>
 #include <mt-plat/aee.h>
+#include <mt-plat/mrdump.h>
+#include <asm/memory.h>
 #include "sda.h"
 #include "dbg_error_flag.h"
 #include "last_bus.h"
@@ -203,6 +205,53 @@ int lastbus_dump(int force_dump)
 	return 1;
 }
 
+/*
+ * Mirror the lastbus ring into the AEE persistent log buffer so the dump
+ * survives a reset even when aed cannot finish writing a DB (freeze/WDT).
+ */
+static void lastbus_sram_dump(void)
+{
+	unsigned int total, start, i, n;
+	char line[192];
+
+	if (dump_buf_size <= 0)
+		return;
+
+	total = (unsigned int)dump_buf_size;
+	if (total > DUMP_BUFF_SIZE)
+		total = DUMP_BUFF_SIZE;
+	start = (unsigned int)dump_buf_size % DUMP_BUFF_SIZE;
+	if (start + total > DUMP_BUFF_SIZE)
+		start = 0;
+
+	/* keep the tail (most recent) 8KB, the SRAM ring is only 128KB */
+	if (total > 8192) {
+		start = (start + (total - 8192)) % DUMP_BUFF_SIZE;
+		total = 8192;
+	}
+
+	aee_sram_printk("[RODIN-LASTBUS] size=%d start=%u\n", dump_buf_size, start);
+
+	for (i = 0; i < total;) {
+		n = 0;
+		while (i < total && n < sizeof(line) - 1) {
+			char c = dump_buf[(start + i) % DUMP_BUFF_SIZE];
+
+			if (c >= 32 && c < 127)
+				line[n++] = c;
+			else if (c == 0x0a || c == 0x09)
+				line[n++] = c;
+			else
+				line[n++] = 0x2e;
+			i++;
+			if (line[n - 1] == 0x0a)
+				break;
+		}
+		line[n] = 0;
+		aee_sram_printk("[LB] %s", line);
+	}
+}
+
 static int last_bus_dump_event(struct notifier_block *this,
 	unsigned long err_flag_status, void *ptr)
 {
@@ -217,6 +266,7 @@ static int last_bus_dump_event(struct notifier_block *this,
 		return 0;
 	}
 	lastbus_dump(TIMEOUT_DUMP);
+	lastbus_sram_dump();
 
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 	if (aee_dump != 0)
@@ -275,6 +325,10 @@ static int last_bus_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		dev_err(dev, "couldn't find property timeout-warning(%d), default disable.\n", ret);
 		aee_dump = 0;
+	}
+	if (!aee_dump) {
+		aee_dump = 1;
+		dev_info(dev, "rodin: force timeout-warning=1, lastbus timeout raises AEE\n");
 	}
 
 	parts_node = of_get_child_by_name(np, "monitors");
@@ -356,6 +410,13 @@ static int last_bus_probe(struct platform_device *pdev)
 		}
 		pr_info("%s: num_used_monitors = %d\n", __func__, num);
 	}
+
+	dev_info(dev, "rodin: enabled=%d monitors=%d timeout=%dms type=%d aee_dump=%d\n",
+			my_cfg_lastbus.enabled, my_cfg_lastbus.num_used_monitors,
+			my_cfg_lastbus.timeout_ms, my_cfg_lastbus.timeout_type, aee_dump);
+	aee_sram_printk("[RODIN] lastbus probe en=%d mon=%d tmo=%dms aee=%d\n",
+			my_cfg_lastbus.enabled, my_cfg_lastbus.num_used_monitors,
+			my_cfg_lastbus.timeout_ms, aee_dump);
 
 	return 0;
 }
@@ -556,6 +617,10 @@ static int __init last_bus_init(void)
 	if (ret)
 		return ret;
 
+#if IS_ENABLED(CONFIG_MTK_AEE_IPANIC)
+	(void)mrdump_mini_add_extra_file((unsigned long)dump_buf,
+			__pa(dump_buf), sizeof(dump_buf), "LASTBUS");
+#endif
 #if IS_ENABLED(CONFIG_MTK_LASTBUS_DEBUG)
 	entry = proc_create("last_bus", 0664, NULL, &last_bus_fops);
 	if (!entry)
