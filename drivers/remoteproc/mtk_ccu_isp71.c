@@ -363,7 +363,7 @@ static int mtk_ccu_run(struct mtk_ccu *ccu)
 	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
 		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
 	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
-	pr_info("F6SMC ret a0=0x%08lx\n", (unsigned long)(_a0)); \
+	pr_info("F6SMC ret a0=0x%08lx\n", (_res ? (unsigned long)((*_res).a0) : 0UL)); \
 } while (0)
 	arm_smccc_smc(MTK_SIP_KERNEL_CCU_CONTROL, (u64) CCU_SMC_REQ_RUN, 0, 0, 0, 0, 0, 0, &res);
 #endif
