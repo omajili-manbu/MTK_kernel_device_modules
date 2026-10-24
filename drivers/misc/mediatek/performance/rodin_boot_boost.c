@@ -15,15 +15,20 @@
  * Safety rails, in order of authority:
  *  - MIN requests structurally lose to any MAX cap: the cpufreq core
  *    resolves min > max in favour of max everywhere (cpufreq_set_policy,
- *    cpufreq_driver_resolve_freq, fast_switch).  When the observed cur
- *    sits below our floor (thermal, or the MIUI powerkeeper cap that
- *    lands right after boot completes), we yield a step on our own
- *    instead of leaning on that clamp.
+ *    cpufreq_driver_resolve_freq, fast_switch).  When policy->max drops
+ *    below our floor (thermal, or the MIUI powerkeeper cap that lands
+ *    right after boot completes) we yield a step on our own instead of
+ *    leaning on that clamp; cur lagging a freshly armed floor is a ramp
+ *    in progress, never a cap.
  *  - soc_max temperature bands drive the same stepwise walk, with
  *    asymmetric persistence (2 ticks to step down, 3 to step back up).
  *  - a read-failure streak on the thermal zone or the window expiry
  *    releases everything; the requests stay in place at hw_min so that
- *    policy teardown/rebuild cannot race them.
+ *    policy teardown/rebuild cannot race them.  Thermal zones register
+ *    later than the cpufreq policies on this platform, so blindness
+ *    before the first successful read is not a fault and only the
+ *    window bounds it.  Once the window has expired the boost never
+ *    re-arms, so a late REMOVE/CREATE policy pair must land on hw_min.
  *
  * A/B: rodin_boot_boost=off on the cmdline, or the sysfs knobs below.
  */
@@ -88,6 +93,8 @@ static unsigned int rbb_window_ms = RBB_WINDOW_MS;
 static unsigned long rbb_deadline;
 static unsigned int rbb_heat_cnt, rbb_cool_cnt, rbb_cap_cnt, rbb_blind_cnt;
 static long rbb_last_temp = -1;
+static bool rbb_temp_ever_read;
+static bool rbb_zone_diag_done;
 
 static const char *const rbb_level_name[] = { "L0", "L1", "L2", "released" };
 static const char *const rbb_state_name[] = { "wait", "active", "done" };
@@ -144,6 +151,7 @@ static void rbb_arm(void)
 	rbb_cool_cnt = 0;
 	rbb_cap_cnt = 0;
 	rbb_blind_cnt = 0;
+	rbb_temp_ever_read = false;
 	rbb_state = RBB_ACTIVE;
 	rbb_goto_level(RBB_L0, "arm");
 	schedule_delayed_work(&rbb_work, 0);
@@ -159,7 +167,8 @@ static void rbb_attach_one(int idx, struct cpufreq_policy *policy)
 
 	ret = freq_qos_add_request(&policy->constraints, &rbb_req[idx],
 				   FREQ_QOS_MIN,
-				   rbb_enabled ? c->floor[RBB_L0] : c->hw_min);
+				   (rbb_enabled && rbb_state != RBB_DONE) ?
+					c->floor[RBB_L0] : c->hw_min);
 	if (ret < 0) {
 		pr_warn("rodin_boot_boost: cpu%u qos add failed (%d)\n",
 			c->first_cpu, ret);
@@ -174,7 +183,10 @@ static void rbb_attach_one(int idx, struct cpufreq_policy *policy)
 		rbb_clusters[0].floor[RBB_L0], rbb_clusters[1].floor[RBB_L0],
 		rbb_clusters[2].floor[RBB_L0], rbb_window_ms,
 		rbb_enabled ? "" : " (disabled)");
-	if (rbb_enabled)
+	/* once the window has expired this boot never re-boosts: a late
+	 * REMOVE/CREATE policy pair (hotplug depth changes) must not
+	 * re-arm a fresh window */
+	if (rbb_enabled && rbb_state != RBB_DONE)
 		rbb_arm();
 	else
 		rbb_state = RBB_DONE;
@@ -219,12 +231,21 @@ static long rbb_read_temp(void)
 	int temp;
 	int ret;
 
-	if (!rbb_tzd) {
+	/* the name lookup returns ERR_PTR(-ENODEV), never NULL, on a miss;
+	 * a cached error pointer would fail every later tick, so only a
+	 * successful lookup is ever stored and misses are retried */
+	if (IS_ERR_OR_NULL(rbb_tzd)) {
 		rbb_tzd = thermal_zone_get_zone_by_name("soc_max");
 		if (IS_ERR_OR_NULL(rbb_tzd))
 			rbb_tzd = thermal_zone_get_zone_by_name("cpu-dsu0");
-		if (IS_ERR_OR_NULL(rbb_tzd))
+		if (IS_ERR_OR_NULL(rbb_tzd)) {
+			rbb_tzd = NULL;
+			if (!rbb_zone_diag_done) {
+				rbb_zone_diag_done = true;
+				pr_info("rodin_boot_boost: thermal zone not found yet (tried soc_max, cpu-dsu0), retrying each tick; list /sys/class/thermal to fix names\n");
+			}
 			return -1;
+		}
 	}
 
 	ret = thermal_zone_get_temp(rbb_tzd, &temp);
@@ -235,7 +256,7 @@ static void rbb_tick(struct work_struct *work)
 {
 	struct cpufreq_policy *policy;
 	struct rbb_cluster *c;
-	int cur_below = 0;
+	int capped = 0;
 	long temp;
 	int target;
 	int i;
@@ -254,13 +275,18 @@ static void rbb_tick(struct work_struct *work)
 	temp = rbb_read_temp();
 	rbb_last_temp = temp;
 	if (temp < 0) {
-		if (++rbb_blind_cnt >= RBB_BLIND_FAILS) {
+		/* zones register later than the policies: before the first
+		 * successful read, blindness is expected rather than a
+		 * fault, and the window expiry still bounds the floors */
+		if (rbb_temp_ever_read &&
+		    ++rbb_blind_cnt >= RBB_BLIND_FAILS) {
 			rbb_goto_level(RBB_RELEASED, "temp unreadable");
 			rbb_state = RBB_DONE;
 			goto out;
 		}
 	} else {
 		rbb_blind_cnt = 0;
+		rbb_temp_ever_read = true;
 
 		target = temp >= RBB_TEMP_L3 ? RBB_RELEASED :
 			 temp >= RBB_TEMP_L2 ? RBB_L2 :
@@ -285,9 +311,11 @@ static void rbb_tick(struct work_struct *work)
 	}
 
 	/*
-	 * cur pinned below our floor means something capped max (thermal,
-	 * or MIUI's own cap after boot completes); yield a step on our own
-	 * instead of leaning on the core's min>max clamp.
+	 * a real cap (thermal, or MIUI's own max clamp after boot
+	 * completes) lands on policy->max; cur lagging a freshly armed
+	 * floor is a ramp in progress, never a cap.  MIN structurally
+	 * loses to MAX, so when max drops below our floor we yield a step
+	 * on our own instead of leaning on the core's min>max clamp.
 	 */
 	if (rbb_level != RBB_RELEASED) {
 		for (i = 0; i < RBB_NR_CLUSTER; i++) {
@@ -297,12 +325,12 @@ static void rbb_tick(struct work_struct *work)
 			policy = cpufreq_cpu_get(c->first_cpu);
 			if (!policy)
 				continue;
-			if (policy->cur && policy->cur < c->floor[rbb_level])
-				cur_below++;
+			if (policy->max && policy->max < c->floor[rbb_level])
+				capped++;
 			cpufreq_cpu_put(policy);
 		}
 
-		if (cur_below) {
+		if (capped) {
 			if (++rbb_cap_cnt >= RBB_DOWN_TICKS) {
 				rbb_goto_level(rbb_level + 1, "capped");
 				rbb_heat_cnt = 0;

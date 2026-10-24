@@ -2115,14 +2115,6 @@ static void fts_fwupg_work(struct work_struct *work)
         return;
     }
 
-    /* A-142：lockdown 读取自 probe 同步路径挪入（见 fts_fwupg_init 注释）。
-     * 此处 TP 已被 probe 完成基本握手，bootloader 往返安全；work 语境的
-     * msleep 不阻塞任何启动关键路径。 */
-    ret = fts_get_lockdown_information(upg->ts_data);
-    if (ret) {
-        FTS_ERROR("get lockdown information fails");
-    }
-
     upg->ts_data->fw_loading = 1;
     fts_irq_disable();
     fts_esdcheck_switch(upg->ts_data, DISABLE);
@@ -2176,6 +2168,7 @@ int fts_fwupg_init(struct fts_ts_data *ts_data)
 {
     int i = 0;
     int j = 0;
+    int ret;
     u16 ic_stype = 0;
     struct upgrade_func *func = upgrade_func_list[0];
     int func_count = sizeof(upgrade_func_list) / sizeof(upgrade_func_list[0]);
@@ -2224,11 +2217,10 @@ int fts_fwupg_init(struct fts_ts_data *ts_data)
     }
 
     fwupgrade->ts_data = ts_data;
-    /* A-142（R2 慢单元异步化）：lockdown 读取原在此同步执行，内含
-     * reset_to_boot(msleep 10+80) + enter_into_boot + reset_in_boot(msleep 80)
-     * 的 bootloader 往返，真机 ~207ms 阻塞 vseq 重放线（2.083-2.290s）。
-     * 消费者只有 proc 调试节点（ft_read_lockdown_info_proc），晚一拍无感，
-     * 故挪入 fts_fwupg_work 开头（该 work 本就异步于 ts_workqueue）。 */
+    ret = fts_get_lockdown_information(ts_data);
+    if (ret) {
+        FTS_ERROR("get lockdown information fails");
+    }
     INIT_WORK(&ts_data->fwupg_work, fts_fwupg_work);
     INIT_DELAYED_WORK(&fwupg_retry_work, fts_fwupg_retry_workfn);
     queue_work(ts_data->ts_workqueue, &ts_data->fwupg_work);
