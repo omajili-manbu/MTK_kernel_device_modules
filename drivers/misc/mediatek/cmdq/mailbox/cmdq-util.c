@@ -752,6 +752,14 @@ void cmdq_util_set_domain(u32 hwid, u32 thrd)
 	cmdq_log("%s hwid:%d thrd:%d", __func__, hwid, thrd);
 
 	cmdq_mbox_mtcmos_by_fast(util.cmdq_mbox[hwid], true);
+/* F6SMC r149b: SMC 边界追踪扫尾（末条 ent 即未返回的 SMC；耗时看 printk 时间戳） */
+#undef arm_smccc_smc
+#define arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res) do { \
+	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
+		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
+	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
+	pr_info("F6SMC ret a0=0x%08lx\n", (unsigned long)(_a0)); \
+} while (0)
 	arm_smccc_smc(MTK_SIP_CMDQ_CONTROL, CMDQ_SET_DOMAIN_EN,
 		hwid, thrd, 0, 0, 0, 0, &res);
 	cmdq_mbox_mtcmos_by_fast(util.cmdq_mbox[hwid], false);

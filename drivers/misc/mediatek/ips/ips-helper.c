@@ -200,6 +200,14 @@ static int __mt6985_mtkips_enable(struct ips_drv_data *ips_data, bool en)
 		return 0;
 	}
 
+/* F6SMC r149b: SMC 边界追踪扫尾（末条 ent 即未返回的 SMC；耗时看 printk 时间戳） */
+#undef arm_smccc_smc
+#define arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res) do { \
+	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
+		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
+	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
+	pr_info("F6SMC ret a0=0x%08lx\n", (unsigned long)(_a0)); \
+} while (0)
 	arm_smccc_smc(MTK_SIP_DVFSRC_VCOREFS_CONTROL, MTK_SIP_VCOREFS_IPS_ENABLE,
 	ips_data->dvd->id, en, 0, 0, 0, 0,
 	&ares);
