@@ -1163,6 +1163,18 @@ static void __mt6991_set_force_opp_level(struct mtk_dvfsrc *dvfsrc, u32 level)
 	}
 }
 
+/* F6SMC r148: SMC 边界追踪（最后一条 ent 即未返回的 SMC）。
+   插入点可能在函数体内：只能有声明/宏，不能包含头文件或定义 */
+u64 sched_clock(void);
+#undef arm_smccc_smc
+#define arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res) do { \
+	u64 __f6t = sched_clock(); \
+	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
+		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
+	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
+	pr_info("F6SMC ret a0=0x%08lx dt=%luus\n", \
+		(unsigned long)(_a0), (unsigned long)((sched_clock() - __f6t) / 1000)); \
+} while (0)
 static void mt6989_set_force_opp_level(struct mtk_dvfsrc *dvfsrc, u32 level)
 {
 	unsigned long flags;

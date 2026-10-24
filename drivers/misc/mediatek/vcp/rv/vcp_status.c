@@ -83,17 +83,25 @@ EXPORT_SYMBOL_GPL(vcp_get_sram_virt_ex);
 
 int vcp_register_feature_ex(enum feature_id id)
 {
+	int __f6r;
+	pr_info("F6SMC vcp_register_feature enter id=%d\n", id);
 	if (!vcp_fp || !vcp_fp->vcp_register_feature)
 		return -1;
-	return vcp_fp->vcp_register_feature(id);
+	__f6r = vcp_fp->vcp_register_feature(id);
+	pr_info("F6SMC vcp_register_feature exit ret=%d\n", __f6r);
+	return __f6r;
 }
 EXPORT_SYMBOL_GPL(vcp_register_feature_ex);
 
 int vcp_deregister_feature_ex(enum feature_id id)
 {
+	int __f6r;
+	pr_info("F6SMC vcp_deregister_feature enter id=%d\n", id);
 	if (!vcp_fp || !vcp_fp->vcp_deregister_feature)
 		return -1;
-	return vcp_fp->vcp_deregister_feature(id);
+	__f6r = vcp_fp->vcp_deregister_feature(id);
+	pr_info("F6SMC vcp_deregister_feature exit ret=%d\n", __f6r);
+	return __f6r;
 }
 EXPORT_SYMBOL_GPL(vcp_deregister_feature_ex);
 
