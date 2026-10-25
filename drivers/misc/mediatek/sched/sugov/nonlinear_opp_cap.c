@@ -2145,16 +2145,9 @@ int init_opp_cap_info(struct proc_dir_entry *dir)
 		set_turn_point_freq(i, 0);
 	}
 
-	if (is_wl_support()) {
-		ret = dsu_pwr_swpm_init();
-		if (ret) {
-			pr_info("dsu_pwr_swpm_init failed\n");
-			return ret;
-		}
-		l3ctl_sram_base_addr = get_l3ctl_sram_base_addr();
-
-		init_eas_dsu_ctrl();
-	}
+	/* rodin 6.18（A-147 第三批）：wl 分支 dormant（is_wl_support() 恒
+	 * false）删除；dsu_pwr_swpm_init/init_eas_dsu_ctrl/l3ctl 取址随支入灭。
+	 */
 #endif
 
 	init_grp_dvfs();

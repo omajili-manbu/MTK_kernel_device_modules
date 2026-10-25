@@ -125,20 +125,10 @@ void eenv_dsu_init(void *private, int quant, unsigned int wl,
 		int PERCORE_L3_BW, unsigned int cpumask_val, unsigned long *pd_base_freq,
 		unsigned int *val, unsigned int *output)
 {
+	/* rodin 6.18（A-147 第三批）：hook 恒 NULL（全树无赋值者）⇒ 调用体删除；
+	 * 函数壳与指针保留（EXPORT 面，blob ABI）。
+	 */
 	if (eenv_dsu_init_hook) {
-		int dsu_temp = 0;
-		unsigned int dsu_freq_thermal = 0;
-
-#if IS_ENABLED(CONFIG_MTK_THERMAL_INTERFACE)
-		dsu_temp = get_dsu_temp()/1000;
-		dsu_freq_thermal = get_dsu_ceiling_freq();
-#endif
-
-		(*eenv_dsu_init_hook)(private, quant, wl,
-			PERCORE_L3_BW, cpumask_val,
-			get_l3ctl_sram_base_addr(), get_cdsu_sram_base_addr(), pd_base_freq,
-			dsu_freq_thermal, dsu_temp,
-			val, output);
 	}
 }
 
@@ -187,9 +177,11 @@ unsigned long get_dsu_pwr(int wl, int dst_cpu, unsigned long task_util,
 		unsigned long ret;
 		int data[8];
 
-		ret = mtk_get_dsu_pwr_hook(wl, dst_cpu, task_util,
-			total_util, private, extern_volt, dsu_pwr_enable,
-			(int) PERCORE_L3_BW, get_clkg_sram_base_addr(), &data[0]);
+		/* rodin 6.18（A-147 第三批）：get_clkg_sram_base_addr() 调用点随
+		 * hook 恒 NULL 分支删除；data[8] 填零保持 trace 面类型完整。
+		 */
+		memset(data, 0, sizeof(data));
+		ret = 0;
 
 		if (trace_dsu_pwr_cal_enabled()) {
 			trace_dsu_pwr_cal(dst_cpu, task_util, total_util, data[0],

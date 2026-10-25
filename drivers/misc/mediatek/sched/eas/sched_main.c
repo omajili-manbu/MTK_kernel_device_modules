@@ -382,13 +382,13 @@ static void mtk_sched_pelt_multiplier(void *data, unsigned int old_pelt,
 	default:
 		break;
 	}
-#if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)
-	if (pelt_weight && pelt_sum && is_wl_support()) {
-		/* notify pelt model */
-		update_pelt_data(pelt_weight, pelt_sum);
-		pr_info("new_pelt %d pelt_w %d pelt_s %d\n", new_pelt, pelt_weight, pelt_sum);
-	}
-#endif
+	/*
+	 * rodin 6.18（A-147 第三批）：update_pelt_data 调用点随 wl 链 dormant
+	 * （is_wl_support() 在 rodin DT 无 wl-info 下恒 false）删除；pelt8
+	 * 模型权重取值逻辑保留（值仍被上层的 sched_pelt_ctrl 接口面消费）。
+	 */
+	(void)pelt_weight;
+	(void)pelt_sum;
 }
 
 static void mtk_post_init_entity_util_avg(void *data, struct sched_entity *se)
@@ -1283,12 +1283,6 @@ static int __init mtk_scheduler_init(void)
 	sched_irq_mon_init();
 #endif
 
-#if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)
-	if (is_wl_support()) {
-		/* default value for pelt8 */
-		update_pelt_data(939, 12329);
-	}
-#endif
 
 #if IS_ENABLED(CONFIG_MTK_EAS)
 	mtk_freq_limit_notifier_register();
