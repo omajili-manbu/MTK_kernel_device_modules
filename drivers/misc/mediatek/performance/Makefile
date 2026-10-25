@@ -36,12 +36,6 @@ MTK_IOCTL_POWERHAL_SRC = $(MTK_IOCTL_POWERHAL)
 obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += mtk_ioctl_powerhal.o
 mtk_ioctl_powerhal-objs += $(MTK_IOCTL_POWERHAL_SRC)
 
-# mtk_perf_ioctl_magt
-MTK_PERF_IOCTL_MAGT = $(mtk_perf_ioctl_magt_objs:%.o=perf_ioctl/%.o)
-MTK_PERF_IOCTL_MAGT_SRC = $(MTK_PERF_IOCTL_MAGT)
-obj-$(CONFIG_MTK_PERF_IOCTL_MAGT) += mtk_perf_ioctl_magt.o
-mtk_perf_ioctl_magt-objs += $(MTK_PERF_IOCTL_MAGT_SRC)
-
 # mtk_game
 mtk_game_objs += game.o
 MTK_GAME = $(mtk_game_objs:%.o=game/%.o)
@@ -57,9 +51,6 @@ obj-$(CONFIG_MTK_FRS) += frs/
 # 私有补丁，源码内建后不再被引用 —— 4-9 闭包实测对该件零影响。
 obj-$(CONFIG_MTK_POWERHAL_CPU_CTRL) += powerhal_cpu_ctrl/
 obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += touch_boost/
-
-obj-$(CONFIG_MTK_LOAD_TRACKER) += load_track/
-obj-$(CONFIG_MTK_LOAD_TRACKER) += uload_ind/
 
 # rodin A-142 R1: boot-window all-core freq QoS floor, thermal-follow release
 obj-y += rodin_boot_boost.o
