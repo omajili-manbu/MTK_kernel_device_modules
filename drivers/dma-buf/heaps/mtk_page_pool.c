@@ -237,10 +237,13 @@ int mtk_dmabuf_page_pool_do_shrink(struct mtk_dmabuf_page_pool *pool, gfp_t gfp_
 		mtk_dmabuf_page_pool_free_pages(pool, page);
 		freed += (1 << pool->order);
 
-		/* rodin b262 (A-113): stock blob 0x9FA8 keeps a floor inside the
+		/* rodin b262 (A-113): stock blob keeps a floor inside the
 		 * dynamic order-0/order-4 pools once the reserve feature is on
 		 * and the box has more than 6G; the reserve pools themselves
-		 * (is_reserve_pool) are exempt and drain to empty. */
+		 * (is_reserve_pool) are exempt and drain to empty.
+		 * 2026-10-25 对账：blob do_shrink 0x4150 同为 (count<<order)
+		 * 与 0x6400/0x780 比较（页数口径，order-4 地板 = 1920 页 =
+		 * 7.5MB），与下式逐位一致；勿按 chunk 口径误判差 16 倍。 */
 		if (pool->is_reserve_pool)
 			continue;
 		if (totalram_pages() <= RESERVE_SMALLRAM_PAGES)

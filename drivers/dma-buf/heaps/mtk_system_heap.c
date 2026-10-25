@@ -482,6 +482,12 @@ static int reserve_pool_refill_kthread(void *data)
 		struct mtk_dmabuf_page_pool *pool = pools[i];
 		int lowmark, total;
 
+		/* init 建池失败链会把失败槽连同此前已建池一并置 NULL 后
+		 * continue，kthread 随后照起（blob 同名线程同样不判空、blob
+		 * init 失败分支同形）——此处为防御性加固，空槽跳过本轮 */
+		if (!pool)
+			goto next_pool;
+
 		lowmark = reserve_extend_info.lowmark[reserve_slot_of_order(pool->order)];
 		total = reserve_pool_total_chunks(pool);
 
@@ -529,6 +535,7 @@ static int reserve_pool_refill_kthread(void *data)
 			       "reserve_pool_lowmark", pool->order, lo, hi);
 		}
 
+next_pool:
 		i++;
 		if (i >= NUM_ORDERS) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -1684,11 +1691,12 @@ static void system_heap_buf_free(struct mtk_deferred_freelist_item *item,
 					pool->count[POOL_HIGHPAGE];
 				spin_unlock(&pool->lock);
 
-				/* rodin b262 (A-113): blob 0x7EF8 -- a dynamic
-				 * pool at its 100MB cap overflows the freed
-				 * chunk into the reserve pool when that
-				 * pool's lowmark still has head-room */
-				if (total < (RESERVE_POOL_CAP_CHUNKS >> orders[j]) &&
+				/* rodin b262 (A-113): blob system_heap_buf_free
+				 * 0x1F18-0x1F34（0x6400 lsr order 后 cmp，b.lt
+				 * 归动态池）-- 动态池达 100MB cap 时溢出的释放
+				 * chunk 才转投 reserve pool（且其 lowmark 仍有
+				 * 余量）；低于 cap 归还原动态池 */
+				if (total >= (RESERVE_POOL_CAP_CHUNKS >> orders[j]) &&
 				    need_free_to_reserve_pool(j))
 					mtk_dmabuf_page_pool_free(system_reserve_pools[j],
 								  page);
