@@ -831,6 +831,11 @@ static void ufs_mtk_mcq_disable_irq(struct ufs_hba *hba)
 	if (host->mcq_nr_intr == 0)
 		return;
 
+	/* 与 enable 侧对称：重复 disable 会让深度失衡，之后一次 enable
+	 * 无法恢复中断 */
+	if (host->is_mcq_intr_enabled == false)
+		return;
+
 	for (i = 0; i < host->mcq_nr_intr; i++) {
 		irq = host->mcq_intr_info[i].irq;
 		disable_irq(irq);
