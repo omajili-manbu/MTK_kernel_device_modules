@@ -181,7 +181,6 @@ static int avg_cpu_loading;
 static int cpu_loading_thres = 95;
 static int tt_vip_enable = 1;
 static int binder_vip_inheritance_enable = 1;
-static int binder_nonvip_inheritance_enable;
 static struct cpu_info ci;
 static u64 checked_timestamp;
 static int max_cpus;
@@ -620,30 +619,12 @@ module_param_cb(enable_binder_vip_inheritance
 		, &enable_binder_vip_inheritance_ops, &binder_vip_inheritance_enable, 0664);
 MODULE_PARM_DESC(enable_binder_vip_inheritance, "Enable or disable binder vip inheritance");
 
-static int enable_binder_nonvip_inheritance(const char *buf, const struct kernel_param *kp)
-{
-	int retval = 0, val = 0;
-
-	retval = kstrtouint(buf, 0, &val);
-
-	if (retval)
-		return -EINVAL;
-
-	if (val < 0)
-		return -EINVAL;
-
-	binder_nonvip_inheritance_enable = !!val;
-	return retval;
-}
-
-static const struct kernel_param_ops enable_binder_nonvip_inheritance_ops = {
-	.set = enable_binder_nonvip_inheritance,
-	.get = param_get_int,
-};
-
-module_param_cb(enable_binder_nonvip_inheritance
-		, &enable_binder_nonvip_inheritance_ops, &binder_nonvip_inheritance_enable, 0664);
-MODULE_PARM_DESC(enable_binder_nonvip_inheritance, "Enable or disable binder nonvip inheritance");
+/*
+ * rodin 6.18：enable_binder_nonvip_inheritance 旋钮已删除——其数据
+ * binder_nonvip_inheritance_enable 树内零读者（binder VIP 继承的真实
+ * 消费方是未编且被丢载的 task_turbo_v sidecar，走 hook 指针面），保留
+ * 只会给用户态一个无效果的开关假象。
+ */
 /*
  * enforce_ct_to_vip - Enforce critical task(ct) VIP status based on caller id
  * @val: the value indicating whether to enforce VIP status
@@ -697,6 +678,9 @@ EXPORT_SYMBOL_GPL(enforce_ct_to_vip);
  * Return: 0 on success, negative error code on failure
  */
 static char enforced_qualified_param[64] = "";
+static int enforced_ct_last_val = -1;
+static int enforced_ct_last_caller = -1;
+
 static int enforce_ct_to_vip_param(const char *buf, const struct kernel_param *kp)
 {
 	int val = 0, caller_id = 0;
@@ -704,12 +688,26 @@ static int enforce_ct_to_vip_param(const char *buf, const struct kernel_param *k
 	if (sscanf(buf, "%d %d", &val, &caller_id) != 2)
 		return -EINVAL;
 
+	enforced_ct_last_val = val;
+	enforced_ct_last_caller = caller_id;
+
 	return enforce_ct_to_vip(val, caller_id);
+}
+
+/*
+ * rodin 6.18：.get 原挂 param_get_int 而数据是 char[64]，读参数时按 int
+ * 重解释字符串缓冲，恒读出无意义值。改为回显最近一次写入的两个整数，
+ * 与 .set 的 "%d %d" 对偶。
+ */
+static int enforce_ct_to_vip_param_get(char *buf, const struct kernel_param *kp)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d %d\n",
+			 enforced_ct_last_val, enforced_ct_last_caller);
 }
 
 static const struct kernel_param_ops enforce_ct_to_vip_param_ops = {
 	.set = enforce_ct_to_vip_param,
-	.get = param_get_int,
+	.get = enforce_ct_to_vip_param_get,
 };
 module_param_cb(enforce_ct_to_vip_param, &enforce_ct_to_vip_param_ops,
 				&enforced_qualified_param, 0664);
