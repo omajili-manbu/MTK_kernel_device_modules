@@ -7,10 +7,11 @@
  * slowly to matter, so the whole ~24s boot runs near the cluster floor
  * OPPs.  For one window after the cpufreq policies appear this pins a
  * FREQ_QOS_MIN floor at each cluster's top hw OPP (2.1/3.0/3.25 GHz on
- * rodin), then hands the machine back before the wall: a
- * thermal-follow law walks the floors down stepwise and releases them
- * entirely at 85C, so stock thermal never gets a floor it has to fight
- * and its cpu_isolate fallback stays out of reach.
+ * rodin), then hands the machine back the moment the userspace thermal
+ * manager starts clamping max (85C and window expiry are backstops): a
+ * thermal-follow law walks the floors down stepwise in the meantime,
+ * so stock thermal never gets a floor it has to fight and its
+ * cpu_isolate fallback stays out of reach.
  *
  * Safety rails, in order of authority:
  *  - MIN requests structurally lose to any MAX cap: the cpufreq core
@@ -22,13 +23,18 @@
  *    in progress, never a cap.
  *  - soc_max temperature bands drive the same stepwise walk, with
  *    asymmetric persistence (2 ticks to step down, 3 to step back up).
+ *  - the normal stop is a handover: the userspace thermal manager
+ *    (mi_thermald) starts clamping policy->max within seconds of boot,
+ *    and the first sustained sight of a max below our floor releases
+ *    the floors outright instead of sawtoothing against its clamps.
  *  - a read-failure streak on the thermal zone or the window expiry
  *    releases everything; the requests stay in place at hw_min so that
  *    policy teardown/rebuild cannot race them.  Thermal zones register
  *    later than the cpufreq policies on this platform, so blindness
  *    before the first successful read is not a fault and only the
- *    window bounds it.  Once the window has expired the boost never
- *    re-arms, so a late REMOVE/CREATE policy pair must land on hw_min.
+ *    window bounds it.  Once stopped the boost never re-arms, so a
+ *    late REMOVE/CREATE policy pair must land on hw_min.  The 30s
+ *    window only backstops a boot where the handover never arrives.
  *
  * A/B: rodin_boot_boost=off on the cmdline, or the sysfs knobs below.
  */
@@ -50,7 +56,7 @@
 
 #define RBB_NR_CLUSTER	3
 #define RBB_TICK_MS	150
-#define RBB_WINDOW_MS	26000
+#define RBB_WINDOW_MS	30000
 #define RBB_TEMP_L1	78000
 #define RBB_TEMP_L2	82000
 #define RBB_TEMP_L3	85000
@@ -313,9 +319,12 @@ static void rbb_tick(struct work_struct *work)
 	/*
 	 * a real cap (thermal, or MIUI's own max clamp after boot
 	 * completes) lands on policy->max; cur lagging a freshly armed
-	 * floor is a ramp in progress, never a cap.  MIN structurally
-	 * loses to MAX, so when max drops below our floor we yield a step
-	 * on our own instead of leaning on the core's min>max clamp.
+	 * floor is a ramp in progress, never a cap.  A max sustained below
+	 * our floor means the userspace thermal manager has taken over
+	 * frequency management (mi_thermald clamps max within seconds of
+	 * boot): hand over outright instead of sawtoothing against its
+	 * clamps -- the window only backstops a boot where the handover
+	 * never arrives.
 	 */
 	if (rbb_level != RBB_RELEASED) {
 		for (i = 0; i < RBB_NR_CLUSTER; i++) {
@@ -332,10 +341,9 @@ static void rbb_tick(struct work_struct *work)
 
 		if (capped) {
 			if (++rbb_cap_cnt >= RBB_DOWN_TICKS) {
-				rbb_goto_level(rbb_level + 1, "capped");
-				rbb_heat_cnt = 0;
-				rbb_cool_cnt = 0;
-				rbb_cap_cnt = 0;
+				rbb_goto_level(RBB_RELEASED, "handover");
+				rbb_state = RBB_DONE;
+				goto out;
 			}
 		} else {
 			rbb_cap_cnt = 0;
