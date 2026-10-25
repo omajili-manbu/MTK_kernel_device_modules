@@ -1295,9 +1295,14 @@ static int __init mtk_scheduler_init(void)
 
 	soft_affinity_init();
 
+	/*
+	 * rodin 6.18：init_sram_info 失败不再终止本 init——它只影响
+	 * thermal-info SRAM 映射（sram_base_addr 树内只写不读），原实现
+	 * 的硬失败会跳过其后的全部 hook 注册与 /proc/easmgr 节点创建。
+	 */
 	ret = init_sram_info();
 	if (ret)
-		return ret;
+		pr_info("init_sram_info failed, ret=%d (thermal-info SRAM unmapped, continue)\n", ret);
 
 	/*
 	 * rodin 6.18：android_rvh_find_busiest_group 与 android_rvh_find_energy_efficient_cpu
