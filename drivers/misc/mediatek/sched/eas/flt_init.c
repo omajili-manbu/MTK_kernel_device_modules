@@ -542,6 +542,7 @@ int flt_init_res(void)
 		return -1;
 	} else {
 		ret = flt_tul();
+		pr_info("flt_init_res: flt_tul ret=%d mode=%u\n", ret, flt_mode);
 		if (ret)
 			return ret;
 
