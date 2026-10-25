@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/cpumask.h>
 #include <linux/cpu.h>
+#include <linux/topology.h>
 #include <linux/seq_file.h>
 #include <linux/energy_model.h>
 #include <linux/jump_label.h>
@@ -1062,6 +1063,157 @@ void exit_flt_platform(void)
 #endif
 
 
+/*
+ * rodin 6.18：native EAS bridge（sugov_ext 下放行 6.18 native EAS 资格）。
+ *
+ * 6.18 的 EAS 资格路径（kernel/sched/topology.c sched_is_eas_possible()）
+ * 第一步就是 android_rvh_build_perf_domains：回调置 true 即直接判定可用；
+ * 置 false 则继续走标准检查。标准检查里 cpufreq_ready_for_eas() 的
+ * governor 身份门（sugov_is_governor() 与内核 schedutil_gov 指针比较）
+ * 使本平台恒失败——三 policy 的 governor 是 vendor sugov_ext（mtk_gov），
+ * perf domain 无法建立（sched_energy_aware 读为 0 字节）。
+ *
+ * 这里注册该回调做 fail-closed 的资格复核，只有下列条件全部成立才置
+ * true（即 hook 绕过的全部前置条件）：
+ *  1) 不对称容量拓扑：online CPU 有 >=2 个不同 capacity 值，且
+ *     sd_asym_cpucapacity 已建立；
+ *  2) 无 SMT；
+ *  3) 频率不变性：cpufreq FIE 生效、per-cpu freq scale 因子健全
+ *     （mtk_arch_set_freq_scale 经 android_vh_arch_set_freq_scale 覆写，
+ *      载体仍是 arch_freq_scale）；
+ *  4) policy 覆盖全集：每个 online CPU 的 policy 都是 mtk-cpufreq-hw +
+ *     governor=sugov_ext（等价于被绕过的 cpufreq_ready_for_eas 语义，
+ *     按 MTK governor 放行——这是本实验的有意识 override 点）；
+ *  5) EM 完整：每 CPU 有真实硬件表（非 artificial、MICROWATTS），状态数
+ *     >=2、频率严格递增、功率非退化；
+ *  6) 回调无状态：不缓存 cpu mask，每次重建路径实时读；不读写 rd->pd，
+ *     域的建立与 sched_energy_present 仍由 kernel build_perf_domains()/
+ *     sched_energy_set() 原路径完成。
+ *
+ * 任何一项不成立保持 false，落回标准路径——标准路径在内核 schedutil
+ * governor 下自行成立，本回调对 schedutil 场景是纯加法、无否决权。
+ * 触发面：内核 schedutil 在 governor 变更（sugov_init/sugov_exit）调用
+ * em_rebuild_sched_domains()，用户态把 policy 切到 sugov_ext 即触发重建；
+ * CPU hotplug / cpuset partition 变更经 partition_sched_domains_locked()
+ * 同样进入 build_perf_domains()。
+ */
+#if IS_BUILTIN(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
+extern struct cpufreq_governor mtk_gov;	/* sugov/cpufreq_sugov_main.c */
+
+static void mtk_eas_bridge_build_perf_domains(void *unused, bool *eas_check)
+{
+	const char *drv;
+	struct cpufreq_policy *policy;
+	struct em_perf_domain *em;
+	struct em_perf_table *table;
+	unsigned long cap0 = 0;
+	static bool logged;
+	bool cap_asym = false, asym_ptr = false;
+	int cpu, i, nr;
+
+	if (!eas_check || *eas_check)
+		return;
+
+	for_each_online_cpu(cpu) {
+		unsigned long cap = topology_get_cpu_scale(cpu);
+
+		if (!cap0) {
+			cap0 = cap;
+			continue;
+		}
+		if (cap != cap0) {
+			cap_asym = true;
+			break;
+		}
+	}
+	if (!cap_asym)
+		return;
+
+	for_each_online_cpu(cpu) {
+		if (rcu_access_pointer(per_cpu(sd_asym_cpucapacity, cpu))) {
+			asym_ptr = true;
+			break;
+		}
+	}
+	if (!asym_ptr)
+		return;
+
+	if (sched_smt_active())
+		return;
+
+	if (!arch_scale_freq_invariant())
+		return;
+	for_each_online_cpu(cpu) {
+		unsigned long fs = topology_get_freq_scale(cpu);
+
+		if (!fs || fs > SCHED_CAPACITY_SCALE)
+			return;
+	}
+
+	rcu_read_lock();
+
+	/* policy 覆盖全集：三 policy 全部 governor=sugov_ext 且
+	 * driver=mtk-cpufreq-hw——等价于被绕过的 cpufreq_ready_for_eas
+	 * 语义按 MTK governor 放行，这是本实验的有意识 override 点。
+	 * （本树 cpufreq_driver 指针是 cpufreq.c 私有 static，走
+	 *  cpufreq_get_current_driver() 取驱动名。） */
+	drv = cpufreq_get_current_driver();
+	if (!drv || strcmp(drv, "mtk-cpufreq-hw")) {
+		rcu_read_unlock();
+		return;
+	}
+	for_each_online_cpu(cpu) {
+		policy = cpufreq_cpu_get_raw(cpu);
+
+		if (!policy || policy->governor != &mtk_gov) {
+			rcu_read_unlock();
+			return;
+		}
+	}
+
+	for_each_online_cpu(cpu) {
+		em = em_cpu_get(cpu);
+
+		if (!em ||
+		    (em->flags & EM_PERF_DOMAIN_ARTIFICIAL) ||
+		    !(em->flags & EM_PERF_DOMAIN_MICROWATTS)) {
+			rcu_read_unlock();
+			return;
+		}
+		nr = em_pd_nr_perf_states(em);
+		if (nr < 2) {
+			rcu_read_unlock();
+			return;
+		}
+		table = rcu_dereference(em->em_table);
+		if (!table) {
+			rcu_read_unlock();
+			return;
+		}
+		for (i = 0; i < nr; i++) {
+			if (i && table->state[i].frequency <=
+				 table->state[i - 1].frequency) {
+				rcu_read_unlock();
+				return;
+			}
+			if (!table->state[i].power ||
+			    table->state[i].power > EM_MAX_POWER) {
+				rcu_read_unlock();
+				return;
+			}
+		}
+	}
+
+	rcu_read_unlock();
+
+	*eas_check = true;
+	if (!logged) {
+		logged = true;
+		pr_info("rodin-sched: native EAS bridge pass: sugov_ext@all policy, mtk-cpufreq-hw, EM complete\n");
+	}
+}
+#endif
+
 static int __init mtk_scheduler_init(void)
 {
 	struct proc_dir_entry *pe, *parent;
@@ -1265,6 +1417,13 @@ static int __init mtk_scheduler_init(void)
 	ret = register_trace_android_rvh_set_cpus_allowed_ptr(mtk_set_cpus_allowed_ptr, NULL);
 	if (ret)
 		pr_info("register mtk_set_cpus_allowed_ptr hooks failed, returned %d\n", ret);
+
+#if IS_BUILTIN(CONFIG_MTK_CPUFREQ_SUGOV_EXT)
+	ret = register_trace_android_rvh_build_perf_domains(
+			mtk_eas_bridge_build_perf_domains, NULL);
+	if (ret)
+		pr_info("register android_rvh_build_perf_domains failed, returned %d\n", ret);
+#endif
 
 out_wq:
 	return ret;
