@@ -550,12 +550,6 @@ int flt_init_res(void)
 		case FLT_MODE_2:
 			flt_register_api_hooks_mode2();
 			break;
-		case FLT_MODE_3:
-			flt_register_api_hooks_mode3();
-			break;
-		case FLT_MODE_4:
-			flt_register_api_hooks_mode4();
-			break;
 		default:
 			return -1;
 		}

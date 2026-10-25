@@ -801,9 +801,6 @@ void check_for_migration(struct task_struct *p)
 		struct em_perf_state *em_states;
 		struct cpufreq_policy *policy;
 		int opp_curr = 0, thre = 0, thre_idx = 0;
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-		int thre_rot = 0, thre_rot_idx = 0;
-#endif
 
 		if (READ_ONCE(curr->__state) != TASK_RUNNING ||
 			READ_ONCE(curr->nr_cpus_allowed) == 1)
@@ -828,11 +825,6 @@ void check_for_migration(struct task_struct *p)
 		if (thre_idx >= 0)
 			thre = em_states[thre_idx].frequency;
 
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-		thre_rot_idx = (pd->nr_perf_states >> 1) - 1;
-		if (thre_rot_idx >= 0)
-			thre_rot = em_states[thre_rot_idx].frequency;
-#endif
 		rcu_read_unlock();
 
 		policy = cpufreq_cpu_get(cpu);
@@ -880,12 +872,6 @@ void check_for_migration(struct task_struct *p)
 			migrate_running_task(new_cpu, p, rq, MIGR_TICK_PULL_MISFIT_RUNNING);
 			irq_log_store();
 		} else {
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-			if (opp_curr > thre_rot) {
-				task_check_for_rotation(rq);
-				irq_log_store();
-			}
-#endif
 			raw_spin_unlock(&migration_lock);
 		}
 	}
@@ -897,19 +883,12 @@ void hook_scheduler_tick(void *data, struct rq *rq)
 	if (!get_eas_hook())
 		return;
 
-	struct root_domain *rd = rq->rd;
-
 	/*
-	 * rodin 6.18（S6/P-40）：rd->android_vendor_data1 在这里被当作
-	 * "本 rd 上有多个重载任务"的 bool 标量使用，写侧在 rq lock 之外
-	 * （tick 钩子），读侧两处（fair.c 的迁移挑任务、rotate.c 的旋转门）。
-	 * 标量语义只需 WRITE_ONCE/READ_ONCE 证伪撕裂与重排，不要挪进
-	 * rq lock —— 那样等于持锁做 O(n) 跨核扫描。
+	 * rodin 6.18（A-147 首批）：rotate 层删除后 rd->android_vendor_data1
+	 * 的唯一写者（system_has_many_heavy_task，rotate.c）不复存在；读侧
+	 * （fair.c 迁移挑任务）读到恒 0 —— 与删除前完全一致（写者本就在
+	 * get_eas_hook()=0 的早退之后，从未实际执行）。
 	 */
-	rcu_read_lock();
-	WRITE_ONCE(rd->android_vendor_data1, system_has_many_heavy_task());
-	rcu_read_unlock();
-
 	if (rq->curr->policy == SCHED_NORMAL)
 		check_for_migration(rq->curr);
 }
@@ -927,9 +906,6 @@ void mtk_hook_after_enqueue_task(void *data, struct rq *rq,
 
 	irq_log_store();
 
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-	rotat_after_enqueue_task(data, rq, p);
-#endif
 	irq_log_store();
 
 #if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)

@@ -56,9 +56,6 @@ int init_sched_common_sysfs(void)
 		goto error;
 	kobject_uevent(kobj, KOBJ_ADD);
 
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-	task_rotate_init();
-#endif
 
 	return 0;
 

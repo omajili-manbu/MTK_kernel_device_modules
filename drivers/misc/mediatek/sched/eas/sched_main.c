@@ -1379,15 +1379,6 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		pr_info("register android_rvh_after_enqueue_task failed, returned %d\n", ret);
 
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-	ret = register_trace_android_rvh_new_task_stats(rotat_task_stats, NULL);
-	if (ret)
-		pr_info("register android_rvh_new_task_stats failed, returned %d\n", ret);
-
-	ret = register_trace_task_newtask(rotat_task_newtask, NULL);
-	if (ret)
-		pr_info("register trace_task_newtask failed, returned %d\n", ret);
-#endif
 	ret = register_trace_android_rvh_select_task_rq_rt(mtk_select_task_rq_rt, NULL);
 	if (ret)
 		pr_info("register mtk_select_task_rq_rt hooks failed, returned %d\n", ret);
@@ -1439,9 +1430,6 @@ static void __exit mtk_scheduler_exit(void)
 {
 	mtk_sched_trace_exit();
 	unregister_trace_android_vh_scheduler_tick(hook_scheduler_tick, NULL);
-#if IS_ENABLED(CONFIG_MTK_SCHED_BIG_TASK_ROTATE)
-	unregister_trace_task_newtask(rotat_task_newtask, NULL);
-#endif
 	cleanup_sched_common_sysfs();
 #if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 	exit_flt_platform();
