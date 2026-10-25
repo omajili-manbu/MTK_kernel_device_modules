@@ -256,11 +256,18 @@ static void btag_fuse_request_send(void *data, const struct fuse_req *req)
 			total_unlink_cnt++;
 #endif
 
-		pid_fuse_stats[current->pid].req_cnt++;
-		pid_fuse_stats[current->pid].tgid = current->tgid;
-		if (pid_fuse_stats[current->pid].req_cnt > fuse_req_max_cnt) {
-			fuse_req_max_cnt = pid_fuse_stats[current->pid].req_cnt;
-			fuse_req_max_cnt_pid = current->pid;
+		/* 数组按 TEMP_PID_CNT 分配，pid_max 若被运行期抬高越过边界即堆
+		 * 越界写（当前实测 pid_max=32768 恒界内，此处为防御）；越界请求
+		 * 跳过统计。读侧 fuse_req_max_cnt_pid 仅在此赋值，界内性随之保证。
+		 * NULL 检查盖住 tracepoint 已装、数组未分配的 init 窗口。 */
+		if (pid_fuse_stats && current->pid >= 0 &&
+		    current->pid < TEMP_PID_CNT) {
+			pid_fuse_stats[current->pid].req_cnt++;
+			pid_fuse_stats[current->pid].tgid = current->tgid;
+			if (pid_fuse_stats[current->pid].req_cnt > fuse_req_max_cnt) {
+				fuse_req_max_cnt = pid_fuse_stats[current->pid].req_cnt;
+				fuse_req_max_cnt_pid = current->pid;
+			}
 		}
 
 		spin_unlock_irqrestore(&stat_lock, flags);
@@ -657,9 +664,16 @@ void mtk_btag_fuse_init(struct proc_dir_entry *btag_root)
 	}
 
 	pid_fuse_stats = kzalloc(sizeof(struct pid_fuse_stat_entry)*TEMP_PID_CNT, GFP_KERNEL);
+	if (!pid_fuse_stats) {
+		ret = -ENOMEM;
+		pr_err("fuse stats alloc failed (%d)\n", ret);
+		goto free_control_e;
+	}
 
 	return;
 
+free_control_e:
+	proc_remove(control_e);
 free_pstat_e:
 	proc_remove(pstat_e);
 free_stat_e:
