@@ -2122,17 +2122,23 @@ static void fts_fwupg_work(struct work_struct *work)
     /* get fw */
     ret = fts_fwupg_get_fw_file(upg);
     if (ret < 0) {
-        if (!rodin_vendor_fw_ready()) {
+        if (!rodin_vendor_fw_ready() &&
+            fwupg_retry_cnt < FTS_FWUPG_RETRY_MAX) {
             /*
              * -ENOENT almost surely means /vendor/firmware is not
-             * mounted yet: skip the fixed 2s backoff and enter the
-             * retry workfn right away, which blocks on the vendor
-             * firmware gate and re-runs this work as soon as the
-             * directory shows up.
+             * mounted yet: retry on the shared 2s backoff and let the
+             * retry workfn block on the vendor firmware gate.  The
+             * counter bounds this branch -- once the gate gave up
+             * (dir never showed up) it falls through to the terminal
+             * error path instead of ping-ponging at 0 delay.  The
+             * common exit below re-enables the touch IRQ between
+             * rounds so the panel stays alive while waiting.
              */
-            FTS_INFO("get file fail, vendor fw dir not ready, wait gate");
-            queue_delayed_work(system_wq, &fwupg_retry_work, 0);
-            return;
+            fwupg_retry_cnt++;
+            FTS_INFO("get file fail, vendor fw dir not ready, wait gate round %d/%d",
+                     fwupg_retry_cnt, FTS_FWUPG_RETRY_MAX);
+            schedule_delayed_work(&fwupg_retry_work, FTS_FWUPG_RETRY_DELAY);
+            goto out;
         }
         fwupg_retry_cnt++;
         if (fwupg_retry_cnt <= FTS_FWUPG_RETRY_MAX) {
@@ -2153,6 +2159,7 @@ static void fts_fwupg_work(struct work_struct *work)
         fts_fwupg_auto_upgrade(upg);
     }
 
+out:
     fts_esdcheck_switch(upg->ts_data, ENABLE);
     fts_irq_enable();
     upg->ts_data->fw_loading = 0;
