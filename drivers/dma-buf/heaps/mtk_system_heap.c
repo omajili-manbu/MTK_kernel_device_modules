@@ -150,6 +150,8 @@ static int pool_pid_usable_index;
 static bool use_name_cmp;
 static struct mtk_dmabuf_page_pool **config_show_pools;
 static struct task_struct *reserve_refill_task;
+/* fail-closed（zswap_setup 形）：init 任一步失败即置位，enable_store 据此拒绝 */
+static bool reserve_init_failed;
 
 static int reserve_slot_of_order(unsigned int order)
 {
@@ -482,10 +484,10 @@ static int reserve_pool_refill_kthread(void *data)
 		struct mtk_dmabuf_page_pool *pool = pools[i];
 		int lowmark, total;
 
-		/* init 建池失败链会把失败槽连同此前已建池一并置 NULL 后
-		 * continue，kthread 随后照起（blob 同名线程同样不判空、blob
-		 * init 失败分支同形）——此处为防御性加固，空槽跳过本轮 */
-		if (!pool)
+		/* tripwire：init 已是全有全无（fail 路径整体回滚且不起线程），
+		 * NULL 槽不应存在；blob 同名线程无判空（NULL 即 panic），此处
+		 * WARN 后跳过兜底 */
+		if (WARN_ON_ONCE(!pool))
 			goto next_pool;
 
 		lowmark = reserve_extend_info.lowmark[reserve_slot_of_order(pool->order)];
@@ -585,6 +587,16 @@ static ssize_t enable_store(struct kobject *kobj, struct kobj_attribute *attr,
 	struct mtk_dmabuf_page_pool *pool;
 	struct page *page, *tmp;
 	int val, ret, i, n;
+
+	/* fail-closed 使能门（zswap_setup 形，mm/zswap.c:583 setter 传播
+	 * setup 失败）：init 失败/任一池缺席即拒绝，堵死"init 失败后经
+	 * sysfs 再拉起半建态"的窗口（正常情况下 sysfs face 本身只在三池
+	 * +refill 线程就绪后才创建，此门为兜底） */
+	if (reserve_init_failed || !system_reserve_pools[0] ||
+	    !system_reserve_pools[1] || !system_reserve_pools[2]) {
+		printk(KERN_ERR "reserve_pool: enable rejected, init incomplete\n");
+		return -ENODEV;
+	}
 
 	ret = kstrtoint(buf, 0, &val);
 	if (ret)
@@ -877,6 +889,10 @@ static void mtk_sys_heap_reserve_pool_init(struct mtk_dmabuf_page_pool **page_po
 
 	g_mem_type_index = totalram_pages() > RESERVE_BIGRAM_PAGES;
 
+	/* 全有全无构造（bioset_init 形，block/bio.c:1814）：任一池建失败即
+	 * goto fail 整体回滚——失败 ≠ continue 留半建态继续跑，消费者在
+	 * 结构上不可能见到半成品三池（mempool 语义：预留池要么在建池时
+	 * 保证，要么整个对象不交付） */
 	for (i = 0; i < NUM_ORDERS; i++) {
 		system_reserve_pools[i] = mtk_dmabuf_page_pool_create(order_flags[i],
 								     orders[i]);
@@ -884,11 +900,7 @@ static void mtk_sys_heap_reserve_pool_init(struct mtk_dmabuf_page_pool **page_po
 			printk(KERN_ERR
 			       "%s: page pool creation failed for the order %u pool!\n",
 			       __func__, orders[i]);
-			for (j = 0; j < i; j++) {
-				mtk_dmabuf_page_pool_destroy(system_reserve_pools[j]);
-				system_reserve_pools[j] = NULL;
-			}
-			continue;
+			goto fail;
 		}
 		printk(KERN_INFO "%s: order<%d> reserve page pool create success!\n",
 		       __func__, orders[i]);
@@ -913,18 +925,7 @@ static void mtk_sys_heap_reserve_pool_init(struct mtk_dmabuf_page_pool **page_po
 	reserve_extend_info.enabled = 1;
 	reserve_pool_enable = 1;
 
-	reserve_kobj = kobject_create_and_add("reserve_pool", kernel_kobj);
-	if (!reserve_kobj) {
-		printk(KERN_ERR "failed to create reserve pool node.\n");
-		goto kthread;
-	}
-	ret = sysfs_create_group(reserve_kobj, &reserve_pool_attr_group);
-	if (ret) {
-		printk(KERN_ERR "failed to create reserve pool attrs.\n");
-		kobject_put(reserve_kobj);
-	}
-
-kthread:
+	/* refill 线程先于 sysfs face 就绪；全有全无下只有三池齐了才走到这里 */
 	reserve_refill_task = kthread_create_on_node(reserve_pool_refill_kthread,
 						     system_reserve_pools,
 						     NUMA_NO_NODE, "reserve-refill");
@@ -932,7 +933,7 @@ kthread:
 		printk(KERN_ERR "%s: failed to create reserve-refill: %ld\n",
 		       __func__, PTR_ERR(reserve_refill_task));
 		reserve_refill_task = NULL;
-		return;
+		goto fail;
 	}
 	wake_up_process(reserve_refill_task);
 	ret = sched_setattr(reserve_refill_task, &attr);
@@ -945,6 +946,38 @@ kthread:
 		if (system_reserve_pools[i])
 			system_reserve_pools[i]->refill_kthread = reserve_refill_task;
 	}
+
+	/* 可见性最后挂（dma_heap_add 形，drivers/dma-buf/dma-heap.c:316：
+	 * list_add 前任何一步失败沿 err3..err0 逆序拆除，注册失败的对象
+	 * 永不出现在 /dev/dma_heap）——sysfs/enable face 在三池 + refill
+	 * 线程全部就绪后才可见，失败态在用户态没有可摸的入口 */
+	reserve_kobj = kobject_create_and_add("reserve_pool", kernel_kobj);
+	if (!reserve_kobj) {
+		printk(KERN_ERR "failed to create reserve pool node.\n");
+		return;
+	}
+	ret = sysfs_create_group(reserve_kobj, &reserve_pool_attr_group);
+	if (ret) {
+		printk(KERN_ERR "failed to create reserve pool attrs.\n");
+		kobject_put(reserve_kobj);
+	}
+	return;
+
+fail:
+	/* 整体回滚 + fail-closed（zswap_setup 形，mm/zswap.c:1785：初始化
+	 * 失败即 zswap_enabled=false 并返回错误，setter 首次使能才调 setup
+	 * 且传播失败）——blob 原形为 continue 留半建态 + refill 线程无判空
+	 * （NULL 即 panic）；错误路径优于 blob 原形（panic → 优雅禁用） */
+	for (j = 0; j < NUM_ORDERS; j++) {
+		if (system_reserve_pools[j]) {
+			mtk_dmabuf_page_pool_destroy(system_reserve_pools[j]);
+			system_reserve_pools[j] = NULL;
+		}
+	}
+	reserve_extend_info.enabled = 0;
+	reserve_pool_enable = 0;
+	reserve_init_failed = true;
+	printk(KERN_ERR "reserve_pool: init failed, feature disabled\n");
 }
 
 static bool smmu_v3_enable;
