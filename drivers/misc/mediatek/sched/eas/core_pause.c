@@ -268,6 +268,18 @@ static enum drain_act drain_push(struct rq **rqp, struct rq_flags *rf,
 		goto out_unlock;
 	}
 
+	/*
+	 * rodin 6.18（S5）：move_queued_task() 以 DEQUEUE_NOCLOCK 出队，契约要求
+	 * 此刻 rq->clock 已更新。drain_rq() 入口的 update_rq_clock() 经历本函数
+	 * 的 unlock/relock 周期后本应由 rq_unpin_lock()/rq_repin_lock() 的
+	 * stash 保障，但真机在排空事件上仍炸出 assert_clock_updated()
+	 * （sched.h WARN，update_load_avg/__update_stats_wait_end/dequeue_task
+	 * 四站一次；62.5s 与 soak 期两例）——多周期路径存在丢失点。与内核
+	 * migration_cpu_stop() 的标准形对齐：__migrate_task() 前幂等重断言
+	 * （flags 在位则 early-return，零行为差；丢失则自愈）。
+	 */
+	update_rq_clock(dead_rq);
+
 	next_rq = __migrate_task(dead_rq, rf, p, dest_cpu);
 	if (next_rq == dead_rq) {
 		/* 目的地在此刻失去资格（并发下线等）：本轮放弃，避免自旋。 */
