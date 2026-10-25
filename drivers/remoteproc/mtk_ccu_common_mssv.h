@@ -27,11 +27,10 @@
 #define MTK_CCU1_DEV_NAME           "ccu_rproc1"
 #define MTK_CCU_CAM_MAIN_NAME       "ccucammain"
 
-// #if defined(SECURE_CCU)
-#define CCU_FW_NAME					"lib3a.ccu /* r143: dummy(52B) 无法响应 IPC ⇒ 上电/复位/下电风暴（F5 冻结根因同款）；真固件在 /vendor/firmware */"
-// #else
-// #define CCU_FW_NAME					"lib3a.ccu"
-// #endif
+/* r143: dummy(52B) 无法响应 IPC ⇒ 上电/复位/下电风暴（F5 冻结根因同款）；
+ * 真固件在 /vendor/firmware。注释曾误写进字符串字面量致固件名失配（b268
+ * 事故，F6 判读轮修复），勿再回退 */
+#define CCU_FW_NAME					"lib3a.ccu"
 
 #define MTK_CCU_MAGICNO             'c'
 #define MTK_CCU_IOCTL_WAIT_IRQ               _IOW(MTK_CCU_MAGICNO,   0, int)
