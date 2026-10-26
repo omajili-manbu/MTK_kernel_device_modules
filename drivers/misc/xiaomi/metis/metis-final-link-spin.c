@@ -22,13 +22,13 @@
 
 /* Existing metis_blocked.h records these as Xiaomi OEM payloads, never native
  * mutex/rwsem layouts. Validation quirks match stock and are not repaired. */
-/* rodin 6.18：mutex 16B payload 已内嵌 OEM 槽（内核树
- * ANDROID_OEM_DATA_ARRAY(1,2)），metis 分区 = word0 低 u32 tag + word1
- * deadline，直接字段访问；word0 高 u32 属 xr_qi，不触碰。 */
+/* rodin 6.18：mutex 16B 载体改走 metis-blocked.c 的模块级侧表（查无即 NULL） */
+struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock);
+struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock);
+struct metis_mutex_oem_unknown *mutex_oem_clear(struct mutex *lock);
 static struct metis_mutex_oem_unknown *spin_mutex_data(struct mutex *lock)
 {
-	return lock ? (struct metis_mutex_oem_unknown *)lock->android_oem_data1
-		    : NULL;
+	return metis_mutex_side_lookup(lock);
 }
 
 static struct metis_rwsem_oem_unknown *spin_rwsem_data(struct rw_semaphore *sem)
@@ -122,15 +122,28 @@ void mi_mutex_init(void *unused, struct mutex *lock)
 {
 	struct metis_mutex_oem_unknown *data;
 
-	/* 内嵌形态下无条件重置 metis 分区：6.18 内核 mutex_init 不清槽，
-	 * 复用锁地址会带脏 tag/deadline；stock 净效果 = 内核清槽 + 钩子
-	 * 条件写 tag，此处一步等价（protect_cs==0 时 tag 归零同 stock
-	 * 净态）。word0 高 u32 属 xr_qi，不触碰。 */
-	data = spin_mutex_data(lock);
+	if (!protect_cs)
+		return;
+	/* rodin 6.18 侧表形态：init 时点 = 锁全新未入表，stock 内嵌槽语义
+	 * = 对新锁预置 payload ⇒ attach（查无即建）而非查无即 NULL。 */
+	data = mutex_oem_attach(lock);
 	if (!data)
 		return;
 	data->deadline_08 = 0;
-	data->unknown_00 = protect_cs ? 0x149f194f : 0;
+	data->unknown_00 = 0x149f194f;
+}
+
+/* rodin：退出任务侧表槽回收（169 轮挂账闭合）。futex_exit/perf_event 两 mutex
+ * 是侧表仅有的每任务条目源；android_vh_lock_task_exit 在 do_exit 早期
+ * （task_struct 未释放、地址未复用）触发，此刻清槽回 freelist，表规模
+ * 有界于活任务数（对齐 stock 内嵌槽随对象消亡；条目永不 kfree，锁外
+ * 持 payload 指针无 UAF）。 */
+static void mi_mutex_task_exit(void *unused, struct task_struct *task)
+{
+	if (!protect_cs)
+		return;
+	mutex_oem_clear(&task->futex_exit_mutex);
+	mutex_oem_clear(&task->perf_event_mutex);
 }
 
 /* .text+0x1bbf0, virtual 00124618; native hook proves ignored lock/taken. */
@@ -371,6 +384,7 @@ void register_cs_hooks(void)
 	register_trace_android_vh_rwsem_opt_spin_finish(mi_rwsem_opt_spin_finish, NULL);
 	register_trace_android_vh_rwsem_can_spin_on_owner(mi_rwsem_can_spin_on_owner, NULL);
 	register_trace_android_vh_mutex_init(mi_mutex_init, NULL);
+	register_trace_android_vh_lock_task_exit(mi_mutex_task_exit, NULL);
 	register_trace_android_vh_rwsem_init(mi_rwsem_init, NULL);
 	register_trace_android_vh_record_rwsem_writer_owned(mi_record_rwsem_writer_owned_hook, NULL);
 	register_trace_android_vh_clear_rwsem_writer_owned(mi_clear_rwsem_writer_owned_hook, NULL);
@@ -387,6 +401,7 @@ void unregister_cs_hooks(void)
 	unregister_trace_android_vh_rwsem_opt_spin_finish(mi_rwsem_opt_spin_finish, NULL);
 	unregister_trace_android_vh_rwsem_can_spin_on_owner(mi_rwsem_can_spin_on_owner, NULL);
 	unregister_trace_android_vh_mutex_init(mi_mutex_init, NULL);
+	unregister_trace_android_vh_lock_task_exit(mi_mutex_task_exit, NULL);
 	unregister_trace_android_vh_rwsem_init(mi_rwsem_init, NULL);
 	unregister_trace_android_vh_record_rwsem_writer_owned(mi_record_rwsem_writer_owned_hook, NULL);
 	unregister_trace_android_vh_clear_rwsem_writer_owned(mi_clear_rwsem_writer_owned_hook, NULL);
