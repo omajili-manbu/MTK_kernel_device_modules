@@ -5,7 +5,6 @@
 #include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/jiffies.h>
-#include <linux/hashtable.h>
 #include <linux/cpu.h>
 #include <linux/preempt.h>
 #include <linux/smp.h>
@@ -22,119 +21,18 @@
 
 #define METIS_RWSEM_TAG_UNKNOWN 0xab9f19ab00000000ULL
 
-/* rodin 6.18：mutex 的 android_oem_data1 只有单 u64，装不下 16B payload
- * ⇒ 载体改模块级侧表（lock 指针 -> payload），查表带 magic 校验、
- * clear 时删槽。语义与 stock（lock 内嵌槽）等价：查无即 NULL。
- * rodin 并发口径：所有访问都在 mutex_side_lock 内；条目 clear 后进
- * freelist 由 attach 复用、永不 kfree —— 调用方在锁外持 payload 指针
- * 也不存在 UAF（锁复用语义与 stock 内嵌槽随锁对象复用一致）。 */
-#define METIS_MUTEX_SIDE_BUCKETS 1024
-static struct hlist_head mutex_side_table[METIS_MUTEX_SIDE_BUCKETS];
-static struct hlist_head mutex_side_free_list;
-static DEFINE_SPINLOCK(mutex_side_lock);
-
-struct metis_mutex_side_entry {
-	struct hlist_node node;
-	void *lock_key;
-	struct metis_mutex_oem_unknown payload;
-};
-
-/* Caller must hold mutex_side_lock. */
-static struct metis_mutex_side_entry *mutex_side_find(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-
-	hash_for_each_possible(mutex_side_table, e, node, (unsigned long)lock)
-		if (e->lock_key == (void *)lock)
-			return e;
-	return NULL;
-}
-
-static struct metis_mutex_oem_unknown *mutex_oem_unknown(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-	unsigned long flags;
-
-	if (!lock)
-		return NULL;
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e = mutex_side_find(lock);
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-	return e ? &e->payload : NULL;
-}
-
-struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock)
-{
-	return mutex_oem_unknown(lock);
-}
-
-struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-	unsigned long flags;
-
-	if (!lock)
-		return NULL;
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e = mutex_side_find(lock);
-	if (e) {
-		/* find 命中 = 旧锁同址条目仍在表。只重置 payload（与 stock
-		 * 内嵌槽被 mutex_init 覆写同型）；节点已在桶链，再 hash_add
-		 * 会把桶打成自环，下一个 find-miss 在锁内死循环。 */
-		memset(&e->payload, 0, sizeof(e->payload));
-		spin_unlock_irqrestore(&mutex_side_lock, flags);
-		return &e->payload;
-	}
-	e = hlist_entry_safe(mutex_side_free_list.first,
-			     struct metis_mutex_side_entry, node);
-	if (e) {
-		hlist_del(&e->node);
-		e->lock_key = (void *)lock;
-		memset(&e->payload, 0, sizeof(e->payload));
-		hash_add(mutex_side_table, &e->node, (unsigned long)lock);
-		spin_unlock_irqrestore(&mutex_side_lock, flags);
-		return &e->payload;
-	}
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-	e = kzalloc(sizeof(*e), GFP_ATOMIC);
-	if (!e)
-		return NULL;
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e->lock_key = (void *)lock;
-	hash_add(mutex_side_table, &e->node, (unsigned long)lock);
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-	return &e->payload;
-}
-
-void mutex_oem_clear(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-	unsigned long flags;
-
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e = mutex_side_find(lock);
-	if (e) {
-		hash_del(&e->node);
-		hlist_add_head(&e->node, &mutex_side_free_list);
-	}
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-}
+/* rodin 174 轮 C 案定案：mutex oem payload 的读者全树死门控
+ * （mutex_zero_unknown 全零门 + protect_cs 分支 + (u64)jiffies>>63 恒零，
+ * unknown_04 零读者、0x149f 值零比较；OSS 原形同构）——"VIP 锁握手接力"
+ * 的 mutex 侧从未活体，活体接力只在 rwsem 侧（16B 原生槽 magic 门）。
+ * 锁侧 payload 与 1024 桶侧表（全局 spin_lock_irqsave + freelist +
+ * lock_task_exit 清槽钩）整体退役；#139/#161 崩类随之结构性消失。
+ * 内核槽 android_oem_data1 高 u32 = xr_qi waiter 计数（qi_mutex_init
+ * 整槽清零自负），低 u32 退役后无主。 */
 
 static struct metis_rwsem_oem_unknown *rwsem_oem_unknown(struct rw_semaphore *sem)
 {
 	return sem ? (void *)sem->android_oem_data1 : NULL;
-}
-
-/* Stock accepts only zero lower 32 bits and zero deadline. It does not
- * recognize the 0x149f tag that it subsequently writes. Preserve this. */
-static bool mutex_zero_unknown(struct metis_mutex_oem_unknown *data)
-{
-	if (!data || data->unknown_00 || data->deadline_08)
-		return false;
-	if (cs_debug)
-		pr_info("metis-cs: %s: mutex oem data is zero\n",
-			"__mi_mutex_data_valid");
-	return true;
 }
 
 /* Load/validate RWSEM payload. Initial tagging happens only when protect_cs
@@ -208,16 +106,6 @@ static void rwsem_record_trace_unknown(struct rw_semaphore *sem, bool reader)
 		trace_metis_tracing_mark_write('B', current->tgid, buffer, 0, 0);
 }
 
-void set_mutex_vip_blocked(struct mutex *lock)
-{
-	struct metis_mutex_oem_unknown *data = mutex_oem_attach(lock);
-
-	if (!data || !mutex_zero_unknown(data))
-		return;
-	data->unknown_00 = protect_cs ? 0x149f194f : data->unknown_00 | 1;
-	data->deadline_08 = jiffies + 7;
-}
-
 void record_mutex_blocked_info(struct task_struct *task, struct mutex *lock)
 {
 	struct mi_task_struct *state;
@@ -232,13 +120,11 @@ void record_mutex_blocked_info(struct task_struct *task, struct mutex *lock)
 	if (!mi_vip_task(task) && !mi_link_vip_task(task))
 		return;
 	MI_FIELD(state, u32, 0x2b4) |= 0x200;
-	set_mutex_vip_blocked(lock);
 }
 
 void clear_mutex_blocked_info(struct task_struct *task, struct mutex *lock)
 {
 	struct mi_task_struct *state;
-	struct metis_mutex_oem_unknown *data;
 	u32 flags;
 
 	if (!protect_cs)
@@ -251,30 +137,8 @@ void clear_mutex_blocked_info(struct task_struct *task, struct mutex *lock)
 	MI_FIELD(state, u32, 0x2b4) = flags & ~0x100;
 	if (!(flags & 0x200))
 		return;
+	/* rodin 174 轮 C 案：锁侧 payload 已退役，仅保留 per-task 面。 */
 	MI_FIELD(state, u32, 0x2b4) = flags & ~0x300;
-	data = mutex_oem_unknown(lock);
-	if (!mutex_zero_unknown(data))
-		return;
-	data->unknown_00 = protect_cs ? 0x149f0000 :
-					 data->unknown_00 & 0xffff0000;
-	data->deadline_08 = 0;
-	mutex_oem_clear(lock);
-}
-
-metis_mutex_blocked_result_unknown vip_blocked_on_mutex(struct mutex *lock)
-{
-	struct metis_mutex_oem_unknown *data = mutex_oem_unknown(lock);
-
-	if (!mutex_zero_unknown(data))
-		return 0;
-	if (protect_cs) {
-		data->deadline_08 = 0;
-		data->unknown_00 = 0x149f194f;
-	} else if (!(u16)data->unknown_00) {
-		return 0;
-	}
-	/* SUB then LSR #63 in stock, with wrapping unsigned subtraction. */
-	return ((u64)jiffies - data->deadline_08) >> 63;
 }
 
 void set_rwsem_vip_blocked(struct rw_semaphore *sem)

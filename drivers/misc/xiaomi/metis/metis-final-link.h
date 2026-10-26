@@ -61,8 +61,6 @@ int metis_link_open(struct inode *inode, struct file *file);
 int metis_link_release(struct inode *inode, struct file *file);
 int mi_art_mutex_debug_open(struct inode *inode, struct file *file);
 int mi_art_mutex_debug_show(struct seq_file *seq, void *unused);
-void mi_mutex_can_spin_on_owner(void *data, struct mutex *lock, int *ret);
-void mi_mutex_init(void *data, struct mutex *lock);
 void mi_mutex_opt_spin_finish(void *data, struct mutex *lock, bool taken);
 void mi_mutex_opt_spin_start(void *data, struct mutex *lock, bool *time_out,
 		int *count);

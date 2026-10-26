@@ -135,8 +135,7 @@ void mi_mutex_lock_starttime(void *unused, struct mutex *lock)
 {
 	const unsigned long start = 1;
 	struct task_struct *task;
-	struct mi_task_struct *state;
-	u32 stat, flags;
+	u32 stat;
 
 	if (!protect_cs)
 		return;
@@ -149,23 +148,8 @@ void mi_mutex_lock_starttime(void *unused, struct mutex *lock)
 		pr_info("metis-link: record mutex lock, cs_stat_type: %d\n", (s32)stat);
 	task = current;
 	mi_record_lock_starttime(task, start, "mutex");
-	if (!start || !(vip_blocked_on_mutex(lock) & 1))
-		return;
-	if (task && (state = get_mi_task_struct(task))) {
-		bool before = (s64)((u64)jiffies - MI_FIELD(state, u64, 0x290)) < 0;
-
-		flags = MI_FIELD(state, u32, 0xc0);
-		if (before) {
-			if (flags & 0x2000)
-				return;
-		} else if (flags & 0x2000) {
-			clean_mi_vip_task_common(task, 0x2000UL);
-		}
-	}
-	set_mi_vip_task_common(task, 0x2000UL, 50UL);
-	if (link_debug)
-		pr_info("metis-link: metis link: set mutex vip, pid = %d, name = %s",
-			task->pid, task->comm);
+	/* rodin 174 轮 C 案：vip_blocked_on_mutex 读者死门控（payload 无消费
+	 * 者），其后 0x2000/50-tick 接力块整体退役 —— stock 本就从未活体。 */
 }
 
 void mi_rtmutex_lock_starttime(void *unused, struct rt_mutex *lock)

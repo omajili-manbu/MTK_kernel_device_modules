@@ -20,29 +20,10 @@
 #include "metis-final-link.h"
 #include "metis-final-link-trace.h"
 
-/* Existing metis_blocked.h records these as Xiaomi OEM payloads, never native
- * mutex/rwsem layouts. Validation quirks match stock and are not repaired. */
-/* rodin 6.18：mutex 16B 载体改走 metis-blocked.c 的模块级侧表（查无即 NULL） */
-struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock);
-struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock);
-struct metis_mutex_oem_unknown *mutex_oem_clear(struct mutex *lock);
-static struct metis_mutex_oem_unknown *spin_mutex_data(struct mutex *lock)
-{
-	return metis_mutex_side_lookup(lock);
-}
-
+/* rodin 174 轮 C 案：mutex 侧表随锁侧 payload 退役；rwsem 载体 = 16B 原生槽直读。 */
 static struct metis_rwsem_oem_unknown *spin_rwsem_data(struct rw_semaphore *sem)
 {
 	return sem ? (void *)sem->android_oem_data1 : NULL;
-}
-
-static bool spin_mutex_valid(struct metis_mutex_oem_unknown *data)
-{
-	if (!data || data->unknown_00 || data->deadline_08)
-		return false;
-	if (cs_debug)
-		pr_info("metis-cs: %s: mutex oem data is zero\n", "__mi_mutex_data_valid");
-	return true;
 }
 
 static bool spin_rwsem_valid(struct metis_rwsem_oem_unknown *data, u64 *word)
@@ -72,81 +53,11 @@ static void spin_rwsem_reset(struct metis_rwsem_oem_unknown *data)
 	data->deadline_08 = 0;
 }
 
-/* .text+0x1ae88, virtual 001238b0. The first write is 32 bits, but resetting
- * an empty wait_list writes all 64 bits to a different word value. */
-void mutex_reset_data_no_waiter(struct mutex *lock)
-{
-	struct metis_mutex_oem_unknown *data = spin_mutex_data(lock);
-
-	if (!spin_mutex_valid(data))
-		return;
-	if (protect_cs) {
-		data->deadline_08 = 0;
-		data->unknown_00 = 0x149f194f;
-	}
-	if (list_empty(&lock->wait_list)) {
-		data->unknown_00 = 0;
-		data->unknown_04 = 0x149f194f;
-		data->deadline_08 = 0;
-	}
-}
-
-/* .text+0x1bd24, virtual 0012474c; native dtask.h fixes unused probe data. */
-void mi_mutex_can_spin_on_owner(void *unused, struct mutex *lock, int *ret)
-{
-	struct metis_mutex_oem_unknown *data;
-	unsigned long deadline;
-
-	if (!protect_cs || ((is_qi_feat_enabled(9) & 1) && is_qos_task(current)))
-		return;
-	if (!*ret || !lock || current->prio < 100)
-		return;
-	data = spin_mutex_data(lock);
-	if (!spin_mutex_valid(data))
-		return;
-	if (protect_cs) {
-		data->deadline_08 = 0;
-		data->unknown_00 = 0x149f194f;
-		deadline = 0;
-	} else {
-		if (!(data->unknown_00 & 0xffff))
-			return;
-		deadline = data->deadline_08;
-	}
-	if ((s64)(jiffies - deadline) < 0)
-		*ret = 0;
-}
-
-/* .text+0x1c294, virtual 00124cbc. No lock NULL check exists in stock. */
-void mi_mutex_init(void *unused, struct mutex *lock)
-{
-	struct metis_mutex_oem_unknown *data;
-
-	if (!protect_cs)
-		return;
-	/* rodin 6.18 侧表形态：init 时点 = 锁全新未入表，stock 内嵌槽语义
-	 * = 对新锁预置 payload ⇒ attach（查无即建）而非查无即 NULL。 */
-	data = mutex_oem_attach(lock);
-	if (!data)
-		return;
-	data->deadline_08 = 0;
-	data->unknown_00 = 0x149f194f;
-}
-
-/* rodin：退出任务侧表槽回收（169 轮挂账闭合）。futex_exit/perf_event 两 mutex
- * 是侧表仅有的每任务条目源；android_vh_lock_task_exit 在 do_exit 早期
- * （task_struct 未释放、地址未复用）触发，此刻清槽回 freelist，表规模
- * 有界于活任务数（对齐 stock 内嵌槽随对象消亡；条目永不 kfree，锁外
- * 持 payload 指针无 UAF）。 */
-static void mi_mutex_task_exit(void *unused, struct task_struct *task)
-{
-	if (!protect_cs)
-		return;
-	mutex_oem_clear(&task->futex_exit_mutex);
-	mutex_oem_clear(&task->perf_event_mutex);
-}
-
-/* .text+0x1bbf0, virtual 00124618; native hook proves ignored lock/taken. */
+/* rodin 174 轮 C 案：mutex_reset_data_no_waiter（全树零调用者）、
+ * mi_mutex_can_spin_on_owner（payload 分支死门控）、mi_mutex_init（新锁
+ * payload 预置）、mi_mutex_task_exit（侧表回收）随锁侧 payload 一起退役，
+ * 对应注册同步摘除；mutex opt_spin 的计数超时半（task 态，活体）保留。
+ * 原 blob 对位地址存档：.text+0x1ae88/0x1bd24/0x1c294/0x1bbf0。 */
 void mi_mutex_opt_spin_finish(void *unused, struct mutex *lock, bool taken)
 {
 	struct mi_task_struct *state;
@@ -176,8 +87,6 @@ void mi_mutex_opt_spin_start(void *unused, struct mutex *lock, bool *time_out,
 		int *count)
 {
 	struct mi_task_struct *state;
-	struct metis_mutex_oem_unknown *data;
-	unsigned long deadline;
 	u64 elapsed, start;
 	s32 threshold;
 	u32 next;
@@ -187,21 +96,6 @@ void mi_mutex_opt_spin_start(void *unused, struct mutex *lock, bool *time_out,
 	state = get_mi_task_struct(current);
 	if (!state)
 		return;
-	data = spin_mutex_data(lock);
-	if (spin_mutex_valid(data)) {
-		if (protect_cs) {
-			data->deadline_08 = 0;
-			data->unknown_00 = 0x149f194f;
-			deadline = 0;
-		} else {
-			if (!(data->unknown_00 & 0xffff))
-				goto count_spin;
-			deadline = data->deadline_08;
-		}
-		if ((s64)(jiffies - deadline) < 0)
-			goto timeout;
-	}
-count_spin:
 	if (!*count) {
 		MI_FIELD(state, u64, 0x2b8) = sched_clock();
 		return;
@@ -219,7 +113,6 @@ count_spin:
 		mutex_vip_spin_thres : mutex_normal_spin_thres;
 	if (elapsed <= (u64)(s64)threshold)
 		return;
-timeout:
 	*time_out = true;
 }
 
@@ -379,12 +272,9 @@ void register_cs_hooks(void)
 {
 	register_trace_android_vh_mutex_opt_spin_start(mi_mutex_opt_spin_start, NULL);
 	register_trace_android_vh_mutex_opt_spin_finish(mi_mutex_opt_spin_finish, NULL);
-	register_trace_android_vh_mutex_can_spin_on_owner(mi_mutex_can_spin_on_owner, NULL);
 	register_trace_android_vh_rwsem_opt_spin_start(mi_rwsem_opt_spin_start, NULL);
 	register_trace_android_vh_rwsem_opt_spin_finish(mi_rwsem_opt_spin_finish, NULL);
 	register_trace_android_vh_rwsem_can_spin_on_owner(mi_rwsem_can_spin_on_owner, NULL);
-	register_trace_android_vh_mutex_init(mi_mutex_init, NULL);
-	register_trace_android_vh_lock_task_exit(mi_mutex_task_exit, NULL);
 	register_trace_android_vh_rwsem_init(mi_rwsem_init, NULL);
 	register_trace_android_vh_record_rwsem_writer_owned(mi_record_rwsem_writer_owned_hook, NULL);
 	register_trace_android_vh_clear_rwsem_writer_owned(mi_clear_rwsem_writer_owned_hook, NULL);
@@ -396,12 +286,9 @@ void unregister_cs_hooks(void)
 {
 	unregister_trace_android_vh_mutex_opt_spin_start(mi_mutex_opt_spin_start, NULL);
 	unregister_trace_android_vh_mutex_opt_spin_finish(mi_mutex_opt_spin_finish, NULL);
-	unregister_trace_android_vh_mutex_can_spin_on_owner(mi_mutex_can_spin_on_owner, NULL);
 	unregister_trace_android_vh_rwsem_opt_spin_start(mi_rwsem_opt_spin_start, NULL);
 	unregister_trace_android_vh_rwsem_opt_spin_finish(mi_rwsem_opt_spin_finish, NULL);
 	unregister_trace_android_vh_rwsem_can_spin_on_owner(mi_rwsem_can_spin_on_owner, NULL);
-	unregister_trace_android_vh_mutex_init(mi_mutex_init, NULL);
-	unregister_trace_android_vh_lock_task_exit(mi_mutex_task_exit, NULL);
 	unregister_trace_android_vh_rwsem_init(mi_rwsem_init, NULL);
 	unregister_trace_android_vh_record_rwsem_writer_owned(mi_record_rwsem_writer_owned_hook, NULL);
 	unregister_trace_android_vh_clear_rwsem_writer_owned(mi_clear_rwsem_writer_owned_hook, NULL);

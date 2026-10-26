@@ -43,6 +43,7 @@ struct metis618_rwsem_waiter {
  * （record_{mutex,rwsem,rtmutex,pcpu}_starttime → wait_start/acquired 面，
  * rtmutex 因 rt_mutex_base* 不匹配剪除）；③载体面：mutex 单 u64 不足 ⇒
  * 侧表（attach/clear/lookup），init 路径改 attach（#139 panic 修复）；
+ * 174 轮 C 案：payload 读者死门控定案后锁侧半与侧表整体退役；
  * rwsem [2] 同型零改；task 载体走 GKI 尾部 rodin_tail.h 双段；
  * user 走 uid 侧表；④防重入：do_rwsem_list_insert 在链守卫（#143 double
  * add）；⑤字段实存核：rq->nr_running/rt.rt_nr_running/plist_head/

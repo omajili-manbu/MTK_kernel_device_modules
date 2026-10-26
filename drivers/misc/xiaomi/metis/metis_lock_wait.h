@@ -12,7 +12,6 @@ struct percpu_rw_semaphore;
 
 /* Actual stock state/helper owners remain absent, not replaced with defaults. */
 extern u32 cs_stat_type; /* Stock .data+0x3fd0; exact original signedness unknown. */
-void mutex_reset_data_no_waiter(struct mutex *lock);
 /* Raw return W0 is tested at bit0; original C return spelling is unknown. */
 u32 do_set_lock_vip(struct task_struct *owner, struct task_struct *waiter,
 		     const char *type);

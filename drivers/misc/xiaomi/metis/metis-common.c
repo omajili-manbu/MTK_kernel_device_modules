@@ -118,7 +118,6 @@ void set_mi_vip_task_common(struct task_struct *task, unsigned long mask,
 		return;
 	owner = (struct task_struct *)(word & ~7UL);
 	set_mi_vip_task_common(owner, 0x2000, duration - 5);
-	set_mutex_vip_blocked(lock);
 	if (link_debug)
 		pr_warn("metis-link: %s: tsk %d %s try to set %d %s as vip for mutex\n",
 			__func__, task->pid, task->comm, owner->pid, owner->comm);
