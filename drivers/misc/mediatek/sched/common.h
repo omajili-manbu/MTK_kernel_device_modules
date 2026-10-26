@@ -204,6 +204,14 @@ static __always_inline bool mtk_task_data_ok(void)
 /* 载体不可用（= 尾部不足）：init 处统一 pr_err 报明原因；入口处静默退化。 */
 #define MTK_TASK_DATA_ABSENT()	unlikely(!mtk_task_data_ok())
 
+/* 尾部双段布局声明拆至 rodin_tail.h（metis/mi_schedule 独立单元共享，
+ * 避开 kernel/sched/sched.h 私有依赖链）。 */
+#include "rodin_tail.h"
+
+/* 尾段偏移对偶锁：rodin_tail.h 的 mi 槽起址 = mtk_task 实际尺寸 */
+static_assert(sizeof(struct mtk_task) == RODIN_TAIL_MTK_SIZE,
+		"rodin_tail.h RODIN_TAIL_MTK_SIZE 与 struct mtk_task 尺寸漂移");
+
 #define mtk_task_data_guard_fail(tag)							\
 do {												\
 	pr_err("%s: task_struct 尾部实配 %d 字节 < 需求 %d 字节 —— boot cmdline 需含 "\
