@@ -13,6 +13,7 @@
 #include <linux/unaligned.h>
 #include <trace/hooks/sched.h>
 #include "kernel/sched/sched.h"
+#include <linux/vseq.h>
 #include "../../mediatek/sched/rodin_tail.h" /* rodin 尾部双段：mi_task_slot_of() */
 #include "mi_schedule.h"
 
@@ -211,7 +212,7 @@ static void __exit mi_sched_exit(void)
 	pr_err("in %s\n", __func__);
 	kmem_cache_destroy(mi_task_struct_cachep);
 }
-module_init(mi_sched_init);
+vseq_module_init(mi_sched_init);
 module_exit(mi_sched_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("mi task-state carrier (cluster type, 32B uid map, per-task slots)");

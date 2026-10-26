@@ -13,6 +13,7 @@
 #include <linux/ioctl.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
+#include <linux/vseq.h>
 #include <linux/module.h>
 #include <linux/rwsem.h>
 
@@ -128,7 +129,7 @@ static void __exit perf_actuator_exit(void)
 	misc_deregister(&perf_actuator_device);
 }
 
-module_init(perf_actuator_init);
+vseq_module_init(perf_actuator_init);
 module_exit(perf_actuator_exit);
 
 MODULE_LICENSE("GPL v2");

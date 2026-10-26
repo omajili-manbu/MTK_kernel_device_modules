@@ -13,6 +13,7 @@
 #include "metis-final-control.h"
 #include "metis-final-boost.h"
 #include "metis_state.h"
+#include <linux/vseq.h>
 #include "metis_vip_queue.h"
 #include "metis-final-owners.h"
 
@@ -73,6 +74,6 @@ static void __exit metis_module_exit(void)
 	tracepoint_synchronize_unregister();
 	misc_deregister(&metis_misc);
 }
-module_init(metis_module_init);
+vseq_module_init(metis_module_init);
 module_exit(metis_module_exit);
 MODULE_LICENSE("GPL");

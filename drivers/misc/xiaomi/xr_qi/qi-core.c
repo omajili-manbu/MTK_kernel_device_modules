@@ -13,6 +13,7 @@
 #define CREATE_TRACE_POINTS
 #include "qi-trace.h"
 #include "../perf_actuator/perf_actuator.h"
+#include <linux/vseq.h>
 
 static unsigned long g_qi_enable;
 static DEFINE_SPINLOCK(g_qi_lock);
@@ -369,7 +370,7 @@ static int __init qi_init(void)
 	kobject_put(kobj);
 	return ret;
 }
-module_init(qi_init);
+vseq_module_init(qi_init);
 /* Stock has no cleanup_module, so no module_exit is introduced. */
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Peide Du <dupeide@xiaomi.com>");
