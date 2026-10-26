@@ -273,6 +273,12 @@ void mi_alter_futex_plist_add(void *data, struct plist_node *node,
 	while (cursor != &head->node_list) {
 		next = cursor->next;
 		entry = list_entry(cursor, struct plist_node, node_list);
+		/* rodin：重入防双插——扫到本 node 即置 already 返回（futex
+		 * unqueue/re-arm 协议间正常不重入，此为同类防御位）。 */
+		if (entry == node) {
+			*already_on_hb = true;
+			return;
+		}
 		other = container_of(entry, struct futex_q, list);
 		waiter = other->task;
 		/* rodin 6.18 时序差：6.18 钩子在 q->task 赋值前触发
@@ -606,6 +612,20 @@ void mi_rwsem_list_add_hook(void *unused, struct rwsem_waiter *waiter_opaque,
 		protect_pre_cs_task(task);
 	if (!waiter || !sem)
 		return;
+	/* rodin 6.18 防重入强化：list_empty 只挡独占成环（首调 waiter 栈上
+	 * 未初始化、多 waiter 在链时亦为假），扫链命中本 waiter 即置 already
+	 * 返回——#143 多 waiter 重入形态闭包，且先于 qos/feat 各门。 */
+	{
+		struct list_head *cur = READ_ONCE(sem->wait_list.prev);
+
+		while (cur && cur != &sem->wait_list) {
+			if (cur == &waiter->list) {
+				*already_on_list = true;
+				return;
+			}
+			cur = READ_ONCE(cur->prev);
+		}
+	}
 	priority = task_prio_for_rwsem_insert(task);
 	if (!protect_cs)
 		goto insert;
