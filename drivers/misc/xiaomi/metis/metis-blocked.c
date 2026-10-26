@@ -5,7 +5,6 @@
 #include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/jiffies.h>
-#include <linux/hashtable.h>
 #include <linux/cpu.h>
 #include <linux/preempt.h>
 #include <linux/smp.h>
@@ -22,102 +21,16 @@
 
 #define METIS_RWSEM_TAG_UNKNOWN 0xab9f19ab00000000ULL
 
-/* rodin 6.18：mutex 的 android_oem_data1 只有单 u64，装不下 16B payload
- * ⇒ 载体改模块级侧表（lock 指针 -> payload），查表带 magic 校验、
- * clear 时删槽。语义与 stock（lock 内嵌槽）等价：查无即 NULL。
- * rodin 并发口径：所有访问都在 mutex_side_lock 内；条目 clear 后进
- * freelist 由 attach 复用、永不 kfree —— 调用方在锁外持 payload 指针
- * 也不存在 UAF（锁复用语义与 stock 内嵌槽随锁对象复用一致）。 */
-#define METIS_MUTEX_SIDE_BUCKETS 1024
-static struct hlist_head mutex_side_table[METIS_MUTEX_SIDE_BUCKETS];
-static struct hlist_head mutex_side_free_list;
-static DEFINE_SPINLOCK(mutex_side_lock);
-
-struct metis_mutex_side_entry {
-	struct hlist_node node;
-	void *lock_key;
-	struct metis_mutex_oem_unknown payload;
-};
-
-/* Caller must hold mutex_side_lock. */
-static struct metis_mutex_side_entry *mutex_side_find(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-
-	hash_for_each_possible(mutex_side_table, e, node, (unsigned long)lock)
-		if (e->lock_key == (void *)lock)
-			return e;
-	return NULL;
-}
-
+/* rodin 6.18：内核树 mutex OEM 槽已扩为 u64[2]（ANDROID_OEM_DATA_ARRAY(1,2)，
+ * 与 rwsem 同型），16B payload 内嵌，stock 6.6 内嵌槽形态复原。
+ * word0 低 u32 = metis tag（unknown_00），高 u32 = xr_qi waiter 计数
+ * （qi_mutex_waiters 所有，本文件从不触碰）；word1 = deadline 全宽。
+ * 侧表（#161 find 命中重插自环的载体）连同 freelist/全局锁一并退役：
+ * payload 生命周期随锁对象，init 重置 + 查零语义与 stock 逐位一致。 */
 static struct metis_mutex_oem_unknown *mutex_oem_unknown(struct mutex *lock)
 {
-	struct metis_mutex_side_entry *e;
-	unsigned long flags;
-
-	if (!lock)
-		return NULL;
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e = mutex_side_find(lock);
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-	return e ? &e->payload : NULL;
-}
-
-struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock)
-{
-	return mutex_oem_unknown(lock);
-}
-
-struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-	unsigned long flags;
-
-	if (!lock)
-		return NULL;
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e = mutex_side_find(lock);
-	if (e) {
-		/* find 命中 = 旧锁同址条目仍在表。只重置 payload（与 stock
-		 * 内嵌槽被 mutex_init 覆写同型）；节点已在桶链，再 hash_add
-		 * 会把桶打成自环，下一个 find-miss 在锁内死循环。 */
-		memset(&e->payload, 0, sizeof(e->payload));
-		spin_unlock_irqrestore(&mutex_side_lock, flags);
-		return &e->payload;
-	}
-	e = hlist_entry_safe(mutex_side_free_list.first,
-			     struct metis_mutex_side_entry, node);
-	if (e) {
-		hlist_del(&e->node);
-		e->lock_key = (void *)lock;
-		memset(&e->payload, 0, sizeof(e->payload));
-		hash_add(mutex_side_table, &e->node, (unsigned long)lock);
-		spin_unlock_irqrestore(&mutex_side_lock, flags);
-		return &e->payload;
-	}
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-	e = kzalloc(sizeof(*e), GFP_ATOMIC);
-	if (!e)
-		return NULL;
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e->lock_key = (void *)lock;
-	hash_add(mutex_side_table, &e->node, (unsigned long)lock);
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
-	return &e->payload;
-}
-
-void mutex_oem_clear(struct mutex *lock)
-{
-	struct metis_mutex_side_entry *e;
-	unsigned long flags;
-
-	spin_lock_irqsave(&mutex_side_lock, flags);
-	e = mutex_side_find(lock);
-	if (e) {
-		hash_del(&e->node);
-		hlist_add_head(&e->node, &mutex_side_free_list);
-	}
-	spin_unlock_irqrestore(&mutex_side_lock, flags);
+	return lock ? (struct metis_mutex_oem_unknown *)lock->android_oem_data1
+		    : NULL;
 }
 
 static struct metis_rwsem_oem_unknown *rwsem_oem_unknown(struct rw_semaphore *sem)
@@ -210,7 +123,7 @@ static void rwsem_record_trace_unknown(struct rw_semaphore *sem, bool reader)
 
 void set_mutex_vip_blocked(struct mutex *lock)
 {
-	struct metis_mutex_oem_unknown *data = mutex_oem_attach(lock);
+	struct metis_mutex_oem_unknown *data = mutex_oem_unknown(lock);
 
 	if (!data || !mutex_zero_unknown(data))
 		return;
@@ -258,7 +171,6 @@ void clear_mutex_blocked_info(struct task_struct *task, struct mutex *lock)
 	data->unknown_00 = protect_cs ? 0x149f0000 :
 					 data->unknown_00 & 0xffff0000;
 	data->deadline_08 = 0;
-	mutex_oem_clear(lock);
 }
 
 metis_mutex_blocked_result_unknown vip_blocked_on_mutex(struct mutex *lock)

@@ -239,10 +239,8 @@ typedef struct xiaomi_touch_data {
 	spinlock_t private_data_lock;				/* 0x0058 notify[0x568 add x20,x0,#0x58] */
 	atomic_t common_data_buf_index;				/* 0x005c dev_poll[0x6a18 ldr w9,[x19,#0x5c]] */
 	common_data_t common_data_buf[COMMON_DATA_BUF_SIZE];	/* 0x0060 */
-	struct mutex common_data_buf_lock;			/* 0x28b0 */
-	/* rodin: pure-6.18 mutex is smaller than the blob-era kernel layout;
-	 * explicit pad keeps the pinned offsets below at their blob addresses. */
-	u8 rodin_pad_28d8[8];					/* 0x28d8 */
+	struct mutex common_data_buf_lock;			/* 0x28b0：171 轮 OEM 槽扩 16B 后
+	 * mutex = 48B，与 blob 时代内核 mutex 同宽，旧 rodin_pad_28d8[8] 冗余删除 */
 	struct htc_ic_polldata* poll_data;			/* 0x28e0 元素-0x10 基址 umaddl 命中 20 处 */
 	struct workqueue_struct *event_wq;			/* 0x28e8 */
 #if defined(CONFIG_DRM)

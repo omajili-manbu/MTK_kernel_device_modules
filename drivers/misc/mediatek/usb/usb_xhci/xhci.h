@@ -1991,10 +1991,12 @@ struct xhci_hcd {
  *   跨单元的真校验由 pahole 门禁承担（vendor xhci.o DWARF vs 内核 vmlinux BTF，
  *   同一棵树内 config 自洽；port 树的 tools/_b244_xhci_align/layout_gate.sh 即此形态）。
  */
-_Static_assert(__builtin_offsetof(struct xhci_hcd, dbc) == 2768,
-	       "xhci_hcd.dbc offset drifted from this tree's kernel layout (2768)");
-_Static_assert(sizeof(struct xhci_hcd) == 2808,
-	       "xhci_hcd size drifted from this tree's kernel layout (2808)");
+/* 171 轮：内核 mutex OEM 槽扩为 u64[2]（ANDROID_OEM_DATA_ARRAY(1,2)），
+ * xhci_hcd 内嵌一个 mutex ⇒ dbc 前所有成员 +8，钉值同步 2768/2808 → 2776/2816。 */
+_Static_assert(__builtin_offsetof(struct xhci_hcd, dbc) == 2776,
+	       "xhci_hcd.dbc offset drifted from this tree's kernel layout (2776)");
+_Static_assert(sizeof(struct xhci_hcd) == 2816,
+	       "xhci_hcd size drifted from this tree's kernel layout (2816)");
 
 /* Platform specific overrides to generic XHCI hc_driver ops */
 struct xhci_driver_overrides {

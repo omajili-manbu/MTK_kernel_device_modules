@@ -696,11 +696,13 @@ void qi_vh_binder_unregister(void)
 	if (_ret < 0) { pr_err("xr-qi: " #name " registration %d\n", _ret); return _ret; } \
 } while (0)
 /* rodin 6.18：__mutex_init 不清 android_oem_data1（waiter 计数槽），
- * 动态锁可能带脏计数 ⇒ init 钩子显式清零。 */
+ * 动态锁可能带脏计数 ⇒ init 钩子清零。槽扩为 u64[2] 后 word0 高 u32 =
+ * 本模块计数、低 u32 与 word1 属 metis，只清己方半字，两 init 钩子
+ * 注册序无关。 */
 static void qi_mutex_init(void *unused, struct mutex *lock)
 {
 	if (lock)
-		lock->android_oem_data1 = 0;
+		atomic_set(qi_mutex_waiters(lock), 0);
 }
 
 int qi_vh_mutex_register(void)

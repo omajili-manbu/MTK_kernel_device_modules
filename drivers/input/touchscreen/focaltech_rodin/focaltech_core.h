@@ -534,9 +534,9 @@ struct fts_ts_data {
         struct ftxxxx_proc proc_ta;
         spinlock_t irq_lock;
         struct mutex report_mutex;
-        u8 rodin_pad_rmutex[8];
+        /* 171 轮：内核 mutex OEM 槽扩 16B ⇒ sizeof(mutex) 0x28→0x30 = blob 原生宽，
+         * rodin_pad_rmutex/bmutex[8] 缩水垫冗余删除（两 mutex 各 +8 恰抵消） */
         struct mutex bus_lock;
-        u8 rodin_pad_bmutex[8];
         /* _b582-INPUT：blob fts_irq_handler 用 cpu_latency_qos_add/remove_request
          * （blob 0x5e2c/0x6a98 直调），句柄槽 blob [ts+0x270] 恒 48B =
          * sizeof(struct pm_qos_request)（struct dev_pm_qos_request 为 56B）⇒ 按 blob
@@ -646,10 +646,10 @@ struct fts_ts_data {
 #endif
 	/* 0xB89..0xBD7：blob 零访问区（0x4F），宿主为下列树侧仍依赖成员；各成员
 	 * blob 全 ko 无立即数访问点（状态面疑为框架 fts_touch_mode 镜像）。布局按
-	 * 6.18 自然对齐（mutex=0x30）恰好填满该窗：pad7→mutex@0xB90..0xBBF →
-	 * nonui@0xBC0/doubletap@0xBC4/aod@0xBC8 → pad4 → reserved_bd0@0xBD0..0xBD7。 */
-	struct mutex cmd_update_mutex;			/* 0xB90（rebase 纯 6.18 sizeof=0x28） */
-	u8 rodin_pad_bb8[8];				/* 0xBB8（mutex 缩水垫；port 排窗按 0x30） */
+	 * 6.18 自然对齐（171 轮扩槽后 mutex=0x30 原生填满该窗，旧 pad_bb8 删）：
+	 * mutex@0xB90..0xBBF → nonui@0xBC0/doubletap@0xBC4/aod@0xBC8 → pad4 →
+	 * reserved_bd0@0xBD0..0xBD7。 */
+	struct mutex cmd_update_mutex;			/* 0xB90（171 轮扩槽后 sizeof=0x30） */
 	int nonui_status;				/* 0xBC0（fod 报点用；blob 对应函数取框架值入局部） */
 	int doubletap_status;				/* 0xBC4（suspend 路径用） */
 	int aod_status;					/* 0xBC8（suspend 路径用） */
@@ -759,7 +759,7 @@ _Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_bmode) == 0x2e5,
  * tools/_b583_ftsface/{ida_dump.py,blbscan_2e8_af0.txt} + evidence_b583b.txt；
  * 等式右端 = blob 机器码立即数偏移，左端 = 本结构编译期 offsetof） ===== */
 _Static_assert(sizeof(struct pen_event) == 48, "_b583b-B8 sizeof(pen_event)==48 (blob events@0x318 边界反推)");
-_Static_assert(sizeof(struct mutex) == 0x28, "_b583b-B8 sizeof(mutex)==0x28 (rebase 纯 6.18 实际值；blob 世界的 0x30 差额由 rodin_pad_* 垫片吸收，内核树零改动)");
+_Static_assert(sizeof(struct mutex) == 0x30, "_b583b-B8 sizeof(mutex)==0x30 (171 轮内核树 mutex OEM 槽扩 16B 后与 blob 时代同宽；rodin_pad_* 缩水垫批量退役)");
 _Static_assert(sizeof(struct delayed_work) == 0x68, "_b583b-B8 sizeof(delayed_work)==0x68 (rebase 纯 6.18 实际值；0xC90+0x88==0xD18 锚点衔接改由 rodin_pad_cd8 垫片维持)");
 /* 0x2E6..0x668 段（改动前后与 blob 同构，DWARF/IDA 双证） */
 _Static_assert(__builtin_offsetof(struct fts_ts_data, old_point_id) == 0x2e6, "_b583b-B8 old_point_id@0x2e6");

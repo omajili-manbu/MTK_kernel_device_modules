@@ -15,6 +15,14 @@ struct metis_mutex_oem_unknown {
 	u32 unknown_04;
 	u64 deadline_08;
 };
+/* rodin: this struct overlays the kernel mutex ANDROID_OEM_DATA_ARRAY(1,2)
+ * slot (u64[2], 16B). Layout lock pins the overlay so upstream struct drift
+ * trips the build instead of silently misaddressing fields. */
+_Static_assert(sizeof(struct metis_mutex_oem_unknown) == 16,
+	       "metis mutex oem overlay: size");
+_Static_assert(__builtin_offsetof(struct metis_mutex_oem_unknown,
+				  deadline_08) == 8,
+	       "metis mutex oem overlay: deadline offset");
 struct metis_rwsem_oem_unknown {
 	u64 unknown_00;
 	u64 deadline_08;
