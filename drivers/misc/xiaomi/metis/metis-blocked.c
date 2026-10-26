@@ -77,25 +77,31 @@ struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock)
 		return NULL;
 	spin_lock_irqsave(&mutex_side_lock, flags);
 	e = mutex_side_find(lock);
-	if (!e) {
-		e = hlist_entry_safe(mutex_side_free_list.first,
-				     struct metis_mutex_side_entry, node);
-		if (e)
-			hlist_del(&e->node);
-	}
 	if (e) {
+		/* find 命中 = 旧锁同址条目仍在表。只重置 payload（与 stock
+		 * 内嵌槽被 mutex_init 覆写同型）；节点已在桶链，再 hash_add
+		 * 会把桶打成自环，下一个 find-miss 在锁内死循环。 */
+		memset(&e->payload, 0, sizeof(e->payload));
+		spin_unlock_irqrestore(&mutex_side_lock, flags);
+		return &e->payload;
+	}
+	e = hlist_entry_safe(mutex_side_free_list.first,
+			     struct metis_mutex_side_entry, node);
+	if (e) {
+		hlist_del(&e->node);
 		e->lock_key = (void *)lock;
 		memset(&e->payload, 0, sizeof(e->payload));
 		hash_add(mutex_side_table, &e->node, (unsigned long)lock);
-	} else {
 		spin_unlock_irqrestore(&mutex_side_lock, flags);
-		e = kzalloc(sizeof(*e), GFP_ATOMIC);
-		if (!e)
-			return NULL;
-		spin_lock_irqsave(&mutex_side_lock, flags);
-		e->lock_key = (void *)lock;
-		hash_add(mutex_side_table, &e->node, (unsigned long)lock);
+		return &e->payload;
 	}
+	spin_unlock_irqrestore(&mutex_side_lock, flags);
+	e = kzalloc(sizeof(*e), GFP_ATOMIC);
+	if (!e)
+		return NULL;
+	spin_lock_irqsave(&mutex_side_lock, flags);
+	e->lock_key = (void *)lock;
+	hash_add(mutex_side_table, &e->node, (unsigned long)lock);
 	spin_unlock_irqrestore(&mutex_side_lock, flags);
 	return &e->payload;
 }
