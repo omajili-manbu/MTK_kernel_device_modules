@@ -34,7 +34,6 @@ struct metis_mutex_side_entry {
 	struct metis_mutex_oem_unknown payload;
 };
 
-static void mutex_oem_clear(struct mutex *lock);
 static struct metis_mutex_oem_unknown *mutex_oem_unknown(struct mutex *lock)
 {
 	struct metis_mutex_side_entry *e;
@@ -50,6 +49,41 @@ static struct metis_mutex_oem_unknown *mutex_oem_unknown(struct mutex *lock)
 struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock)
 {
 	return mutex_oem_unknown(lock);
+}
+
+struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock)
+{
+	struct metis_mutex_side_entry *e;
+
+	e = (struct metis_mutex_side_entry *)mutex_oem_unknown(lock);
+	if (e)
+		return &e->payload;
+	e = kzalloc(sizeof(*e), GFP_ATOMIC);
+	if (!e)
+		return NULL;
+	e->lock_key = (void *)lock;
+	spin_lock(&mutex_side_lock);
+	hash_add(mutex_side_table, &e->node, (unsigned long)lock);
+	spin_unlock(&mutex_side_lock);
+	return &e->payload;
+}
+
+void mutex_oem_clear(struct mutex *lock)
+{
+	struct metis_mutex_side_entry *e;
+	bool found = false;
+
+	spin_lock(&mutex_side_lock);
+	hash_for_each_possible(mutex_side_table, e, node, (unsigned long)lock) {
+		if (e->lock_key == (void *)lock) {
+			hash_del(&e->node);
+			found = true;
+			break;
+		}
+	}
+	spin_unlock(&mutex_side_lock);
+	if (found)
+		kfree(e);
 }
 
 static struct metis_rwsem_oem_unknown *rwsem_oem_unknown(struct rw_semaphore *sem)
@@ -142,9 +176,9 @@ static void rwsem_record_trace_unknown(struct rw_semaphore *sem, bool reader)
 
 void set_mutex_vip_blocked(struct mutex *lock)
 {
-	struct metis_mutex_oem_unknown *data = mutex_oem_unknown(lock);
+	struct metis_mutex_oem_unknown *data = mutex_oem_attach(lock);
 
-	if (!mutex_zero_unknown(data))
+	if (!data || !mutex_zero_unknown(data))
 		return;
 	data->unknown_00 = protect_cs ? 0x149f194f : data->unknown_00 | 1;
 	data->deadline_08 = jiffies + 7;

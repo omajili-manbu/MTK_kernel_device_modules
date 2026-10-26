@@ -26,6 +26,7 @@
  * mutex/rwsem layouts. Validation quirks match stock and are not repaired. */
 /* rodin 6.18：mutex 16B 载体改走 metis-blocked.c 的模块级侧表（查无即 NULL） */
 struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock);
+struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock);
 static struct metis_mutex_oem_unknown *spin_mutex_data(struct mutex *lock)
 {
 	return metis_mutex_side_lookup(lock);
@@ -124,7 +125,11 @@ void mi_mutex_init(void *unused, struct mutex *lock)
 
 	if (!protect_cs)
 		return;
-	data = spin_mutex_data(lock);
+	/* rodin 6.18 侧表形态：init 时点 = 锁全新未入表，stock 内嵌槽语义
+	 * = 对新锁预置 payload ⇒ attach（查无即建）而非查无即 NULL。 */
+	data = mutex_oem_attach(lock);
+	if (!data)
+		return;
 	data->deadline_08 = 0;
 	data->unknown_00 = 0x149f194f;
 }
