@@ -1,8 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0
 config XIAOMI_MI_SCHEDULE
-	tristate "Xiaomi package runtime accounting"
+	tristate "Xiaomi task-state carrier (slots, cluster type, 32B uid map)"
 	depends on ARM64 && ANDROID_VENDOR_HOOKS && ANDROID_VENDOR_OEM_DATA
 	help
-	  Reconstruct the dash stock mi_schedule task/UID runtime provider and
-	  /proc/package interfaces. Stock failure and lifetime defects are
-	  retained; see RECONSTRUCTION.txt. Build and runtime remain untested.
+	  Per-task state carrier for the Xiaomi policy modules: mi_task_struct
+	  slots in the GKI task tail, cluster typing from the native topology
+	  masks, and the 32-bit compat UID map. Fork production attaches to
+	  the native android_rvh_sched_fork; free/cleanup to
+	  android_vh_free_task. The stock per-UID runtime accounting and
+	  /proc/package faces are dropped: 6.18 owns load tracking
+	  (PELT/schedstat), and their producers were closed-scheduler calls.

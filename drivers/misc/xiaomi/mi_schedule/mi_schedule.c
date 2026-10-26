@@ -28,13 +28,12 @@ bool mi_task_exiting(struct task_struct *p)
 }
 EXPORT_SYMBOL(mi_task_exiting);
 
-struct mi_task_struct *get_mi_task_struct_unsafe(struct task_struct *p)
+static struct mi_task_struct *get_mi_task_struct_unsafe(struct task_struct *p)
 {
 	if (!p || mi_task_slot_of(p)->magic != MI_TASK_OEM_MAGIC)
 		return NULL;
 	return (void *)mi_task_slot_of(p)->ptr;
 }
-EXPORT_SYMBOL(get_mi_task_struct_unsafe);
 
 struct mi_task_struct *get_mi_task_struct(struct task_struct *p)
 {

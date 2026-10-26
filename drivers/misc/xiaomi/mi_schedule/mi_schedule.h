@@ -57,7 +57,6 @@ struct mi_task_struct {
 };
 
 struct mi_task_struct *get_mi_task_struct(struct task_struct *task);
-struct mi_task_struct *get_mi_task_struct_unsafe(struct task_struct *task);
 bool mi_task_exiting(struct task_struct *task);
 int get_cluster_type(unsigned int cpu);
 u32 is_32B_user(int uid);

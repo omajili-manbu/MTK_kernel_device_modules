@@ -95,11 +95,10 @@ u32 get_dyn_qos_lvl(struct task_struct *p)
 	struct task_qi *qi = get_task_qi(p);
 	return qi ? qi->dynamic_attrs & 15 : 0;
 }
-u32 get_qos_lvl(struct task_struct *p)
+static u32 get_qos_lvl(struct task_struct *p)
 {
 	return max(get_static_qos_lvl(p), get_dyn_qos_lvl(p));
 }
-EXPORT_SYMBOL_GPL(get_qos_lvl);
 bool is_qos_task(struct task_struct *p)
 {
 	return p && get_qos_lvl(p) == 3;

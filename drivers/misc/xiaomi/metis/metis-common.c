@@ -386,21 +386,3 @@ u8 *get_important_task_info(struct mi_task_struct *state)
 	return index < 7 ? important_tasks[index].raw : NULL;
 }
 
-s32 get_metis_deadline_ms(struct mi_task_struct *state)
-{
-	struct mi_task_struct *leader;
-	u8 *info = get_important_task_info(state);
-	u32 policy;
-
-	if (!info)
-		return 0;
-	policy = MI_FIELD(info, u32, 0x18);
-	if (policy & 8)
-		return MI_FIELD(info, s32, 0x1c);
-	if (!(policy & 16) || !state->task || !state->task->group_leader)
-		return 0;
-	leader = get_mi_task_struct(state->task->group_leader);
-	if (leader && (leader->flags_0xc0 & 0x800))
-		return MI_FIELD(info, s32, 0x1c);
-	return 0;
-}

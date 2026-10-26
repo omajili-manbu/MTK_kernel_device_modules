@@ -5,7 +5,6 @@
 
 /* Missing controller-owned state; no defaults, definitions or init here. */
 extern s32 protect_cs;
-extern s32 cs_protect_dur;
 extern s32 cs_debug;
 extern s32 cold_start_app_tgid, cold_start_sserver_tgid;
 extern s32 home_tgid, systemui_tgid, systemserver_tgid, sf_tgid;

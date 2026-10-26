@@ -14,5 +14,4 @@ void fas_exit(void);
 /* Literal RET body; unsigned-int spelling inferred from stock KCFI family
  * 019c0cac shared with set_foreground_app and identity setters. No caller
  * survives in the retained module, and native ABI remains UNTESTED. */
-void set_foreground_pid(unsigned int pid);
 #endif

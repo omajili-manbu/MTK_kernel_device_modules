@@ -750,7 +750,7 @@ void mi_lock_vip_finish_common(struct task_struct *task)
 }
 
 /* .text+0x2650, virtual 0010b078. Stock dispatched this through the
- * mi_try_to_wake_up_func table filled by the closed scheduler; on 6.18 the
+ * stock dispatch table filled by the closed scheduler; on 6.18 the
  * policy attaches directly to the native android_rvh_try_to_wake_up hook. */
 void metis_link_try_to_wake_up_hook(void *unused, struct task_struct *task)
 {

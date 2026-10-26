@@ -283,10 +283,8 @@ void metis_set_vip_thread(struct task_struct *task, u32 kind, u32 seconds)
 static void ioctl_foreground(u32 uid)
 {
 	if (metis_debug) printk("\0016metis-fas: Change foreground uid from %d to %d\n", foreground_uid, uid);
-	if (uid != last_traced_uid) {
-		show_traced_uid = uid;
+	if (uid != last_traced_uid)
 		last_traced_uid = uid;
-	}
 	foreground_uid = uid;
 }
 

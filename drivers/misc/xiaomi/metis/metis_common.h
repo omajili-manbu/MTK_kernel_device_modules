@@ -35,7 +35,6 @@ void mi_dynamic_vtask_prio_sched_end(struct task_struct *task);
 void metis_clean_vip_thread(struct task_struct *task);
 bool metis_xxx_task(struct task_struct *task, unsigned long mask);
 bool metis_vvip_task(struct task_struct *task);
-s32 get_metis_deadline_ms(struct mi_task_struct *state);
 u8 *get_important_task_info(struct mi_task_struct *state);
 u32 get_process_config_index(struct task_struct *task);
 

@@ -37,15 +37,12 @@ struct task_qi *get_task_qi(struct task_struct *);
 int get_proc_static_qos_lvl(struct task_struct *);
 u32 get_static_qos_lvl(struct task_struct *);
 u32 get_dyn_qos_lvl(struct task_struct *);
-u32 get_qos_lvl(struct task_struct *);
+
 u32 is_qi_feat_enabled(unsigned long bit);
 bool is_qos_task(struct task_struct *);
 bool is_qos_rt_task(struct task_struct *);
 void qi_intf_schedinfo_update(struct qi_event *);
 void qi_intf_schedinfo_reset(struct qi_event *);
-int register_qievent_notifier(struct notifier_block *);
-int unregister_qievent_notifier(struct notifier_block *);
-int call_qievent_notifiers(unsigned long event, struct qi_event *);
 int do_qos_inherit(struct task_struct *from, struct task_struct *to, void *cookie, u32 kind);
 int undo_qos_inherit(struct task_struct *task, struct task_qi *qi, void *cookie, u32 kind);
 #endif

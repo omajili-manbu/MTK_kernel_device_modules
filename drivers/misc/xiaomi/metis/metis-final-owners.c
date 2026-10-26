@@ -46,7 +46,6 @@ u32 min_cluster_freqs[3] = { 1324800, 1785600, 1708800 };
 unsigned int n_user_freq = 3;
 DECLARE_WORK(finish_fboost_work, finish_fboost_workfn);
 s32 fboost_debug;
-u32 in_perf_mod;
 struct metis_fboost_execution fboost_exe_mode;
 DEFINE_RAW_SPINLOCK(fboost_pending_lock);
 u8 fboost_pending;
@@ -61,13 +60,9 @@ struct metis_cluster_max_notifier nb_max_limit[3];
 
 /* FAS control surface. */
 u32 binder_boost_msec = 10;
-u32 fperiod = 8;
-u32 task_enqueue_time_toolong = 3000;
 char metis_version_str[64] = "4.0";	/* rodin 6.18：原名 version 与 mtkcam cam_cal_config.o 撞全局，改名保 internal 链接 */
-s32 show_traced_uid;
 unsigned int metis_debug;
 s32 mi_fboost_enable;
-u32 limit_bgtask_sched;
 s32 thermal_break_enable;
 atomic_t mi_sdk_eboost_vip_num = ATOMIC_INIT(0);
 unsigned long mi_link_boost_jif;
@@ -89,7 +84,7 @@ s32 comm_monitor_debug;
 s32 set_static_vip;
 
 /* Cold start/locks. */
-s32 protect_cs = 6, cs_protect_dur = 1000;
+s32 protect_cs = 6;
 u32 cs_stat_type = 15;
 u32 coldstart_set_mmlock_holder_vip = 1;
 u32 set_cold_start_render_vip = 1;
@@ -106,7 +101,6 @@ void *cold_start_app_mmlock, *cold_start_sserver_mmlock;
 void *home_mmlock, *systemui_mmlock, *systemserver_mmlock, *sf_mmlock;
 s32 last_ui_forked_pid;
 unsigned long cold_start_ui_futex_wait;
-u32 reader_biased_jif_for_vip;
 unsigned long rtg_rwsem_handoff_jif;
 s32 cs_debug;
 unsigned long last_ui_forked_jif, coldstart_end_jif, coldstart_begin_jif;

@@ -23,7 +23,6 @@ extern unsigned long cluster_affinity_uid_llist[3125];
 extern u32 mi_rebind_task[4][5], mi_viptask[3];
 extern s32 thermal_break_enable, last_traced_uid;
 extern unsigned int ui_last_cpu;
-extern s32 show_traced_uid; /* Stock METIS .bss+0x159b0, size4. */
 extern s64 vtask_monitor_beg_us, vtask_monitor_end_us, frame_boost_start;
 extern unsigned long max_limit_freq[3], thermal_limit_freq[3];
 extern s32 comm_monitor_debug, set_static_vip;
@@ -95,7 +94,6 @@ int set_common_persist_vip_task(const char *value,
 int get_common_persist_vip_task(char *buffer, const struct kernel_param *param);
 int set_clear_persist_vip_task(const char *value,
 			     const struct kernel_param *param);
-int metis_common_api_init(void);
 void metis_common_api_exit(void);
 void history_task_info_init(void);
 int metis_doublecyc_init(void);

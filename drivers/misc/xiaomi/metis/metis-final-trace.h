@@ -63,7 +63,7 @@ TRACE_EVENT(lock_spin_dur,
 	TP_printk("[vip %d]tsk %d %s spin finished with lock taken %d, lock type %s, dur %llu ", __entry->vip, __entry->pid, __entry->comm, __entry->taken, __entry->type, __entry->dur)
 );
 
-/* Ex-metis-lowlt-trace.h (its CREATE_TRACE_POINTS owner moved here).
+/* Moved from the dropped metis-lowlt-trace.h (CREATE_TRACE_POINTS now here).
  * Original raw event metadata; stock reserves str_data but never assigns
  * or prints it, and keeps the fixed 64-byte string read for type != 'C'. */
 TRACE_EVENT(metis_tracing_mark_write,

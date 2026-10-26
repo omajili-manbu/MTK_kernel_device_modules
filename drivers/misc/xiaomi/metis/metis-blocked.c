@@ -14,7 +14,8 @@
 #include "metis_classify.h"
 #include "metis-final-trace.h"
 
-/* Only this event is defined here; lowlt owns the shared systrace event. */
+/* Only this event is defined here; the shared systrace event lives in
+ * metis-final-trace.h. */
 #define CREATE_TRACE_POINTS
 #include "metis-blocked-trace.h"
 #undef CREATE_TRACE_POINTS

@@ -79,6 +79,4 @@ void register_cs_hooks(void);
 void unregister_cs_hooks(void);
 int metis_cs_init(void);
 void metis_cs_exit(void);
-void register_coldstart_hooks(void);
-void unregister_coldstart_hooks(void);
 #endif

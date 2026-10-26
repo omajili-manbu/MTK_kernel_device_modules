@@ -24,8 +24,6 @@ EXPORT_SYMBOL_GPL(metis_link_init);
 EXPORT_SYMBOL_GPL(metis_link_exit);
 EXPORT_SYMBOL_GPL(clu_aff_init);
 EXPORT_SYMBOL_GPL(clu_aff_exit);
-EXPORT_SYMBOL_GPL(in_perf_mod);
-EXPORT_SYMBOL_GPL(show_traced_uid);
 EXPORT_SYMBOL_GPL(cpu_to_cluster);
 EXPORT_SYMBOL_GPL(del_cluster);
 EXPORT_SYMBOL_GPL(boost_cluster);

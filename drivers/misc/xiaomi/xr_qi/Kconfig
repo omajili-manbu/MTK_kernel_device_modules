@@ -6,5 +6,7 @@ config XIAOMI_XR_QI
 	depends on !PREEMPT_RT && !DEBUG_SPINLOCK && !DEBUG_LOCK_ALLOC
 	depends on MUTEX_SPIN_ON_OWNER && RWSEM_SPIN_ON_OWNER
 	help
-	  Source reconstruction of dash stock xr-qi. See RECONSTRUCTION.txt
-	  for retained stock defects, coverage gaps and untested status.
+	  Xiaomi QoS inheritance policy: binder/futex/lock QoS propagation and
+	  QoS-gated spin budgets, driven by the /dev/xr_perf_actuator ABI and
+	  native GKI lock/binder/futex vendor hooks. Feature 9 reuses the
+	  native rwsem fast path; policy lives only in the hook decisions.

@@ -10,9 +10,7 @@
 
 /* Genuine original objects not previously declared by the recovered slices.
  * Their parameter ops are retained independently of inferred C signedness. */
-extern u32 mi_lock_blocked_pid, in_perf_mod, fperiod;
-extern u32 limit_bgtask_sched, task_enqueue_time_toolong;
-extern u32 reader_biased_jif_for_vip;
+extern u32 mi_lock_blocked_pid;
 extern unsigned int n_freq, n_user_freq;
 extern char metis_version_str[64];
 
