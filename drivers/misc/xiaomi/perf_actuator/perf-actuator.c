@@ -52,25 +52,6 @@ int register_perf_actuator(unsigned int cmd,
 }
 EXPORT_SYMBOL_GPL(register_perf_actuator);
 
-int unregister_perf_actuator(unsigned int cmd)
-{
-	unsigned int index = _IOC_NR(cmd);
-
-	if (index >= ARRAY_SIZE(perf_actuator_table))
-		return -EINVAL;
-
-	down_write(&table_rwsem);
-	if (!perf_actuator_table[index].callback ||
-	    perf_actuator_table[index].cmd != cmd)
-		pr_err("perf_actuator: unregister %u conflict\n", cmd);
-	perf_actuator_table[index].cmd = 0;
-	perf_actuator_table[index].callback = NULL;
-	up_write(&table_rwsem);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(unregister_perf_actuator);
-
 static long perf_actuator_ioctl(struct file *file, unsigned int cmd,
 				unsigned long arg)
 {

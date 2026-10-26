@@ -16,7 +16,6 @@
 
 static unsigned long g_qi_enable;
 static DEFINE_SPINLOCK(g_qi_lock);
-static ATOMIC_NOTIFIER_HEAD(qi_event_chain);
 struct qi_inherit_entry { struct list_head list; u32 reserved; u32 pad; void *cookie; };
 struct qi_ioctl { u32 attrs; s32 pid; };
 unsigned int sysctl_mutex_qos_opt_spin_time_ns = 100000;
@@ -39,8 +38,9 @@ u32 is_qi_feat_enabled(unsigned long bit)
 {
 	if (!(READ_ONCE(g_qi_enable) & 1))
 		return 0;
-	/* Stock masks the word index to two bits, including out-of-object reads. */
-	return (((unsigned long *)&g_qi_enable)[(bit >> 6) & 3] >> (bit & 63)) & 1;
+	/* enable 值被 inherit_enable_store 限制在 0x3ff 内，只可能触及 word0；
+	 * stock 的 (bit>>6)&3 三字越界读在合法位域内不会命中，直接单字读。 */
+	return (READ_ONCE(g_qi_enable) >> (bit & 63)) & 1;
 }
 EXPORT_SYMBOL_GPL(is_qi_feat_enabled);
 
@@ -100,17 +100,6 @@ u32 get_qos_lvl(struct task_struct *p)
 	return max(get_static_qos_lvl(p), get_dyn_qos_lvl(p));
 }
 EXPORT_SYMBOL_GPL(get_qos_lvl);
-int get_proc_static_qos_lvl(struct task_struct *p)
-{
-	struct task_qi *qi;
-	if (!p) {
-		pr_err("xr-qi: null process task\n");
-		return -EINVAL;
-	}
-	qi = get_task_qi(p->group_leader);
-	return qi ? qi->process_attrs & 15 : 0;
-}
-EXPORT_SYMBOL_GPL(get_proc_static_qos_lvl);
 bool is_qos_task(struct task_struct *p)
 {
 	return p && get_qos_lvl(p) == 3;
@@ -122,41 +111,15 @@ bool is_qos_rt_task(struct task_struct *p)
 		return is_qos_task(p);
 	return true;
 }
-int register_qievent_notifier(struct notifier_block *nb)
-{
-	return atomic_notifier_chain_register(&qi_event_chain, nb);
-}
-EXPORT_SYMBOL_GPL(register_qievent_notifier);
-int unregister_qievent_notifier(struct notifier_block *nb)
-{
-	return atomic_notifier_chain_unregister(&qi_event_chain, nb);
-}
-EXPORT_SYMBOL_GPL(unregister_qievent_notifier);
-int call_qievent_notifiers(unsigned long event, struct qi_event *data)
-{
-	return atomic_notifier_call_chain(&qi_event_chain, event, data);
-}
-void qi_intf_schedinfo_update(struct qi_event *e)
-{
-	if (!e)
-		return;
-	e->schedattrs = (e->schedattrs & 0xffff000f) | (((e->flags >> 4) & 0xfff) << 4);
-}
-EXPORT_SYMBOL_GPL(qi_intf_schedinfo_update);
-void qi_intf_schedinfo_reset(struct qi_event *e)
-{
-	if (!e)
-		return;
-	e->schedattrs &= 0xffff000f;
-}
-EXPORT_SYMBOL_GPL(qi_intf_schedinfo_reset);
+/* qi_event 通知链（register/unregister_qievent_notifier + 调用面）随本树
+ * 无注册者一并拆除：stock 里订阅方是外部 sched 模块，链空跑等价于
+ * 事件字段直传，语义不变。 */
 
 int do_qos_inherit(struct task_struct *from, struct task_struct *to, void *cookie, u32 kind)
 {
 	struct task_qi *src = get_task_qi(from), *dst = get_task_qi(to);
 	struct qi_inherit_slot *slot;
 	struct qi_inherit_entry *entry;
-	struct qi_event event;
 	u32 attrs;
 	kind &= 255;
 	if (!dst)
@@ -182,9 +145,7 @@ int do_qos_inherit(struct task_struct *from, struct task_struct *to, void *cooki
 	dst->inherit_mask |= BIT(kind);
 	if (!dst->inherit_deadline)
 		dst->inherit_deadline = jiffies + 500;
-	event = (struct qi_event){ from, to, attrs, attrs & 15 };
-	call_qievent_notifiers(3, &event);
-	dst->dynamic_attrs = event.schedattrs;
+	dst->dynamic_attrs = attrs;
 	spin_unlock(&dst->lock);
 	spin_unlock(&slot->lock);
 	return 0;
@@ -193,7 +154,6 @@ int undo_qos_inherit(struct task_struct *p, struct task_qi *qi, void *cookie, u3
 {
 	struct qi_inherit_entry *entry;
 	struct qi_inherit_slot *slot;
-	struct qi_event event;
 	kind &= 255;
 	BUG_ON(kind > 4);
 	slot = &qi->slots[kind];
@@ -207,8 +167,6 @@ int undo_qos_inherit(struct task_struct *p, struct task_qi *qi, void *cookie, u3
 			qi->inherit_mask &= ~BIT(kind);
 			if (!qi->inherit_mask) {
 				qi->inherit_deadline = 0;
-				event = (struct qi_event){ NULL, p, 0, qi->dynamic_attrs };
-				call_qievent_notifiers(4, &event);
 				qi->dynamic_attrs = 0;
 			}
 			spin_unlock(&qi->lock);
@@ -228,8 +186,6 @@ void qi_free_task_extension(struct task_struct *p)
 	int i;
 	if (!is_qi_feat_enabled(0) || !mq)
 		return;
-	if (mq->qi.inherit_deadline && (long)(mq->qi.inherit_deadline - jiffies) < 0)
-		(void)jiffies_to_msecs(jiffies - mq->qi.inherit_deadline);
 	for (i = 0; i < 5; i++) {
 		spin_lock(&mq->qi.slots[i].lock);
 		list_for_each_entry_safe(entry, tmp, &mq->qi.slots[i].entries, list) {
@@ -247,7 +203,6 @@ static int qi_intf_set_qos(void *arg)
 	struct qi_ioctl req;
 	struct task_struct *p, *thread, *leader;
 	struct task_qi *qi, *lqi;
-	struct qi_event event;
 	u32 others = 0, lvl;
 	int ret = 0;
 	if (!is_qi_feat_enabled(0))
@@ -288,11 +243,6 @@ static int qi_intf_set_qos(void *arg)
 		lqi->process_attrs = max(others, req.attrs);
 	else
 		pr_err("xr-qi: process qos allocation failed\n");
-	event = (struct qi_event){ NULL, p, 0, req.attrs };
-	if (lvl == 2 || lvl == 3)
-		call_qievent_notifiers(1, &event);
-	else if (!lvl)
-		call_qievent_notifiers(2, &event);
  out_task:
 	rcu_read_unlock();
 	put_task_struct(p);
@@ -366,9 +316,6 @@ static struct attribute *qi_attrs[] = { &inherit_enable_attr.attr, NULL };
 static const struct attribute_group qi_attr_group = { .attrs = qi_attrs };
 static struct ctl_table mqos_sysctls[] = {
 	{ .procname = "mutex_qos_opt_spin_time_ns", .data = &sysctl_mutex_qos_opt_spin_time_ns,
-	  .maxlen = sizeof(unsigned int), .mode = 0644, .proc_handler = proc_douintvec_minmax,
-	  .extra1 = SYSCTL_ZERO, .extra2 = SYSCTL_INT_MAX },
-	{ .procname = "mutex_normal_opt_spin_time_ns", .data = &sysctl_mutex_normal_opt_spin_time_ns,
 	  .maxlen = sizeof(unsigned int), .mode = 0644, .proc_handler = proc_douintvec_minmax,
 	  .extra1 = SYSCTL_ZERO, .extra2 = SYSCTL_INT_MAX },
 	{ }

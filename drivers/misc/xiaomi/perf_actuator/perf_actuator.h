@@ -12,6 +12,5 @@ typedef int (*perf_actuator_callback_t)(void *arg);
 
 int register_perf_actuator(unsigned int cmd,
 			   perf_actuator_callback_t callback);
-int unregister_perf_actuator(unsigned int cmd);
 
 #endif /* _XIAOMI_PERF_ACTUATOR_H_ */

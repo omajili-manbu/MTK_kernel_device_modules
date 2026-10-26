@@ -22,7 +22,6 @@
 #include "qi-trace.h"
 
 extern unsigned int sysctl_mutex_qos_opt_spin_time_ns;
-extern unsigned int sysctl_mutex_normal_opt_spin_time_ns;
 extern struct percpu_rw_semaphore cgroup_threadgroup_rwsem;
 extern void qi_free_task_extension(struct task_struct *p);
 /* The native rwsem waiter is private to rwsem.c; its recovered contract matches it. */
@@ -76,10 +75,9 @@ static void qi_free_task(void *unused, struct task_struct *p)
 		qi_free_task_extension(p);
 }
 static void qi_select_task_rq_rt(void *unused, struct task_struct *p, int prev_cpu,
-			       int sd_flag, int wake_flags, int *new_cpu)
+		       int sd_flag, int wake_flags, int *new_cpu)
 {
 	struct task_qi *src, *dst;
-	struct qi_event event;
 	u32 attrs;
 	if (!p || !(wake_flags & 4) || !is_qi_feat_enabled(0) || !is_qos_task(current) ||
 	    current->policy == SCHED_NORMAL || current->policy == SCHED_BATCH)
@@ -94,13 +92,10 @@ static void qi_select_task_rq_rt(void *unused, struct task_struct *p, int prev_c
 	dst = get_alloc_task_qi(p);
 	if (!dst || !(attrs & 0x200))
 		return;
-	event = (struct qi_event){ current, p, attrs, attrs };
-	if (!call_qievent_notifiers(6, &event)) {
-		spin_lock(&dst->lock);
-		dst->dynamic_attrs = event.schedattrs;
-		spin_unlock(&dst->lock);
-		trace_qi_wake_new_rt_task(current->pid, p->pid, dst->static_attrs, dst->dynamic_attrs);
-	}
+	spin_lock(&dst->lock);
+	dst->dynamic_attrs = attrs;
+	spin_unlock(&dst->lock);
+	trace_qi_wake_new_rt_task(current->pid, p->pid, dst->static_attrs, dst->dynamic_attrs);
 }
 
 /* Stock transaction +0xb8 is the low word of android_oem_data1. */
@@ -118,7 +113,6 @@ static void qi_binder_attach(struct task_struct *from, struct task_struct *to,
 {
 	struct task_qi *qi;
 	int ret;
-	struct qi_event event = { NULL, to, 0, 0 };
 	get_task_struct(from);
 	get_task_struct(to);
 	qi = get_alloc_task_qi(to);
@@ -137,8 +131,6 @@ static void qi_binder_attach(struct task_struct *from, struct task_struct *to,
 					trace_qi_set_binder_transaction_pid(t, to->pid, to->pid,
 									    "set_priority");
 			}
-		} else {
-			call_qievent_notifiers(5, &event);
 		}
 	}
 	put_task_struct(to);
@@ -168,9 +160,10 @@ static void qi_binder_proc_transaction(void *unused, struct task_struct *caller,
 static void qi_binder_restore_priority(void *unused, struct binder_transaction *t)
 {
 	struct task_qi *qi;
+	/* binder_internal.h：teardown 期 to_proc 可置 NULL，取 tsk 前判空。 */
 	struct task_struct *p = (t && t->to_proc) ? t->to_proc->tsk : NULL;
 	int ret;
-	if (!is_qi_feat_enabled(1))
+	if (!is_qi_feat_enabled(1) || !t || !p)
 		return;
 	get_task_struct(p);
 	qi = get_task_qi(p);
@@ -278,15 +271,13 @@ static void undo_mutex_qos_inherit(struct mutex *lock)
 static void qi_mutex_wait_start(void *unused, struct mutex *lock)
 {
 	struct task_struct *owner;
-	if (!is_qi_feat_enabled(3))
+	if (!is_qi_feat_enabled(3) || IS_ERR_OR_NULL(lock))
 		return;
 	if (is_qi_feat_enabled(9) && is_qos_task(current)) {
 		(*(u8 *)&get_alloc_mqos_task(current)->flags) |= 1;
 		atomic_inc(qi_mutex_waiters(lock));
 		trace_qos_mutex_wait(true, current->pid, (s64)atomic_read(qi_mutex_waiters(lock)));
 	}
-	if (IS_ERR_OR_NULL(lock))
-		return;
 	owner = (void *)(atomic_long_read(&lock->owner) & ~7UL);
 	if (!owner)
 		return;
@@ -355,7 +346,6 @@ static void qi_mutex_spin_start(void *unused, struct mutex *lock, bool *timeout,
 {
 	struct task_qi *qi;
 	u64 elapsed;
-	bool qos;
 	if (!is_qi_feat_enabled(9) || !is_qos_task(current))
 		return;
 	qi = get_task_qi(current);
@@ -368,11 +358,12 @@ static void qi_mutex_spin_start(void *unused, struct mutex *lock, bool *timeout,
 	if ((++*cnt & 15) != 0)
 		return;
 	elapsed = sched_clock() - qi->mutex_spin_start;
-	qos = is_qos_task(current);
-	if ((!qos && elapsed > sysctl_mutex_normal_opt_spin_time_ns) ||
-	    (qos && elapsed > sysctl_mutex_qos_opt_spin_time_ns))
+	/* 本钩子只在 QoS 任务上生效（非 QoS 任务无 task_qi 记账载体）；
+	 * normal 预算分支（sysctl_mutex_normal_opt_spin_time_ns）在
+	 * is_qos_task 门控下永不可达，随其 sysctl 一并删除。 */
+	if (elapsed > sysctl_mutex_qos_opt_spin_time_ns)
 		*timeout = true;
-	trace_qos_mutex_opt_spin(current->pid, qos, qi->mutex_spin_start, elapsed);
+	trace_qos_mutex_opt_spin(current->pid, true, qi->mutex_spin_start, elapsed);
 }
 static void qi_mutex_spin_finish(void *unused, struct mutex *lock, bool taken)
 {
@@ -679,8 +670,17 @@ void qi_vh_binder_unregister(void)
 	int _ret = register_trace_##name(fn, NULL); \
 	if (_ret < 0) { pr_err("xr-qi: " #name " registration %d\n", _ret); return _ret; } \
 } while (0)
+/* rodin 6.18：__mutex_init 不清 android_oem_data1（waiter 计数槽），
+ * 动态锁可能带脏计数 ⇒ init 钩子显式清零。 */
+static void qi_mutex_init(void *unused, struct mutex *lock)
+{
+	if (lock)
+		lock->android_oem_data1 = 0;
+}
+
 int qi_vh_mutex_register(void)
 {
+	QI_REGISTER_HOOK(android_vh_mutex_init, qi_mutex_init);
 	QI_REGISTER_HOOK(android_vh_alter_mutex_list_add, qi_alter_mutex_list);
 	QI_REGISTER_HOOK(android_vh_mutex_wait_start, qi_record_mutex);
 	QI_REGISTER_HOOK(android_vh_mutex_unlock_slowpath, qi_mutex_unlock);
@@ -693,6 +693,7 @@ int qi_vh_mutex_register(void)
 }
 void qi_vh_mutex_unregister(void)
 {
+	unregister_trace_android_vh_mutex_init(qi_mutex_init, NULL);
 	unregister_trace_android_vh_mutex_wait_start(qi_mutex_wait_start, NULL);
 	unregister_trace_android_vh_mutex_wait_finish(qi_mutex_wait_finish, NULL);
 	unregister_trace_android_vh_mutex_unlock_slowpath(qi_mutex_unlock, NULL);

@@ -70,26 +70,6 @@ TRACE_EVENT(qi_binder_set_priority,
 	TP_printk("binder set priority: ret=%d tasns=%p from=%d to=%d static_qos=%u dyn_qos=%u", __entry->ret, __entry->trans, __entry->from, __entry->to, __entry->static_qos, __entry->dyn_qos)
 );
 
-TRACE_EVENT(qi_free_task,
-	TP_PROTO(struct task_struct *pid, int flag, u32 static_qos, u32 dyn_qos, unsigned long timeout),
-	TP_ARGS(pid, flag, static_qos, dyn_qos, timeout),
-	TP_STRUCT__entry(
-		__field(pid_t, pid)
-		__field(int, flag)
-		__field(u32, static_qos)
-		__field(u32, dyn_qos)
-		__field(unsigned long, timeout)
-	),
-	TP_fast_assign(
-		__entry->pid = pid->pid;
-		__entry->flag = flag;
-		__entry->static_qos = static_qos;
-		__entry->dyn_qos = dyn_qos;
-		__entry->timeout = timeout;
-	),
-	TP_printk("free task: pid=%d, falg=%d, static_qos=%u, dyn_qos=%u, timeout=%lu", __entry->pid, __entry->flag, __entry->static_qos, __entry->dyn_qos, __entry->timeout)
-);
-
 TRACE_EVENT(qi_futex_inherit,
 	TP_PROTO(int ret, struct task_struct *from, struct task_struct *to, unsigned long lock, u32 static_qos, u32 dyn_qos),
 	TP_ARGS(ret, from, to, lock, static_qos, dyn_qos),
@@ -312,26 +292,6 @@ TRACE_EVENT(qi_rwsem_jump,
 		__entry->lock = lock;
 	),
 	TP_printk("rwsem jump: pid:%d lock=%lu", __entry->pid, __entry->lock)
-);
-
-TRACE_EVENT(qi_rwsem_reader_owned,
-	TP_PROTO(bool uninherited, struct task_struct *pid, u32 static_qos, u32 dyn_qos, unsigned long long lock),
-	TP_ARGS(uninherited, pid, static_qos, dyn_qos, lock),
-	TP_STRUCT__entry(
-		__field(bool, uninherited)
-		__field(pid_t, pid)
-		__field(u32, static_qos)
-		__field(u32, dyn_qos)
-		__field(unsigned long long, lock)
-	),
-	TP_fast_assign(
-		__entry->uninherited = uninherited;
-		__entry->pid = pid->pid;
-		__entry->static_qos = static_qos;
-		__entry->dyn_qos = dyn_qos;
-		__entry->lock = lock;
-	),
-	TP_printk("rwsem reader:uninherited=%d cur=%d static_qos=%u dyn_qos=%u lock=%llu", __entry->uninherited, __entry->pid, __entry->static_qos, __entry->dyn_qos, __entry->lock)
 );
 
 TRACE_EVENT(qi_rwsem_skip,
