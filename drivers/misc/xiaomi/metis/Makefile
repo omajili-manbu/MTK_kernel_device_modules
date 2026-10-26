@@ -10,4 +10,5 @@ metis-y := metis-state.o metis-classify.o metis-blocked.o metis-binder-request.o
 	metis-final-link.o metis-final-link-spin.o \
 	metis-final-scheduler-affinity.o metis-final-boost.o \
 	metis-final-important.o metis-final-owners.o metis-final-tables.o \
-	metis-final-trace.o metis-final-module.o metis-final-exports.o
+	metis-final-trace.o metis-final-module.o metis-final-exports.o \
+	metis-carrier-audit.o
