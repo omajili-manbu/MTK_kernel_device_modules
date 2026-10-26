@@ -5,6 +5,7 @@
  * root's explicitly authorized internal kernel/locking/rwsem.h header move. */
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
+#include <linux/stddef.h>
 #include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/mm_types.h>
@@ -32,6 +33,16 @@ struct metis618_rwsem_waiter {
 	bool handoff_set;
 	bool donor_wakeup;
 };
+
+/* rodin 6.18 对位锁：内核 rwsem.c:375-383 真身 = list(0..15)+task(16..23)+
+ * type(24..27)+pad(28..31)+timeout(32..39)+handoff_set(40)+donor_wakeup(41)
+ * → pad 至 48。若 6.18 内核侧字段增删，此处编译期即炸而非运行期静默越界。 */
+static_assert(sizeof(struct metis618_rwsem_waiter) == 48,
+	      "metis618 rwsem_waiter 与 6.18 rwsem.c 真身布局漂移");
+static_assert(offsetof(struct metis618_rwsem_waiter, task) == 16,
+	      "metis618 waiter.task 偏移漂移");
+static_assert(offsetof(struct metis618_rwsem_waiter, timeout) == 32,
+	      "metis618 waiter.timeout 偏移漂移");
 
 #include <linux/sched.h>
 #include <linux/sched/clock.h>
