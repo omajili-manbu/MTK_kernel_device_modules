@@ -526,6 +526,15 @@ void do_rwsem_list_insert(struct metis618_rwsem_waiter *waiter,
 
 	if (priority == 5)
 		return;
+	/* rodin 6.18 防重入：reader 慢路径对同一 waiter 可能二次触发本钩子
+	 * （前次 already=true 未 add，waiter 仍挂在链上）；若本 waiter 已挂在
+	 * sem->wait_list（list 非空即视为在链——本链是唯一归属），直接置
+	 * already 返回，复现 stock "already on list" 语义并规避
+	 * list_add double add BUG（#143 实证 lmkd fork 路径）。 */
+	if (!list_empty(&waiter->list)) {
+		*already_on_list = true;
+		return;
+	}
 	while (cursor != &sem->wait_list) {
 		if (!cursor)
 			return;
