@@ -76,10 +76,8 @@ static_assert(offsetof(struct metis618_rwsem_waiter, timeout) == 32,
 #include "metis-final-link.h"
 #include "metis-final-link-trace.h"
 
-#ifndef CONFIG_LIST_HARDENED
-extern bool __list_add_valid_or_report(struct list_head *new,
-		struct list_head *prev, struct list_head *next);
-#endif
+/* __list_add_valid_or_report is declared by linux/list.h exactly when
+ * CONFIG_LIST_HARDENED builds it; no local prototype copy. */
 
 /* Original separate usage test plus unconditional increment is deliberate;
  * replacing it with get_task_struct_rcu() would repair a reference race. */
@@ -580,11 +578,6 @@ void do_rwsem_list_insert(struct metis618_rwsem_waiter *waiter,
 		if (priority >= other_priority) {
 			rwsem_link_after(&waiter->list, cursor);
 			*already_on_list = true;
-			/* Raw .text+0x3968..0x3998 __trace_bprintk tail, skipped
- * by Ghidra. Preserve the genuine native debug producer. */
-			trace_printk("tsched: insert tsk %d %s %d after %d %s %d\n",
-				current->pid, current->comm, priority,
-				other->task->pid, other->task->comm, other_priority);
 			return;
 		}
 		cursor = previous;
@@ -796,6 +789,8 @@ int metis_link_init(void)
 	/* rodin 6.18：rtmutex_wait_start 传 rt_mutex_base*；qi/metis 语义点已由
  * rwsem/mutex 替代钩子覆盖，rtmutex 链不再注册 */
 	register_trace_android_vh_pcpu_rwsem_lock_acquired(mi_pcpu_rwsem_lock_starttime, NULL);
+	/* rodin 6.18：rtmutex 时序面由 android_vh_rtmutex_lock_acquired 原生挂回 */
+	register_trace_android_vh_rtmutex_lock_acquired(mi_rtmutex_lock_starttime, NULL);
 	register_trace_android_vh_percpu_rwsem_wq_add(mi_pcpu_rwsem_wq_add, NULL);
 	register_trace_android_vh_rwsem_read_wait_finish(mi_rwsem_read_wait_finish_hook, NULL);
 	register_trace_android_vh_rwsem_write_wait_finish(mi_rwsem_write_wait_finish_hook, NULL);

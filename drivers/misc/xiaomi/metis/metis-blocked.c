@@ -23,9 +23,13 @@
 
 /* rodin 6.18：mutex 的 android_oem_data1 只有单 u64，装不下 16B payload
  * ⇒ 载体改模块级侧表（lock 指针 -> payload），查表带 magic 校验、
- * clear 时删槽。语义与 stock（lock 内嵌槽）等价：查无即 NULL。 */
+ * clear 时删槽。语义与 stock（lock 内嵌槽）等价：查无即 NULL。
+ * rodin 并发口径：所有访问都在 mutex_side_lock 内；条目 clear 后进
+ * freelist 由 attach 复用、永不 kfree —— 调用方在锁外持 payload 指针
+ * 也不存在 UAF（锁复用语义与 stock 内嵌槽随锁对象复用一致）。 */
 #define METIS_MUTEX_SIDE_BUCKETS 1024
 static struct hlist_head mutex_side_table[METIS_MUTEX_SIDE_BUCKETS];
+static struct hlist_head mutex_side_free_list;
 static DEFINE_SPINLOCK(mutex_side_lock);
 
 struct metis_mutex_side_entry {
@@ -34,16 +38,28 @@ struct metis_mutex_side_entry {
 	struct metis_mutex_oem_unknown payload;
 };
 
-static struct metis_mutex_oem_unknown *mutex_oem_unknown(struct mutex *lock)
+/* Caller must hold mutex_side_lock. */
+static struct metis_mutex_side_entry *mutex_side_find(struct mutex *lock)
 {
 	struct metis_mutex_side_entry *e;
 
-	if (!lock)
-		return NULL;
 	hash_for_each_possible(mutex_side_table, e, node, (unsigned long)lock)
 		if (e->lock_key == (void *)lock)
-			return &e->payload;
+			return e;
 	return NULL;
+}
+
+static struct metis_mutex_oem_unknown *mutex_oem_unknown(struct mutex *lock)
+{
+	struct metis_mutex_side_entry *e;
+	unsigned long flags;
+
+	if (!lock)
+		return NULL;
+	spin_lock_irqsave(&mutex_side_lock, flags);
+	e = mutex_side_find(lock);
+	spin_unlock_irqrestore(&mutex_side_lock, flags);
+	return e ? &e->payload : NULL;
 }
 
 struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock)
@@ -54,36 +70,47 @@ struct metis_mutex_oem_unknown *metis_mutex_side_lookup(struct mutex *lock)
 struct metis_mutex_oem_unknown *mutex_oem_attach(struct mutex *lock)
 {
 	struct metis_mutex_side_entry *e;
+	unsigned long flags;
 
-	e = (struct metis_mutex_side_entry *)mutex_oem_unknown(lock);
-	if (e)
-		return &e->payload;
-	e = kzalloc(sizeof(*e), GFP_ATOMIC);
-	if (!e)
+	if (!lock)
 		return NULL;
-	e->lock_key = (void *)lock;
-	spin_lock(&mutex_side_lock);
-	hash_add(mutex_side_table, &e->node, (unsigned long)lock);
-	spin_unlock(&mutex_side_lock);
+	spin_lock_irqsave(&mutex_side_lock, flags);
+	e = mutex_side_find(lock);
+	if (!e) {
+		e = hlist_entry_safe(mutex_side_free_list.first,
+				     struct metis_mutex_side_entry, node);
+		if (e)
+			hlist_del(&e->node);
+	}
+	if (e) {
+		e->lock_key = (void *)lock;
+		memset(&e->payload, 0, sizeof(e->payload));
+		hash_add(mutex_side_table, &e->node, (unsigned long)lock);
+	} else {
+		spin_unlock_irqrestore(&mutex_side_lock, flags);
+		e = kzalloc(sizeof(*e), GFP_ATOMIC);
+		if (!e)
+			return NULL;
+		spin_lock_irqsave(&mutex_side_lock, flags);
+		e->lock_key = (void *)lock;
+		hash_add(mutex_side_table, &e->node, (unsigned long)lock);
+	}
+	spin_unlock_irqrestore(&mutex_side_lock, flags);
 	return &e->payload;
 }
 
 void mutex_oem_clear(struct mutex *lock)
 {
 	struct metis_mutex_side_entry *e;
-	bool found = false;
+	unsigned long flags;
 
-	spin_lock(&mutex_side_lock);
-	hash_for_each_possible(mutex_side_table, e, node, (unsigned long)lock) {
-		if (e->lock_key == (void *)lock) {
-			hash_del(&e->node);
-			found = true;
-			break;
-		}
+	spin_lock_irqsave(&mutex_side_lock, flags);
+	e = mutex_side_find(lock);
+	if (e) {
+		hash_del(&e->node);
+		hlist_add_head(&e->node, &mutex_side_free_list);
 	}
-	spin_unlock(&mutex_side_lock);
-	if (found)
-		kfree(e);
+	spin_unlock_irqrestore(&mutex_side_lock, flags);
 }
 
 static struct metis_rwsem_oem_unknown *rwsem_oem_unknown(struct rw_semaphore *sem)

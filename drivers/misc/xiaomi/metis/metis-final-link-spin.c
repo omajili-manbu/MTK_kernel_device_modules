@@ -5,7 +5,6 @@
 #include <linux/kernel.h>
 #include <linux/mm_types.h>
 #include <linux/mutex.h>
-#include <linux/osq_lock.h>
 #include <linux/preempt.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
@@ -282,11 +281,10 @@ no_spin:
 	*ret = false;
 }
 
-/* .text+0x1c2d8, virtual 00124d00, literal RET. Native rwsem.h proves unused
- * callback signature; this original no-op is not a replacement producer. */
-void mi_rwsem_direct_rsteal(void *unused, struct rw_semaphore *sem, bool *steal)
-{
-}
+/* The stock rwsem direct-rsteal and optimistic-rspin overrides re-walked the
+ * native rwsem fast path (owner spin loop, sem->count/owner/osq hand-edits);
+ * 6.18 owns that path, so they are dropped instead of being kept as
+ * registered no-op placeholders. */
 
 /* .text+0x1c2b8, virtual 00124ce0. */
 void mi_rwsem_init(void *unused, struct rw_semaphore *sem)
@@ -361,89 +359,6 @@ timeout:
 	*time_out = true;
 }
 
-/* .text+0x1dd70, virtual 00126798. Values 1/2/4/8 are observed owner-state
- * results; original local C enum spelling is UNKNOWN. No private enum copied.
- * Original has no RCU section around owner->on_cpu. */
-u32 rwsem_spin_on_owner(struct rw_semaphore *sem)
-{
-	unsigned long initial = atomic_long_read(&sem->owner), next;
-	struct task_struct *owner, *new_owner;
-
-	if (initial & 2)
-		return 8;
-	if (initial & 1)
-		return 4;
-	owner = (void *)(initial & ~3UL);
-	if (!owner)
-		return 1;
-	next = atomic_long_read(&sem->owner);
-	new_owner = (void *)(next & ~3UL);
-	while (new_owner == owner && !((next ^ initial) & 3)) {
-		if (need_resched() || !READ_ONCE(owner->on_cpu))
-			return 8;
-		/* Original also reads task->__state without using the result. */
-		(void)READ_ONCE(owner->__state);
-		cpu_relax();
-		next = atomic_long_read(&sem->owner);
-		new_owner = (void *)(next & ~3UL);
-	}
-	if (next & 2)
-		return 8;
-	if (next & 1)
-		return 4;
-	return new_owner ? 2 : 1;
-}
-
-/* .text+0x1c2e0, virtual 00124d08. Canonical sem count/owner/osq members;
- * native kernel/locking/rwsem.c defines READER_BIAS=1<<8 and writer/handoff
- * bits 0/2. The unused adjustment formal is proven by native rwsem hook.
- * No max spin count, no reference/RCU stabilization, as in stock. */
-void mi_rwsem_optimistic_rspin(void *unused, struct rw_semaphore *sem,
-		long *adjustment, bool *rspin)
-{
-	u32 state, previous = 1, next;
-	unsigned long old;
-	bool taken = false;
-
-	if (!(protect_cs & 4) || *rspin || is_qos_task(current) ||
-	    current->tgid != cold_start_app_tgid)
-		return;
-	trace_metis_tracing_mark_write('B', current->tgid, "rwsem rspin", 0, 0);
-	atomic_long_add(-256, &sem->count);
-	preempt_disable();
-	if (osq_lock(&sem->osq)) {
-		state = rwsem_spin_on_owner(sem);
-		while (state & 7) {
-			next = state;
-			if (!(atomic_long_read(&sem->count) & 5)) {
-				old = atomic_long_fetch_add_acquire(256, &sem->count);
-				if (!(old & 5)) {
-					atomic_long_set(&sem->owner, (unsigned long)current |
-						(atomic_long_read(&sem->owner) & 2) | 1);
-					taken = true;
-					break;
-				}
-				atomic_long_add(-256, &sem->count);
-			}
-			if (next != 2 && (need_resched() ||
-			    (previous != 2 && current->prio < 100)))
-				break;
-			cpu_relax();
-			state = rwsem_spin_on_owner(sem);
-			previous = next;
-		}
-		osq_unlock(&sem->osq);
-	}
-	preempt_enable();
-	*rspin = taken;
-	if (!taken)
-		atomic_long_add(256, &sem->count);
-	/* Two separate event intervals exist in the stock jump-table tails. */
-	trace_metis_tracing_mark_write('E', current->tgid, "", 0, 0);
-	trace_metis_tracing_mark_write('B', current->tgid, "rspin with lock get", 0, *rspin);
-	trace_metis_tracing_mark_write('E', current->tgid, "", 0, 0);
-}
-
 /* .text+0x1b930, virtual 00124358; typed native wrappers preserve call order
  * and ignored errors. No cast of a mismatched callback is introduced. */
 void register_cs_hooks(void)
@@ -456,8 +371,6 @@ void register_cs_hooks(void)
 	register_trace_android_vh_rwsem_can_spin_on_owner(mi_rwsem_can_spin_on_owner, NULL);
 	register_trace_android_vh_mutex_init(mi_mutex_init, NULL);
 	register_trace_android_vh_rwsem_init(mi_rwsem_init, NULL);
-	register_trace_android_vh_rwsem_direct_rsteal(mi_rwsem_direct_rsteal, NULL);
-	register_trace_android_vh_rwsem_optimistic_rspin(mi_rwsem_optimistic_rspin, NULL);
 	register_trace_android_vh_record_rwsem_writer_owned(mi_record_rwsem_writer_owned_hook, NULL);
 	register_trace_android_vh_clear_rwsem_writer_owned(mi_clear_rwsem_writer_owned_hook, NULL);
 	register_trace_android_vh_record_rwsem_reader_owned(mi_record_rwsem_reader_owned_hook, NULL);
@@ -474,8 +387,6 @@ void unregister_cs_hooks(void)
 	unregister_trace_android_vh_rwsem_can_spin_on_owner(mi_rwsem_can_spin_on_owner, NULL);
 	unregister_trace_android_vh_mutex_init(mi_mutex_init, NULL);
 	unregister_trace_android_vh_rwsem_init(mi_rwsem_init, NULL);
-	unregister_trace_android_vh_rwsem_direct_rsteal(mi_rwsem_direct_rsteal, NULL);
-	unregister_trace_android_vh_rwsem_optimistic_rspin(mi_rwsem_optimistic_rspin, NULL);
 	unregister_trace_android_vh_record_rwsem_writer_owned(mi_record_rwsem_writer_owned_hook, NULL);
 	unregister_trace_android_vh_clear_rwsem_writer_owned(mi_clear_rwsem_writer_owned_hook, NULL);
 	unregister_trace_android_vh_record_rwsem_reader_owned(mi_record_rwsem_reader_owned_hook, NULL);
