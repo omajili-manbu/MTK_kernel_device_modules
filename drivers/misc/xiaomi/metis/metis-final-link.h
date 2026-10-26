@@ -14,11 +14,6 @@ struct plist_head;
 struct metis618_rwsem_waiter;
 /* Native android_rvh_try_to_wake_up supplies probe data plus task.
  * Original provider consumer/CFI acceptance remains UNTESTED. */
-typedef void (*metis_link_wake_fn)(void *data, struct task_struct *task);
-typedef void (*metis_game_wake_fn)(struct task_struct *task,
-		unsigned int wake_flags);
-extern metis_link_wake_fn mi_try_to_wake_up_func[3];
-extern metis_game_wake_fn game_wake_hooks;
 extern struct miscdevice metis_link_misc;
 extern const struct proc_ops mi_art_mutex_debug_proc_ops;
 extern struct proc_dir_entry *mi_art_mutex_entry;
@@ -66,10 +61,6 @@ int metis_link_open(struct inode *inode, struct file *file);
 int metis_link_release(struct inode *inode, struct file *file);
 int mi_art_mutex_debug_open(struct inode *inode, struct file *file);
 int mi_art_mutex_debug_show(struct seq_file *seq, void *unused);
-void register_rvh_mi_try_to_wake_up(unsigned int module, metis_link_wake_fn hook);
-void unregister_rvh_mi_try_to_wake_up(unsigned int module);
-void register_game_wake_f(metis_game_wake_fn hook);
-void unregister_game_wake_f(void);
 void mi_mutex_can_spin_on_owner(void *data, struct mutex *lock, int *ret);
 void mi_mutex_init(void *data, struct mutex *lock);
 void mi_mutex_opt_spin_finish(void *data, struct mutex *lock, bool taken);

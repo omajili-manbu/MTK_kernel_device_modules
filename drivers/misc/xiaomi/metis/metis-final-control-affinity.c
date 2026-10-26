@@ -181,9 +181,9 @@ void rebind_task_req(u32 *pids, u32 count, u32 cluster, bool unbind)
 			}
 		}
 		state->flags_0xc0 &= ~2U;
+		/* rodin 6.18：nr_cpus_allowed 由 __set_cpus_allowed_ptr 内部维护，
+		 * 不再手工按首字重数（stock 只数 W0 且与内核维护值竞争）。 */
 		set_cpus_allowed_ptr(task, &MI_FIELD(state, cpumask_t, 0xd0));
-		/* Stock weights only W0 of the first native cpus_mask word. */
-		task->nr_cpus_allowed = hweight64((u64)(u32)cpumask_bits(&task->cpus_mask)[0]);
 		state->flags_0xc0 = (state->flags_0xc0 & ~4U) | (unbind ? 0 : 4);
 put:
 		put_task_struct(task);
@@ -291,7 +291,8 @@ int get_rebind_task(char *buffer, const struct kernel_param *param)
 	if (strstr(param->name, "show_rebind_task_big"))
 		return list_bitmap(buffer, rebind_task_blist, 0x8000);
 	strcpy(buffer, "need show_rebind_task_[big|lit|mid]\n");
-	return 0x24;
+	/* rodin 6.18：提示串 strlen 36 + NUL = 37，stock 返回 0x24 少 1 字节。 */
+	return 0x25;
 }
 
 /* add_uid_to_list 0010f6e4, .text+0x6cbc..0x7034. Signed upper check

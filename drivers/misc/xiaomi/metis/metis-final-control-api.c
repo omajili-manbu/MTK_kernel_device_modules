@@ -135,7 +135,9 @@ int set_mi_efboost(u32 pid, unsigned long mask, bool clear)
 			if (mask & 0x100000) atomic_dec(&mi_dynamic_vip_num);
 			if (mask & 0x400000) atomic_dec(&mi_sdk_eboost_vip_num);
 			if (mask & 0x200000) MI_FIELD(state, u32, 0x298) = UINT_MAX;
-			state->flags_0xc0 &= ~(u32)mask | 0x2000000;
+			/* rodin 6.18：stock 优先级为 (~mask)|0x2000000，会把从未持有的
+			 * bit25 清掉且污染其它未清位；本意为 ~(mask|0x2000000)。 */
+			state->flags_0xc0 &= ~((u32)mask | 0x2000000U);
 			if (metis_debug && mask == 0x400000)
 				printk("\0016metis-fas: clean mi eboost vip task: cnt = %d, pid = %d, name = %s",
 					atomic_read(&mi_sdk_eboost_vip_num), task->pid, task->comm);
@@ -392,9 +394,10 @@ long metis_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			mi_dynamic_vtask_prio_sched_start(task, request[1]);
 		} else if ((cmd & 0xff) == 9) {
 			clean_mi_dynamic_vip_task(task);
-			put_task_struct(task);
-			/* Preserve original debug-after-put lifetime defect. */
+			/* rodin 6.18：stock 在 put 后仍读 task->pid/comm（UAF），
+			 * 打点挪到 put 之前。 */
 			if (metis_debug) printk("\0016metis-fas: metis ioctl: clear dynamic vip, pid = %d, name = %s\n", task->pid, task->comm);
+			put_task_struct(task);
 			break;
 		} else {
 			if (metis_debug)

@@ -12,18 +12,22 @@
 #include <trace/hooks/sched.h>
 #include "metis-final-control.h"
 
-/* Preserve stock subsystem0 lookup and the name access after RCU unlock;
- * the cgroup/kernfs fields are current native fields, not old offsets. */
+/* rodin 6.18：stock 在 RCU 解锁后才解引用 group->kn->name——kernfs 名
+ * 指针不保证 RCU 存续，改为锁内拷贝到栈缓冲再比较。 */
 static bool task_group_named(struct task_struct *task, const char *wanted)
 {
 	struct cgroup *group;
 	const char *name;
+	bool matched = false;
 
 	rcu_read_lock();
 	group = task_css_set(task)->subsys[0]->cgroup;
+	if (group && group->kn) {
+		name = group->kn->name;
+		matched = name && !strcmp(wanted, name);
+	}
 	rcu_read_unlock();
-	name = group->kn->name;
-	return name && !strcmp(wanted, name);
+	return matched;
 }
 
 /* str2_in_str1 0012063c, .text+0x17c14..0x17c78. */
@@ -116,8 +120,12 @@ void probe_task_rename(void *unused, struct task_struct *task, bool exec)
 	item->leader_state = leader;
 	INIT_WORK(&item->work, compare_task_comm_work_func);
 	get_task_struct(task->group_leader);
-	/* queue result ignored; no queue failure reference release in stock. */
-	queue_work(my_wq, &item->work);
+	/* 队列失败时释放 probe 持有的两条 task 引用，避免泄漏。 */
+	if (!queue_work(my_wq, &item->work)) {
+		put_task_struct(task->group_leader);
+		put_task_struct(task);
+		kfree(item);
+	}
 	return;
 put:
 	put_task_struct(task);
@@ -146,7 +154,11 @@ void probe_android_vh_cgroup_set_task(void *unused, int result,
 	item->task = task;
 	item->top_app = task_group_named(task, "top-app");
 	INIT_WORK(&item->work, setup_task_wk_func);
-	queue_work(my_wq, &item->work);
+	/* 队列失败时释放 probe 持有的 task 引用，避免泄漏。 */
+	if (!queue_work(my_wq, &item->work)) {
+		put_task_struct(task);
+		kfree(item);
+	}
 }
 
 /* compare_task_comm_work_func 0012038c, .text+0x17964..0x17c14.
@@ -194,7 +206,8 @@ void compare_task_comm_work_func(struct work_struct *work)
 }
 
 /* setup_task_wk_func 001206a4, .text+0x17c7c..0x17e5c.
- * Stock walks signal.thread_head unlocked and does not take thread refs. */
+ * thread_head 是 RCU 链：work 侧补 rcu_read_lock（持 item->task 引用保证
+ * signal 对象存活，但链表遍历本身需要 RCU）。 */
 void setup_task_wk_func(struct work_struct *work)
 {
 	struct metis_comm_work *item = container_of(work, struct metis_comm_work, work);
@@ -202,6 +215,7 @@ void setup_task_wk_func(struct work_struct *work)
 	struct mi_task_struct *state;
 	bool vip;
 
+	rcu_read_lock();
 	list_for_each_entry(task, &item->task->signal->thread_head, thread_node) {
 		state = get_mi_task_struct(task);
 		if (!state || !is_top_app_vip(state)) continue;
@@ -219,6 +233,7 @@ void setup_task_wk_func(struct work_struct *work)
 					task->pid, task->comm, task->group_leader->comm);
 		}
 	}
+	rcu_read_unlock();
 	put_task_struct(item->task);
 	kfree(item);
 }
@@ -234,6 +249,15 @@ int metis_comm_monitor_init(void)
 	return 0;
 }
 
-/* metis_comm_monitor_exit 0011fc9c/.text+0x17274 is genuinely RET-only;
- * no hook unregister, flushing or workqueue destruction exists. */
-void metis_comm_monitor_exit(void) { }
+/* rodin 6.18：exit 补齐对偶清理（rvh 为 restricted 无 unregister；
+ * =y 内建下不可达，仅为与 init 对称）。 */
+void metis_comm_monitor_exit(void)
+{
+	unregister_trace_android_vh_cgroup_set_task(
+		probe_android_vh_cgroup_set_task, NULL);
+	tracepoint_synchronize_unregister();
+	if (my_wq) {
+		destroy_workqueue(my_wq);
+		my_wq = NULL;
+	}
+}

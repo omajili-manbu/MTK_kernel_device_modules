@@ -8,5 +8,4 @@ extern unsigned long mi_link_boost_jif;
 void set_mi_req_async_binder_link_task(struct task_struct *task, u32 ticks);
 void clean_mi_req_async_binder_link_task(struct task_struct *task);
 void mi_req_async_binder_link_sched_start(struct task_struct *task, u32 milliseconds);
-void mi_req_async_binder_link_sched_end(struct task_struct *task);
 #endif

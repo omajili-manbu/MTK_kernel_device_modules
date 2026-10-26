@@ -21,8 +21,6 @@ void mi_record_lock_starttime(struct task_struct *task, unsigned long start,
 void mi_lock_vip_finish_common(struct task_struct *task);
 
 /* Four-argument exported helper, not a native five-argument trace callback. */
-void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
-			    struct list_head *list, bool *already_on_list);
 void mi_mutex_wait_start_hook(void *unused, struct mutex *lock);
 void mi_rwsem_write_wait_start_hook(void *unused, struct rw_semaphore *sem);
 void mi_rwsem_read_wait_start_hook(void *unused, struct rw_semaphore *sem);

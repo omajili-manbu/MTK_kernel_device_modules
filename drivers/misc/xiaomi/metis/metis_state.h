@@ -17,8 +17,6 @@ struct metis_vip_detect_slot {
 extern struct metis_vip_detect_slot vip_task_detect[3];
 extern unsigned int metis_debug;
 extern unsigned int foreground_uid;
-extern u8 fas_ktime_suspended;
-extern s32 fas_ktime_last;
 /* Stock .data+0x3eb0: seven private records, each 0x28 bytes. Typed
  * pointer fields retain native relocations; raw access preserves consumers. */
 union metis_important_task {
@@ -47,6 +45,5 @@ void register_vip_task_detect(unsigned int module, metis_vip_detect_fn detect);
 void unregister_vip_task_detect(unsigned int module);
 bool is_static_vip(struct mi_task_struct *state);
 bool is_top_app_vip(struct mi_task_struct *state);
-void clear_task_low_lt(struct mi_task_struct *state);
 const char *mi_link_mask_to_type(long mask);
 #endif

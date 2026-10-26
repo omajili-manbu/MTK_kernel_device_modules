@@ -15,13 +15,6 @@ extern void *cold_start_app_mmlock, *cold_start_sserver_mmlock;
 extern void *home_mmlock, *systemui_mmlock, *systemserver_mmlock, *sf_mmlock;
 
 bool is_dynamic_vip(struct task_struct *task);
-bool is_deadline_task(struct mi_task_struct *state);
-bool is_deadline_depend_main_task(struct mi_task_struct *state);
-bool is_low_lt_task(struct mi_task_struct *state);
-void mark_task_low_lt(struct mi_task_struct *state);
-bool task_in_cs(struct task_struct *task);
-bool task_in_cs_protect(struct task_struct *task);
-bool is_preempted_cs_task(struct task_struct *task);
 bool is_mmaplk_vip_task(struct task_struct *task);
 void set_mmaplk_vip_task(struct mi_task_struct *state);
 void clean_mmaplk_vip_task(struct task_struct *task);
