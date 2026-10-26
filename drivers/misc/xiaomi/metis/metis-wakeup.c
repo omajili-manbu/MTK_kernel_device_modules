@@ -1,71 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* PARTIAL: fifteen stock wakeup bodies; native ABI/runtime are untested. */
-#include <linux/bitops.h>
-#include <linux/cpumask.h>
+/* Cold-start wakeup marking: PR_SET_NAME table matching, fork-time VIP
+ * inheritance, futex-wait cleanup and futex plist priority. The stock
+ * private select-rq/enqueue/dequeue hooks are dropped: their callers were
+ * closed-scheduler call sites absent on 6.18. */
 #include <linux/errno.h>
 #include <linux/futex.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/fortify-string.h>
 #include <linux/tracepoint.h>
 #include <trace/hooks/futex.h>
 #include <trace/hooks/sched.h>
 #include <trace/hooks/sys.h>
-#include <asm/cpufeature.h>
-#include "kernel/sched/sched.h"
+#include "metis_state.h"
 #include "metis_wakeup.h"
 
 #include "metis-final-trace.h"
-
-int metis_wakeup_ui_pipeline_select_rq(struct task_struct *task,
-		struct cpumask *excluded, int wake_flags)
-{
-	u64 allowed;
-	u32 cpu;
-
-	if (!metis_wakeup_enable || !in_coldstart_period())
-		return -1;
-	if (cold_start_ui_task(task)) {
-		cold_start_ui_state = 2;
-		cpu = nr_cpu_ids - 1;
-	} else {
-		if (!metis_ui_pipeline(task)) {
-			if (!(wake_flags & 0x10))
-				return -1;
-			if (!cold_start_ui_task(current))
-				return -1;
-			metis_set_ui_pipeline(task);
-		} else {
-			if (!metis_wakeup_enable)
-				return -1;
-			if (in_coldstart_period() && cold_start_ui_state > 1) {
-				metis_clean_ui_pipeline(task);
-				return -1;
-			}
-		}
-		if (!metis_wakeup_enable || !in_coldstart_period())
-			return -1;
-		cpu = cold_start_ui_cpu;
-		if ((s32)cpu < 0 || cpu >= nr_cpu_ids)
-			return -1;
-	}
-	/* Stock truncates active/excluded to low 32 bits before combining
-	 * with the first 64-bit affinity word; preserve that limitation. */
-	allowed = task->cpus_ptr->bits[0] &
-		(u64)((u32)cpu_active_mask->bits[0] &
-		      ~(u32)cpumask_bits(excluded)[0]);
-	if (test_tsk_thread_flag(task, TIF_32BIT))
-		allowed &= system_32bit_el0_cpumask()->bits[0];
-	/* AArch64 variable shifts mask the shift amount to its low six bits. */
-	if (!(allowed & (1ULL << (cpu & 63))))
-		return -1;
-	if (metis_wakeup_debug)
-		pr_info("metis-fas: metis wakeup debug: ui/pipeline select rq %s(%d), cpu%d",
-			task->comm, task->pid, cpu);
-	return cpu;
-}
 
 bool metis_wakeup_futex_plist_insert(int *priority)
 {
@@ -81,50 +32,6 @@ bool metis_wakeup_futex_plist_insert(int *priority)
 		return true;
 	}
 	return false;
-}
-
-void metis_wakeup_cold_start_skip_ui_cpumask(struct task_struct *task,
-		struct cpumask *mask)
-{
-	int cpu = cold_start_ui_recent_used_cpu();
-	bool ui = cold_start_ui_task(task);
-
-	/* Both consumers invoke the expiry predicate separately in stock. */
-	if (cpu >= 0 && !ui)
-		cpumask_clear_cpu(cpu, mask);
-}
-
-bool metis_wakeup_cold_start_skip_ui_cpu(struct task_struct *task, int cpu)
-{
-	int used_cpu = cold_start_ui_recent_used_cpu();
-	bool ui = cold_start_ui_task(task);
-
-	return used_cpu >= 0 && !ui && used_cpu == cpu;
-}
-
-void metis_wakeup_enqueue_task_hook(struct rq *rq, struct task_struct *task)
-{
-	bool active;
-
-	if (!metis_wakeup_enable)
-		return;
-	active = in_coldstart_period();
-	if (task && active && task->pid == cold_start_app_tgid) {
-		cold_start_ui_state = 3;
-		cold_start_ui_cpu = rq->cpu;
-	}
-}
-
-void metis_wakeup_dequeue_task_hook(void *unused, struct rq *rq,
-		struct task_struct *task, int flags)
-{
-	bool active;
-
-	if (!metis_wakeup_enable)
-		return;
-	active = in_coldstart_period();
-	if (task && active && task->pid == cold_start_app_tgid)
-		cold_start_ui_state = 1;
 }
 
 void set_coldstart_wakeup_task(struct task_struct *task)
@@ -264,23 +171,6 @@ void metis_wakeup_try_to_wakeup(struct task_struct *task)
 	}
 }
 
-void metis_wakeup_clear_wakeup_task(struct task_struct *task, int enabled)
-{
-	struct mi_task_struct *state;
-
-	if (!task || !enabled || !metis_wakeup_enable || !in_coldstart_period())
-		return;
-	state = get_mi_task_struct(task);
-	if (!state || !(state->unknown_c8 & 0xe0) ||
-	    task->__state != TASK_INTERRUPTIBLE)
-		return;
-	state = get_mi_task_struct(task);
-	if (state) {
-		state->unknown_c8 &= 0xfffffd1fU;
-		trace_mi_wakeup_link(task, "clear wakeup all task by sleep");
-	}
-}
-
 void metis_wakeup_syscall_prctl_finished_hook(void *unused, int option,
 		struct task_struct *task)
 {
@@ -319,9 +209,10 @@ int set_metis_wakeup_task(const char *value, const struct kernel_param *param)
 		return -ENOMEM;
 	cursor = allocation;
 	token = strsep(&cursor, ",");
-	/* Stock leaks allocation on these malformed-input failures. */
-	if (!token || sscanf(token, "%d ", &tid) != 1)
+	if (!token || sscanf(token, "%d ", &tid) != 1) {
+		kfree(allocation);
 		return -EINVAL;
+	}
 	if (tid > 0) {
 		if (metis_wakeup_debug)
 			pr_info("metis-fas: metis wakeup debug: ui thread pid = %d\n", tid);
@@ -349,7 +240,6 @@ int set_metis_wakeup_task(const char *value, const struct kernel_param *param)
 
 int metis_wakeup_init(void)
 {
-	/* The three stock registration returns are intentionally ignored. */
 	register_trace_android_vh_syscall_prctl_finished(
 		metis_wakeup_syscall_prctl_finished_hook, NULL);
 	register_trace_android_rvh_wake_up_new_task(wake_up_new_task_hook, NULL);
@@ -359,5 +249,8 @@ int metis_wakeup_init(void)
 
 void metis_wakeup_exit(void)
 {
-	/* Literal stock .text+0x1f1f0..0x1f1f4 is RET, no unregister. */
+	unregister_trace_android_vh_syscall_prctl_finished(
+		metis_wakeup_syscall_prctl_finished_hook, NULL);
+	unregister_trace_android_vh_do_futex(metis_wakeup_futex_wait_hook, NULL);
+	tracepoint_synchronize_unregister();
 }

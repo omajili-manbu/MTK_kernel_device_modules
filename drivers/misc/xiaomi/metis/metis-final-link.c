@@ -64,6 +64,7 @@ static_assert(offsetof(struct metis618_rwsem_waiter, timeout) == 32,
 #include <futex/futex.h>
 #include <trace/hooks/binder.h>
 #include <trace/hooks/dtask.h>
+#include <trace/hooks/sched.h>
 #include <trace/hooks/futex.h>
 #include <trace/hooks/rwsem.h>
 #include "../xr_qi/qi_provider.h"
@@ -645,8 +646,6 @@ void mi_rwsem_list_add_hook(void *unused, struct rwsem_waiter *waiter_opaque,
 			rtg_rwsem_handoff_jif = waiter->timeout;
 		}
 	}
-	if (coldstart_app_tasks(task) && !coldstart_set_mmlock_holder_vip)
-		mark_task_low_lt(get_mi_task_struct(task));
 insert:
 	do_rwsem_list_insert(waiter, sem, already_on_list, priority);
 }
@@ -736,7 +735,6 @@ void mi_record_lock_starttime(struct task_struct *task, unsigned long start,
 		return;
 	if (start) {
 		protect_cs_task(task);
-		clear_task_low_lt(state);
 	} else if (MI_FIELD(state, u32, 0x2b4) & 8) {
 		state->flags_0xc0 &= ~0x2000U;
 		clear_preemption_protect(task);
@@ -758,8 +756,10 @@ void mi_lock_vip_finish_common(struct task_struct *task)
 	link_put_task(task);
 }
 
-/* .text+0x2650, virtual 0010b078; native wake-up callback is data/task. */
-void metis_link_try_to_wake_up_hook(void *data, struct task_struct *task)
+/* .text+0x2650, virtual 0010b078. Stock dispatched this through the
+ * mi_try_to_wake_up_func table filled by the closed scheduler; on 6.18 the
+ * policy attaches directly to the native android_rvh_try_to_wake_up hook. */
+void metis_link_try_to_wake_up_hook(void *unused, struct task_struct *task)
 {
 	struct mi_task_struct *state, *wake_state;
 
@@ -779,41 +779,6 @@ void metis_link_try_to_wake_up_hook(void *data, struct task_struct *task)
 	}
 ready:
 	coldstart_tsk_ready_to_run(task);
-}
-
-/* .text+0x1374, virtual 00109d9c. Bounds failure really is BRK #0x5512. */
-void register_rvh_mi_try_to_wake_up(unsigned int module, metis_link_wake_fn hook)
-{
-	if (module >= 3) {
-		asm volatile("brk #0x5512");
-		__builtin_unreachable();
-	}
-	mi_try_to_wake_up_func[module] = hook;
-	pr_info("metis-link: %s[%d] now\n", __func__, module);
-}
-
-/* .text+0x13c0, virtual 00109de8. No RCU or hook synchronization in stock. */
-void unregister_rvh_mi_try_to_wake_up(unsigned int module)
-{
-	if (module >= 3) {
-		asm volatile("brk #0x5512");
-		__builtin_unreachable();
-	}
-	mi_try_to_wake_up_func[module] = NULL;
-	pr_info("metis-link: %s[%d] now\n", __func__, module);
-}
-
-/* .text+0x4298, virtual 0010ccc0; real MIGT consumers witness task/flags. */
-void register_game_wake_f(metis_game_wake_fn hook)
-{
-	pr_info("metis-fas: %s now\n", __func__);
-	game_wake_hooks = hook;
-}
-
-/* .text+0x42dc, virtual 0010cd04. */
-void unregister_game_wake_f(void)
-{
-	game_wake_hooks = NULL;
 }
 
 /* .text+0x140c, virtual 00109e34. All returns are ignored, including failed
@@ -837,8 +802,7 @@ int metis_link_init(void)
 	register_trace_android_vh_mutex_wait_finish(mi_mutex_wait_finish_hook, NULL);
 	register_trace_android_vh_rwsem_read_trylock_failed(mi_rwsem_read_trylock_failed, NULL);
 	register_trace_android_vh_rwsem_wake_finish(mi_lock_rwsem_wake_finish_hook, NULL);
-	mi_try_to_wake_up_func[1] = metis_link_try_to_wake_up_hook;
-	pr_info("metis-link: %s[%d] now\n", "register_rvh_mi_try_to_wake_up", 1);
+	register_trace_android_rvh_try_to_wake_up(metis_link_try_to_wake_up_hook, NULL);
 	register_trace_android_vh_alter_futex_plist_add(mi_alter_futex_plist_add, NULL);
 	register_trace_android_vh_do_futex(mi_do_futex, NULL);
 	register_trace_android_vh_futex_sleep_start(mi_futex_sleep_start, NULL);
@@ -855,11 +819,10 @@ int metis_link_init(void)
  * left installed by this original exit body. */
 void metis_link_exit(void)
 {
+	tracepoint_synchronize_unregister();
 	misc_deregister(&metis_link_misc);
 	if (mi_art_mutex_entry)
 		proc_remove(mi_art_mutex_entry);
-	mi_try_to_wake_up_func[1] = NULL;
-	pr_info("metis-link: %s[%d] now\n", "unregister_rvh_mi_try_to_wake_up", 1);
 	mi_art_mutex_entry = NULL;
 	pr_info("metis-link: LINK: %s: exit!\n", __func__);
 }

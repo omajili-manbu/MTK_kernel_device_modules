@@ -73,68 +73,12 @@ void restore_boost_cluster(int cluster)
 			cluster, 2, 1);
 }
 
-void store_boost_cluster(int cluster)
-{
-	if ((u32)cluster >= 4)
-		metis_cluster_bug();
-	if (!mi_freq_enable)
-		return;
-	if ((u32)cluster >= 3)
-		metis_cluster_bounds_trap();
-	bcluster_stat[cluster].action = 1;
-	bcluster_stat[cluster].mode = 1;
-	if (fboost_debug)
-		pr_info("metis-fboost: store boost cluster %d, bfreq %d, bcpu %d",
-			cluster, 1, 1);
-}
-
-void speed_touch_store_freq(int index)
-{
-	unsigned int *const last_cpu[4] = {
-		&ui_last_cpu, &ren_last_cpu, &sf_last_cpu, &hwc_last_cpu,
-	};
-
-	if ((u32)index < 4)
-		store_boost_cluster(cpu_to_cluster(*last_cpu[index]));
-}
-
-void speed_touch_restore_freq(int index)
-{
-	unsigned int *const last_cpu[4] = {
-		&ui_last_cpu, &ren_last_cpu, &sf_last_cpu, &hwc_last_cpu,
-	};
-
-	if ((u32)index < 4)
-		restore_boost_cluster(cpu_to_cluster(*last_cpu[index]));
-}
-
-int *get_frmboost_sta_hook(void)
-{
-	return cluster_states;
-}
-
 void del_cluster(void)
 {
 	unsigned long flags;
 
 	fboost_exe_mode.execute = 0;
 	fboost_exe_mode.delete = 1;
-	raw_spin_lock_irqsave(&fboost_pending_lock, flags);
-	fboost_pending = 1;
-	raw_spin_unlock_irqrestore(&fboost_pending_lock, flags);
-	wake_up_process(fboost_thread);
-}
-
-void trigger_fboost_work(void)
-{
-	unsigned long flags;
-
-	if (!fboost_exe_mode.delete)
-		fboost_exe_mode.execute = 1;
-	raw_spin_lock_irqsave(&fboost_pending_lock, flags);
-	fboost_pending = 1;
-	raw_spin_unlock_irqrestore(&fboost_pending_lock, flags);
-	/* Stock repeats this complete lock/write/unlock sequence. */
 	raw_spin_lock_irqsave(&fboost_pending_lock, flags);
 	fboost_pending = 1;
 	raw_spin_unlock_irqrestore(&fboost_pending_lock, flags);
@@ -162,47 +106,19 @@ enum hrtimer_restart queue_for_boost_cluster(struct hrtimer *timer)
 
 void do_adjust_freq_delayed(struct work_struct *work)
 {
-	metis_perflock_last_freqs_fn get_freqs = get_perflock_last_freqs_func;
 	struct metis_cluster_adjust_work *adjust;
-	metis_corectl_boost_fn corectl_boost;
 	unsigned int cluster;
-	int *frequencies;
-	int frequency, previous, index;
 
 	adjust = container_of(to_delayed_work(work),
 			      struct metis_cluster_adjust_work, work);
 	cluster = adjust->cluster;
-	if (mi_switch_enable) {
-		if (cluster >= 3)
-			metis_cluster_bug();
-		cluster_states[cluster] = 0;
-		/* These providers are mandatory here; stock has no NULL guards. */
-		frequencies = get_freqs();
-		frequency = frequencies[0];
-		if (frequency || frequencies[1] || frequencies[2]) {
-			for (index = 0; index < 3; index++) {
-				if (index)
-					frequency = frequencies[index];
-				do {
-					previous = frequency;
-					update_perflock_freq_func(index, frequency);
-					frequencies = get_perflock_last_freqs_func();
-					frequency = frequencies[index];
-				} while (previous != frequency);
-			}
-		}
-	}
 	metis_update_policy_online((int)cluster, 0, -1);
-	corectl_boost = oem_corectl_boost_func;
-	if (corectl_boost)
-		corectl_boost(cluster, 0);
-	/* With mi_switch_enable clear, the provider calls precede this BUG. */
 	if (cluster >= 3)
 		metis_cluster_bug();
 	thermal_limit_freq[cluster] = ULONG_MAX;
 	if (fboost_debug)
 		pr_err("metis-fboost: metis do_adjust_freq_delayed end...%d %llu",
-			0x1a9, (unsigned long long)ktime_to_us(ktime_get()));
+		       0x1a9, (unsigned long long)ktime_to_us(ktime_get()));
 }
 
 int cpufreq_notifier_max(struct notifier_block *notifier,
@@ -225,32 +141,6 @@ void finish_fboost_workfn(struct work_struct *work)
 	cpufreq_unregister_notifier(&init_fboost_notifier,
 				    CPUFREQ_POLICY_NOTIFIER);
 	pr_err("metis-fboost: finish_fboost_workfn!");
-}
-
-bool oem_rvh_try_to_wake_up_success(struct task_struct *task)
-{
-	unsigned int cluster = get_cluster_type(task_cpu(task));
-	bool super = metis_sup_task(task);
-
-	if (super) {
-		if (cluster >= 4)
-			cluster = 0;
-		if (cluster >= 3)
-			metis_cluster_bug();
-		perf_min_freq[cluster] = user_min_freq[cluster];
-	}
-	return super;
-}
-
-bool oem_should_update_freq(struct cpufreq_policy *policy)
-{
-	unsigned int cluster = get_cluster_type(policy->cpu);
-
-	if (cluster >= 4)
-		cluster = 0;
-	if (cluster >= 3)
-		metis_cluster_bug();
-	return policy->cur < perf_min_freq[cluster];
 }
 
 unsigned int get_fboost_duration(void)

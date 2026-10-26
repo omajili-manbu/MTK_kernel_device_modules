@@ -15,7 +15,7 @@
 #include <linux/sched.h>
 #include <uapi/linux/sched/types.h>
 #include "metis-final-boost.h"
-#include "metis-final-scheduler.h"
+#include "metis-final-owners.h"
 
 static __always_inline void metis_boost_bug(void)
 {
@@ -59,33 +59,16 @@ static void metis_boost_remove_requests(void)
 	}
 }
 
-/* Stock mandatory perflock providers, with no NULL checks or retry bound. */
-static void metis_boost_restore_perflock(int *frequencies)
-{
-	int frequency = frequencies[0];
-	int previous, index;
-
-	if (!frequency && !frequencies[1] && !frequencies[2])
-		return;
-	for (index = 0; index < 3; index++) {
-		if (index)
-			frequency = frequencies[index];
-		do {
-			previous = frequency;
-			READ_ONCE(update_perflock_freq_func)(index, frequency);
-			frequencies = READ_ONCE(get_perflock_last_freqs_func)();
-			frequency = frequencies[index];
-		} while (previous != frequency);
-	}
-}
+/* Stock mandatory perflock providers are gone on 6.18 (no in-tree
+ * registrants), so the mi_switch_enable perflock hand-off branch and its
+ * helper are dropped with them. */
 
 int fboost_run(void *data)
 {
 	unsigned long flags;
 	unsigned int cluster;
-	int mode, action, *frequencies;
+	int mode, action;
 	u32 remaining;
-	metis_corectl_boost_fn corectl_boost;
 	struct delayed_work *adjust;
 
 	(void)data;
@@ -105,8 +88,9 @@ int fboost_run(void *data)
 		raw_spin_unlock_irqrestore(&fboost_pending_lock, flags);
 
 		if (READ_ONCE(fboost_exe_mode.execute)) {
-			/* Cluster zero is deliberately excluded by both stock loops. */
-			for (cluster = 1; cluster < 3; cluster++) {
+			/* rodin 6.18：cluster 0 也参与 boost/restore（stock 只扫 1..2，
+			 * cluster 0 被 boost 后永不恢复，属保留缺陷，此处对齐对称） */
+			for (cluster = 0; cluster < 3; cluster++) {
 				mode = READ_ONCE(bcluster_stat[cluster].mode);
 				action = READ_ONCE(bcluster_stat[cluster].action);
 				if (!mode && !action)
@@ -115,20 +99,6 @@ int fboost_run(void *data)
 					pr_err("metis-fboost: metis __do_cluster_boost start...%d %d %d, %d %llu",
 						cluster, action, min_cluster_freqs[cluster],
 						0x1b9, (unsigned long long)ktime_to_us(ktime_get()));
-				if (READ_ONCE(mi_switch_enable)) {
-					cluster_states[cluster] = 1;
-					frequencies = READ_ONCE(get_perflock_last_freqs_func)();
-					if (frequencies[0] || frequencies[1] || frequencies[2]) {
-						READ_ONCE(update_perflock_freq_func)(0, 0);
-						READ_ONCE(update_perflock_freq_func)(1, 0);
-						READ_ONCE(update_perflock_freq_func)(2, 0);
-					}
-				}
-				if (READ_ONCE(bcluster_stat[cluster].mode)) {
-					corectl_boost = READ_ONCE(oem_corectl_boost_func);
-					if (corectl_boost)
-						corectl_boost(cluster, 1);
-				}
 				action = READ_ONCE(bcluster_stat[cluster].action);
 				if (action == 2)
 					metis_update_policy_online(cluster, 0, 0);
@@ -151,18 +121,10 @@ int fboost_run(void *data)
 		}
 
 		if (READ_ONCE(fboost_exe_mode.delete)) {
-			for (cluster = 1; cluster < 3; cluster++) {
+			for (cluster = 0; cluster < 3; cluster++) {
 				if (hrtimer_active(&boost_timers[cluster].timer))
 					hrtimer_cancel(&boost_timers[cluster].timer);
-				if (READ_ONCE(mi_switch_enable)) {
-					cluster_states[cluster] = 0;
-					frequencies = READ_ONCE(get_perflock_last_freqs_func)();
-					metis_boost_restore_perflock(frequencies);
-				}
 				metis_update_policy_online(cluster, 0, -1);
-				corectl_boost = READ_ONCE(oem_corectl_boost_func);
-				if (corectl_boost)
-					corectl_boost(cluster, 0);
 				if (READ_ONCE(fboost_debug))
 					pr_err("metis-fboost: metis boost_cluster end...%d %llu",
 						0x118, (unsigned long long)ktime_to_us(ktime_get()));
@@ -275,6 +237,7 @@ void metis_update_policy_online(int cluster, int minimum, int restore_maximum)
 	u32 maximum, online;
 	s32 ordinal = 0;
 	unsigned long debug_limit;
+	unsigned int policy_cpu;
 
 	cpumask_clear(&group);
 	cpus_read_lock();
@@ -291,23 +254,24 @@ void metis_update_policy_online(int cluster, int minimum, int restore_maximum)
 				policy = cpufreq_cpu_get(cpu);
 				ordinal = (s32)((u32)cluster + 1U);
 				if (policy) {
-					if (policy->cpu >= 32)
+					/* rodin 6.18：先取 cpu 快照再 put（stock put 后读
+					 * policy 属 UAF，此处修复） */
+					policy_cpu = policy->cpu;
+					if (policy_cpu >= 32)
 						metis_boost_bug();
 					freq_qos_update_request(per_cpu_ptr(&metis_req_min,
-								 policy->cpu), minimum);
+								 policy_cpu), minimum);
 					maximum = restore_maximum ? U32_MAX :
-						(u32)get_metis_limit(policy->cpu);
+						(u32)get_metis_limit(policy_cpu);
 					/* Original +0x28 is cpuinfo.max_freq, not policy.max. */
 					maximum = min(maximum, policy->cpuinfo.max_freq);
-					if (policy->cpu >= 32)
-						metis_boost_bug();
 					if (maximum)
 						freq_qos_update_request(per_cpu_ptr(&metis_req_max,
-									 policy->cpu), (s32)maximum);
+									 policy_cpu), (s32)maximum);
 					if (READ_ONCE(fboost_debug)) {
-						debug_cpu = policy->cpu;
+						debug_cpu = policy_cpu;
 						debug_limit = get_metis_limit(debug_cpu);
-						kind = get_cluster_type(policy->cpu);
+						kind = get_cluster_type(policy_cpu);
 						if (kind >= 4)
 							kind = 0;
 						if (kind >= 3)
@@ -317,8 +281,7 @@ void metis_update_policy_online(int cluster, int minimum, int restore_maximum)
 							thermal_limit_freq[kind]);
 					}
 					cpufreq_cpu_put(policy);
-					/* Deliberately retain the original put-before-read ordering. */
-					cpufreq_update_policy(READ_ONCE(policy->cpu));
+					cpufreq_update_policy(policy_cpu);
 					break;
 				}
 			} else {
@@ -403,19 +366,4 @@ int metis_freq_qos_request_init(struct notifier_block *notifier,
 remove_requests:
 	metis_boost_remove_requests();
 	return ret;
-}
-
-void register_corectl_boost_hook(metis_corectl_boost_fn hook)
-{
-	oem_corectl_boost_func = hook;
-}
-
-void register_get_perflock_last_freqs_hook(metis_perflock_last_freqs_fn hook)
-{
-	get_perflock_last_freqs_func = hook;
-}
-
-void register_update_perflock_freq_hook(metis_update_perflock_freq_fn hook)
-{
-	update_perflock_freq_func = hook;
 }

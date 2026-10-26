@@ -139,34 +139,6 @@ void clean_mi_vip_task_common(struct task_struct *task, unsigned long mask)
 	metis_link_message(task, mask, false);
 }
 
-static bool metis_expiring_link(struct task_struct *task, u32 mask)
-{
-	struct mi_task_struct *state;
-
-	if (!task || !(state = get_mi_task_struct(task)))
-		return false;
-	if ((s64)((u64)jiffies - state->deadline_0x290) < 0)
-		return !!(state->flags_0xc0 & mask);
-	if (state->flags_0xc0 & mask)
-		clean_mi_vip_task_common(task, mask);
-	return false;
-}
-
-bool mi_lock_vip_task(struct task_struct *task)
-{
-	return metis_expiring_link(task, 0x2000);
-}
-
-bool mi_binder_vip_task(struct task_struct *task)
-{
-	return metis_expiring_link(task, 0x4000);
-}
-
-bool mi_art_mutex_vip_task(struct task_struct *task)
-{
-	return metis_expiring_link(task, 0x20000);
-}
-
 void set_mi_vip_task(struct task_struct *task, u32 duration, unsigned long mask)
 {
 	struct mi_task_struct *state;
@@ -320,17 +292,6 @@ void mi_dynamic_vtask_prio_sched_end(struct task_struct *task)
 	clean_mi_dynamic_vip_task(task);
 }
 
-void mi_binder_restore_prio_sched_start(struct task_struct *task, int milliseconds)
-{
-	u32 ticks = (u32)milliseconds * 250U > 1999U ? 2 : 1;
-
-	if (task && metis_debug)
-		pr_info("metis-fas: metis ioctl: set dynamic vip, pid=%d time = %d, jiff = %d \n",
-			task->pid, milliseconds, ticks);
-	set_mi_dynamic_vip_task(task, ticks);
-	mi_resched_vip_task(task);
-}
-
 void metis_clean_vip_thread(struct task_struct *task)
 {
 	struct mi_task_struct *state, *owner_state;
@@ -357,7 +318,6 @@ void metis_clean_vip_thread(struct task_struct *task)
 
 bool metis_xxx_task(struct task_struct *task, unsigned long mask)
 {
-	unsigned int cpu = task_cpu(task), cluster;
 	struct mi_task_struct *state = get_mi_task_struct(task), *again;
 	u32 flags;
 	bool foreign;
@@ -381,35 +341,9 @@ bool metis_xxx_task(struct task_struct *task, unsigned long mask)
 		return false;
 	if ((s64)((u64)jiffies - MI_FIELD(state, u64, 0x278)) < 0)
 		return true;
-	cluster = cpu_to_cluster(cpu);
-	if (cluster >= 3) {
-		asm volatile("brk #0x5512");
-		__builtin_unreachable();
-	}
-	perf_min_freq[cluster] = 0;
 	MI_FIELD(state, u64, 0x278) = 0;
 	metis_clean_vip_thread(task);
 	return false;
-}
-
-bool metis_vip_task(struct task_struct *task)
-{
-	return metis_xxx_task(task, 0xd00);
-}
-
-bool metis_ren_task(struct task_struct *task)
-{
-	return metis_xxx_task(task, 0x400);
-}
-
-bool metis_sup_task(struct task_struct *task)
-{
-	return coldstart_app_ui_task(task) || metis_xxx_task(task, 0x100);
-}
-
-bool metis_ip_task(struct task_struct *task)
-{
-	return metis_xxx_task(task, 0x10);
 }
 
 bool metis_vvip_task(struct task_struct *task)
@@ -428,28 +362,6 @@ bool metis_vvip_task(struct task_struct *task)
 	}
 	state = get_mi_task_struct(task);
 	return state && (state->flags_0xc0 & mask);
-}
-
-bool metis_ui_task_quick(struct task_struct *task)
-{
-	struct mi_task_struct *state = get_mi_task_struct(task);
-
-	return state && (state->flags_0xc0 & 0x100);
-}
-
-bool metis_ui_pipeline(struct task_struct *task)
-{
-	struct mi_task_struct *state = get_mi_task_struct(task);
-
-	return state && (state->flags_0xc0 & 0x200);
-}
-
-void metis_set_ui_task(struct task_struct *task)
-{
-	struct mi_task_struct *state = get_mi_task_struct(task);
-
-	if (state)
-		state->flags_0xc0 |= 0x100;
 }
 
 u32 get_process_config_index(struct task_struct *task)
@@ -491,36 +403,4 @@ s32 get_metis_deadline_ms(struct mi_task_struct *state)
 	if (leader && (leader->flags_0xc0 & 0x800))
 		return MI_FIELD(info, s32, 0x1c);
 	return 0;
-}
-
-u32 get_preempt_prio(struct task_struct *task)
-{
-	struct mi_task_struct *state;
-
-	if (!task)
-		return 0;
-	if (cold_start_ui_task(task) || coldstart_app_ui_task(task))
-		return 5;
-	if (cold_start_link_task(task))
-		return 4;
-	if (mi_vip_task(task) || mi_link_vip_task(task))
-		return 3;
-	if (task_in_cs_protect(task))
-		return 2;
-	state = get_mi_task_struct(task);
-	return state && get_metis_deadline_ms(state) > 0 ? 1 : 0;
-}
-
-bool is_uuser_set_vip(struct task_struct *task)
-{
-	struct mi_task_struct *state = get_mi_task_struct(task);
-
-	return state && (state->flags_0xc0 & 0x2c0ae020);
-}
-
-bool is_uuser_set_ip(struct task_struct *task)
-{
-	struct mi_task_struct *state = get_mi_task_struct(task);
-
-	return state && (state->flags_0xc0 & 2);
 }

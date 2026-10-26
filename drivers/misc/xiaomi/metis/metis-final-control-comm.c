@@ -33,14 +33,6 @@ bool str2_in_str1(const char *haystack, const char *needle)
 	return strnstr(haystack, needle, strlen(haystack)) != NULL;
 }
 
-/* is_main_thread_depend 0011f728, .text+0x16d00..0x16d78. */
-bool is_main_thread_depend(struct mi_task_struct *state)
-{
-	u8 *record = get_important_task_info(state);
-
-	return record && (record[0x18] & 4);
-}
-
 /* kernel_set_static_vip 0011f9b8, .text+0x16f90..0x17114. */
 int kernel_set_static_vip(struct task_struct *task)
 {

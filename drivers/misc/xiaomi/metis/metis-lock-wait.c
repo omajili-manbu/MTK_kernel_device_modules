@@ -21,79 +21,6 @@
 
 #include "metis-final-trace.h"
 
-/* The stock calls the real core corruption reporter even when a list is not
- * inserted. LIST_HARDENED's native declaration carries its calling convention. */
-#ifndef CONFIG_LIST_HARDENED
-extern bool __list_add_valid_or_report(struct list_head *new,
-				       struct list_head *prev, struct list_head *next);
-#endif
-
-void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
-			    struct list_head *list, bool *already_on_list)
-{
-	struct list_head *cursor, *next, *prev, *new;
-	struct mutex_waiter *other;
-	struct task_struct *task;
-	bool vip, link_vip;
-
-	/* Original dereferences this result pointer before all other guards. */
-	if (READ_ONCE(*already_on_list))
-		return;
-	if ((is_qi_feat_enabled(3) & 1) && is_qos_task(current))
-		return;
-	/* Original accesses only the low byte at this callsite. */
-	if (READ_ONCE(*(u8 *)&cs_stat_type) & BIT(1))
-		protect_pre_cs_task(current);
-	if (!lock || !waiter || !list)
-		return;
-	mutex_reset_data_no_waiter(lock);
-	if (!mi_vip_task(current) && !mi_link_vip_task(current))
-		return;
-	new = &waiter->list;
-	cursor = READ_ONCE(list->next);
-	for (;;) {
-		if (cursor == list) {
-			prev = READ_ONCE(list->prev);
-			if (new == list || prev == new || READ_ONCE(prev->next) != list) {
-				__list_add_valid_or_report(new, prev, list);
-			} else {
-				WRITE_ONCE(list->prev, new);
-				WRITE_ONCE(new->next, list);
-				WRITE_ONCE(new->prev, prev);
-				WRITE_ONCE(prev->next, new);
-			}
-			break;
-		}
-		if (!cursor)
-			return;
-		other = list_entry(cursor, struct mutex_waiter, list);
-		task = READ_ONCE(other->task);
-		if (!task)
-			return;
-		/* Stock captures next before predicates, then reloads other->task for
- 		 * the second predicate even when the first result was already true. */
-		next = READ_ONCE(cursor->next);
-		vip = mi_vip_task(task);
-		link_vip = mi_link_vip_task(READ_ONCE(other->task));
-		if (!vip && !link_vip) {
-			prev = READ_ONCE(cursor->prev);
-			next = READ_ONCE(prev->next);
-			if (READ_ONCE(next->prev) != prev || prev == new || next == new) {
-				__list_add_valid_or_report(new, prev, next);
-			} else {
-				WRITE_ONCE(next->prev, new);
-				WRITE_ONCE(new->next, next);
-				WRITE_ONCE(new->prev, prev);
-				WRITE_ONCE(prev->next, new);
-			}
-			break;
-		}
-		cursor = next;
-	}
-	/* This is set even when corruption reporting prevented the insertion. */
-	WRITE_ONCE(*already_on_list, true);
-}
-
 void mi_mutex_wait_start_hook(void *unused, struct mutex *lock)
 {
 	struct task_struct *task, *owner;
@@ -283,8 +210,6 @@ void mi_pcpu_rwsem_wq_add(void *unused, struct percpu_rw_semaphore *sem, bool re
 		return;
 	if (link_debug > 1)
 		pr_info("metis-link: pcpu_rwsem lock wq add, cs_stat_type: %d\n", (s32)stat);
-	if (sem == &cgroup_threadgroup_rwsem)
-		mark_task_low_lt(get_mi_task_struct(current));
 }
 
 void mi_rwsem_write_wait_finish_hook(void *unused, struct rw_semaphore *sem)

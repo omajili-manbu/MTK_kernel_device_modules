@@ -12,6 +12,7 @@
 #include <linux/rcupdate.h>
 #include <linux/refcount.h>
 #include <linux/sched.h>
+#include <linux/sysfs.h>
 #include <linux/sched/task.h>
 #include <linux/string.h>
 #include "metis_coldstart.h"
@@ -70,18 +71,6 @@ bool coldstart_app_tasks(struct task_struct *task)
 	return false;
 }
 
-bool coldstart_app_ui_pid(int pid)
-{
-	if (cold_start_app_tgid != pid)
-		return false;
-	if (pid && protect_cs) {
-		if (coldstart_window_active())
-			return true;
-		coldstart_clear_data();
-	}
-	return false;
-}
-
 bool coldstart_app_ui_task(struct task_struct *task)
 {
 	/* Stock +0x618 is pid, not tgid: only the process leader matches. */
@@ -99,26 +88,6 @@ void coldstart_mark_mmlock_holder(struct task_struct *task)
 {
 	if (coldstart_set_mmlock_holder_vip)
 		set_mi_vip_task_common_noresched(task, 0x08000000UL, 3UL);
-}
-
-bool coldstart_override_schedboost(struct task_struct *task)
-{
-	if (!override_schedboost_in_coldstart || !protect_cs ||
-	    !cold_start_app_tgid)
-		return false;
-	if (!coldstart_window_active()) {
-		coldstart_clear_data();
-		return false;
-	}
-	if (task->tgid && task->tgid == cold_start_app_tgid) {
-		/* The reference reads jiffies again after its initial window test. */
-		if ((s64)(jiffies - coldstart_begin_jif - 1000UL) < 0)
-			return false;
-		coldstart_clear_data();
-	}
-	if (mi_vip_task(task))
-		return false;
-	return !mi_link_vip_task(task);
 }
 
 bool coldstart_sserver_tasks(struct task_struct *task)
@@ -174,16 +143,11 @@ int get_coldstart_app_tgid(void)
 	return tgid;
 }
 
-int get_protect_dur_us(void)
-{
-	return cs_protect_dur;
-}
-
 int get_sserver_tgid(char *buffer, const struct kernel_param *param)
 {
-	/* Both module-parameter getter arguments are ignored in stock. It
-	 * returns the numeric TGID without writing the requested output buffer. */
-	return cold_start_sserver_tgid;
+	/* Stock returned the numeric TGID without writing the output buffer;
+	 * a kernel_param get must fill the buffer to be readable at all. */
+	return sysfs_emit(buffer, "%d\n", cold_start_sserver_tgid);
 }
 
 bool is_important_mmlock(struct rw_semaphore *mmlock)
@@ -254,7 +218,6 @@ int set_cold_start_app_tgid(int tid)
 	rcu_read_unlock();
 	if (!tid) {
 		coldstart_clear_data();
-		stask_prefer_cluster = 0;
 		coldstart_end_jif = jiffies;
 		pr_info("metis-cs: %s: clean tgid %d, cur %d %s\n",
 			__func__, task->tgid, current->pid, current->comm);
@@ -270,7 +233,6 @@ int set_cold_start_app_tgid(int tid)
 			coldstart_clear_auxiliary_data();
 		}
 		cold_start_app_tgid = task->tgid;
-		stask_prefer_cluster = 2;
 		coldstart_begin_jif = jiffies;
 		pr_info("metis-cs: %s: set tgid %d for tsk %d %s\n",
 			__func__, task->tgid, task->pid, task->comm);
@@ -296,48 +258,6 @@ int set_sserver_tgid(const char *buffer, const struct kernel_param *param)
 	return 0;
 }
 
-void save_home_tgid(int tgid)
-{
-	home_tgid = tgid;
-}
-
-void save_systemui_tgid(int tgid)
-{
-	systemui_tgid = tgid;
-}
-
-void save_systemserver_tgid(int tgid)
-{
-	systemserver_tgid = tgid;
-}
-
-void save_sf_tgid(int tgid)
-{
-	sf_tgid = tgid;
-}
-
-int cold_start_ui_recent_used_cpu(void)
-{
-	if (metis_wakeup_enable && in_coldstart_period() &&
-	    (s32)cold_start_ui_cpu >= 0 && cold_start_ui_cpu < nr_cpu_ids)
-		return cold_start_ui_cpu;
-	return -1;
-}
-
-int cold_start_ui_sched_state(void)
-{
-	if (metis_wakeup_enable && in_coldstart_period())
-		return cold_start_ui_state;
-	return 0;
-}
-
-int cold_start_ui_sleep(void)
-{
-	if (metis_wakeup_enable && in_coldstart_period())
-		return cold_start_ui_state == 1;
-	return false;
-}
-
 bool cold_start_ui_task(struct task_struct *task)
 {
 	bool active;
@@ -347,42 +267,6 @@ bool cold_start_ui_task(struct task_struct *task)
 	/* The expiry call precedes the task NULL check in the reference. */
 	active = in_coldstart_period();
 	return task && active && task->pid == cold_start_app_tgid;
-}
-
-bool cold_start_competing_with_ui(int cpu)
-{
-	int state = 0;
-	unsigned int used_cpu = U32_MAX;
-
-	if (metis_wakeup_enable) {
-		if (in_coldstart_period())
-			state = cold_start_ui_state;
-		/* Two separate period calls/reloads occur in the stock body. */
-		if (metis_wakeup_enable && in_coldstart_period() &&
-		    (s32)cold_start_ui_cpu >= 0 && cold_start_ui_cpu < nr_cpu_ids)
-			used_cpu = cold_start_ui_cpu;
-	}
-	return state > 1 && used_cpu == (u32)cpu;
-}
-
-bool cold_start_ind_task(struct task_struct *task)
-{
-	struct mi_task_struct *state;
-
-	if (!metis_wakeup_enable || !in_coldstart_period())
-		return false;
-	state = get_mi_task_struct(task);
-	return state && (state->unknown_c8 & 0x80);
-}
-
-bool cold_start_link_task(struct task_struct *task)
-{
-	struct mi_task_struct *state;
-
-	if (!metis_wakeup_enable || !in_coldstart_period())
-		return false;
-	state = get_mi_task_struct(task);
-	return state && (state->unknown_c8 & 0x2e0);
 }
 
 bool cold_start_ui_pipeline(struct task_struct *task)
@@ -405,16 +289,6 @@ bool cold_start_wakeup_link_task(struct task_struct *task)
 	return state && (state->unknown_c8 & 0x60);
 }
 
-bool cold_start_wakeup_mark(struct task_struct *task)
-{
-	struct mi_task_struct *state;
-
-	if (!metis_wakeup_enable || !in_coldstart_period())
-		return false;
-	state = get_mi_task_struct(task);
-	return state && (state->unknown_c8 & 8);
-}
-
 bool cold_start_wakeup_task(struct task_struct *task)
 {
 	struct mi_task_struct *state;
@@ -423,16 +297,4 @@ bool cold_start_wakeup_task(struct task_struct *task)
 		return false;
 	state = get_mi_task_struct(task);
 	return state && (state->unknown_c8 & 0xe0);
-}
-
-bool cold_start_wakeup_task_common(struct task_struct *task,
-		unsigned long mask)
-{
-	struct mi_task_struct *state;
-
-	if (!metis_wakeup_enable || !in_coldstart_period())
-		return false;
-	state = get_mi_task_struct(task);
-	/* LDR w8 zero-extends state, while TST uses the full incoming x1. */
-	return state && ((unsigned long)state->unknown_c8 & mask);
 }

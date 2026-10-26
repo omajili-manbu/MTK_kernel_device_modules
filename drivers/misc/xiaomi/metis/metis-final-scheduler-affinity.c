@@ -12,7 +12,7 @@
 #include <asm/thread_info.h>
 #include <trace/hooks/cgroup.h>
 #include <trace/hooks/sched.h>
-#include "metis-final-scheduler.h"
+#include "metis-final-owners.h"
 
 static unsigned long affinity_word(const struct cpumask *mask)
 {
@@ -179,92 +179,6 @@ void mi_set_cpus_allowed_comm(void *unused, struct task_struct *task,
 		state->flags_0xc0 &= ~2U;
 		MI_FIELD(state, unsigned long, 0xd0) = affinity_word(mask);
 	}
-}
-
-/* Original 0010d310, .text+0x48e8..0x4d98, CFI ab5097ae. Stock provider
- * mtk_select_task_rq_rt at00122914 passes task/excluded and the preserved
- * native int source_cpu, sd_flag, flags, int *target; it tests returned W0.
- * Source/SD formals are unused by this algorithm, not removed from the ABI. */
-bool mi_select_task_rq_hook(struct task_struct *task, struct cpumask *excluded,
-		int source_cpu, int sd_flag, int wake_flags, int *cpu)
-{
-	struct mi_task_struct *state, *selected_state;
-	unsigned long value;
-	unsigned int uid;
-	int group, selected;
-	bool done = false;
-
-	if (!task || !refcount_read(&task->usage))
-		return false;
-	get_task_struct(task); /* Stock reads usage before incrementing it. */
-	state = get_mi_task_struct(task);
-	if (!state)
-		goto out;
-	if (!unbind_cpu_affinity_task(task)) {
-		if (state->flags_0xc0 & 2) {
-			state->flags_0xc0 &= ~2U;
-			value = affinity_store(task, &cpumask_bits(&task->cpus_mask)[0],
-				MI_FIELD(state, unsigned long, 0xd0));
-			task->nr_cpus_allowed = hweight32(value);
-		}
-	} else if (!(state->flags_0xc0 & 2)) {
-		state->flags_0xc0 |= 2;
-		affinity_store(state->task, &MI_FIELD(state, unsigned long, 0xd0),
-			       affinity_word(&task->cpus_mask));
-		rcu_read_lock();
-		uid = __kuid_val(__task_cred(task)->uid);
-		rcu_read_unlock();
-		selected_state = get_mi_task_struct(task);
-		if (cluster_core_init_suc != 1 || !selected_state || affinity_compat(task))
-			goto clear;
-		if (minor_window_app && minor_window_app == uid) {
-			value = affinity_word(cpu_possible_mask);
-		} else if (selected_state->flags_0xc0 & 4) {
-			value = MI_FIELD(selected_state, unsigned long, 0xd8);
-			if (tsched_debug) {
-				struct cpumask saved;
-
-				cpumask_clear(&saved);
-				cpumask_bits(&saved)[0] = value;
-				pr_info("metis-clu-aff: pid %d comm %s get rebind mask: %*pbl",
-					task->pid, task->comm, cpumask_pr_args(&saved));
-			}
-		} else {
-			if ((uid >> 6) >= 3125)
-				goto clear;
-			if (test_bit(uid, cluster_affinity_uid_mlist))
-				group = 2;
-			else if (test_bit(uid, cluster_affinity_uid_llist))
-				group = 1;
-			else if (test_bit(uid, cluster_affinity_uid_blist))
-				group = 3;
-			else
-				goto clear;
-			value = affinity_word(&cluster_affinity_cpumask[group]);
-		}
-		/* Stock counts the requested word even if the second compat test
- 		 * restores the old mask. It does not refresh task->cpus_ptr. */
-		affinity_store(task, &cpumask_bits(&task->cpus_mask)[0], value);
-		task->nr_cpus_allowed = hweight32(value);
-		goto selected;
-clear:
-		state->flags_0xc0 &= ~2U;
-	}
-selected:
-	if (tsched_debug)
-		pr_info("metis-clu-aff: debug_setaffinity: cur: %s %d, cpumask: %*pbl %d.",
-			task->comm, task->pid, cpumask_pr_args(&task->cpus_mask),
-			task->nr_cpus_allowed);
-	if (game_wake_hooks)
-		game_wake_hooks(task, wake_flags);
-	selected = metis_ui_and_ui_pipeline_select_rq(task, excluded, wake_flags);
-	if (selected >= 0) {
-		*cpu = selected;
-		done = true;
-	}
-out:
-	put_task_struct(task);
-	return done;
 }
 
 /* Original 0010d7c4, .text+0x4d9c..0x51ac. All hook/sysctl results are

@@ -12,7 +12,7 @@
 #include <linux/tracepoint.h>
 #include "metis_blocked.h"
 #include "metis_classify.h"
-#include "metis-lowlt-trace.h"
+#include "metis-final-trace.h"
 
 /* Only this event is defined here; lowlt owns the shared systrace event. */
 #define CREATE_TRACE_POINTS

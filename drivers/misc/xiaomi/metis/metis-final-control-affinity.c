@@ -13,6 +13,7 @@
 #include <linux/sysctl.h>
 #include <linux/uidgid.h>
 #include "metis-final-control.h"
+#include "metis-final-owners.h"
 
 /* Helpers extract repeated stock instructions, and count zero stock bodies. */
 static bool control_allowed(void)

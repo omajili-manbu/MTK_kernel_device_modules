@@ -37,25 +37,6 @@ int __set_common_persist_vip(s32 pid, struct task_struct *task)
 	return result;
 }
 
-/* metis_set_common_persist_vip 00127e20, .text+0x1f3f8..0x1f494. */
-void metis_set_common_persist_vip(struct task_struct *task)
-{
-	int result, pid;
-
-	if (!task) {
-		printk("\0016metis-fas: set common persist vip task: but p is NULL\n");
-		return;
-	}
-	pid = task->pid;
-	spin_lock(&persist_vip_lock);
-	result = __set_common_persist_vip(pid, task);
-	spin_unlock(&persist_vip_lock);
-	if (!result)
-		printk("\0016metis-fas: set common persist vip task: %d %s\n", pid, task->comm);
-	else
-		printk("\0016metis-fas: set common persist vip task failed: %d, error: %d\n", pid, result);
-}
-
 /* set_common_persist_vip_task 0012810c, .text+0x1f6e4..0x1f7bc;
  * param_ops .rodata+0xf58, CFI63fa7f9c establishes unused kp. */
 int set_common_persist_vip_task(const char *value,
@@ -135,8 +116,3 @@ int set_clear_persist_vip_task(const char *value,
 	spin_unlock(&persist_vip_lock);
 	return 0;
 }
-
-/* Literal stock 001280f8/.text+0x1f6d0 and 00128104/+0x1f6dc;
- * CFI36b1c5a6 and a540670c establish int(void), void(void). */
-int metis_common_api_init(void) { return 0; }
-void metis_common_api_exit(void) { }

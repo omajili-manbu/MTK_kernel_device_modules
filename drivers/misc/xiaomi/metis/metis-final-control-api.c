@@ -309,7 +309,6 @@ long metis_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			if (metis_debug) printk("\0016metis-fas: UI_GET_VTASK_TOKEN, in_frame_boost");
 			del_cluster();
 		}
-		vtask_monitor = 1;
 		vtask_monitor_beg_us = ktime_to_us(ktime_get());
 		ui_last_cpu = raw_smp_processor_id();
 		ioctl_foreground(uid);
@@ -333,7 +332,6 @@ long metis_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			if (metis_debug) printk("\0016metis-fas: UI_RELEASE_VTASK_TOKEN, in_frame_boost");
 			del_cluster();
 		}
-		vtask_monitor = 0;
 		vtask_monitor_end_us = ktime_to_us(ktime_get());
 		if (metis_debug)
 			printk("\0016metis-fas: vtask_monitor_us is %lu\n", (unsigned long)(vtask_monitor_end_us - vtask_monitor_beg_us));

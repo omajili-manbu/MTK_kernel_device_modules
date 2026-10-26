@@ -6,20 +6,34 @@
 #include "metis-final-link.h"
 #include "metis-final-boost.h"
 #include "metis-final-module.h"
-#include "metis_registry.h"
-#include "metis_io.h"
+#include "metis_wakeup.h"
 
 /* Genuine original objects not previously declared by the recovered slices.
  * Their parameter ops are retained independently of inferred C signedness. */
 extern u32 mi_lock_blocked_pid, in_perf_mod, fperiod;
-extern u32 limit_bgtask_sched, force_forbidden_walt_lb;
-extern u32 force_viptask_select_rq, task_enqueue_time_toolong;
-extern u32 reader_biased_jif_for_vip, metis_io_debug;
-extern unsigned int n_freq;
-extern char version[64];
+extern u32 limit_bgtask_sched, task_enqueue_time_toolong;
+extern u32 reader_biased_jif_for_vip;
+extern unsigned int n_freq, n_user_freq;
+extern char metis_version_str[64];
 
-/* Stock .bss+0x15a40, eight zero bytes. The callback's family86f86ddd
- * typedef remains UNKNOWN. This storage has no callable C interface. */
-extern void *get_cpu_util_without;
+/* Cluster-affinity state shared by the sysctl/param policy faces. */
+extern u32 minor_window_app, tsched_debug, bug_detect, cluaff_control;
+extern s32 vip_task_max_cpu_nr;
+extern struct cpumask viptask_use_cpumask;
+extern struct ctl_table_header *clu_aff_header;
+extern u32 mi_rebind_task[4][5];
+extern unsigned long rebind_task_mlist[512], rebind_task_llist[512];
+extern unsigned long rebind_task_blist[512];
+extern struct cpumask cluster_affinity_cpumask[4];
+extern unsigned long cluster_affinity_uid_mlist[3125];
+extern unsigned long cluster_affinity_uid_llist[3125];
+extern unsigned long cluster_affinity_uid_blist[3125];
+extern u8 cluster_core_init_suc;
+extern struct cpumask cluster_core_mask[4];
+int uid_type(unsigned int uid);
+int clu_aff_init(void);
+void clu_aff_exit(void);
+void mi_cpu_coregroup_mask(unsigned int cpu, struct cpumask *mask);
+extern const struct ctl_table clu_aff_table[2];
 
 #endif

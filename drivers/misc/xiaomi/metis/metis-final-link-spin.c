@@ -16,9 +16,8 @@
 #include "../xr_qi/qi_provider.h"
 #include "metis_blocked.h"
 #include "metis_coldstart.h"
-#include "metis_coldstart_policy.h"
 #include "metis_common.h"
-#include "metis-lowlt-trace.h"
+#include "metis-final-trace.h"
 #include "metis-final-link.h"
 #include "metis-final-link-trace.h"
 
@@ -486,7 +485,6 @@ void unregister_cs_hooks(void)
 int metis_cs_init(void)
 {
 	register_cs_hooks();
-	register_trace_android_rvh_sched_balance_rt(metis_coldstart_sched_balance_rt, NULL);
 	pr_info("metis-cs: cs init!!\n");
 	return 0;
 }
@@ -497,13 +495,3 @@ void metis_cs_exit(void)
 	unregister_cs_hooks();
 }
 
-/* .text+0x1dbc4, virtual 001265ec. */
-void register_coldstart_hooks(void)
-{
-	register_trace_android_rvh_sched_balance_rt(metis_coldstart_sched_balance_rt, NULL);
-}
-
-/* .text+0x1dd04, virtual 0012672c. Literal original RET, true void(void). */
-void unregister_coldstart_hooks(void)
-{
-}

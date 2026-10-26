@@ -55,8 +55,3 @@ void mi_req_async_binder_link_sched_start(struct task_struct *task, u32 millisec
 		ticks = 12;
 	set_mi_req_async_binder_link_task(task, ticks);
 }
-
-void mi_req_async_binder_link_sched_end(struct task_struct *task)
-{
-	clean_mi_req_async_binder_link_task(task);
-}
