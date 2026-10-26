@@ -276,6 +276,15 @@ void mi_alter_futex_plist_add(void *data, struct plist_node *node,
 		entry = list_entry(cursor, struct plist_node, node_list);
 		other = container_of(entry, struct futex_q, list);
 		waiter = other->task;
+		/* rodin 6.18 时序差：6.18 钩子在 q->task 赋值前触发
+		 * （kernel/futex/core.c:909 trace → :913 q->task=task），
+		 * 链上可能存在 task 未赋值的 futex_q（先前置 already_on_hb
+		 * 的 node 尚未由内核完成注册）——stock 6.6 时序无此状态；
+		 * 跳过该 entry（#144 首刷 30.5s plist_add NULL+0x548 Oops）。 */
+		if (!waiter) {
+			cursor = next;
+			continue;
+		}
 		if ((!other->pi_state || !other->rt_waiter) &&
 		    (u32)(waiter->policy - 1U) > 1 &&
 		    !mi_vip_task(waiter) && !mi_link_vip_task(waiter)) {
