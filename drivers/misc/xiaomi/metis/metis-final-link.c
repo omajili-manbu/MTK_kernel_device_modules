@@ -36,7 +36,19 @@ struct metis618_rwsem_waiter {
 
 /* rodin 6.18 对位锁：内核 rwsem.c:375-383 真身 = list(0..15)+task(16..23)+
  * type(24..27)+pad(28..31)+timeout(32..39)+handoff_set(40)+donor_wakeup(41)
- * → pad 至 48。若 6.18 内核侧字段增删，此处编译期即炸而非运行期静默越界。 */
+ * → pad 至 48。若 6.18 内核侧字段增删，此处编译期即炸而非运行期静默越界。
+ * 逐行审计结论（163-165 轮）：①钩子签名漂移 9 处全重签（cgroup 四参/
+ * binder restore 单参/do_futex 四参/futex 三件/hrtimer_setup/
+ * wakeup_preempt/proc_handler const）；②消失钩子 4 个替代重签
+ * （record_{mutex,rwsem,rtmutex,pcpu}_starttime → wait_start/acquired 面，
+ * rtmutex 因 rt_mutex_base* 不匹配剪除）；③载体面：mutex 单 u64 不足 ⇒
+ * 侧表（attach/clear/lookup），init 路径改 attach（#139 panic 修复）；
+ * rwsem [2] 同型零改；task 载体走 GKI 尾部 rodin_tail.h 双段；
+ * user 走 uid 侧表；④防重入：do_rwsem_list_insert 在链守卫（#143 double
+ * add）；⑤字段实存核：rq->nr_running/rt.rt_nr_running/plist_head/
+ * cgroup_threadgroup_rwsem 均实存；MI_FIELD 偏移面作用于 mi_task 自有
+ * slab 载体非内核 task_struct（安全）；⑥顺序：metis(1257) 早于
+ * mi_schedule(1258) init，早期 get_mi_task_struct 返 NULL，各调用点判空。 */
 static_assert(sizeof(struct metis618_rwsem_waiter) == 48,
 	      "metis618 rwsem_waiter 与 6.18 rwsem.c 真身布局漂移");
 static_assert(offsetof(struct metis618_rwsem_waiter, task) == 16,
