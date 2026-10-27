@@ -25,7 +25,7 @@ void cmdq_sec_mtee_setup_context(struct cmdq_sec_mtee_context *tee)
 	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
 		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
 	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
-	pr_info("F6SMC ret a0=0x%08lx\n", (_res ? (unsigned long)((*_res).a0) : 0UL)); \
+	pr_info("F6SMC ret a0=0x%08lx\n", (unsigned long)(_a0)); \
 } while (0)
 	arm_smccc_smc(0xBC00000B, 1, 0, 0, 0, 0, 0, 0, &res);
 	if (res.a0 == 1)
