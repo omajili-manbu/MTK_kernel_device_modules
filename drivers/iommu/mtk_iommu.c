@@ -1945,7 +1945,6 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
 	int ret;
 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
 	int retry_count = 0;
-	pr_info("F6TRACE iommu_map enter iova=0x%lx pa=0x%pa sz=%zx\n", iova, &paddr, pgsize * pgcount);
 
 	/* The "4GB mode" M4U physically can not use the lower remap of Dram. */
 	if (dom->data->enable_4GB)
@@ -1986,7 +1985,6 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
 		if (ret != -ENOMEM)
 			mtk_iommu_dump_iova(dom->data, IOMMU_BK0, iova);
 	}
-	pr_info("F6TRACE iommu_map done ret=%d iova=0x%lx sz=%zx\n", ret, iova, pgsize * pgcount);
 	return ret;
 }
 
