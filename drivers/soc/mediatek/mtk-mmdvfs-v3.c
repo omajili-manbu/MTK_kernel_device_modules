@@ -196,7 +196,6 @@ EXPORT_SYMBOL_GPL(mtk_mmdvfs_get_ipi_status);
 int mtk_mmdvfs_enable_vcp(const bool enable, const u8 idx)
 {
 	int ret = 0;
-	pr_info("F6SMC enable_vcp enter en=%d idx=%u\n", enable, idx);
 
 	if (!mmdvfs_free_run)
 		return 0;
@@ -230,7 +229,6 @@ int mtk_mmdvfs_enable_vcp(const bool enable, const u8 idx)
 	}
 
 enable_vcp_end:
-	pr_info("F6SMC enable_vcp exit ret=%d en=%d\n", ret, enable);
 	if (ret || (log_level & (1 << log_pwr)))
 		MMDVFS_ERR("ret:%d enable:%d vcp_power:%d idx:%hhu usage:%d",
 			ret, enable, vcp_power, idx, vcp_pwr_usage[idx]);

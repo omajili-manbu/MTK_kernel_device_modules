@@ -1363,12 +1363,9 @@ int mtk_disp_hrt_cond_change_cb(struct notifier_block *nb, unsigned long value,
 		DDPINFO("CAM trigger repaint\n");
 		hrt_idx = _layering_rule_get_hrt_idx(drm_crtc_index(dev_crtc));
 		hrt_idx++;
-		pr_info("F6SMC disp pre_hrt_repaint idx=%d\n", hrt_idx);
 		DDP_MUTEX_UNLOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
 		mtk_disp_hrt_repaint_blocking(hrt_idx);
-		pr_info("F6SMC disp post_hrt_repaint\n");
 		mtk_disp_mmqos_bw_repaint(dev_crtc->dev->dev_private);
-		pr_info("F6SMC disp post_mmqos_bw\n");
 		locked = false;
 		break;
 	case BW_THROTTLE_END: /* CAM off */

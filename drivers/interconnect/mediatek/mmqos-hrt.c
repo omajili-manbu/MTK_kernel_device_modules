@@ -309,10 +309,8 @@ static void set_camera_max_bw(u32 bw)
 	} else if (mmqos_hrt->cam_max_bw > 0 && bw == 0)
 		mtk_mmdvfs_enable_vcp(false, VCP_PWR_USR_MMQOS);
 
-	pr_info("F6SMC cam pre_record bw=%u\n", bw);
 	mmqos_hrt->cam_max_bw = bw;
 	record_cam_hrt(bw);
-	pr_info("F6SMC cam post_record\n");
 
 	if (mmqos_hrt->blocking && mmqos_hrt->cam_bw_inc) {
 		atomic_inc(&mmqos_hrt->lock_count);
@@ -320,7 +318,6 @@ static void set_camera_max_bw(u32 bw)
 			atomic_read(&mmqos_hrt->lock_count));
 	}
 	mtk_mmqos_hrt_scen(CAM_SCEN_CHANGE, bw > 0);
-	pr_info("F6SMC cam post_scen\n");
 	if (mmqos_hrt->blocking && mmqos_hrt->cam_bw_inc) {
 		atomic_dec(&mmqos_hrt->lock_count);
 		wake_up(&mmqos_hrt->hrt_wait);
