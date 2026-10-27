@@ -1164,20 +1164,16 @@ static void __mt6991_set_force_opp_level(struct mtk_dvfsrc *dvfsrc, u32 level)
 }
 
 /* F6SMC r148: SMC 边界追踪（最后一条 ent 即未返回的 SMC）。
-   插入点可能在函数体内：只能有声明/宏，不能包含头文件或定义。
-   关中断窗内静默：printk 会拉长关中断窗，且真挂死时写不出反而制造
-   "ent 无 ret"假象（观测污染）；进程上下文路径保留全量打点。 */
+   插入点可能在函数体内：只能有声明/宏，不能包含头文件或定义 */
 u64 sched_clock(void);
 #undef arm_smccc_smc
 #define arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res) do { \
 	u64 __f6t = sched_clock(); \
-	if (!irqs_disabled()) \
-		pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
-			(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
+	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
+		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
 	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
-	if (!irqs_disabled()) \
-		pr_info("F6SMC ret a0=0x%08lx dt=%luus\n", \
-			(_res ? (unsigned long)((*_res).a0) : 0UL), (unsigned long)((sched_clock() - __f6t) / 1000)); \
+	pr_info("F6SMC ret a0=0x%08lx dt=%luus\n", \
+		(_res ? (unsigned long)((*_res).a0) : 0UL), (unsigned long)((sched_clock() - __f6t) / 1000)); \
 } while (0)
 static void mt6989_set_force_opp_level(struct mtk_dvfsrc *dvfsrc, u32 level)
 {

@@ -75,9 +75,14 @@ static void clear_kp_violation(unsigned int emi_id)
 {
 	struct arm_smccc_res smc_res;
 
-	/* F6SMC r149b 插桩已撤销：本函数唯一调用点在 primary hardirq
-	 * （smpu_violation 清场路径），插桩 = 关中断窗内 printk，且真挂死时
-	 * 写不出反而制造"ent 无 ret"假象。vendor 原生 SMC 原样保留。 */
+/* F6SMC r149b: SMC 边界追踪扫尾（末条 ent 即未返回的 SMC；耗时看 printk 时间戳） */
+#undef arm_smccc_smc
+#define arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res) do { \
+	pr_info("F6SMC ent a0=0x%08lx a1=0x%08lx a2=0x%08lx\n", \
+		(unsigned long)(_a0), (unsigned long)(_a1), (unsigned long)(_a2)); \
+	__arm_smccc_smc(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _res, NULL); \
+	pr_info("F6SMC ret a0=0x%08lx\n", (_res ? (unsigned long)((*_res).a0) : 0UL)); \
+} while (0)
 	arm_smccc_smc(MTK_SIP_EMIMPU_CONTROL, MTK_EMIMPU_CLEAR_KP, emi_id, 0, 0,
 		      0, 0, 0, &smc_res);
 }
