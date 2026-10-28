@@ -197,7 +197,10 @@ int clu_aff_init(void)
 			cpumask_set_cpu(cpu, &viptask_use_cpumask);
 	}
 	clu_aff_header = register_sysctl_sz("clu-aff/viptask_maxcpu_nr",
-			clu_aff_table, 2);
+			clu_aff_table, 1);	/* 6.18 iterates ctl_table_size exactly; the 
+					 * .data+0x60 zero terminator (where the 6.6 walker
+					 * stopped) must not be counted, or sysctl_check_table
+					 * rejects the registration ("procname is null"). */
 	pr_info("metis-clu-aff: come into %s\n", "cluster_core_init");
 	for (cpu = 0; cpu < 32 && cluster <= 2; cpu++) {
 		if (!(remaining & BIT(cpu)))
