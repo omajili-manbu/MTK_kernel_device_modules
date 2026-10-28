@@ -162,3 +162,10 @@ x509.genkey
 
 # Documentation toolchain
 sphinx_*/
+
+#
+# rodin: focaltech 固件/pramboot 数组源——.i 在此是源文件而非预处理产物，
+# 入库防 clean 类事故再删（曾致 focaltech_flash.o 全量构建断）
+#
+!drivers/input/touchscreen/focaltech_rodin/include/firmware/*.i
+!drivers/input/touchscreen/focaltech_rodin/include/pramboot/*.i
