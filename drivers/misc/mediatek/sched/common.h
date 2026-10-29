@@ -43,7 +43,22 @@ static inline bool mtk_task_migratable(const struct task_struct *p)
 	/* 语义 = task_on_rq_queued(p) && !p->se.sched_delayed；此处按
 	 * kernel/sched/sched.h:2366 的实现原样内联，以免 const 形参在
 	 * task_on_rq_queued()（形参非 const）上丢限定符。
+	 *
+	 * rodin 2026-10-29 冻结线修复（rq convoy 定案）：PROXY_EXEC 下
+	 * blocked_on 在身的 QUEUED 任务是阻塞链在册成员（donor 代等、
+	 * 唤醒后才清 blocked_on），核心自身的迁移路径从不对它做裸搬移；
+	 * 厂商搬家点（vip push / fair 迁移 ×3 / core_pause drain）经本判据
+	 * 放行时绕过 proxy 链维护 → find_proxy_task/activate_blocked_waiters
+	 * 走链不终止 → 持 rq 锁永挂 → 其余核 rq convoy 逐核饿死（两份死亡帧
+	 * 多核 rq 队列级联 + expdb CPU0 slowpath ×102 实证）。补上核心同款门：
+	 * blocked_on 非空一律不可裸迁移；拒绝时打点留证（现场窗口本就瞬时，
+	 * ratelimited 足够）。
 	 */
+	if (READ_ONCE(p->blocked_on.lock)) {
+		pr_info_ratelimited("mtkmig: refuse blocked-on %s[%d]\n",
+				    p->comm, p->pid);
+		return false;
+	}
 	return READ_ONCE(p->on_rq) == TASK_ON_RQ_QUEUED && !p->se.sched_delayed;
 }
 
