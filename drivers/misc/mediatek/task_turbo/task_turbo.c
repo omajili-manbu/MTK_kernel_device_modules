@@ -994,8 +994,12 @@ static void probe_android_rvh_rtmutex_prepare_setprio(void *ignore, struct task_
 				 * 收尾；这里若照旧 deactivate/activate 会把 entity
 				 * 账目与其 sched_delayed 位拆开。权重变更由
 				 * set_load_weight()→reweight_task() 自行在树上重排。
+				 * 记账口径用 mtk_task_on_rq_active()（不得用
+				 * mtk_task_migratable() 的搬家门）：blocked_on 在身
+				 * 者照旧走 SAVE/RESTORE 周期——同 rq 锁内瞬态摘挂、
+				 * 不动 rq 归属，与 proxy 链无涉。
 				 */
-				queued = mtk_task_migratable(p);
+				queued = mtk_task_on_rq_active(p);
 				running = task_current(rq, p);
 				if (queued)
 					deactivate_task(rq, p,

@@ -182,9 +182,13 @@ static void remove_task_from_group(struct task_struct *p)
 	/*
 	 * rodin 6.18（A-62 家族）：task_on_rq_queued() 对延迟出队僵尸也返回真，
 	 * 但僵尸不占 group_nr_running 的名额（flt 的 enqueue/dequeue 钩子已按
-	 * sched_delayed 口径记账），这里改用同源的 mtk_task_migratable()。
+	 * sched_delayed 口径记账），这里用同口径的 mtk_task_on_rq_active()。
+	 * 不得换成 mtk_task_migratable()：钩子账只认 sched_delayed 不认
+	 * blocked_on，PROXY_EXEC 下 blocked 在身者仍被钩子计为在队，修正掺进
+	 * 搬家门即与钩子失配——blocked 时移出组会永久漏一个 -1（任务离组后
+	 * 钩子不再为它发 dequeue），group_nr_running 虚高带偏 grp_awr。
 	 */
-	queued = mtk_task_migratable(p);
+	queued = mtk_task_on_rq_active(p);
 	fsrq = &per_cpu(flt_rq, rq->cpu);
 	if (queued && fsrq->group_nr_running[flt_groupid] > 0)
 		fsrq->group_nr_running[flt_groupid]--;
@@ -212,8 +216,10 @@ add_task_to_group(struct task_struct *p, struct grp *grp)
 	rcu_assign_pointer(gts->grp, grp);
 	/* take care of flt group */
 	fsrq = &per_cpu(flt_rq, rq->cpu);
-	/* rodin 6.18（A-62 家族）：同上，延迟出队僵尸不计入 group_nr_running。 */
-	queued = mtk_task_migratable(p);
+	/* rodin 6.18（A-62 家族）：同上，延迟出队僵尸不计入 group_nr_running；
+	 * 必须走 mtk_task_on_rq_active()（记账口径），不得用搬家门，理由见
+	 * remove_task_from_group()。 */
+	queued = mtk_task_on_rq_active(p);
 	if (queued)
 		fsrq->group_nr_running[flt_groupid]++;
 	__task_rq_unlock(rq, &rf);

@@ -19,47 +19,62 @@
 		ARRAY_SIZE(((kstruct *)0)->android_vendor_data1)))
 
 
-/* rodin 6.18（A-75）：DELAY_DEQUEUE 僵尸语义下的"真在队列上"判定。
+/* rodin 6.18（A-62/A-75 口径）：钩子账里的"真在队列上"判定。语义 =
+ * task_on_rq_queued(p) && !p->se.sched_delayed；此处按
+ * kernel/sched/sched.h:2366 的实现原样内联，以免 const 形参在
+ * task_on_rq_queued()（形参非 const）上丢限定符。
  *
  * 6.18 core 对阻塞任务默认走 delayed dequeue：dequeue_task_fair() 拒绝出队、
  * 置 se->sched_delayed = 1 后提前返回，block_task() 于是跳过下线 ⇒ 任务保持
  * p->on_rq == TASK_ON_RQ_QUEUED 却已不在运行队列语义里（下称僵尸）。
- * core 自己所有"把它当活任务搬/激活"的地方都显式排除 se.sched_delayed
- * （can_migrate_task() kernel/sched/fair.c:9839 直接 return 0；
- * __set_next_task_fair()/switched_to_fair()/try_to_wake_up() 均带
+ *
+ * 这是记账口径，不含搬家资格语义：PROXY_EXEC 下 blocked_on 在身的 QUEUED
+ * 任务（阻塞链在册成员，donor 代等、唤醒后才清 blocked_on）在本判据下为真
+ * ——flt 的 enqueue/dequeue 钩子（flt_cal.c，只认 sched_delayed 不认
+ * blocked_on）正是这样计它的 ⇒ group_nr_running 的 add/remove 修正
+ * （group.c）与 nice 备份的 SAVE/RESTORE 周期（task_turbo.c）必须用本判据、
+ * 不得换成 mtk_task_migratable()：修正掺进搬家门即与钩子失配——blocked 时
+ * 移出组会永久漏一个 -1（任务离组后钩子不再为它发 dequeue），
+ * group_nr_running 从此虚高，grp_awr 的目标 util 随之被带偏。
+ */
+static inline bool mtk_task_on_rq_active(const struct task_struct *p)
+{
+	return READ_ONCE(p->on_rq) == TASK_ON_RQ_QUEUED && !p->se.sched_delayed;
+}
+
+/* 搬家资格 = mtk_task_on_rq_active() + blocked_on 门，只给搬家判定点用。
+ *
+ * A-75：core 自己所有"把任务当活任务搬/激活"的地方都显式排除
+ * se.sched_delayed（can_migrate_task() kernel/sched/fair.c:9846 直接
+ * return 0；__set_next_task_fair()/switched_to_fair()/try_to_wake_up() 均带
  * WARN_ON_ONCE(se->sched_delayed) 断言；pick_next_entity() 对选中的 delayed
  * 实体先 dequeue_entities(DEQUEUE_SLEEP|DEQUEUE_DELAYED) 收尾再返回 NULL）。
- *
  * 厂商迁移器原先只看 task_on_rq_queued()：会把僵尸 deactivate_task() 真出队
  * （flags 不带 DEQUEUE_DELAYED ⇒ finish_delayed_dequeue_entity() 不执行、
  * sched_delayed 残留；也不带 DEQUEUE_SLEEP ⇒ h_nr_runnable 走"不算 runnable"
  * 分支），随后再重新入树，造成 se->on_rq / p->on_rq / sched_delayed /
  * h_nr_runnable 四者裂脑，与真唤醒或任务自身 block 并发时崩在
- * dequeue_entity()→update_entity_lag() 的 WARN_ON_ONCE(!se->on_rq)（A-75）。
- * 所有"挑任务迁移/激活"的判定点统一走本函数。
+ * dequeue_entity()→update_entity_lag() 的 WARN_ON_ONCE(!se->on_rq)。所有
+ * "挑任务迁移/激活"的判定点统一走本函数。
+ *
+ * rodin 2026-10-29 冻结线修复（rq convoy 定案）：PROXY_EXEC 下 blocked_on
+ * 在身的 QUEUED 任务是阻塞链在册成员（donor 代等、唤醒后才清 blocked_on），
+ * 核心自身的迁移路径从不对它做裸搬移（can_migrate_task() 里
+ * task_is_blocked() 一票否决；balance_push 只推 curr，阻塞者原地等链解）；
+ * 厂商搬家点（vip push / fair 迁移 ×3 / core_pause drain）经本判据放行时
+ * 绕过 proxy 链维护 → find_proxy_task/activate_blocked_waiters 走链不终止
+ * → 持 rq 锁永挂 → 其余核 rq convoy 逐核饿死（两份死亡帧多核 rq 队列级联
+ * + expdb CPU0 slowpath ×102 实证）。补上核心同款门：blocked_on 非空一律
+ * 不可裸迁移；拒绝时打点留证（现场窗口本就瞬时，ratelimited 足够）。
  */
 static inline bool mtk_task_migratable(const struct task_struct *p)
 {
-	/* 语义 = task_on_rq_queued(p) && !p->se.sched_delayed；此处按
-	 * kernel/sched/sched.h:2366 的实现原样内联，以免 const 形参在
-	 * task_on_rq_queued()（形参非 const）上丢限定符。
-	 *
-	 * rodin 2026-10-29 冻结线修复（rq convoy 定案）：PROXY_EXEC 下
-	 * blocked_on 在身的 QUEUED 任务是阻塞链在册成员（donor 代等、
-	 * 唤醒后才清 blocked_on），核心自身的迁移路径从不对它做裸搬移；
-	 * 厂商搬家点（vip push / fair 迁移 ×3 / core_pause drain）经本判据
-	 * 放行时绕过 proxy 链维护 → find_proxy_task/activate_blocked_waiters
-	 * 走链不终止 → 持 rq 锁永挂 → 其余核 rq convoy 逐核饿死（两份死亡帧
-	 * 多核 rq 队列级联 + expdb CPU0 slowpath ×102 实证）。补上核心同款门：
-	 * blocked_on 非空一律不可裸迁移；拒绝时打点留证（现场窗口本就瞬时，
-	 * ratelimited 足够）。
-	 */
 	if (READ_ONCE(p->blocked_on.lock)) {
 		pr_info_ratelimited("mtkmig: refuse blocked-on %s[%d]\n",
 				    p->comm, p->pid);
 		return false;
 	}
-	return READ_ONCE(p->on_rq) == TASK_ON_RQ_QUEUED && !p->se.sched_delayed;
+	return mtk_task_on_rq_active(p);
 }
 
 #define GEAR_HINT_UNSET -1
