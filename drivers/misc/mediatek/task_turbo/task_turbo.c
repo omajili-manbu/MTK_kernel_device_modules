@@ -1514,6 +1514,14 @@ static void rwsem_stop_turbo_inherit(struct rw_semaphore *sem)
 	int i;
 	bool found = false;
 
+	/* rodin 6.18（2026-10-30）：write wait_finish 钩子在成功取锁路径的
+	 * sem->wait_lock 持中触发，stop_turbo_inherit→unset_scheduler_tuning
+	 * 的 set_user_nice(owner) 取 task_rq_lock，与 PROXY_EXEC
+	 * find_proxy_task（rq→wait_lock）互为反序可成环——与 start 成对门
+	 * （start 被门则无记录，本函数经 get_inherit_task() 亦自然走空）。 */
+	if (sched_proxy_exec())
+		return;
+
 	spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
 	inherited_owner = get_inherit_task(sem);
 	if (!inherited_owner)
@@ -1582,6 +1590,14 @@ static void rwsem_start_turbo_inherit(struct rw_semaphore *sem)
 	bool found = false;
 
 	if (!sub_feat_enable(SUB_FEAT_LOCK))
+		return;
+
+	/* rodin 6.18（2026-10-30）：wait_start 钩子在 sem->wait_lock 持中触发，
+	 * start_turbo_inherit→set_scheduler_tuning 的 set_user_nice(owner) 取
+	 * task_rq_lock，与 PROXY_EXEC find_proxy_task（rq→wait_lock）互为反序
+	 * 可成环；等待者重要性经 donor 继承原生传递，PROXY_EXEC 下整条 rwsem
+	 * 继承让位——与 stop 成对门，无残留态。 */
+	if (sched_proxy_exec())
 		return;
 
 	spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
