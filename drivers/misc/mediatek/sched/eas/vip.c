@@ -1195,6 +1195,17 @@ void vip_cfs_tick(struct rq *rq)
 	if (unlikely(!vip_enable))
 		return;
 
+	/*
+	 * rodin 6.18：tick 钩子在 scheduler_tick() 的 rq_unlock 之后触发，本
+	 * 函数此前对任意 CFS curr 每个 tick 都空转一对 rq_lock/unlock（非在队
+	 * curr 在队列检查处 goto out，别无动作）。VIP 任务在队则链表必非空，
+	 * 空链即 account/resched/requeue 全部无事可做，免锁直返；远程 ttwu
+	 * 并发入队与本读竞争时，最坏把一次 tick 级 resched 检查推迟一拍，
+	 * 唤醒路径自身抢占判定不受影响。
+	 */
+	if (list_empty_careful(&vrq->vip_tasks))
+		return;
+
 	rq_lock(rq, &rf);
 
 	if (vts->vip_list.next && !link_with_others(&vts->vip_list))
