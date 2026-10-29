@@ -13,6 +13,7 @@
 #include <linux/pm_qos.h>
 #include <linux/spinlock_types.h>
 #include <linux/workqueue.h>
+#include <linux/platform_device.h> /* rodin: ufshcd-pltfrm.h relies on includer for struct platform_device */
 
 #include <ufs/ufs.h>
 #include <ufs/ufshcd.h>
