@@ -145,7 +145,7 @@ void ipi_monitor_dump(struct mtk_ipi_device *ipidev)
 EXPORT_SYMBOL(ipi_monitor_dump);
 
 /*
- * rodin b513 #113: 内建化的消费者（elliptic 等）在 initcall 期就会调
+ * rodin 2026-10-01: 内建化的消费者（elliptic 等）在 initcall 期就会调
  * mtk_ipi_register()，而 ipidev 的注册（ipi_inited=1）发生在提供者的
  * probe 里（scp_probe -> scp_ipi_table_init -> mtk_ipi_device_register），
  * 6.18 内建后 SCP 的 vseq_device_initcall_sync 晚于消费者的
@@ -242,7 +242,7 @@ int mtk_ipi_device_register(struct mtk_ipi_device *ipidev,
 	ipidev->mbdev = mbox;
 	ipidev->ipi_inited = 1;
 
-	/* rodin b513 #113: 通知等待该 ipidev 的内建消费者（一次性语义
+	/* rodin 2026-10-01: 通知等待该 ipidev 的内建消费者（一次性语义
 	 * 由消费者自己持有的标志保证；回调内不注销，避免 blocking
 	 * notifier 死锁）。 */
 	blocking_notifier_call_chain(&mtk_ipi_dev_ready_chain, 0, ipidev);

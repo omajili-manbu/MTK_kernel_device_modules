@@ -96,7 +96,7 @@ enum ioctl_cmd {
 	SELECT_TOUCH_ID,
 	GET_FRAME_DATA_INDEX,
 	RAW_DATA_INDEX,
-	/* _b582-INPUT：UPDATE_REPORT_POINT(=6) 随 report-point 面删除——blob
+	/* rodin（2026-10-08）：UPDATE_REPORT_POINT(=6) 随 report-point 面删除——blob
 	 * xiaomi_touch_dev_ioctl 只处理 0..5（0x6af0 cmp #0x5 / 跳表 6 项），
 	 * 前六项取值不变。 */
 };
@@ -119,7 +119,7 @@ enum common_data_cmd {
 
 enum common_data_mode {
 	DATA_MODE_0			= 0,
-	/* b567：warsaw 代 Touch_* 旧名枚举（goodix/focaltech 骨架引用）；数值与
+	/* rodin 2026-10-06：warsaw 代 Touch_* 旧名枚举（goodix/focaltech 骨架引用）；数值与
 	 * DATA_MODE_N 逐项重合（blob rodin 框架语义同序），作兼容别名保留。 */
 	Touch_Game_Mode					= 0,
 	Touch_Active_MODE				= 1,
@@ -271,7 +271,7 @@ enum common_data_mode {
 	THP_HAL_IDLE_RATE				= THP_CMD_BASE + 205,
 	THP_REF_HOPPING_SET				= THP_CMD_BASE + 206,
 	THP_TEMPERATURE_STATUS				= THP_CMD_BASE + 207,
-	/* b567：mievent 上报 code（yoro dash 同代数值，blob mievent 面一致） */
+	/* rodin 2026-10-06：mievent 上报 code（yoro dash 同代数值，blob mievent 面一致） */
 	TOUCH_EVENT_TRANSFER_ERR			= 912001001,
 	TOUCH_EVENT_FWLOAD_ERR				= 912001002,
 	TOUCH_EVENT_PARAM_ERR				= 912001003,

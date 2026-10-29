@@ -9,10 +9,10 @@
 
 DEBUG_SET_LEVEL(DEBUG_LEVEL_ERR);
 
-/* rodin b54: MKP service 的 ticket/grant 协议要求全系统同一时刻至多一个
+/* rodin 2026-09-30: MKP service 的 ticket/grant 协议要求全系统同一时刻至多一个
  * secure op 在途（单一 grant-cookie 槽 + secure 侧非重入）。6.6 =m 时代
  * 靠用户态装载时序碰巧串行；内建后 initcall 线程与 krn 保护 work 并发
- * 进入，secure world 卡死 ⇒ 真机 #104 0.414s 双 CPU hard lockup、零回栈
+ * 进入，secure world 卡死 ⇒ 真机 0.414s 双 CPU hard lockup、零回栈
  * （两 CPU 均困在 HVC 内）。修复 = raw spinlock 序列化：单发 HVC 走
  * mkp_smccc_hvc（内含锁），do_secure_ops 的 [ticket 写 + HVC] 临界区
  * 持锁后走 mkp_smccc_hvc_raw。 */
@@ -41,7 +41,7 @@ static void mkp_smccc_hvc(unsigned long a0, unsigned long a1,
 	raw_spin_unlock_irqrestore(&mkp_hvc_svc_lock, flags);
 }
 
-/* rodin b54: 无锁版本，仅供 do_secure_ops 的持锁临界区使用。 */
+/* rodin 2026-09-30: 无锁版本，仅供 do_secure_ops 的持锁临界区使用。 */
 static void mkp_smccc_hvc_raw(unsigned long a0, unsigned long a1,
 			      unsigned long a2, unsigned long a3,
 			      unsigned long a4, unsigned long a5,
@@ -350,12 +350,12 @@ int mkp_start_granting_hvc_call(void)
 
 	mkp_hvc_fast_call_id = MKP_HVC_CALL_ID(0, HVC_FUNC_ESS_1);
 
-	/* rodin b57: 服务端语义已由 GZ mkp_service ELF（tee.img/gz.img 容器
+	/* rodin 2026-09-30: 服务端语义已由 GZ mkp_service ELF（tee.img/gz.img 容器
 	 * 内 mkp_service 子镜像）反汇编定案：mkp_kick_off_granting 要求
 	 * *slot == 0x6d6b7021("mkp!")，命中则把槽改写为 per-boot ticket_key
 	 * 并置 start_granting；不命中 => do_action_panic(557) => 服务端向
 	 * NULL 写 "mkppanic" magic 自陷 => GZ sync handler 判 unhandled =>
-	 * 静默死机（真机 #107：b56 的槽清零方向反了，0.412s 起 cpu2 困
+	 * 静默死机（真机：早前槽清零方向反了，0.412s 起 cpu2 困
 	 * EL3）。槽在 ESS_0/ESS_1 之间不被服务端消费——OEM =m 时槽恒为
 	 * magic（自面三连调写入）；=y 由 krn 面的 do_secure_ops 写入/跳过
 	 * 后同为 magic。此处按 do_secure_ops 同一纪律持锁重写 magic 保证

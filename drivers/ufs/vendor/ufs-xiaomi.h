@@ -2,8 +2,8 @@
 /*
  * 小米 UFS ABI 面（6.6 blob 兼容）——共享声明头
  *
- * ufs-xiaomi.c（drivers/ufs/vendor/，#150 还原的提供面）与 mi_memory.ko 的
- * 内建重建（drivers/memory/xiaomi/，#166）共用。mi_memory 的消费面（6.6
+ * ufs-xiaomi.c（drivers/ufs/vendor/，2026-10-04 还原的提供面）与 mi_memory.ko 的
+ * 内建重建（drivers/memory/xiaomi/）共用。mi_memory 的消费面（6.6
  * blob 机器码实测）：
  *   - +0x5c/+0x60/+0x64（u32）：show_hba 尾三行计数器（恒零）
  *   - +0x68（u64）：err_state（恒零）

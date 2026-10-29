@@ -53,7 +53,7 @@ static int disable_unused_probe(struct platform_device *pdev)
 				pr_notice("get clk [%d] fail, ret=%d, clk_con=%d\n",
 						i,  (int)ret, clk_con);
 		} else {
-			/* rodin #135: audiosys@8f [44]+ = AFE ASRC(CON3)/源CG(CON4)族的 _V
+			/* rodin 2026-10-02: audiosys@8f [44]+ = AFE ASRC(CON3)/源CG(CON4)族的 _V
 			 * 虚拟门, enable->disable 净效果为零但会经父门写 CON3/CON4; CON3
 			 * ASRC 的 disable 写触发 PD 域掉电握手, 26M 已被 AFE free-run 后缀
 			 * 掐断, store 不 retire 即总线挂死。CON3 保持 free-run 0x0 = 6.6

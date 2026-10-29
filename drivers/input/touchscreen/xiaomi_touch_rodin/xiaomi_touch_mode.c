@@ -10,12 +10,12 @@
 #define MI_TOUCH_MODE_PARAMETERS_SIZE 5
 #define MI_CORNERFILTER_AREA_STEP_SIZE 4
 #define VALUE_TYPE_SIZE 6
-/* _b583-XT③：blob 触摸模式表维度 = 35 模式/面板（非树侧 DATA_MODE_45=45）——
+/* rodin（2026-10-08）：blob 触摸模式表维度 = 35 模式/面板（非树侧 DATA_MODE_45=45）——
  * ① driver_get_touch_mode_common 0x9068/0x906c/0x9098：面板步长 #0x348=840=35×24、
  *    槽步长 #0x18=24；xiaomi_touch_get_mode_all 0xac48-0xacc0 同形；
  * ② 有效模式上界 0..34：driver_update_touch_mode_common 0x8ff8 `cmp w1,#0x22`、
  *    xiaomi_touch_get_mode_all 0xac34 `cmp w3,#0x22`、xiaomi_touch_set_mode_value
- *    0xa668 段 `cmp w22,#0x23`（b581 已收口）。
+ *    0xa668 段 `cmp w22,#0x23`（已收口）。
  * ③ 表访问者清单 = 本文件 xiaomi_touch_get_mode_value/get_mode_all/reset_mode/
  *    driver_get_touch_mode_common/driver_update_touch_mode_common/
  *    xiaomi_touch_cmd_update_work；stylus 分支（DATA_MODE_40/24）在本树
@@ -55,7 +55,7 @@ enum xiaomi_touch_mode_dts_index {
 };
 
 static int touch_mode[MAX_TOUCH_PANEL_COUNT][DATA_MODE_COUNT][VALUE_TYPE_SIZE];
-/* _b583-XT：blob 布局断言（面板步长 0x348=840B、槽步长 0x18=24B） */
+/* rodin（2026-10-08）：blob 布局断言（面板步长 0x348=840B、槽步长 0x18=24B） */
 static_assert(sizeof(touch_mode[0]) == DATA_MODE_COUNT * VALUE_TYPE_SIZE * sizeof(int),
 	      "touch_mode[panel] must be 35*6*4 = 840 (blob 0x348)");
 static_assert(sizeof(touch_mode[0][0]) == VALUE_TYPE_SIZE * sizeof(int),
@@ -141,7 +141,7 @@ u8 xiaomi_get_gesture_type_common(s8 touch_id)
 				!touch_mode[touch_id][DATA_MODE_17][GET_CUR_VALUE])
 			tmp_value |= GESTURE_SINGLETAP_EVENT;
 	}
-	/* _b581-XT③：blob xiaomi_get_gesture_type_common 串 = "gesture type:%2x\n"
+	/* rodin（2026-10-08）：blob xiaomi_get_gesture_type_common 串 = "gesture type:%2x\n"
 	 * （0x198f），无 touch_id 形参（树侧 donor 多带 1 参）。 */
 	LOG_INFO("gesture type:%2x\n", tmp_value);
 	return tmp_value;
@@ -245,7 +245,7 @@ static void xiaomi_touch_cmd_update_work(struct work_struct *work)
 	}
 
 	if (mode_update_flag & ((1 << DATA_MODE_0) | (1 << DATA_MODE_8) | (1 << DATA_MODE_7))) {
-		/* _b581-XT③：blob xiaomi_touch_cmd_update_work 串 = "mode_update_flag: 0x%02lX"（0x2122）。 */
+		/* rodin（2026-10-08）：blob xiaomi_touch_cmd_update_work 串 = "mode_update_flag: 0x%02lX"（0x2122）。 */
 		LOG_INFO("mode_update_flag: 0x%02lX", (long)mode_update_flag);
 		schedule_work(&grid_update_work[touch_id]);
 	}
@@ -439,7 +439,7 @@ static void xiaomi_touch_set_mode_long_value(common_data_t *common_data)
 
 	if (mode == DATA_MODE_15) {
 		if (touch_mode[common_data->touch_id][DATA_MODE_0][GET_CUR_VALUE]) {
-			/* _b581-XT③：blob 无 "in gamemode,will set by cmd game update update" 串
+			/* rodin（2026-10-08）：blob 无 "in gamemode,will set by cmd game update update" 串
 			 * （tree-only donor）。 */
 			return;
 		}
@@ -489,7 +489,7 @@ static void xiaomi_touch_reset_mode(common_data_t *common_data)
 		return;
 	}
 
-	/* _b581-XT③：blob xiaomi_touch_reset_mode 串 = "mode: %d reset!"（0x31df，I 级）。 */
+	/* rodin（2026-10-08）：blob xiaomi_touch_reset_mode 串 = "mode: %d reset!"（0x31df，I 级）。 */
 	LOG_INFO("mode: %d reset!", mode);
 	if (mode < DATA_MODE_COUNT && mode > 0) {
 		touch_mode[common_data->touch_id][mode][SET_CUR_VALUE] =
@@ -521,7 +521,7 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 	s8 touch_id = common_data->touch_id;
 	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(touch_id);
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = get_xiaomi_touch_driver_param(touch_id);
-	/* _b581-XT③：blob 体内只有 2 处间接调用（ops+0x178 set_mode_value / ops+0x1f0
+	/* rodin（2026-10-08）：blob 体内只有 2 处间接调用（ops+0x178 set_mode_value / ops+0x1f0
 	 * touch_log_level_control_v2），无 get_tddi_status——树侧 donor 的 is_tddi
 	 * （只为已删的 DATA_MODE_35 分支服务）一并删除。 */
 
@@ -530,12 +530,12 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 			mode, val, xiaomi_touch_driver_param, xiaomi_touch_data);
 		return;
 	}
-	/* _b581-XT③：blob 0xa574-0xa604 = 无排除表、无 touch_id 形参的单条
+	/* rodin（2026-10-08）：blob 0xa574-0xa604 = 无排除表、无 touch_id 形参的单条
 	 * LOG_INFO("mode:%d,val:%d", mode, val)（w3=w22=mode, w4=w20=val，行号 488）。
 	 * 树侧原为 donor 的 153/169/177 排除 + 3 参串 "touch_id:%d, mode:%d,val:%d"。 */
 	LOG_INFO("mode:%d,val:%d", mode, val);
 
-	/* _b581-XT③：blob 0xa57c `cmp w22,#0x23`（=35=DATA_MODE_35）→ mode>=35 一律走
+	/* rodin（2026-10-08）：blob 0xa57c `cmp w22,#0x23`（=35=DATA_MODE_35）→ mode>=35 一律走
 	 * IC op set_mode_value(mode, common_data->data_buf)（blob 0xa584 取 ops+0x178，
 	 * 无 DATA_MODE_57 特例）；树侧原为 donor 的 `mode>=DATA_MODE_45` + 57 特例。
 	 * 同时 blob 的 touch_mode 表 = 35 模式/面板（步长 24 = 6 int/模式，见 0xa618
@@ -582,7 +582,7 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 		LOG_INFO("Touch_FodIcon_Enable value [%d]", val);
 		queue_work(xiaomi_touch_data->event_wq, &switch_mode_work[touch_id]);
 		break;
-	/* _b581-XT③：blob jump table `cmp w22,#0x1f; b.hi 0xa79c`——
+	/* rodin（2026-10-08）：blob jump table `cmp w22,#0x1f; b.hi 0xa79c`——
 	 * mode 32..34 与 0/2/3/4/5/7/8 同走 cmd_update 队列，mode 35.. 已被上面的
 	 * `mode>=DATA_MODE_35` 提前返回，故树侧 donor 的 case DATA_MODE_35
 	 * （串 "Surport/NOT Surport TDDI..."，blob 面无此二串）为不可达残留，删除。 */
@@ -641,7 +641,7 @@ static void xiaomi_touch_set_mode_value(common_data_t *common_data)
 		value = val > 0 ? XIAOMI_TOUCH_ENABLE_SENSOR : XIAOMI_TOUCH_DISABLE_SENSOR;
 		add_common_data_to_buf_common(touch_id, SET_CUR_VALUE, DATA_MODE_27, 1, &value);
 		break;
-	/* _b581-XT③：blob jump table mode 25 → 0xa79c default（"don't not support mode"），
+	/* rodin（2026-10-08）：blob jump table mode 25 → 0xa79c default（"don't not support mode"），
 	 * 且 mode>=35 由前置 op 路径处理；树侧 donor 的 case DATA_MODE_25 / DATA_MODE_41
 	 * （各自带 "DATA_MODE_25: %d" / "DATA_MODE_41: %d" 串，blob 面无）删除。 */
 #ifdef TOUCH_MULTI_PANEL_NOTIFIER_SUPPORT
@@ -687,7 +687,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			return -1;
 		}
 
-		/* _b580-A74①（站点2-a）：blob 0xa13c→0xa374 只按 current_log_level>=3 门控，
+		/* rodin（2026-10-08）：blob 0xa13c→0xa374 只按 current_log_level>=3 门控，
 		 * 形参 (cmd=[sp+1], mode=[sp+2])，串 "cmd: %d, mode: %d"（0x1743）；
 		 * 树侧原为 donor 的 cmd==SET_CUR_VALUE / mode∉{153,177} 过滤 + 4 参串。 */
 		LOG_INFO("cmd: %d, mode: %d", common_data.cmd, common_data.mode);
@@ -697,7 +697,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			if (xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue) {
 				xiaomi_touch_driver_param->hardware_operation.htc_ic_setModeValue(&common_data);
 			}
-			/* _b581-XT③：blob cmd==8 的块 = 0xa314（ops+0x1f8=htc_ic_setModeValue）
+			/* rodin（2026-10-08）：blob cmd==8 的块 = 0xa314（ops+0x1f8=htc_ic_setModeValue）
 			 * 后接 0xa3a0-0xa3c8：`sub w8,w2(mode),#0x14; cmp w8,#0xb3; b.hi` →
 			 * mode ∈ [20,199] 时追加 add_common_data_to_buf_common(touch_id, cmd,
 			 * mode, data_len, data_buf)（x4=&data_buf）。树侧原缺该追加（少 1 调用点）。 */
@@ -711,7 +711,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 					update_get_ic_current_value(&common_data);
 					copy_size = copy_to_user((void __user *)arg, &common_data, user_size);
 					if (copy_size) {
-						/* _b580-A74①（站点2-d）：blob 0xa448 串 = "copy to user failed,
+						/* rodin（2026-10-08）：blob 0xa448 串 = "copy to user failed,
 						 * %d copy to user! value %d"（0x3b3d），形参 (cmd, copy_size)；
 						 * 树侧原为 donor 串 "%d copy to user failed! value %d"（blob 面无此串）。 */
 						LOG_ERROR("copy to user failed, %d copy to user! value %d", common_data.cmd, copy_size);
@@ -719,7 +719,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 						return -1;
 					}
 			} else {
-				/* _b581-XT③（纠错）：blob 0xb05 确有串 "get thp ic cur value has error"
+				/* rodin（2026-10-08 纠错）：blob 0xb05 确有串 "get thp ic cur value has error"
 				 * （xiami_touch_mode 内，0xa278 ops+0x200 失败支路）。 */
 				LOG_ERROR("get thp ic cur value has error");
 				mutex_unlock(&ioctl_operation_mutex);
@@ -727,7 +727,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			}
 			break;
 		case SET_CMD_FOR_DRIVER:
-			/* _b580-A74①（站点2-b）：blob 0xa2c4-0xa2d8 只判 mode==26 后无条件下发
+			/* rodin（2026-10-08）：blob 0xa2c4-0xa2d8 只判 mode==26 后无条件下发
 			 * update_palm_sensor_value_common(data_buf[0])（无 touch_id 分派、无 second_panel
 			 * 分支：update_palm_sensor_value_second_panel 是 blob def 面不存在的树侧 EXTRA）。
 			 * 注：palm 值在 blob/树内均为单一全局（blob palm_value@bss+0x8b48），
@@ -754,7 +754,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			xiaomi_touch_get_mode_value(&common_data);
 			copy_size = copy_to_user((void __user *)arg, &common_data, user_size);
 			if (copy_size)
-				/* _b580-A74①（站点2-d）：blob 0xa190/0x280 串 = "copy data failed,
+				/* rodin（2026-10-08）：blob 0xa190/0x280 串 = "copy data failed,
 				 * %d copy to user! value %d"（0x40ef），形参 (cmd, copy_size)。 */
 				LOG_ERROR("copy data failed, %d copy to user! value %d", common_data.cmd, copy_size);
 			break;
@@ -765,7 +765,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			xiaomi_touch_get_mode_all(&common_data);
 			copy_size = copy_to_user((void __user *)arg, &common_data, user_size);
 			if (copy_size)
-				/* _b580-A74①（站点2-d）：blob 0xa250/0x289 串 = "copy data failed,
+				/* rodin（2026-10-08）：blob 0xa250/0x289 串 = "copy data failed,
 				 * %d copy to user! value %d"（0x40ef），形参 (cmd, copy_size)。 */
 				LOG_ERROR("copy data failed, %d copy to user! value %d", common_data.cmd, copy_size);
 			break;
@@ -777,7 +777,7 @@ int xiaomi_touch_mode(private_data_t *client_private_data, u32 user_size, unsign
 			mutex_unlock(&ioctl_operation_mutex);
 			return -EINVAL;
 		}
-		/* _b580-A74①（站点2-c）：blob 0xa3a0-0xa3ac 只判 [20,199] 区间
+		/* rodin（2026-10-08）：blob 0xa3a0-0xa3ac 只判 [20,199] 区间
 		 * （sub w8,w2,#0x14 / cmp w8,#0xb3），无 donor 的 `|| mode == DATA_MODE_66`；
 		 * blob 全镜像无 1004(#0x3ec) 立即数比较（grep 仅命中分支目标偏移）。
 		 * 推送形参 w1 = [sp+1] = 用户 common_data.cmd（blob 0xa3b0 ldrb w1,[sp,#0x1]）。 */

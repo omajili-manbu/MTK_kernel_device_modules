@@ -25,7 +25,7 @@
 #include "fp_spi.h"
 #include <linux/iopoll.h>
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
 
 #define SPI_CFG0_REG                      0x0000
 #define SPI_CFG1_REG                      0x0004

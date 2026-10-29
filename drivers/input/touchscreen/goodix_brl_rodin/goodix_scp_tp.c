@@ -18,7 +18,7 @@
  *   goodix_scp_gesture (0x93a0,156)        goodix_gesture_10diff_write (0x16dcc,180)
  *   goodix_readprint_debuginfo (0x16244,248)
  *
- * 纪律（b567）：
+ * 纪律（2026-10-06）：
  *   - blob 中本文件符号全部为 GLOBAL 定义且两 blob 无 __ksymtab（无 EXPORT_SYMBOL）
  *     -> 重建为非 static 全局、不加 EXPORT_SYMBOL。
  *   - blob 中 LOCAL 的 4 个（两个 *_fun、ipi_handler、notifier_call）保持 static。

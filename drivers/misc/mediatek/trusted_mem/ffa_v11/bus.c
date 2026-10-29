@@ -40,7 +40,7 @@ static int ffa_device_match(struct device *dev,
 		if (uuid_equal(&ffa_dev->uuid, &id_table->uuid))
 			return 1;
 		/*
-		 * rodin (#149): no wildcard fallback here. The vendor tree
+		 * rodin 2026-10-03: no wildcard fallback here. The vendor tree
 		 * special-cased the tmem service UUID to match every device,
 		 * which on 6.6 was masked by load order (mitee.ko bound its
 		 * partition before tmem registered). On 6.18 both drivers are

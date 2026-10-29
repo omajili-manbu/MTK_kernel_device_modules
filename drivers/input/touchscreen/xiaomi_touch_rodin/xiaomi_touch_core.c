@@ -167,7 +167,7 @@ void notify_xiaomi_touch(xiaomi_touch_data_t *xiaomi_touch_data, enum poll_notif
 	private_data_t *client_private_data = NULL;
 	if (!xiaomi_touch_data)
 		return;
-	/* _b583-XT：blob notify_xiaomi_touch 0x54c-0x5f0 列表遍历内**只有一处**唤醒：
+	/* rodin（2026-10-08）：blob notify_xiaomi_touch 0x54c-0x5f0 列表遍历内**只有一处**唤醒：
 	 * 0x59c `add x0,x21,#0x18; mov w1,#3; mov w2,wzr; mov x3,xzr; bl __wake_up`
 	 * （= wake_up_all(&client_private_data->poll_wait_queue_head)，mode=3(nr_exclusive=0)
 	 * ⇔ wake_up_all 形态）；type 形参在 blob 全程未用（blob private_data 只有 1 个队列，
@@ -190,7 +190,7 @@ void add_common_data_to_buf_common(s8 touch_id, enum common_data_cmd cmd, enum c
 	if (!xiaomi_touch_data)
 		return;
 
-	/* _b580-A74①（站点1-容量）：blob 原件对 length 无源码级上界——6.6 blob 仅靠 FORTIFY 的
+	/* rodin（2026-10-08）：blob 原件对 length 无源码级上界——6.6 blob 仅靠 FORTIFY 的
 	 * __memcpy_chk 运行时兜底（判据 = blob add_common_data_to_buf_common 0x7a0/0x7c4：
 	 * memcpy 前 cmp x22(=length*4), #0x401；越界走 0x8e4 __warn_printk/fortify_panic 路径）。
 	 * 6.18 pahole 实测 common_data_t.data_buf = CMD_DATA_BUF_SIZE(256) 个 s32（sizeof=1032），
@@ -270,7 +270,7 @@ int get_bms_temp_common(void)
 	union power_supply_propval prop;
 	int ret;
 
-	/* _b580-A74①（站点3-a）：blob 0xc08 只查 "bms" 一个名字（串面 0x1cdc="bms"），
+	/* rodin（2026-10-08）：blob 0xc08 只查 "bms" 一个名字（串面 0x1cdc="bms"），
 	 * 失败串 "can't find bms battery"（0x2c9e）；树侧原为 donor popsicle 的
 	 * "battery"→"bms" 二级回退 + 串 "can't find bms and battery"（blob 无此串）。 */
 	battery = power_supply_get_by_name("bms");
@@ -317,7 +317,7 @@ static int xiaomi_touch_temp_thread_func(void *data)
 		return -1;
 
 	while (!kthread_should_stop()) {
-		/* _b581-XT③：blob 0x1874-0x18c4 的 wait 条件只有一处 32 位原子读
+		/* rodin（2026-10-08）：blob 0x1874-0x18c4 的 wait 条件只有一处 32 位原子读
 		 * （ldr w8,[x21,#0x2a20] ×2 处 = temp_detect_ready），无 ready[1] 项；
 		 * 树侧原为 donor 的 ready[0]||ready[1]。rodin 为单面板（TOUCH_ID=0，
 		 * enable_temperature_detection_func 也只被 touch_id=0 分支触达），
@@ -326,7 +326,7 @@ static int xiaomi_touch_temp_thread_func(void *data)
 				atomic_read(&xiaomi_touch_data->temp_detect_ready));
 			cur_temp0 = get_bms_temp_common();
 			cur_temp = (cur_temp0 + 5) / 10; // Rounding, in degrees Celsius
-			/* _b580-A74①（站点3-b/c）：blob 0x1960-0x19d4 = 单面板形态——外层只判
+			/* rodin（2026-10-08）：blob 0x1960-0x19d4 = 单面板形态——外层只判
 			 * driver_param[0].set_thermal_temp 非空（0x1960 ldr x8,[x25,#0x228] +
 			 * 0x1964 cbz x8 → 整块跳过；6.18 pahole = driver_param+0x288，树侧实测同）；
 			 * 内层判有效温度 |temp0| < 1000 与 2℃ 温差；set_thermal_temp → common-data
@@ -379,7 +379,7 @@ void enable_temperature_detection_func(s8 touch_id, bool is_resume)
 
 	if (is_resume) {
 		atomic_set(&xiaomi_touch_data->temp_detect_ready, 1);
-		/* _b581-XT③：blob 该两处串为 MI_TP_D（LOG_DEBUG），树侧原为 LOG_INFO。 */
+		/* rodin（2026-10-08）：blob 该两处串为 MI_TP_D（LOG_DEBUG），树侧原为 LOG_INFO。 */
 		LOG_DEBUG("start detect temperature");
 	} else {
 		atomic_set(&xiaomi_touch_data->temp_detect_ready, 0);
@@ -436,7 +436,7 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	xiaomi_touch_data->raw_data_size = hardware_param->raw_data_page_size * PAGE_SIZE;
 	xiaomi_touch_data->raw_data_buf_size = hardware_param->raw_data_buf_size;
 
-	/* _b583b-XT③（纠错）：blob 0x7068(IDA)/0x1064(.disr) `str w9(=1),[x28,#0x2a08]` 的 x28
+	/* rodin（2026-10-08 纠错）：blob 0x7068(IDA)/0x1064(.disr) `str w9(=1),[x28,#0x2a08]` 的 x28
 	 * 已被 0x7058/0x1054 `str xzr,[x28,#0x28]!` 前索引回写定标为 元素+0x18 ⇒ 落点 =
 	 * 元素+0x2A20 = temp_detect_ready（此处即 blob 位置：raw_data_buf_size 存点之后、
 	 * frame 分配之前，无条件——set_thermal_temp 判空只门槛线程创建，见 0x7314）。
@@ -489,7 +489,7 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	/* alloc poll data memory */
 	xiaomi_touch_data->poll_data = kzalloc_retry(sizeof(htc_ic_polldata_t), 3);
 	if (!xiaomi_touch_data->poll_data) {
-		/* _b581-XT③：blob 串 = "alloc poll data memory failed!"（0x3733）。 */
+		/* rodin（2026-10-08）：blob 串 = "alloc poll data memory failed!"（0x3733）。 */
 		LOG_ERROR("alloc poll data memory failed!");
 		return -1;
 	}
@@ -526,7 +526,7 @@ int register_touch_panel_common(struct device *dev, s8 touch_id, hardware_param_
 	/* create a thread for temp detect */
 	if (hardware_operation && hardware_operation->set_thermal_temp) {
 		/* The temperature detection function is enabled by default when machine startup */
-		/* _b583b-XT③：blob 线程创建/等待队列初始化确在 set_thermal_temp 判空内
+		/* rodin（2026-10-08）：blob 线程创建/等待队列初始化确在 set_thermal_temp 判空内
 		 * （0x7314 `ldr x8,[x21,#0xD0]`+cbz、0x73E8 __init_waitqueue_head(+0x2A18
 		 * 基址→元素+0x2A08)+wake_up_process 0x7410）；temp_detect_ready=1 不在此门内
 		 * （无条件，已前移至 raw_data_buf_size 存点后，见上）。 */
@@ -556,7 +556,7 @@ void unregister_touch_panel_common(s8 touch_id)
 	xiaomi_touch_data_t *xiaomi_touch_data = NULL;
 	xiaomi_touch_driver_param_t *xiaomi_touch_driver_param = NULL;
 	if (!(xiaomi_touch.panel_register_mask & (1 << touch_id))) {
-		/* _b581-XT③（纠错）：blob 0x1817 该直检串确为 "touch id %d didn't register,
+		/* rodin（2026-10-08 纠错）：blob 0x1817 该直检串确为 "touch id %d didn't register,
 		 * break unregister!"（blob 串表内存在；"panel in touch id %d hasn't register"
 		 * 是 get_xiaomi_touch_data/_driver_param 内联副本的串，非本处）。 */
 		LOG_ERROR("touch id %d didn't register, break unregister!", touch_id);
@@ -594,7 +594,7 @@ void unregister_touch_panel_common(s8 touch_id)
 	LOG_INFO("current panel_register_mask is %d", xiaomi_touch.panel_register_mask);
 	/* free temp detect thread */
 	if(xiaomi_touch_temp_thread != NULL) {
-		/* _b581-XT③：blob 0x1dbc 只有一处 4 字节清零 str wzr,[x23,#0x2a20]
+		/* rodin（2026-10-08）：blob 0x1dbc 只有一处 4 字节清零 str wzr,[x23,#0x2a20]
 		 * = temp_detect_ready（无 ready[1] 槽；ready[1] 为 donor 残留）。 */
 		atomic_set(&xiaomi_touch_data->temp_detect_ready, 0);
 		// kthread_stop(xiaomi_touch_temp_thread); /* Optimize restart time */
@@ -809,7 +809,7 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 #endif
 
 	LOG_INFO("Start register panel notifier");
-	/* _b583-XT③：blob 0x21f8-0x22b0 —— Start 串（行663）之后、of_count_phandle_with_args
+	/* rodin（2026-10-08）：blob 0x21f8-0x22b0 —— Start 串（行663）之后、of_count_phandle_with_args
 	 * 之前有一处 `ldr x8,[&xiaomi_touch]; cbz x8,<行679 "Invalid params">`（E 级）并
 	 * return；此后 of_count/of_parse 两处 of_node 均取自**该全局 dev**（0x2204/0x2238：
 	 * `ldr x8,[.bss+0x8]; ldr x0,[x8,#0x300]`），而非 per-panel dev。
@@ -843,7 +843,7 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 		return;
 	}
 
-	/* _b583-XT③：blob 0x22b8/0x22c8-0x22f4 —— 找到 panel 后、注册前，把 container_of
+	/* rodin（2026-10-08）：blob 0x22b8/0x22c8-0x22f4 —— 找到 panel 后、注册前，把 container_of
 	 * 出来的指针与 &xiaomi_touch.xiaomi_touch_data[0]（.bss+0x18）/ [1]（.bss+0x2a90，
 	 * 步长 0x2A78）两两比对（clang 展开的 2 元素 for 循环）；两者皆不等则打
 	 * "can't not find this touch id!"（E 级，行713）并 return。树侧缺此校验（串面
@@ -859,7 +859,7 @@ static void xiaomi_register_panel_notifier_work(struct work_struct *work)
 		LOG_ERROR("Failed to register for panel events");
 		return;
 	}
-	/* _b581-XT③：blob @0x2390 该函数末只有上面这条 E 级串，无
+	/* rodin（2026-10-08）：blob @0x2390 该函数末只有上面这条 E 级串，无
 	 * "panel notifier registered (mi_disp), touch_id %ld"（树侧 donor 附加，删除；
 	 * 连带删除仅供该串使用的 long touch_id 变量）。 */
 }
@@ -1000,13 +1000,13 @@ static void xiaomi_unregister_power_supply_event(void)
 	power_supply_unreg_notifier(&xiaomi_touch.power_supply_notifier);
 }
 
-/* _b582-INTB：A-80① 死面——nfc_to_touch_event 在 blob 三 ko 中 nfc 串/符号 0 命中
+/* rodin（2026-10-08）：死面——nfc_to_touch_event 在 blob 三 ko 中 nfc 串/符号 0 命中
  * （strings -a/nm 复核）；全树 0 调用者；6.6 ops 表（216B=27 槽，_b581_goodix 逐槽解码）
  * 无该槽位 ⇒ 整函数删除；结构体成员 set_nfc_to_touch_event 保留（值为 NULL，勿改结构体）。 */
 
 static int xiaomi_touch_probe(struct platform_device *pdev)
 {
-	/* _b583-XT③：blob xiaomi_touch_probe 0x4abc `add x20,x0,#0x10`（=&pdev->dev）→
+	/* rodin（2026-10-08）：blob xiaomi_touch_probe 0x4abc `add x20,x0,#0x10`（=&pdev->dev）→
 	 * 0x4b00 `cbz x20,<行1245 "Invalid touch device">`→`mov w0,#-0x13`(-ENODEV)；
 	 * 0x4b04 `str x20,[x19]`（x19=&xiaomi_touch，即结构 +0x0 的 dev 成员）。
 	 * 判据：该检查在 6.6 blob 为死检（&pdev->dev 恒非 0），但成员与写入是
@@ -1087,12 +1087,12 @@ void xiaomi_touch_mievent_report_int_common(unsigned int code, int panel_id,
 {
 	struct misight_mievent *event;
 
-	/* _b581-XT③：blob 该串带尾 \n（+0x1ec2 区，形参同） */
+	/* rodin（2026-10-08）：blob 该串带尾 \n（+0x1ec2 区，形参同） */
 	printk(KERN_INFO "[MI_TP_I][%s:%d]: code:%d,fault_name:%s,panel_id:%d,vendor_name:%s,error_code:%ld\n",
 	       __func__, __LINE__, code, fault_name, panel_id, vendor_name, error_code);
 	event = cdev_tevent_alloc(code);
 	if (!event) {
-		/* _b581-XT③：blob 该串为 KERN_INFO(\x016) + 尾 \n（树侧原 KERN_ERR 无 \n）。 */
+		/* rodin（2026-10-08）：blob 该串为 KERN_INFO(\x016) + 尾 \n（树侧原 KERN_ERR 无 \n）。 */
 		printk(KERN_INFO "[MI_TP_E][%s:%d]: misight event is error\n", __func__, __LINE__);
 		return;
 	}
@@ -1110,12 +1110,12 @@ void xiaomi_touch_mievent_report_str_common(unsigned int code, int panel_id,
 {
 	struct misight_mievent *event;
 
-	/* _b581-XT③：blob 该串带尾 \n */
+	/* rodin（2026-10-08）：blob 该串带尾 \n */
 	printk(KERN_INFO "[MI_TP_I][%s:%d]: code:%d,fault_name:%s,panel_id:%d,vendor_name:%s\n",
 	       __func__, __LINE__, code, fault_name, panel_id, vendor_name);
 	event = cdev_tevent_alloc(code);
 	if (!event) {
-		/* _b581-XT③：blob 该串为 KERN_INFO(\x016) + 尾 \n（树侧原 KERN_ERR 无 \n）。 */
+		/* rodin（2026-10-08）：blob 该串为 KERN_INFO(\x016) + 尾 \n（树侧原 KERN_ERR 无 \n）。 */
 		printk(KERN_INFO "[MI_TP_E][%s:%d]: misight event is error\n", __func__, __LINE__);
 		return;
 	}

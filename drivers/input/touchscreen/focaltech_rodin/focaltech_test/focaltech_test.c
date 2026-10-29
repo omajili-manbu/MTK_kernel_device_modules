@@ -70,14 +70,14 @@ int fts_abs(int value)
 
 void *fts_malloc(size_t size)
 {
-    /* _b582-TEST：blob 忠实形态——分配一律 vzalloc（blob fts_malloc 0x10f7c: bl vzalloc；
+    /* rodin（2026-10-08）：blob 忠实形态——分配一律 vzalloc（blob fts_malloc 0x10f7c: bl vzalloc；
      * 6.6 的 vzalloc 只取 size，6.18 宏化后同义）。清零由 vzalloc 保证，调用侧不再补 memset。 */
     return vzalloc(size);
 }
 
 void fts_free_proc(void *p)
 {
-    /* _b582-TEST：blob fts_free_proc 0x10f9c: bl vfree —— 与 fts_malloc 的 vzalloc 成对，
+    /* rodin（2026-10-08）：blob fts_free_proc 0x10f9c: bl vfree —— 与 fts_malloc 的 vzalloc 成对，
      * 半对（kfree 释放 vzalloc 区）立即 UAF/BUG。 */
     return vfree(p);
 }
@@ -103,7 +103,7 @@ void print_buffer(int *buffer, int length, int line_num)
 
     tmpline = line_num ? line_num : length;
     tmplen = tmpline * 6 + 128;
-    /* _b582-TEST：blob print_buffer 0x11024 是 __kmalloc(GFP_KERNEL)（非 kzalloc；
+    /* rodin（2026-10-08）：blob print_buffer 0x11024 是 __kmalloc(GFP_KERNEL)（非 kzalloc；
      * 6.6 名下 __kmalloc，6.18 开 CONFIG_MEM_ALLOC_PROFILING ⇒ __kmalloc_noprof），
      * 树侧按同名类落 kmalloc。 */
     tmpbuf = kmalloc(tmplen, GFP_KERNEL);
@@ -228,7 +228,7 @@ int fts_test_write(u8 addr, u8 *writebuf, int writelen)
 
     data = fts_malloc(BYTES_PER_TIME + 1);
     if (!data) {
-        FTS_TEST_ERROR("malloc bus write data memory failed");   /* _b582-INTB：blob 串面 */
+        FTS_TEST_ERROR("malloc bus write data memory failed");   /* rodin（2026-10-08）：blob 串面 */
         return -ENOMEM;
     }
 
@@ -756,7 +756,7 @@ int get_cb_sc(int byte_num, int *cb_buf, enum byte_mode mode)
 
     cb = (u8 *)fts_malloc(byte_num * sizeof(u8));
     if (cb == NULL) {
-        FTS_TEST_SAVE_ERR("malloc cb buffer memory failed\n");   /* _b582-INTB：blob 串面（含尾 \n） */
+        FTS_TEST_SAVE_ERR("malloc cb buffer memory failed\n");   /* rodin（2026-10-08）：blob 串面（含尾 \n） */
         return -ENOMEM;
     }
 
@@ -1269,7 +1269,7 @@ static int fts_test_save_test_data(char *file_name, char *data_buf, int len)
     filp_close(pfile, NULL);
     FTS_TEST_FUNC_EXIT();
 #else
-    /* _b582-INTB：blob 无该串（全 ko 0 命中）——donor 告警在本机（非 factory 构建）按 blob 静默 */
+    /* rodin（2026-10-08）：blob 无该串（全 ko 0 命中）——donor 告警在本机（非 factory 构建）按 blob 静默 */
 #endif //CONFIG_FACTORY_BUILD && USER_DEBUG_BUILD
     return 0;
 }	
@@ -1291,7 +1291,7 @@ void fts_test_save_fail_result(
 #endif
 
 
-/* _b582-INTB：A-80③ 链删除——fts_test_malloc_free_data_txt 在 blob 全 ko 无符号
+/* rodin（2026-10-08）：链删除——fts_test_malloc_free_data_txt 在 blob 全 ko 无符号
  * （两个 ko 均 0 命中；testresult 全模块无分配、无 vmalloc(0x64000) 除 csv），
  * 原 TXT 分配/释放链按 blob 删除（结构体成员 testresult/testresult_len 保留，
  * 系 0xbe0/0xbe8 布局锚点，值恒 NULL）。 */
@@ -1335,7 +1335,7 @@ static int fts_test_get_item_count_scap_csv(int index)
 }
 #endif
 
-/* _b582-INTB：blob 将两 csv 保存件内联进 fts_test_main_exit（0x15264-0x159e4 一体现形，
+/* rodin（2026-10-08）：blob 将两 csv 保存件内联进 fts_test_main_exit（0x15264-0x159e4 一体现形，
  * 无独立符号）⇒ always_inline 对齐（单调用点静态件，确定性内联） */
 static __attribute__((always_inline)) inline void fts_test_save_data_csv(struct fts_test *tdata)
 {
@@ -1359,10 +1359,10 @@ static __attribute__((always_inline)) inline void fts_test_save_data_csv(struct 
     struct item_info *info = NULL;
 
     FTS_TEST_INFO("save data in csv format");
-    /* _b571：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
+    /* rodin（2026-10-06）：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
     csv_buffer = tdata->csv_data_buffer;
     if (!csv_buffer) {
-        FTS_TEST_ERROR("tdata/csv_file_buf is null");   /* _b582-INTB：blob 串面（无尾 \n，0x414） */
+        FTS_TEST_ERROR("tdata/csv_file_buf is null");   /* rodin（2026-10-08）：blob 串面（无尾 \n，0x414） */
         return ;
     }
 
@@ -1501,7 +1501,7 @@ csv_save_err:
         line2_buffer = NULL;
     }
 
-    /* _b571/_b582-TEST：blob 语义——csv 缓冲常驻不在此释放；由 fts_test_exit
+    /* rodin（2026-10-08）：blob 语义——csv 缓冲常驻不在此释放；由 fts_test_exit
      * 按 blob 16704 vfree(fts_ftest->csv_data_buffer) 统一收口（原 fts_free_test_memory
      * 是 donor 件，其唯一调用方 tp_selftest_write 已随 tp_selftest_v0 节点删除）。 */
 #endif
@@ -1514,10 +1514,10 @@ static __attribute__((always_inline)) inline void fts_test_save_data_csv_private
     int csv_length = 0;
 
     FTS_TEST_INFO("save data in csv format");
-    /* _b571：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
+    /* rodin（2026-10-06）：blob 语义——csv 缓冲由 fts_test_init 常驻分配（fts_csv_show 同源读取） */
     csv_buffer = tdata->csv_data_buffer;
     if (!csv_buffer) {
-        FTS_TEST_ERROR("tdata/csv_file_buf is null");   /* _b582-INTB：blob 串面（无尾 \n，0x414） */
+        FTS_TEST_ERROR("tdata/csv_file_buf is null");   /* rodin（2026-10-08）：blob 串面（无尾 \n，0x414） */
         return;
     }
 
@@ -1532,13 +1532,13 @@ static __attribute__((always_inline)) inline void fts_test_save_data_csv_private
                               csv_buffer, csv_length);
 #endif
 
-    /* _b571/_b582-TEST：blob 语义——csv 缓冲常驻不在此释放；由 fts_test_exit
+    /* rodin（2026-10-08）：blob 语义——csv 缓冲常驻不在此释放；由 fts_test_exit
      * 按 blob 16704 vfree(fts_ftest->csv_data_buffer) 统一收口（原 fts_free_test_memory
      * 是 donor 件，其唯一调用方 tp_selftest_write 已随 tp_selftest_v0 节点删除）。 */
 #endif
 }
 
-/* _b582-INTB：fts_test_save_result_txt 按 blob 删除（blob 无该符号；
+/* rodin（2026-10-08）：fts_test_save_result_txt 按 blob 删除（blob 无该符号；
  * "test result is null"/"test result length in txt" 串 0 命中）。 */
 
 /*****************************************************************************
@@ -1564,7 +1564,7 @@ void fts_test_save_data(char *name, int code, int *data, int datacnt,
         return;
     }
 
-    /* _b582-INTB：blob 形态（0x14c4c strlen → csel min(len,30) → memcpy 0x14c68 → strb 尾 NUL）：
+    /* rodin（2026-10-08）：blob 形态（0x14c4c strlen → csel min(len,30) → memcpy 0x14c68 → strb 尾 NUL）：
      * 30 字节截断语义；TEST_ITEM_NAME_MAX-2 = 30 与 blob 常数 0x1e 一致 */
     {
         size_t name_len = strlen(name);
@@ -1593,7 +1593,7 @@ void fts_test_save_data(char *name, int code, int *data, int datacnt,
     FTS_TEST_DBG("name:%s,len:%d", name, datalen);
     info->data = fts_malloc(datalen * sizeof(int));
     if (!info->data) {
-        FTS_TEST_ERROR("malloc item(%d) data memory failed", td->item_count);   /* _b582-INTB：blob 串面 */
+        FTS_TEST_ERROR("malloc item(%d) data memory failed", td->item_count);   /* rodin（2026-10-08）：blob 串面 */
         info->datalen = 0;
         return;
     }
@@ -2081,7 +2081,7 @@ int fts_test_main_exit(void)
         fts_test_save_data_csv_private(tdata);
     else
         fts_test_save_data_csv(tdata);
-    /* _b582-INTB：fts_test_save_result_txt / malloc_free_data_txt(false) 按 blob 删除
+    /* rodin（2026-10-08）：fts_test_save_result_txt / malloc_free_data_txt(false) 按 blob 删除
      * （blob main_exit 0x15264 起：csv 两分支 + malloc_free_thr/free_data/buffer 收口） */
 
     /* free memory */
@@ -2135,7 +2135,7 @@ static int fts_test_start(void)
 static int fts_test_entry(char *ini_file_name)
 {
     int ret = 0;
-    /* _b582-INTB：原 `struct fts_test *tdata` 仅服务于 ini_ver 打印（已按 blob 删除） */
+    /* rodin（2026-10-08）：原 `struct fts_test *tdata` 仅服务于 ini_ver 打印（已按 blob 删除） */
 
     /* test initialize */
     ret = fts_test_main_init();
@@ -2151,14 +2151,14 @@ static int fts_test_entry(char *ini_file_name)
         fts_ftest->result = false;
         goto test_err;
     }
-    FTS_TEST_SAVE_INFO("ini_file_name:%s\n", ini_file_name);   /* _b582-INTB：blob 串面无 ', ini version' 段 */
+    FTS_TEST_SAVE_INFO("ini_file_name:%s\n", ini_file_name);   /* rodin（2026-10-08）：blob 串面无 ', ini version' 段 */
 
     /* Start testing according to the test configuration */
     if (true == fts_test_start()) {
-        FTS_TEST_SAVE_INFO("\n\n=======Tp test pass.\n");   /* _b582-INTB：blob 无 "Tp test pass" 日志（0 命中） */
+        FTS_TEST_SAVE_INFO("\n\n=======Tp test pass.\n");   /* rodin（2026-10-08）：blob 无 "Tp test pass" 日志（0 命中） */
         fts_ftest->result = true;
     } else {
-        FTS_TEST_SAVE_INFO("\n\n=======Tp test failure.\n");   /* _b582-INTB：blob 无 "Tp test failure" 日志（0 命中） */
+        FTS_TEST_SAVE_INFO("\n\n=======Tp test failure.\n");   /* rodin（2026-10-08）：blob 无 "Tp test failure" 日志（0 命中） */
         fts_ftest->result = false;
 #if defined(TEST_SAVE_FAIL_RESULT) && TEST_SAVE_FAIL_RESULT
         do_gettimeofday(&(fts_ftest->tv));
@@ -2375,7 +2375,7 @@ int fts_ic_data_collect(char *buf, int *length)
 		}
 	}
 
-	/* _b582-INTB：blob 无 "tx num:%d,rx num:%d" 串（0 命中）⇒ 按 blob 静默 */
+	/* rodin（2026-10-08）：blob 无 "tx num:%d,rx num:%d" 串（0 命中）⇒ 按 blob 静默 */
 	cnt += snprintf(buf + cnt, buf_size - cnt, "\nRAW DATA\n");
 	for (i = 0; (i < tdata->node.tx_num) && (i < TX_NUM_MAX); i++) {
 		for (j = 0; (j < tdata->node.rx_num) && (j < RX_NUM_MAX); j++) {
@@ -2427,7 +2427,7 @@ static int fts_test_func_init(struct fts_ts_data *ts_data)
         return -ENODATA;
     }
 
-    /* _b582-TEST：blob fts_test_init 0x16430 vzalloc(0x139378)；sizeof(struct fts_test)
+    /* rodin（2026-10-08）：blob fts_test_init 0x16430 vzalloc(0x139378)；sizeof(struct fts_test)
      * = 0x139378 远超 kmalloc 上限，必须 vzalloc（kzalloc 在此走 large 面、order 过大易失败）。 */
     fts_ftest = vzalloc(sizeof(*fts_ftest));
     if (fts_ftest == NULL) {
@@ -2470,10 +2470,10 @@ int fts_test_init(struct fts_ts_data *ts_data)
 		FTS_TEST_ERROR("sysfs(test) create fail");
 		sysfs_remove_group(&ts_data->dev->kobj, &fts_test_attribute_group);
 	} else
-		FTS_TEST_DBG("sysfs(test) create successfully");	/* _b582-TEST：blob fts_test_init 全程只有一次 proc 创建（proc_create_data("fts_test_csv",
+		FTS_TEST_DBG("sysfs(test) create successfully");	/* rodin（2026-10-08）：blob fts_test_init 全程只有一次 proc 创建（proc_create_data("fts_test_csv",
 	 * 0777, NULL, &fts_proccsv_fops, fts_ftest)，blob 0x16648），全 ko 串面 0 命中
 	 * "tp_selftest_v0"/"tp_data_dump_v0"（⑥-b 实证）⇒ donor 的两个 proc 节点删除。 */
-	/* _b581：A-74 续行④ 归位（blob fts_test_init 0x1658c-0x165d0 实证）：
+	/* rodin（2026-10-08）：续行④ 归位（blob fts_test_init 0x1658c-0x165d0 实证）：
 	 *   csv_data_buffer = vmalloc(0x64000)（失败打 "csv_file_buf malloc fail"）
 	 *   -> memset(buf, 0, 0x64000) -> fts_ftest->result(0xbf8) = 0
 	 * 树侧原缺此段（csv 字段只有 vfree 无 alloc 点）→ fts_csv_show 恒返
@@ -2487,13 +2487,13 @@ int fts_test_init(struct fts_ts_data *ts_data)
 		}
 		fts_ftest->result = 0;			/* blob: str wzr,[x20,#0xbf8] */
 	}
-	/* _b571：blob fts_test_init 16630 实证（name "fts_test_csv", 0777, data=fts_ftest） */
-	/* _b582-TEST：blob 把该 proc 句柄存在 fts_ftest+0x3d0（0x16650 str x0,[x8,#0x3d0]、
+	/* rodin（2026-10-06）：blob fts_test_init 16630 实证（name "fts_test_csv", 0777, data=fts_ftest） */
+	/* rodin（2026-10-08）：blob 把该 proc 句柄存在 fts_ftest+0x3d0（0x16650 str x0,[x8,#0x3d0]、
 	 * fts_test_exit 0x166f8 ldr x0,[x21,#0x3d0] → proc_remove），树侧原用文件级 global
 	 * fts_proccsv_entry ⇒ 归位到结构体成员（同址同生命周期，删 global）。 */
 	fts_ftest->proc_entry = proc_create_data("fts_test_csv", 0777, NULL, &fts_proccsv_fops, fts_ftest);
 	if (fts_ftest->proc_entry == NULL)
-		FTS_ERROR("create proc_csv entry fail");   /* _b582-INTB：blob 该站点用核心宏（6[FTS_TS_E][%s:%d]） */
+		FTS_ERROR("create proc_csv entry fail");   /* rodin（2026-10-08）：blob 该站点用核心宏（6[FTS_TS_E][%s:%d]） */
 	FTS_TEST_FUNC_EXIT();
 	return ret;
 }
@@ -2501,7 +2501,7 @@ int fts_test_init(struct fts_ts_data *ts_data)
 int fts_test_exit(struct fts_ts_data *ts_data)
 {
 	FTS_TEST_FUNC_ENTER();
-	/* _b582-TEST：blob fts_test_exit 166e4-16748 逐条对齐——
+	/* rodin（2026-10-08）：blob fts_test_exit 166e4-16748 逐条对齐——
 	 *   ① sysfs_remove_group(ts_data->dev, fts_test_attribute_group)（0x166f0）
 	 *   ② proc_remove(fts_ftest->proc_entry @0x3d0)（0x166f8）= "fts_test_csv"
 	 *   ③ vfree(fts_ftest->csv_data_buffer @0xb8) + 置 NULL（0x16704-0x16708）

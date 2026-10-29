@@ -3384,7 +3384,7 @@ static int accdet_probe(struct platform_device *pdev)
 	 */
 	accdet->accdet_class = class_create(ACCDET_DEVNAME);
 	if (IS_ERR(accdet->accdet_class)) {
-		/* rodin b513 #113: class_create 失败返回 ERR_PTR，永不 NULL；
+		/* rodin 2026-10-01: class_create 失败返回 ERR_PTR，永不 NULL；
 		 * 原判 NULL 会带着 ERR_PTR 继续建 workqueue/attr，最后在
 		 * err_device_create 把它交给 class_destroy。 */
 		ret = (int)PTR_ERR(accdet->accdet_class);

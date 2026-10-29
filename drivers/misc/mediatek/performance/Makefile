@@ -52,5 +52,5 @@ obj-$(CONFIG_MTK_FRS) += frs/
 obj-$(CONFIG_MTK_POWERHAL_CPU_CTRL) += powerhal_cpu_ctrl/
 obj-$(CONFIG_MTK_PERFORMANCE_MODULE) += touch_boost/
 
-# rodin A-142 R1: boot-window all-core freq QoS floor, thermal-follow release
+# rodin: boot-window all-core freq QoS floor, thermal-follow release
 obj-y += rodin_boot_boost.o

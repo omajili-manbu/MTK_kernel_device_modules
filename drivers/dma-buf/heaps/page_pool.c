@@ -7,7 +7,7 @@
  * Based on the ION page pool code
  * Copyright (C) 2011 Google, Inc.
  *
- * rodin b247 / A-107: 本文件是厂商树自持的 6.6 版 page-pool 实现（无前缀
+ * rodin 2026-10-12: 本文件是厂商树自持的 6.6 版 page-pool 实现（无前缀
  * dmabuf_page_pool_*），由 CONFIG_DEVICE_MODULES_DMABUF_HEAPS_PAGE_POOL 打开
  * （Makefile 原本就有该接线，只是从未启用）。之所以要启用它：唯一导入这组符号的
  * 预编译 blob（mtk_sec_heap.ko）期望的正是这套名字与结构体布局；启用后 blob 与

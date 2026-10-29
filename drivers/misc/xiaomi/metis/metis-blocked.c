@@ -21,12 +21,12 @@
 
 #define METIS_RWSEM_TAG_UNKNOWN 0xab9f19ab00000000ULL
 
-/* rodin 174 轮 C 案定案：mutex oem payload 的读者全树死门控
+/* rodin 6.18（2026-10-27 定案）：mutex oem payload 的读者全树死门控
  * （mutex_zero_unknown 全零门 + protect_cs 分支 + (u64)jiffies>>63 恒零，
  * unknown_04 零读者、0x149f 值零比较；OSS 原形同构）——"VIP 锁握手接力"
  * 的 mutex 侧从未活体，活体接力只在 rwsem 侧（16B 原生槽 magic 门）。
  * 锁侧 payload 与 1024 桶侧表（全局 spin_lock_irqsave + freelist +
- * lock_task_exit 清槽钩）整体退役；#139/#161 崩类随之结构性消失。
+ * lock_task_exit 清槽钩）整体退役；对应崩类随之结构性消失。
  * 内核槽 android_oem_data1 高 u32 = xr_qi waiter 计数（qi_mutex_init
  * 整槽清零自负），低 u32 退役后无主。 */
 
@@ -137,7 +137,7 @@ void clear_mutex_blocked_info(struct task_struct *task, struct mutex *lock)
 	MI_FIELD(state, u32, 0x2b4) = flags & ~0x100;
 	if (!(flags & 0x200))
 		return;
-	/* rodin 174 轮 C 案：锁侧 payload 已退役，仅保留 per-task 面。 */
+	/* rodin 6.18（2026-10-27）：锁侧 payload 已退役，仅保留 per-task 面。 */
 	MI_FIELD(state, u32, 0x2b4) = flags & ~0x300;
 }
 

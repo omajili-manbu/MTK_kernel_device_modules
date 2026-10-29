@@ -28,7 +28,7 @@
 #include <sugov/cpufreq.h>
 
 /*
- * rodin 6.18（S6/P-29）：struct mtk_tg 借 task_group::android_vendor_data1 存放
+ * rodin 6.18（2026-10-17）：struct mtk_tg 借 task_group::android_vendor_data1 存放
  * （kernel/sched/sched.h:533 ANDROID_VENDOR_DATA_ARRAY(1, 4) = 32B）。该坑位
  * 只在 CONFIG_UCLAMP_TASK_GROUP=y 时存在，且容量是编译期常量 —— 用断言把
  * "切配置后越界"挡在编译期，而不是运行期踩邻居字段。
@@ -97,7 +97,7 @@ inline struct grp *task_grp(struct task_struct *p)
 	struct gp_task_struct *gts = &(mtk_task_of(p))->gp_task;
 
 	/*
-	 * rodin 6.18（S6/P-30）：gts->grp 是 __rcu 指针（写侧在
+	 * rodin 6.18（2026-10-17）：gts->grp 是 __rcu 指针（写侧在
 	 * add/remove_task_to_group() 里 rcu_assign_pointer）。读侧必须在
 	 * rcu 读侧区间内，加锁依赖检查把违约点显式暴露（无 PROVE_RCU 时为空）。
 	 */
@@ -180,7 +180,7 @@ static void remove_task_from_group(struct task_struct *p)
 	rcu_assign_pointer(gts->grp, NULL);
 	/* take care of flt group */
 	/*
-	 * rodin 6.18（A-62 家族）：task_on_rq_queued() 对延迟出队僵尸也返回真，
+	 * rodin 6.18（2026-10-17）：task_on_rq_queued() 对延迟出队僵尸也返回真，
 	 * 但僵尸不占 group_nr_running 的名额（flt 的 enqueue/dequeue 钩子已按
 	 * sched_delayed 口径记账），这里用同口径的 mtk_task_on_rq_active()。
 	 * 不得换成 mtk_task_migratable()：钩子账只认 sched_delayed 不认
@@ -216,7 +216,7 @@ add_task_to_group(struct task_struct *p, struct grp *grp)
 	rcu_assign_pointer(gts->grp, grp);
 	/* take care of flt group */
 	fsrq = &per_cpu(flt_rq, rq->cpu);
-	/* rodin 6.18（A-62 家族）：同上，延迟出队僵尸不计入 group_nr_running；
+	/* rodin 6.18（2026-10-30）：同上，延迟出队僵尸不计入 group_nr_running；
 	 * 必须走 mtk_task_on_rq_active()（记账口径），不得用搬家门，理由见
 	 * remove_task_from_group()。 */
 	queued = mtk_task_on_rq_active(p);

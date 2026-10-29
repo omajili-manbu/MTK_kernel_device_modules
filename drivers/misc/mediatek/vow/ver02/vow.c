@@ -703,7 +703,7 @@ static void vow_service_Init(void)
 	vowserv.tx_keyword_start = false;
 	/*Initialization*/
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
-	/* rodin b514 #114: SCP 预留内存由 scp_device_probe() → scp_reserve_memory_ioremap()
+	/* rodin 2026-10-01: SCP 预留内存由 scp_device_probe() → scp_reserve_memory_ioremap()
 	 * （vseq_device_initcall_sync=6s）建立；=y 内建后本函数在 VowDrv_mod_init(level 6)
 	 * 里先跑，scp_get_reserve_mem_virt() 返回 0 ⇒ NULL+VOW_VOICEDATA_OFFSET
 	 * 当 memset 目标崩（6.6 是 =m：vow 装载 2.5853s 晚于 ioremap 2.5798s，仅 5.5ms）。
@@ -3748,7 +3748,7 @@ bool vow_service_GetVowRecoverStatus(void)
  * SCP Recovery Register
  *****************************************************************************/
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCP_SUPPORT)
-/* rodin b513 #113: SCP 就绪判定下的 IPI 注册。内建化后本 initcall
+/* rodin 2026-10-01: SCP 就绪判定下的 IPI 注册。内建化后本 initcall
  * （VowDrv_mod_init = vseq_module_init/level 6）早于 SCP 提供者的
  * vseq_device_initcall_sync（scp_init），mtk_ipi_register() 因
  * !scp_ipidev.ipi_inited 返回 IPI_DEV_ILLEGAL；6.6 上 vow.ko 在 scp.ko
@@ -3794,7 +3794,7 @@ static int vow_scp_recover_event(struct notifier_block *this,
 			VOWDRV_DEBUG("SCP is Off, don't recover VOW\n");
 			return NOTIFY_DONE;
 		}
-		/* rodin b513 #113: SCP 就绪后补注册 vow IPI（initcall 期
+		/* rodin 2026-10-01: SCP 就绪后补注册 vow IPI（initcall 期
 		 * SCP 尚未就绪时注册会静默失败）。 */
 		vow_ipi_register_when_ready();
 		if (vowserv.scp_recovering) {
@@ -4049,7 +4049,7 @@ static int __init VowDrv_mod_init(void)
 				 &dev_attr_vow_SetPatternInput);
 	if (unlikely(ret != 0))
 		return ret;
-	/* ipi register（rodin b513 #113: SCP 未就绪时注册会静默失败，
+	/* ipi register（rodin 2026-10-01: SCP 未就绪时注册会静默失败，
 	 * 由 vow_ipi_register_when_ready 在就绪后补） */
 	vow_ipi_register_when_ready();
 

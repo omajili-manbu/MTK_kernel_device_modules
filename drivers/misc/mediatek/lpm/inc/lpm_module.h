@@ -9,7 +9,7 @@
 
 #include <linux/arm-smccc.h>
 
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
 
 #define lpm_smc_impl(p1, p2, p3, p4, p5, res) \
 			arm_smccc_smc(p1, p2, p3, p4\

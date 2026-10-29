@@ -2139,7 +2139,7 @@ static int ppm_data_init(struct cluster_data *cluster)
 		unsigned long power, freq;
 
 		/*
-		 * rodin 6.18（A-61′）：em_perf_domain::em_table 是
+		 * rodin 6.18（2026-10-17）：em_perf_domain::em_table 是
 		 * struct em_perf_table __rcu *，必须持 rcu_read_lock() 并经
 		 * em_perf_state_from_pd() 取表。只把两个标量取进锁内：
 		 * pd_get_opp_capacity_legacy() 会派发 vendor 私有 hook，

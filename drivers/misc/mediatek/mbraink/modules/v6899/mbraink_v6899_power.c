@@ -4,7 +4,7 @@
  */
 
 #include <linux/module.h>
-/* rodin 6.9：6.18 头瘦身后 vmalloc.h 不再被隐式带入（B1）。 */
+/* rodin 6.9：6.18 头瘦身后 vmalloc.h 不再被隐式带入。 */
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
 #include <linux/rtc.h>

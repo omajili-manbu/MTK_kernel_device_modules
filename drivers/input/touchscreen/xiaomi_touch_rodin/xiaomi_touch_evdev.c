@@ -47,7 +47,7 @@ enum touch_state {
 	EVENT_UP,
 };
 
-/* _b581-XT③：blob last_touch_events 的 touch_event 步长 24B
+/* rodin（2026-10-08）：blob last_touch_events 的 touch_event 步长 24B
  * （blob 0x5010 mov w8,#0x18；slot@+8/state@+0xc/timespec64@+0x10），无 name 字段；
  * 树侧原为 donor 的 {slot,name[32],state,time}。 */
 struct touch_event {
@@ -71,7 +71,7 @@ static int event_state[MAX_TOUCH_ID] = {0};
 void last_touch_events_collect_common(int slot, int state);
 EXPORT_SYMBOL(last_touch_events_collect_common);
 
-/* _b582-INPUT：A-80① 成对拆改的 fts 侧要求本函数为 blob 的 **2 参形态**
+/* rodin（2026-10-08）：成对拆改的 fts 侧要求本函数为 blob 的 **2 参形态**
  * （blob 0x4fbc：w0=slot、w1=state，体内直接 `if (slot > 9) return;`
  * `if (event_state[slot] == state) return;`），原树 donor 的
  * (handle, type, code, value) 四参签名与 `handle->dev->name` 面已无消费者，
@@ -81,7 +81,7 @@ void last_touch_events_collect_common(int slot, int state)
 	if (slot >= MAX_TOUCH_ID || event_state[slot] == state)
 		return;
 	event_state[slot] = state;
-	/* _b581-XT③：blob 体内无任何 strncpy/默认名写入（blob 无 strncpy 调用点）；
+	/* rodin（2026-10-08）：blob 体内无任何 strncpy/默认名写入（blob 无 strncpy 调用点）；
 	 * 树侧 donor 的 handle->dev->name 拷贝与 DEFAULT_INPUT_DEVICE_NAME 一并删除。 */
 	last_touch_events.touch_event_buf[last_touch_events.head].state = !!state ? EVENT_DOWN : EVENT_UP;
 	last_touch_events.touch_event_buf[last_touch_events.head].slot = slot;
@@ -145,7 +145,7 @@ static int32_t event_show(struct seq_file *m, void *v)
 	if (event_info->state == EVENT_INIT)
 		return 0;
 	rtc_time64_to_tm(event_info->touch_time.tv_sec, &tm);
-	/* _b581-XT③：blob event_show 串 = "%d-%02d-%02d %02d:%02d:%02d.%09lu UTC Finger (%2d) %s\n"
+	/* rodin（2026-10-08）：blob event_show 串 = "%d-%02d-%02d %02d:%02d:%02d.%09lu UTC Finger (%2d) %s\n"
 	 * （无设备名 %s；与 24B touch_event 结构自洽）。 */
 	seq_printf(m, "%d-%02d-%02d %02d:%02d:%02d.%09lu UTC Finger (%2d) %s\n",
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
@@ -258,7 +258,7 @@ static void xiaomitouch_input_event(struct input_handle *handle,
 	if (type == EV_KEY && (code == KEY_POWER || code == KEY_VOLUMEDOWN || code ==  KEY_VOLUMEUP))
 		LOG_INFO("keycode:%d,value:%d", code, value);
 	if (type == EV_ABS) {
-		/* _b582-INPUT：blob 0xb724-0xb73c + 0xb740（内联 collect）——
+		/* rodin（2026-10-08）：blob 0xb724-0xb73c + 0xb740（内联 collect）——
 		 * code==ABS_MT_TRACKING_ID(0x39) 先 collect(slot, (value==-1?0:1))，
 		 * code==ABS_MT_SLOT(0x2f) 存 slot=value；两者互斥。 */
 		if (code == ABS_MT_TRACKING_ID)

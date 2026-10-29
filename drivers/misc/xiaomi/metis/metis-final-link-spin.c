@@ -20,7 +20,7 @@
 #include "metis-final-link.h"
 #include "metis-final-link-trace.h"
 
-/* rodin 174 轮 C 案：mutex 侧表随锁侧 payload 退役；rwsem 载体 = 16B 原生槽直读。 */
+/* rodin 6.18（2026-10-27）：mutex 侧表随锁侧 payload 退役；rwsem 载体 = 16B 原生槽直读。 */
 static struct metis_rwsem_oem_unknown *spin_rwsem_data(struct rw_semaphore *sem)
 {
 	return sem ? (void *)sem->android_oem_data1 : NULL;
@@ -53,7 +53,7 @@ static void spin_rwsem_reset(struct metis_rwsem_oem_unknown *data)
 	data->deadline_08 = 0;
 }
 
-/* rodin 174 轮 C 案：mutex_reset_data_no_waiter（全树零调用者）、
+/* rodin 6.18（2026-10-27）：mutex_reset_data_no_waiter（全树零调用者）、
  * mi_mutex_can_spin_on_owner（payload 分支死门控）、mi_mutex_init（新锁
  * payload 预置）、mi_mutex_task_exit（侧表回收）随锁侧 payload 一起退役，
  * 对应注册同步摘除；mutex opt_spin 的计数超时半（task 态，活体）保留。

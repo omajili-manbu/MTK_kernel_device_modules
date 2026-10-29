@@ -30,7 +30,7 @@
 
 #include "xiaomi_touch_type_common.h"
 
-/* _b581-XT③：blob 串表内版本号 = "2025.07.24-01"（.rodata.str1.1，被
+/* rodin（2026-10-08）：blob 串表内版本号 = "2025.07.24-01"（.rodata.str1.1，被
  * xiaomi_touch_probe / proc_tp_write 等引用），树侧原为 donor 串 "2024.08.30-01"。 */
 #define XIAOMI_TOUCH_VERSION    "2025.07.24-01"
 
@@ -201,7 +201,7 @@ typedef struct private_data {
 	u8 mmap_area;
 	s8 touch_id;
 	wait_queue_head_t poll_wait_queue_head;
-	/* _b583-XT：blob private_data_t = 0x40B —— xiaomi_touch_dev_open 0x71c8 实参
+	/* rodin（2026-10-08）：blob private_data_t = 0x40B —— xiaomi_touch_dev_open 0x71c8 实参
 	 * `kzalloc_retry(#0x40, 3)`（64 = node16+mmap_area1+touch_id1+pad6+waitqueue24
 	 * +3×atomic12 → 0x40），且全区只有 1 个 wait queue：
 	 *   · dev_open 0x7204/0x720c：`strb w10(-1),[priv+0x11]`（touch_id=-1）后单次
@@ -218,7 +218,7 @@ typedef struct private_data {
 	atomic_t raw_data_index;
 } private_data_t;
 
-/* _b583-XT2：xiaomi_touch_data_t 逐成员按 blob 归位（步长 0x2A78，见文末断言块）。
+/* rodin（2026-10-08）：xiaomi_touch_data_t 逐成员按 blob 归位（步长 0x2A78，见文末断言块）。
  * 归位证据链（双证 = .disr 机器码 + IDA asm）：见各成员行内锚点。 */
 typedef struct xiaomi_touch_data {
 	s8 touch_id;						/* 0x0000 */
@@ -325,7 +325,7 @@ typedef struct hardware_operation {
 	void (*xiaomi_touch_fod_low_attn)(int value);
 	void (*set_panel_notifier_status)(enum suspend_state panel_status[]);
 	void (*notify_sensorhub_status)(int notify_type);
-	/* popsicle ops 与 blob ops 不同代，按命名成员追加（§B 记账） */
+	/* popsicle ops 与 blob ops 不同代，按命名成员追加 */
 	void (*scp_mistouch_enable)(int *value);
 } hardware_operation_t;
 
@@ -346,7 +346,7 @@ typedef struct xiaomi_touch_driver_param {
 } xiaomi_touch_driver_param_t;						/* sizeof == 0x2B0 */
 
 typedef struct xiaomi_touch {
-	/* _b583-XT：blob xiaomi_touch_t 首成员（结构基址 +0x0）——blob 证据三重：
+	/* rodin（2026-10-08）：blob xiaomi_touch_t 首成员（结构基址 +0x0）——blob 证据三重：
 	 *   ① xiaomi_touch_probe 0x4abc/0x4b00/0x4b04：`add x20,x0,#0x10`(=&pdev->dev)->
 	 *      `cbz x20`->`str x20,[x19]`(x19=.bss+0x8=&xiaomi_touch)；
 	 *   ② xiaomi_register_panel_notifier_work 0x21fc/0x2204：`ldr x8,[&xiaomi_touch]`
@@ -476,7 +476,7 @@ int update_fod_press_status_common(int value);
 #endif
 struct class *get_xiaomi_touch_class_common(void);
 int update_palm_sensor_value_common(int value);
-/* _b583-XT2：update_weak_doubletap_value 声明删除（blob 确无；见 xiaomi_touch_sys.c 锚点）*/
+/* rodin（2026-10-08）：update_weak_doubletap_value 声明删除（blob 确无；见 xiaomi_touch_sys.c 锚点）*/
 int update_abnormal_event(u16 type, u16 code, u16 value);
 void *get_raw_data_base_common(s8 touch_id);
 void notify_raw_data_update_common(s8 touch_id);
@@ -490,7 +490,7 @@ void driver_update_touch_mode_common(s8 touch_id, int touch_mode[DATA_MODE_45], 
 u8 xiaomi_get_gesture_type_common(s8 touch_id);
 int driver_get_touch_mode_common(s8 touch_id, int mode);
 
-/* blob 导出面（b567 重建，xiaomi_touch_boost.c）：boost 六件族 + 数据访问器 */
+/* blob 导出面（2026-10-06 重建，xiaomi_touch_boost.c）：boost 六件族 + 数据访问器 */
 struct device_node;
 void init_touch_irq(int id, struct device_node *np);
 void touch_irq_boost_switch(int irq, int enable);
@@ -532,7 +532,7 @@ void *kvzalloc_retry(size_t size, int retry);
 void kvzalloc_free(void *p);
 
 xiaomi_touch_data_t *get_xiaomi_touch_data(s8 touch_id);
-/* b567：blob GLOBAL 164B 的 boost 槽访问器原名 get_xiaomi_touch_data，与 popsicle
+/* rodin 2026-10-06：blob GLOBAL 164B 的 boost 槽访问器原名 get_xiaomi_touch_data，与 popsicle
  * static（blob LOCAL 语义）在 =y 单符号空间撞名，按 §84 让名 _boost 后缀。 */
 struct xiaomi_touch_irq_boost *get_xiaomi_touch_boost_data(int id);
 xiaomi_touch_driver_param_t *get_xiaomi_touch_driver_param(s8 touch_id);
@@ -553,7 +553,7 @@ void add_input_event_timeline_before_event_time_common(int type, u64 frame_count
 bool init_input_event_timeline(void);
 void release_input_event_timeline(void);
 void xiaomi_touch_evdev_remove(void);
-/* _b582-INPUT：A-80① 输入设备层成对拆改——device.c 的 register/unregister_xiaomi_
+/* rodin（2026-10-08）：输入设备层成对拆改——device.c 的 register/unregister_xiaomi_
  * input_dev 族、report_touch_event/get_report_point_info_phy_addr（report-point 面）
  * 在 blob（xiaomi_touch_rodin.ko）里**全无**（符号面 + 串面 + ioctl 面三重实证），
  * 且 IC 侧（focaltech/goodix）皆自建 input_dev ⇒ 整层删除，声明随之移除。
@@ -561,5 +561,5 @@ void xiaomi_touch_evdev_remove(void);
  * 串），ioctl 只处理 cmd 0..5（UPDATE_REPORT_POINT=6 无跳表项），见 _b582_input/。 */
 /* blob 2 参形态（blob 0x4fbc：w0=slot/w1=state；fts 3+1 处直调 + evdev 内联各一处） */
 void last_touch_events_collect_common(int slot, int state);
-/* _b582-INTB：nfc_to_touch_event 声明删除（详情见 xiaomi_touch_core.c 同名注释） */
+/* rodin（2026-10-08）：nfc_to_touch_event 声明删除（详情见 xiaomi_touch_core.c 同名注释） */
 #endif

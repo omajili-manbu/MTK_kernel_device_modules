@@ -135,7 +135,7 @@ static void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
 		trace_sched_domain_flags(p, prev_cpu, sd_flag, wake_flags, *target_cpu);
 
 	/*
-	 * rodin 6.18（S9/P-13）：只在普通唤醒路径接管。fork/exec 与
+	 * rodin 6.18（2026-10-17）：只在普通唤醒路径接管。fork/exec 与
 	 * WF_CURRENT_CPU 由 core 自己处理；sd_flag 与 wake_flags 共用低半字节
 	 * （6.18 fair.c:8880-8881）。本钩子的投递点 core.c:8886-8889 在
 	 * p->pi_lock 内、IRQs off，且钩子可写 target_cpu 后立即返回。
@@ -273,7 +273,7 @@ struct set_affinity_pending {
 	struct migration_arg	arg;
 };
 /*
- * rodin 6.18（S6/P-42）：本函数从未注册 —— 对应注册点在
+ * rodin 6.18（2026-10-17）：本函数从未注册 —— 对应注册点在
  * register_sched_hooks() 里被注释掉（见文件末尾的
  * "register_trace_android_vh_check_uninterrupt_tasks" 注释行），因此是死代码。
  * 它涉及的 struct set_affinity_pending / migration_pending 是 core 私有实现
@@ -383,7 +383,7 @@ static void mtk_sched_pelt_multiplier(void *data, unsigned int old_pelt,
 		break;
 	}
 	/*
-	 * rodin 6.18（A-147 第三批）：update_pelt_data 调用点随 wl 链 dormant
+	 * rodin 6.18（2026-10-26）：update_pelt_data 调用点随 wl 链 dormant
 	 * （is_wl_support() 在 rodin DT 无 wl-info 下恒 false）删除；pelt8
 	 * 模型权重取值逻辑保留（值仍被上层的 sched_pelt_ctrl 接口面消费）。
 	 */
@@ -461,7 +461,7 @@ static void mtk_set_cpus_allowed_ptr(void *data, struct task_struct *p,
 	}
 
 	/*
-	 * rodin 6.18（A-59）：本钩子在 core 取 task_rq_lock() 之前触发，因此
+	 * rodin 6.18（2026-10-16）：本钩子在 core 取 task_rq_lock() 之前触发，因此
 	 * 不得碰任何 rq 状态 —— rq->scratch_mask 的注释明写 "under rq_lock"，
 	 * core 自己紧接着就在锁内写它；而 task_rq(p) 在锁外解析还可能拿到已经
 	 * 过期的 rq。改成把我们自己持有的掩码交给 core：ctx->new_mask 此后只被
@@ -1219,7 +1219,7 @@ static int __init mtk_scheduler_init(void)
 	struct proc_dir_entry *pe, *parent;
 	int ret = 0;
 
-	/* rodin 6.18（分区 A）：mtk_task 的载体 = GKI 动态 task_struct 尾部
+	/* rodin 6.18（2026-10-12）：mtk_task 的载体 = GKI 动态 task_struct 尾部
 	 * （CONFIG_GKI_DYNAMIC_TASK_STRUCT_SIZE=y，android_task_vendor_data()）。
 	 * 静态断言只能断"需求 <= 尾部上限"（sizeof(struct mtk_task)=352 <= 1280）；
 	 * 真实可用尾部尺寸是运行期量（boot cmdline android_arch_task_struct_size，

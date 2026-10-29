@@ -232,7 +232,7 @@ static void goodix_pdev_release(struct device *dev)
 }
 
 /* blob 同形：判型门读全局 gpio 639（DET1；pio 基号 500 + 偏移 139）。
- * A-78 由 module init 移到 probe 顶端（initcall 期 gpiochip 未注册） */
+ * 由 module init 移到 probe 顶端（initcall 期 gpiochip 未注册） */
 #define PANEL_ID_DET1 639
 
 static int goodix_spi_probe(struct spi_device *spi)
@@ -242,7 +242,7 @@ static int goodix_spi_probe(struct spi_device *spi)
 
 	ts_info("goodix spi probe in");
 
-	/* A-78 判型门（blob 同形；#222 原在 module init，initcall 期 pio gpiochip
+	/* 判型门（blob 同形；原在 module init，initcall 期 pio gpiochip
 	 * 未注册 → gpio_request 恒 -517 双 fail-open 门空转）：移到 probe 顶端，
 	 * gpio 已就绪、读真实值。DET1=全局 639；非 1 → "TP is not goodix!" 并
 	 * return -ENODEV（让总线把 spi1.0 让给 focaltech）；读脚失败（-517 等）
@@ -253,7 +253,7 @@ static int goodix_spi_probe(struct spi_device *spi)
 		if (!ret) {
 			int gpio_det1 = gpio_get_value(PANEL_ID_DET1);
 
-			/* _b582-INTD（A3）：blob .rodata.str1.1+0x3881 =
+			/* rodin（2026-10-08）：blob .rodata.str1.1+0x3881 =
 			 * b'\0016[GTP_I][%s:%d]: gpio_det1 = %d\n'（goodix_core_rodin.disr
 			 * init_module+0xc8/0xcc，行 0xab6=2742）——blob 带尾 \n，树缺 ⇒ 补齐。
 			 * 同文件其它 DET 面串已核对：'(TP is not goodix!' 0x33bf 无尾 \n（树同）、
@@ -290,7 +290,7 @@ static int goodix_spi_probe(struct spi_device *spi)
 		return ret;
 	}
 
-	/* _b582-GXI：blob goodix_spi_probe 0x928-0x978 只有 spi_setup+goodix_get_ic_type，
+	/* rodin（2026-10-08）：blob goodix_spi_probe 0x928-0x978 只有 spi_setup+goodix_get_ic_type，
 	 * 无 sched_setscheduler_nocheck（全 ko 无 "SPI kworker"/"MAX_RT_PRIO" 串、无
 	 * kworker RT 提升体）⇒ warsaw 只树有的 RT 提升块连同 2 条打印按 blob 删除。 */
 

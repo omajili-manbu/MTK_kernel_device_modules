@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* rodin 174 批 2：metis_carrier_audit —— 载体机器级开机对账件。
+/* rodin 6.18（2026-10-27）：metis_carrier_audit —— 载体机器级开机对账件。
  * 位置 = late_initcall（晚于 vseq DEVICE 波与四件 init，boot 一次）；
  * 输出 = dmesg 单行 summary（对齐 rodin_vendor_fw 门闩风格），异常 WARN。
  *
- * C 案（174 轮）后的对账面：
- *  1. BTF 对账（C 类主防线）：内核真身 rwsem_waiter（rwsem.c 私有）的
+ * 2026-10-27 定案后的对账面：
+ *  1. BTF 对账（主防线）：内核真身 rwsem_waiter（rwsem.c 私有）的
  *     sizeof/task@/timeout@ 三值 vs 副本三断言（metis-final-link.c
  *     sizeof=48/task@16/timeout@32）。LTS 追新上游改私有结构时此处
  *     开机即红——副本断言只锁副本自身，够不着真身，本件补足机器级
- *     对账（tripwire 一行笔未获批，本件为唯一防线）。BTF 缺失降级
+ *     对账（tripwire 未采纳，本件为唯一防线）。BTF 缺失降级
  *     SKIP（不误报）。
  *  2. rwsem 16B 原生槽不变量：mi_rwsem_init 复位语义（magic 模 +
  *     deadline 清零）+ 幂等二次应用。活体接力载体，stock 布局保真。
- *  3. #143 型微回归：do_rwsem_list_insert 在链守卫（重入置 already
+ *  3. 同类微回归：do_rwsem_list_insert 在链守卫（重入置 already
  *     不再插）、priority==5 门（already 不动）、空链首插。
  *  4. futex alter 钩子 already 出参契约（直通不触链）+ 空链 smoke。
- *     NULL-task 遍历（#144）在 boot 期不可确定性驱动（钩子前置
- *     VIP/qos 门对 init 任务恒关），留作 LTS 重验项由 §3.4 流程覆盖。
- *  5. 退役面提示：#139/#161（mutex 侧表/payload）随 C 案结构性消失，
+ *     NULL-task 遍历在 boot 期不可确定性驱动（钩子前置
+ *     VIP/qos 门对 init 任务恒关），留作 LTS 重验项。
+ *  5. 退役面提示：mutex 侧表/payload 已结构性消失，
  *     无运行时可查面，summary 行带注记。
  */
 #include <linux/bpf.h>
@@ -124,7 +124,7 @@ static bool metis_audit_rwsem_reentry(void)
 	memset(&sem, 0, sizeof(sem));
 	INIT_LIST_HEAD(&sem.wait_list);
 
-	/* #143 型：waiter 已在链（自链 = 非空）→ 守卫置 already 且不插。 */
+	/* 同类微回归防线：waiter 已在链（自链 = 非空）→ 守卫置 already 且不插。 */
 	memset(&w, 0, sizeof(w));
 	INIT_LIST_HEAD(&w.list);
 	already = false;
@@ -198,7 +198,7 @@ static int __init metis_carrier_audit_init(void)
 	reentry = metis_audit_rwsem_reentry();
 	futex = metis_audit_futex_contract();
 
-	pr_info("metis-audit: RESULT=%s btf=%s rwsem_reset=%s rwsem_reentry=%s futex=%s (mutex payload/side-table retired: #139/#161 surfaces structurally gone)\n",
+	pr_info("metis-audit: RESULT=%s btf=%s rwsem_reset=%s rwsem_reentry=%s futex=%s (mutex payload/side-table retired: surfaces structurally gone)\n",
 		(btf && reset && reentry && futex) ? "GREEN" : "RED",
 		btf ? "ok" : "FAIL", reset ? "ok" : "FAIL",
 		reentry ? "ok" : "FAIL", futex ? "ok" : "FAIL");

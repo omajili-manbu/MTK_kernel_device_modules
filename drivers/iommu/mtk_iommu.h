@@ -235,8 +235,8 @@ struct mtk_iommu_data {
 	struct mtk_smi_larb_iommu	larb_imu[MTK_LARB_NR_MAX];
 
 	/*
-	 * rodin #144: 6.18 注册期扫描在 probe 内同步 attach 全部消费者，
-	 * APU SMMU 此时电源未上，一次性 hw_init 写入全部丢失(b528 回读
+	 * rodin 2026-10-02: 6.18 注册期扫描在 probe 内同步 attach 全部消费者，
+	 * APU SMMU 此时电源未上，一次性 hw_init 写入全部丢失(回读
 	 * 0x0 实锤)。PT_BASE 回读非 0 前 HW init 只算"跑过"不算"验过"，
 	 * hw_verify_work 周期重放直到回读验证通过。
 	 */

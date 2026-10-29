@@ -34,7 +34,7 @@
 
 #include "goodix_ts_core.h"
 #include <linux/vseq.h>
-/* b567：warsaw 骨架用旧枚举名（Touch_Mode_NUM=42/Touch_Aod_Enable=11/...），
+/* rodin 2026-10-06：warsaw 骨架用旧枚举名（Touch_Mode_NUM=42/Touch_Aod_Enable=11/...），
  * rodin blob = popsicle DATA_MODE 体系（数值两代一致：fod=10/aod=11/doubletap=14）。
  * 模式数组维度随 blob 45 通道（driver_update_touch_mode_common 按 mask 位拷贝）。 */
 #define Touch_Mode_NUM		DATA_MODE_45
@@ -48,7 +48,7 @@
 #define PINCTRL_STATE_SUSPEND		"pmx_ts_suspend"
 #define PINCTRL_STATE_BOOT			"pmx_ts_boot"
 
-/* #228（b581）blob .rodata.str1.1+0x315 = "rodin_gtp_thp_config.ini"
+/* rodin（2026-10-08）：blob .rodata.str1.1+0x315 = "rodin_gtp_thp_config.ini"
  * （引用点：goodix_start_later_init L19681 处 memcpy 进 hardware_param；
  * 原树 warsaw 名为偏离） */
 #define HTC_PROJECT_CFG_NAME		"rodin_gtp_thp_config.ini"
@@ -316,7 +316,7 @@ struct kobject *goodix_get_default_kobj(void)
 	return kobj;
 }
 
-/* _b582-GXI：blob 全 ko 无 test_stage/do_inspect/diff_shift_start/diff_shift_end 四
+/* rodin（2026-10-08）：blob 全 ko 无 test_stage/do_inspect/diff_shift_start/diff_shift_end 四
  * 个 sysfs 节点名串，也无 g_test_stage 全局 ⇒ warsaw diff-shift 测试面入口按 blob
  * 删除（框架侧零引用；inspect 侧对应函数同轮删除）。 */
 
@@ -800,7 +800,7 @@ static ssize_t goodix_ts_debug_log_store(struct device *dev,
 	/* _b573 scp 联动：blob 0xc2d4-0xc2e4 = !mistouch_close 时把日志等级同步给 SCP */
 	if (!goodix_scp_tp_mistouch_close)
 		scp_tp_ipi_send(6, debug_log_level, 0, 0);
-	/* #228（b581）blob goodix_ts_debug_log_store 打印点 L849/L853/L861：
+	/* rodin（2026-10-08）：blob goodix_ts_debug_log_store 打印点 L849/L853/L861：
 	 * L861 = ts_info("scp set log level = %d")（__func__="goodix_ts_debug_log_store"），
 	 * 树侧原缺该打印（callcmp only-blob _printk:1） */
 	ts_info("scp set log level = %d", debug_log_level);
@@ -1685,7 +1685,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 		goodix_sched_sethigh(current);
 
 		core_data->irq_priority_high = true;
-		/* #228（b581）blob goodix_ts_threadirq_func 厂商源行 1777 的打印串为
+		/* rodin（2026-10-08）：blob goodix_ts_threadirq_func 厂商源行 1777 的打印串为
 		 * "set goodix_irq priority"（.rodata.str1.1+0xc13e，无参数）；
 		 * 树侧多出的 "cpu affinity: %d" 形式为偏离，按 blob 收口 */
 		ts_info("set goodix_irq priority");
@@ -1743,7 +1743,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 				pm_relax(core_data->bus->dev);
 				return IRQ_HANDLED;
 			}
-			/* #228（b581）blob 无 "gesture_ist not cancel, ret=%d, continu"
+			/* rodin（2026-10-08）：blob 无 "gesture_ist not cancel, ret=%d, continu"
 			 * 串（strcmp only-tree），此路径静默继续，按 blob 去掉 */
 		}
 		mutex_unlock(&goodix_modules.mutex);
@@ -1765,7 +1765,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 			goodix_ts_request_handle(core_data, ts_event);
 		}
 	}
-	/* #228（b581）blob 无 "event_handler failed, ret=%d" 串（strcmp only-tree），
+	/* rodin（2026-10-08）：blob 无 "event_handler failed, ret=%d" 串（strcmp only-tree），
 	 * 该失败路径静默，按 blob 去掉打印 */
 
 	ts_event->retry = 0;
@@ -1831,7 +1831,7 @@ static int goodix_ts_power_init(struct goodix_ts_core *core_data)
 			core_data->avdd = NULL;
 			return ret;
 		}
-		/* #228（b581）blob 反汇编复原：goodix_ts_power_init 内联在
+		/* rodin（2026-10-08）：blob 反汇编复原：goodix_ts_power_init 内联在
 		 * goodix_ts_probe+0x850/+0x87c，确有 regulator_set_voltage(avdd,
 		 * 3300000, 3300000)（0xd83c 立即数 0x325aa0 = 3,300,000），失败打
 		 * "set avdd voltage failed"（厂商源行 1842）后 return ret；
@@ -1853,7 +1853,7 @@ static int goodix_ts_power_init(struct goodix_ts_core *core_data)
 			ts_err("Failed to get regulator iovdd:%d", ret);
 			core_data->iovdd = NULL;
 		}
-		/* #228（b581）同上按 blob 复原：goodix_ts_probe+0xa0c 立即数
+		/* rodin（2026-10-08）：同上按 blob 复原：goodix_ts_probe+0xa0c 立即数
 		 * 0x1b7740 = 1,800,000；失败打 "set iovdd voltage failed"
 		 * （厂商源行 1859）后 return ret。注意 blob 在 iovdd 取失败
 		 * （IS_ERR_OR_NULL）时不提前返回，仍以 NULL 调用 set_voltage
@@ -1866,7 +1866,7 @@ static int goodix_ts_power_init(struct goodix_ts_core *core_data)
 	} else {
 		ts_info("iovdd name is NULL");
 	}
-	/* #228（b581）blob 0xda24 行 1865 ts_info("iovdd end.")：树缺，补齐 */
+	/* rodin（2026-10-08）：blob 0xda24 行 1865 ts_info("iovdd end.")：树缺，补齐 */
 	ts_info("iovdd end.");
 
 	return ret;
@@ -1909,7 +1909,7 @@ static int goodix_ts_pinctrl_init(struct goodix_ts_core *core_data)
 		goto exit_pinctrl_put;
 	}
 
-	/* #228（b581）blob goodix_ts_pinctrl_init 0xe4ec 逐点复原：共 5 次
+	/* rodin（2026-10-08）：blob goodix_ts_pinctrl_init 0xe4ec 逐点复原：共 5 次
 	 * lookup（active/suspend/touch_mode_ap/touch_mode_scp/pmx_gt_spi_mode），
 	 * 五次失败全部走 exit_pinctrl_put（devm_pinctrl_put + 返回 r）＝致命。
 	 * 原树此处的 ap/scp 块重复了两遍（7 次 lookup）且失败降为容忍，属偏离，
@@ -1934,7 +1934,7 @@ static int goodix_ts_pinctrl_init(struct goodix_ts_core *core_data)
 		goto exit_pinctrl_put;
 	}
 
-	/* #228（b581）pmx_gt_spi_mode（主 SPI 三组引脚）：blob 0xe5a0 lookup →
+	/* rodin（2026-10-08）：pmx_gt_spi_mode（主 SPI 三组引脚）：blob 0xe5a0 lookup →
 	 * 0xe668 失败即 0xe678 devm_pinctrl_put，属致命；格式串 "Failed to get
 	 * %s, r: %d"，厂商源行 1933 */
 	core_data->pin_sta_spi_mode = pinctrl_lookup_state(core_data->pinctrl,
@@ -2357,7 +2357,7 @@ static void goodix_ts_release_connects(struct goodix_ts_core *core_data)
 	input_mt_sync_frame(input_dev);
 	input_sync(input_dev);
 
-	/* _b583b-GX/T3：blob release_connects（resume_suspend 内联，站点
+	/* rodin（2026-10-08）：blob release_connects（resume_suspend 内联，站点
 	 * 0x103e0/0x10478，0x10488-0x10628）在 mt_slot 环+sync 后**无**
 	 * fingerprint_authstate 分支与第二次 update_fod 站点，直接 unlock。
 	 * 树原 authstate if/else（含 'fingerprint_authstate: %d ...' 两条
@@ -2381,7 +2381,7 @@ static void goodix_cmd_fifo_get(u64 address, u8 *buf)
 	read_buff = (u8*)kzalloc(node_data_size, GFP_KERNEL);
 
 	if (!read_buff) {
-		/* _b583b-GX：blob 无 'fail memory' 串（strcmp only-tree），删打印留守卫 */
+		/* rodin（2026-10-08）：blob 无 'fail memory' 串（strcmp only-tree），删打印留守卫 */
 		return;
 	}
 	if (!buf) {
@@ -2490,7 +2490,7 @@ static int goodix_htc_ic_setModeValue(common_data_t *common_data)
 	int ret = 0;
 	bool flag = false;
 
-	ts_debug("setModeValue in, cmd = %d, mode = %d, addr = 0x%x", common_data->cmd, common_data->mode, addr);	/* #228：blob 等级 D */
+	ts_debug("setModeValue in, cmd = %d, mode = %d, addr = 0x%x", common_data->cmd, common_data->mode, addr);	/* 2026-10-08：blob 等级 D */
 	if (!goodix_core_data) {
 		ts_err("not inited");
 		return -EFAULT;
@@ -2515,7 +2515,7 @@ static int goodix_htc_ic_setModeValue(common_data_t *common_data)
 		ts_err("failed write addr(%x) data 0x%*ph", addr,
 			data_len, data_buf);
 	}
-	ts_debug("setModeValue out, cmd = %d, mode = %d, value:0x%*ph", common_data->cmd, common_data->mode, data_len, data_buf);	/* #228：blob 等级 D */
+	ts_debug("setModeValue out, cmd = %d, mode = %d, value:0x%*ph", common_data->cmd, common_data->mode, data_len, data_buf);	/* 2026-10-08：blob 等级 D */
 	return 0;
 }
 
@@ -2540,7 +2540,7 @@ static int goodix_htc_ic_getModeValue(common_data_t *common_data)
 
 	ret = goodix_core_data->hw_ops->read(goodix_core_data, addr, data_buf, data_len);
 	if (ret) {
-		/* _b583-GX：blob L2513（站点 0x11740）无参数；L2517（0x1175c）不带 addr */
+		/* rodin（2026-10-08）：blob L2513（站点 0x11740）无参数；L2517（0x1175c）不带 addr */
 		ts_err("can't get, error");
 		return -EINVAL;
 	}
@@ -2669,7 +2669,7 @@ out:
 			input_report_abs(input_dev, ABS_MT_WIDTH_MAJOR, 0);
 			input_report_abs(input_dev, ABS_MT_WIDTH_MINOR, 0);
 			input_sync(input_dev);
-			/* _b583b-GX/T3：blob 该 THP 块（站点 A，0x103e0）update_fod(0)
+			/* rodin（2026-10-08）：blob 该 THP 块（站点 A，0x103e0）update_fod(0)
 			 * 无 fingerprint_authstate 门（blob 全 ko 无 authstate 串），
 			 * 树原 if/else 两打印为 warsaw 残项 */
 			update_fod_press_status_common(0);
@@ -2691,7 +2691,7 @@ out:
 			ret = scp_tp_switch(1);
 			if (ret)
 				ts_err("scp_tp_switch fail, ret=%d", ret);	/* blob ts_suspend:2656 */
-			/* _b583b-GX/T5：blob 0x1077c（ts_suspend:2660，E 级）在切换后
+			/* rodin（2026-10-08）：blob 0x1077c（ts_suspend:2660，E 级）在切换后
 			 * param0<=1 时补打当前状态（\n 结尾，strcmp 工具盲区但 blob 有）
 			 * ——blob 0x10684-0x10694 对成败两路均判 param0<=1 */
 			if (scp_tp_param.param0 <= 1)
@@ -2842,7 +2842,7 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 	out:
 		core_data->work_status = TP_NORMAL;
 		enable_temperature_detection_func(TOUCH_ID, true);
-		/* #228（b581）blob goodix_resume_suspend 无 goodix_set_thermal_temp 调用
+		/* rodin（2026-10-08）：blob goodix_resume_suspend 无 goodix_set_thermal_temp 调用
 		 * （callcmp only-tree 项），按 blob 去掉 */
 	
 #if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
@@ -3368,7 +3368,7 @@ static int goodix_fw_version_info_read(char *buf)
 
 static int goodix_get_limit_csv_version(char *buf)
 {
-	/* _b583b-GX：blob 无 'get_limit_csv_file_version failed' 串，删打印 */
+	/* rodin（2026-10-08）：blob 无 'get_limit_csv_file_version failed' 串，删打印 */
 	get_limit_csv_file_version(goodix_core_data, buf);
 	return 0;
 }
@@ -3410,7 +3410,7 @@ static int goodix_get_limit_csv_version(char *buf)
 static bool ic_self_test_flag = false;
 bool goodix_get_ic_self_test_mode(void)
 {
-	/* #228（b581）blob goodix_get_ic_self_test_mode @0xa4d0：读 .bss+0x1b11
+	/* rodin（2026-10-08）：blob goodix_get_ic_self_test_mode @0xa4d0：读 .bss+0x1b11
 	 * 后 ts_debug("enter ic_self_test_flag %d")（厂商源行 3228，level D 门限
 	 * debug>=4），树侧原缺此打印 */
 	ts_debug("enter ic_self_test_flag %d", ic_self_test_flag);
@@ -3418,7 +3418,7 @@ bool goodix_get_ic_self_test_mode(void)
 }
 //END:fix echo open/short > proc/tp_selftest can not open csv
 
-/* #228（b581）blob goodix_short_open_test 为独立源函数（内联进 ic_self_test 后
+/* rodin（2026-10-08）：blob goodix_short_open_test 为独立源函数（内联进 ic_self_test 后
  * __func__ 串 'goodix_short_open_test' 仍保留在 blob .rodata —— 树侧保持独立
  * static 函数（clang 单调用点自动内联，符号不落 .o，串随之保留），勿并入 */
 static int goodix_short_open_test(struct goodix_ts_core *cd)
@@ -3451,7 +3451,7 @@ static int goodix_short_open_test(struct goodix_ts_core *cd)
 	return ret;
 }
 
-/* _b583b-GX：blob goodix_ic_self_test（0xf26c，848B）主体与树 b581 版同形，
+/* rodin（2026-10-08）：blob goodix_ic_self_test（0xf26c，848B）主体与树版同形，
  * 差异点：① !goodix_core_data 时置 *result=0（blob 0xf2a0→0xf47c）；
  * ② chip_ver 清零（0xf2c4-0xf2cc）；③ resultInfo 打印门 I 级（0xf578）；
  * ④ miev 上报以 !pass 门控（0xf58c，与 retval!=PASS 等价） */
@@ -3520,7 +3520,7 @@ int goodix_ts_get_lockdown_info(struct goodix_ts_core *cd)
 static void  goodix_xiaomi_touch_fod_test(int value)
 {
 	struct input_dev *input_dev = goodix_core_data->input_dev;
-	/* _b583b-GX/T4：blob goodix_xiaomi_touch_fod_test（0x11ab0，380B）无入口打印
+	/* rodin（2026-10-08）：blob goodix_xiaomi_touch_fod_test（0x11ab0，380B）无入口打印
 	 * （calldiff only-tree _printk:1；'fod_test enter' 串 blob 无），删 */
 	if (value) {
 		input_report_key(input_dev, BTN_INFO, 1);
@@ -3643,7 +3643,7 @@ void goodix_ic_switch_mode(u8 _gesture_type)
 	}
 #endif // TOUCH_TRUSTED_SUPPORT
 
-	/* _b583b-GX2：blob 0x12640-0x12650 先做 EN 位重映射（UBFIZ W20,W0,#2,#1 =
+	/* rodin（2026-10-15）：blob 0x12640-0x12650 先做 EN 位重映射（UBFIZ W20,W0,#2,#1 =
 	 * bit0(LONGPRESS/FOD)→bit2=FOD_EN；BFXIL W20,W0,#1,#2 = bit2:1→bit1:0 =
 	 * DOUBLETAP→DOUBLE_TAP_EN@bit1、SINGLETAP→SINGLE_TAP_EN@bit0），ipi(5) 与
 	 * gesture_enabled 比较写回共用该值。树侧原映射在 ipi(5) 之后（下方三-if），
@@ -3864,7 +3864,7 @@ static void goodix_set_cur_value(int mode, int *value)
 	int gtp_value = value[0];
 	bool flag = false;
 
-	/* _b583b-GX：blob 0xfad4 只此一处 mode/value 打印（I 级，行 3589）；
+	/* rodin（2026-10-08）：blob 0xfad4 只此一处 mode/value 打印（I 级，行 3589）；
 	 * 树原第二条（suspended 检查后）与 FACTORY cmd_flag 门 blob 均无 */
 	ts_info("mode:%d, value:%d", gtp_mode, gtp_value);
 
@@ -3901,14 +3901,14 @@ static void goodix_set_cur_value(int mode, int *value)
 			goodix_core_data->cfg_cloud_state = !!gtp_value;
 			break;
 		case TOUCH_CLOUD_MODE_CLOSE_SCP_TP_MISTOUCH:
-			/* _b583b-GX：blob 0xfbd4-0xfbec + 打印 0xfd64（I 级行 3627）：
+			/* rodin（2026-10-08）：blob 0xfbd4-0xfbec + 打印 0xfd64（I 级行 3627）：
 			 * csel(open/close by value==0) 后写 mistouch_close=(value==0)。
 			 * 树原缺 case（blob 跳表 103 → 专用块） */
 			ts_info("%s SCP_TP_MISTOUCH", gtp_value ? "close" : "open");
 			goodix_scp_tp_mistouch_close = (gtp_value == 0);
 			break;
 		case Touch_Boost_EN: {
-			/* _b583-GX：blob 0xfb58-0xfb7c（跳转表 mode 200 → 块 0xfb58）=
+			/* rodin（2026-10-08）：blob 0xfb58-0xfb7c（跳转表 mode 200 → 块 0xfb58）=
 			 * ts_info("notify hal to boost")（L3635）+ add_common_data_to_buf_common(
 			 * 0, SET_CUR_VALUE, 10001, 1, &out)（w2=0x2711，out=-1 见 0xfa00）；
 			 * 树原为 warsaw 死面打印（该串 blob 无） */
@@ -3926,7 +3926,7 @@ static void goodix_set_cur_value(int mode, int *value)
 			brl_switch_report_rate(goodix_core_data, !!gtp_value);
 			break;
 		case THP_LOCK_SCAN_MODE:
-			ts_info("THP enable doze mode [%d]", gtp_value);	/* _b583-GX：blob L3645（0xfd98） */
+			ts_info("THP enable doze mode [%d]", gtp_value);	/* rodin（2026-10-08）：blob L3645（0xfd98） */
 			goodix_htc_enter_idle(value);
 			break;
 		case THP_FOD_DOWNUP_CTL:
@@ -3943,20 +3943,20 @@ static void goodix_set_cur_value(int mode, int *value)
 			goodix_htc_set_active_scan_rate(gtp_value);
 			break;
 		case THP_NORMALIZE_STUDY_SCAN:
-			ts_info("B array is not reasonable, need scan freq...");	/* _b583-GX：blob L3662（0xfdfc） */
+			ts_info("B array is not reasonable, need scan freq...");	/* rodin（2026-10-08）：blob L3662（0xfdfc） */
 			goodix_htc_start_calibration();
 			break;
 		case THP_NORMALIZE_B_REQUEST:
-			ts_info("THP request B array");	/* _b583-GX：blob L3666（0xfe18） */
+			ts_info("THP request B array");	/* rodin（2026-10-08）：blob L3666（0xfe18） */
 			goodix_htc_enable_b_array();
 			break;
 		case THP_IDLE_BASALINE_UPDATE:
-			ts_debug("THP update idle baseline");	/* _b583-GX：blob L3678（0xfe34，D 级） */
+			ts_debug("THP update idle baseline");	/* rodin（2026-10-08）：blob L3678（0xfe34，D 级） */
 			goodix_htc_update_idle_baseline();
 			break;
 #if defined(TOUCH_THP_SUPPORT) && defined(TOUCH_DUMP_TIC_SUPPORT)
 		case Touch_THP_Dump:
-			/* _b583b-GX：blob 0xfcac-0xfce0（mode 1076）：value>1 落
+			/* rodin（2026-10-08）：blob 0xfcac-0xfce0（mode 1076）：value>1 落
 			 * default；enable_ic_dump 失败不改 dump_type。树同形 */
 			if ((gtp_value == DUMP_OFF || gtp_value == DUMP_ON) && goodix_core_data->dump_type != gtp_value) {
 				if (!goodix_htc_enable_ic_dump(gtp_value)) {
@@ -3989,7 +3989,7 @@ static void goodix_set_cur_value(int mode, int *value)
 			goodix_htc_set_gesture_feedback(gtp_value);
 			break;
 		default:
-			/* _b583b-GX：blob 0xfbf4-0xfc04 = ts_warn（W 级、无 mode 实参，
+			/* rodin（2026-10-08）：blob 0xfbf4-0xfc04 = ts_warn（W 级、无 mode 实参，
 			 * 跳表 1000-1103 之外与其内 1002/1003/1005-1010/1012-1015 全落此；
 			 * 1012=DISPLAY_FPS/1105=IDLE_RATE/1106=REF_HOPPING 亦然）。
 			 * 树原 ts_err("not support mode, mode(%d)!") 为 warsaw 残项 */
@@ -4000,7 +4000,7 @@ static void goodix_set_cur_value(int mode, int *value)
 
 static u8 goodix_panel_color_read(void)
 {
-	/* _b583b-GX：blob 0x10d84 = 28B 纯转发（cbz 判空 + ldrb [cd+0x612]），
+	/* rodin（2026-10-08）：blob 0x10d84 = 28B 纯转发（cbz 判空 + ldrb [cd+0x612]），
 	 * 无任何打印；树原 'core data is null'/'read info is %c' 为 warsaw 残项 */
 	if (!goodix_core_data)
 		return 0;
@@ -4009,7 +4009,7 @@ static u8 goodix_panel_color_read(void)
 
 static u8 goodix_panel_vendor_read(void)
 {
-	/* _b583b-GX：blob 0x10d64 同上（ldrb [cd+0x610]） */
+	/* rodin（2026-10-08）：blob 0x10d64 同上（ldrb [cd+0x610]） */
 	if (!goodix_core_data)
 		return 0;
 	return goodix_core_data->lockdown_info[0];
@@ -4017,7 +4017,7 @@ static u8 goodix_panel_vendor_read(void)
 
 static u8 goodix_panel_display_read(void)
 {
-	/* _b583b-GX：blob 0x10da4 同上（ldrb [cd+0x611]） */
+	/* rodin（2026-10-08）：blob 0x10da4 同上（ldrb [cd+0x611]） */
 	if (!goodix_core_data)
 		return 0;
 	return goodix_core_data->lockdown_info[1];
@@ -4025,7 +4025,7 @@ static u8 goodix_panel_display_read(void)
 
 static char goodix_touch_vendor_read(void)
 {
-	/* _b583b-GX：blob 0x10dc4 = 8B（mov w0,#0x32; ret），无打印 */
+	/* rodin（2026-10-08）：blob 0x10dc4 = 8B（mov w0,#0x32; ret），无打印 */
 	return '2';
 }
 
@@ -4088,7 +4088,7 @@ static int goodix_log_level_control(int value)
 	return value;
 }
 
-/* #228（b581）ops 槽 set_thermal_temp 收口：blob .text+0x11c30
+/* rodin（2026-10-08）：ops 槽 set_thermal_temp 收口：blob .text+0x11c30
  * goodix_set_thermal_temp 全函数体仅 8 字节 ——
  *   11c30: mov w0, wzr
  *   11c34: ret
@@ -4106,7 +4106,7 @@ static int goodix_set_thermal_temp(int temp, bool force)
 #endif
 
 #ifdef GOODIX_DEBUGFS_ENABLE
-/* _b583-GX：blob tpdbg_suspend（LOCAL FUNC @0x1204c, 100B）单形参 = enable；
+/* rodin（2026-10-08）：blob tpdbg_suspend（LOCAL FUNC @0x1204c, 100B）单形参 = enable；
  * 0x12090-0x120a8 = ts_info("enter schedule_resume_suspend_work_common  enable %d", enable)
  * （I 级，源行 3839；__func__ = "tpdbg_suspend"），0x12070-0x1207c =
  * schedule_resume_suspend_work_common(0, !enable)。树原为 2 形参且无打印（被内联掉）。 */
@@ -4254,7 +4254,7 @@ static int goodix_start_later_init(struct goodix_ts_core *ts_core)
 		update_flag |= UPDATE_MODE_FORCE;
 		goto upgrade;
 	}
-	/* _b583b-GX：blob 无 'get version info!!!!!!' 串（strcmp only-tree），删 */
+	/* rodin（2026-10-08）：blob 无 'get version info!!!!!!' 串（strcmp only-tree），删 */
 	/* get ts lockdown info */
 	goodix_ts_get_lockdown_info(cd);
 	goodix_match_panel(cd);
@@ -4267,7 +4267,7 @@ static int goodix_start_later_init(struct goodix_ts_core *ts_core)
 		ts_info("success get valid ic config");
 
 	upgrade:
-		/* #228（b581）blob 厂商源行 4003（goodix_start_later_init，升级段起手）：
+		/* rodin（2026-10-08）：blob 厂商源行 4003（goodix_start_later_init，升级段起手）：
 		 * 先取一次 ic info，失败即打 "failed to get ic info, try to upgrade"
 		 * 并置 FORCE 升级位（仅 blob 有该打印，callcmp only-blob _printk:1） */
 		if (cd->hw_ops->get_ic_info(cd, &cd->ic_info) < 0) {
@@ -4302,7 +4302,7 @@ static int goodix_start_later_init(struct goodix_ts_core *ts_core)
 	}
 		ret = hw_ops->get_ic_info(cd, &cd->ic_info);
 		if (ret) {
-			/* #228（b581）blob 该路径（goodix_fw_update_init 内联体
+			/* rodin（2026-10-08）：blob 该路径（goodix_fw_update_init 内联体
 			 * L28185 "invalid ic info, abort"）**无** TpTransferErr
 			 * mievent 上报；blob goodix_start_later_init 仅 1 次
 			 * mievent str（TpFirmwareLoadFail，L3997 处）。
@@ -4374,7 +4374,7 @@ static int goodix_start_later_init(struct goodix_ts_core *ts_core)
 	memcpy(hardware_param.config_file_name, HTC_PROJECT_CFG_NAME, strlen(HTC_PROJECT_CFG_NAME));
 	memset(hardware_param.driver_version, 0, 64);
 	memcpy(hardware_param.driver_version, GOODIX_DRIVER_VERSION, strlen(GOODIX_DRIVER_VERSION));
-	/* #228（b581）blob 0xed04-0xed44：逐字节从 core_data->lockdown_info
+	/* rodin（2026-10-08）：blob 0xed04-0xed44：逐字节从 core_data->lockdown_info
 	 * （blob core_data+0x610，8B）拷进 hardware_param.lockdown_info
 	 * （blob .bss+0x2b4d）——是内联拷贝循环而非 goodix_lockdown_info_read()
 	 * 调用（该 helper 在 blob 仅作 ops 槽 ic_get_lockdown_info 的地址存放）；
@@ -4467,10 +4467,10 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	int ret;
 
 	ts_info("goodix_ts_probe IN THP");
-	/* _b582-INTC：blob 该串唯一引用点 = .init.text init_module+0xe4（disr L47124，
+	/* rodin（2026-10-08）：blob 该串唯一引用点 = .init.text init_module+0xe4（disr L47124，
 	 * reloc .rodata.str1.1+0x16b4，门 `cmp w8,#4; b.hs` = ts_debug 级），位于 DET1
 	 * （面板 gpio 639，"TP is not goodix!" 判非）的 goodix 分支内、goodix_spi_bus_init
-	 * 之前（0x4c-0x58）。树侧 DET1 门由 A-78 移至 goodix_spi_probe（initcall 期
+	 * 之前（0x4c-0x58）。树侧 DET1 门移至 goodix_spi_probe（initcall 期
 	 * gpiochip 未注册），该门通过才 platform_device_register ⇒ 本探测是 DET1==1 之后
 	 * goodix 侧首个入口，条件等价（残留：所属函数 init_module vs goodix_ts_probe）。 */
 	ts_debug("TP is goodix, panel is CSOT.");
@@ -4484,7 +4484,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	core_data = devm_kzalloc(&pdev->dev,
 			sizeof(struct goodix_ts_core), GFP_KERNEL);
 	if (!core_data) {
-		/* _b582-INTD（A4-1）：blob = .rodata.str1.1+0xb85
+		/* rodin（2026-10-08）：blob = .rodata.str1.1+0xb85
 		 * b'\0016[GTP_E][%s:%d]: allocate core data memory failed'
 		 * （goodix_core_rodin.disr goodix_ts_probe 0xd314/0xd328，行 0x1049=4169，
 		 * __func__ "goodix_ts_probe"；与 0xd2f8 "Invalid touch device"（行 4161）
@@ -4533,7 +4533,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		goto err_out;
 	}
 
-	/* #228（b581）blob 厂商源行 4213 ts_err("begin goodix_ts_power_init")
+	/* rodin（2026-10-08）：blob 厂商源行 4213 ts_err("begin goodix_ts_power_init")
 	 * （树缺），失败串 4219 为 "fail to init power(regulator)"（树原写
 	 * "failed init power"）——按 blob 收口 */
 	ts_err("begin goodix_ts_power_init");
@@ -4554,7 +4554,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 					core_data->pin_sta_active);
 		if (ret < 0)
 			ts_err("Failed to select active pinstate, r:%d", ret);
-		/* #228（b581）blob goodix_ts_probe 0xde6c：active 之后**无条件**
+		/* rodin（2026-10-08）：blob goodix_ts_probe 0xde6c：active 之后**无条件**
 		 * select pmx_gt_spi_mode（blob 无 pin_sta_spi_mode NULL 判据，
 		 * NULL 时 select 内部返 -EINVAL 并打印），失败打印
 		 * "Failed to select %s pinstate %d"（厂商源行 4235），不阻断
@@ -4576,7 +4576,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		ts_err("failed power on");
 		goto err_out;
 	}
-	/* #228（b581）blob 厂商源行 4248 ts_err("end goodix_ts_power_on")（树缺） */
+	/* rodin（2026-10-08）：blob 厂商源行 4248 ts_err("end goodix_ts_power_on")（树缺） */
 	ts_err("end goodix_ts_power_on");
 
 	/* confirm it's goodix touch dev or not */
@@ -4613,7 +4613,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	/* Try start a thread to get config-bin info */
 	ret = goodix_start_later_init(core_data);
 	if (ret) {
-		/* #228（b581）blob 厂商源行 4284 无 "[DIS-TF-TOUCH] " 前缀 */
+		/* rodin（2026-10-08）：blob 厂商源行 4284 无 "[DIS-TF-TOUCH] " 前缀 */
 		ts_err("Failed start cfg_bin_proc, %d", ret);
 		goto err_out;
 	}
@@ -4636,7 +4636,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	scp_tp_param.unknown_14[3] = core_data->ic_info.misc.frame_data_addr;
 	scp_tp_param.unknown_14[4] = 2500;
 
-	/* _b582-INTD（A4-2）：blob goodix_ts_probe 0xe040 `cmp w12,#3; b.hs 0xe15c`（ts_info 级），
+	/* rodin（2026-10-08）：blob goodix_ts_probe 0xe040 `cmp w12,#3; b.hs 0xe15c`（ts_info 级），
 	 * 0xe15c/0xe160 = adrp/add .rodata.str1.1+0x2db2 =
 	 * b'\0016[GTP_I][%s:%d]: mtk_scp_touch_init in probe'（行 0x10dc=4316，
 	 * __func__ 0x6fe0 "goodix_ts_probe"），printk 后 0xe174 `b 0xe044` 回到
@@ -4669,7 +4669,7 @@ static void goodix_ts_remove(struct platform_device *pdev)
 	struct goodix_ts_esd *ts_esd = &core_data->ts_esd;
 
 	/* _b573 scp 接线：blob 0xe1b0-0xe1cc = remove 起手 scp_tp_exit + 框架双反注册。
-	 * _b583b-GX/T4：blob ts_remove（0xe198，532B）无 ts_notifier 反注册
+	 * rodin（2026-10-08）：blob ts_remove（0xe198，532B）无 ts_notifier 反注册
 	 * （0xe250 的 blocking_notifier_chain_unregister 仅 esd_notifier 一处，
 	 * calldiff only-tree blocking_notifier_chain_unregister:1），删之 */
 	scp_tp_exit();
@@ -4771,7 +4771,7 @@ static void __exit goodix_ts_core_exit(void)
 #endif
 }
 
-/* _b580：触控框架 probe 时序倒挂修复（vseq 化），与 focaltech_rodin 同因。
+/* rodin（2026-10-08）：触控框架 probe 时序倒挂修复（vseq 化），与 focaltech_rodin 同因。
  * 原厂本单元 = goodix_core.ko，6.6 装载位 vendor_dlkm modules.load 行 212
  * （框架 211 之后、focaltech 213 之前）。按 vseq.h 层级对应改写：.ko 语境下
  * late_initcall 折叠为 module_init，vseq_*_initcall 全族同义、级别仅用于

@@ -326,8 +326,8 @@ static int emi_icc_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
-	/* rodin b58: 6.18 起 nodes[] 带 __counted_by(num_nodes)，计数必须先于填充，
-	 * 否则 UBSAN array-index trap（#108 实证）；register 前无并发读者，语义不变。 */
+	/* rodin 2026-09-30: 6.18 起 nodes[] 带 __counted_by(num_nodes)，计数必须先于填充，
+	 * 否则 UBSAN array-index trap（实证）；register 前无并发读者，语义不变。 */
 	data->num_nodes = num_nodes;
 
 	provider = &mtk_icc->provider;

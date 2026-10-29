@@ -153,7 +153,7 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 		sg_policy->need_freq_update = true;
 
 		/*
-		 * rodin 6.18（A-116/S5）：limits_changed 的清零必须先于
+		 * rodin 6.18（2026-10-17）：limits_changed 的清零必须先于
 		 * cpufreq_driver_resolve_freq() 对 policy 限制的读取，否则可能
 		 * 丢掉一次限制更新；与 sugov_limits() 的 smp_wmb() 配对。
 		 */
@@ -256,7 +256,7 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 		freq = next_freq;
 	} else {
 		/*
-		 * rodin 6.18（S6/P-07）：core 的 map_util_freq() 只在
+		 * rodin 6.18（2026-10-17）：core 的 map_util_freq() 只在
 		 * mtk_map_util_freq() 不产出频率时才可达，即
 		 * am_ctrl==0 && grp_dvfs_ctrl_mode==0 && turn_point_util==0；
 		 * 本树默认配置（DT eas-info version=650）下是死支。保留它是
@@ -274,13 +274,13 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 }
 
 /*
- * rodin 6.18（A-116）：包络出参化后，本函数既可直接夹 @util（出参为 NULL 的
+ * rodin 6.18（2026-10-17）：包络出参化后，本函数既可直接夹 @util（出参为 NULL 的
  * 旧路径），也可只回传 [u_min, u_max] 让消费者在出口夹一次（min_out 非空）。
  */
 inline int curr_clamp(struct rq *rq, unsigned long *util,
 		      unsigned long *u_min_out, unsigned long *u_max_out)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 非零返回（= 不施加 clamp）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 非零返回（= 不施加 clamp）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return -EAGAIN;
 	struct task_struct *curr_task;
@@ -375,7 +375,7 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_cfs,
 	}
 
 	/*
-	 * rodin 6.18（A-116）：包络先算、util 后算 —— 6.18 把 uclamp/容量约束
+	 * rodin 6.18（2026-10-17）：包络先算、util 后算 —— 6.18 把 uclamp/容量约束
 	 * 拆成 effective_cpu_util() 的 min/max 出参（fair.c:8424-8455），由消费者
 	 * 在出口夹一次。min 的地板是 IRQ + DL 预留带宽（fair.c:8431），不再是
 	 * 加进 util 的一项；max 是 min(容量, uclamp_max)（fair.c:8454-8455）。
@@ -505,7 +505,7 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_cfs,
 	dl_util = cpu_util_dl(rq);
 
 	/*
-	 * rodin 6.18（A-116）：DL 的实际运行时间无条件并入 util
+	 * rodin 6.18（2026-10-17）：DL 的实际运行时间无条件并入 util
 	 * （fair.c:8447-8448）；DL 预留带宽 cpu_bw_dl() 已改作 min 地板
 	 * （fair.c:8431），不再加进 util。stop 类造成的数值误差同上游处理。
 	 */
@@ -550,7 +550,7 @@ EXPORT_SYMBOL(sugov_grp_awr_update_cpu_tar_util_hook);
 #endif
 
 /*
- * rodin 6.18（A-60）：上游 sugov 在 iowait boost 之后还有一步最终包络夹取 ——
+ * rodin 6.18（2026-10-16）：上游 sugov 在 iowait boost 之后还有一步最终包络夹取 ——
  * sugov_effective_cpu_perf(cpu, util, min, max)，其中 [min, max] 是
  * effective_cpu_util() 的 uclamp/容量包络出参（max = min(cap, uclamp_max)）。
  * 本树的 mtk_cpu_util() 只夹取 boost 之前的实际值，boost 因此可以越过
@@ -579,7 +579,7 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu, unsigned long boost)
 							0, SCHED_CAPACITY_SCALE,
 							&min, &max);
 	/*
-	 * rodin 6.18（A-116）：包络在消费者出口夹一次（对应上游
+	 * rodin 6.18（2026-10-17）：包络在消费者出口夹一次（对应上游
 	 * sugov_effective_cpu_perf() 的 max(min, min(actual, max)) 半边）。
 	 * headroom 仍由 mtk_map_util_freq() 的 adaptive_margin/util_scale 在
 	 * CAP→FREQ 之前施加，这里不引 map_util_perf()（否则双计 1.5625×）。
@@ -715,7 +715,7 @@ static unsigned long sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
 	 */
 	boost = (sg_cpu->iowait_boost * max_cap) >> SCHED_CAPACITY_SHIFT;
 	/*
-	 * rodin 6.18（A-60）：与上游 cpufreq_schedutil.c 同形 —— boost 不再就地
+	 * rodin 6.18（2026-10-16）：与上游 cpufreq_schedutil.c 同形 —— boost 不再就地
 	 * 改写 sg_cpu->util，而是回传给 sugov_get_util()，在那里于最终 uclamp
 	 * 包络夹取之前施加（上游的 sugov_get_util(sg_cpu, boost) 形态）。
 	 */
@@ -729,7 +729,7 @@ static unsigned long sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
 static inline void ignore_dl_rate_limit(struct sugov_cpu *sg_cpu)
 {
 	/*
-	 * rodin 6.18（A-116/S5）：比较对象是包络下限 bw_min（本次预测将要施加的
+	 * rodin 6.18（2026-10-17）：比较对象是包络下限 bw_min（本次预测将要施加的
 	 * DL 带宽地板），不是上一次记录的实际带宽 bw_dl；副作用改为
 	 * need_freq_update（6.18 cpufreq_schedutil.c:400-404）——它是"本次必须
 	 * 重算"的请求，由 sugov_should_update_freq() 直接放行，不再伪造
@@ -1330,7 +1330,7 @@ static void sugov_limits(struct cpufreq_policy *policy)
 	}
 
 	/*
-	 * rodin 6.18（A-116/S5）：limits_changed 的置位必须先于
+	 * rodin 6.18（2026-10-17）：limits_changed 的置位必须先于
 	 * cpufreq_set_policy() 对 policy 限制的更新，否则可能丢掉一次限制变更；
 	 * 与 sugov_should_update_freq() 的 smp_mb() 配对。
 	 */

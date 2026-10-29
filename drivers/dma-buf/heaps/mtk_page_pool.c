@@ -49,7 +49,7 @@ void mtk_dmabuf_page_pool_add(struct mtk_dmabuf_page_pool *pool, struct page *pa
 }
 EXPORT_SYMBOL_GPL(mtk_dmabuf_page_pool_add);
 
-/* rodin b262 (A-113): split out of mtk_dmabuf_page_pool_remove so the
+/* rodin 2026-10-16: split out of mtk_dmabuf_page_pool_remove so the
  * reserve-pool consumers can hold pool->lock across the count peek and
  * the removal, like the stock blob does (mtk_extend... 0xED44/0xEE40,
  * enable_store drain 0xF824). */
@@ -237,7 +237,7 @@ int mtk_dmabuf_page_pool_do_shrink(struct mtk_dmabuf_page_pool *pool, gfp_t gfp_
 		mtk_dmabuf_page_pool_free_pages(pool, page);
 		freed += (1 << pool->order);
 
-		/* rodin b262 (A-113): stock blob keeps a floor inside the
+		/* rodin 2026-10-25: stock blob keeps a floor inside the
 		 * dynamic order-0/order-4 pools once the reserve feature is on
 		 * and the box has more than 6G; the reserve pools themselves
 		 * (is_reserve_pool) are exempt and drain to empty.

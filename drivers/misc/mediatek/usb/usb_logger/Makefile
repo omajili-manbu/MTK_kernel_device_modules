@@ -2,7 +2,7 @@
 
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/usb/mtu3
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/usb/usb_xhci
-# b246: xhci trace family handed back to the kernel tree
+# rodin 2026-10-11: xhci trace family handed back to the kernel tree
 ccflags-y += -I$(srctree)/drivers/usb/host
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/usb/usb_offload
 

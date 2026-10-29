@@ -1979,7 +1979,7 @@ struct xhci_hcd {
 /*
  * Layout guardrail: the MTK fork must stay byte-identical with the
  * kernel-tree struct xhci_hcd across the whole shared prefix, so a
- * #118-class cross-unit layout drift becomes a compile error.
+ * cross-unit layout drift becomes a compile error.
  *
  * 期望值随**本树内核布局**走：本树 = 纯上游 android17-6.18-lts（dbc 2768 / sizeof 2808）。
  * port 树（bsp-rodin-c-port）同位置是 2824 / 2864，差的 56B 来自那边内核侧的 rodin
@@ -2997,7 +2997,7 @@ static inline const char *xhci_decode_ep_context(char *str, u32 info,
 
 
 
-/* ---- 6.18 defines bulk-ported for the merged core files (b245) ---- */
+/* ---- 6.18 defines bulk-ported for the merged core files (2026-10-11) ---- */
 #define CMD_RING_CYCLE		(1 << 0)
 #define CMD_RING_PTR_MASK	GENMASK_ULL(63, 6)
 #define XHCI_PAGE_SIZE_MASK     0xffff
@@ -3014,7 +3014,7 @@ static inline const char *xhci_decode_ep_context(char *str, u32 info,
 #define	xhci_bus_resume		NULL
 #define	xhci_get_resuming_ports	NULL
 
-/* ---- 6.18 definitions ported for the merged core files (b245) ---- */
+/* ---- 6.18 definitions ported for the merged core files (2026-10-11) ---- */
 #define TR_DEQ_PTR_MASK			GENMASK_ULL(63, 4)
 #define	GET_PORT_BW_ARRAY_SIZE		256
 #define COMP_PARAM(p)	((p) & 0xffffff) /* Command Completion Parameter */

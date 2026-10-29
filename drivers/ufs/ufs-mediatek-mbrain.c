@@ -50,7 +50,7 @@ int ufs_mb_register(struct platform_device *pdev,  ufs_mb_event_notify notify)
 	struct ufs_hba *hba;
 
 	hba = dev_get_drvdata(&pdev->dev);
-	/* rodin b515 #115: =y 消费者 probe 可早于 ufs-mediatek probe（6.6 靠 .ko 装载序
+	/* rodin 2026-10-01: =y 消费者 probe 可早于 ufs-mediatek probe（6.6 靠 .ko 装载序
 	 * mbraink 3.57s >> UFS probe 完成 1.44s 保证）。drvdata(hba) 由 ufshcd_init()
 	 * （core ufshcd.c dev_set_drvdata）写入；未就绪返回 -EPROBE_DEFER，
 	 * 避免落入 ufshcd_get_variant() 的 BUG_ON(!hba)（ufshcd.h:1541）。
@@ -75,7 +75,7 @@ int ufs_mb_unregister(struct platform_device *pdev)
 	struct ufs_mtk_host *host;
 
 	hba = dev_get_drvdata(&pdev->dev);
-	/* rodin b515 #115: UFS 未 probe 过 ⇒ 从未注册成功，幂等返回（防同款 BUG_ON）。 */
+	/* rodin 2026-10-01: UFS 未 probe 过 ⇒ 从未注册成功，幂等返回（防同款 BUG_ON）。 */
 	if (!hba)
 		return 0;
 	host = ufshcd_get_variant(hba);

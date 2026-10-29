@@ -17,7 +17,7 @@
 #include <linux/rwsem.h>
 
 /* rodin 6.18：rwsem_waiter 是 kernel/locking/rwsem.c 私有类型（无共享头）；
- * 按 6.18 rwsem.c:370-383 真身内联副本（用户拍板整段重写授权；
+ * 按 6.18 rwsem.c:370-383 真身内联副本（整段重写；
  * 字段访问仅 list/task/type/timeout/handoff_set，与 6.18 布局一致；
  * donor_wakeup 为 6.18 新增字段，保留占位保证 sizeof 对位）。 */
 enum metis618_rwsem_waiter_type {
@@ -37,15 +37,15 @@ struct metis618_rwsem_waiter {
 /* rodin 6.18 对位锁：内核 rwsem.c:375-383 真身 = list(0..15)+task(16..23)+
  * type(24..27)+pad(28..31)+timeout(32..39)+handoff_set(40)+donor_wakeup(41)
  * → pad 至 48。若 6.18 内核侧字段增删，此处编译期即炸而非运行期静默越界。
- * 逐行审计结论（163-165 轮）：①钩子签名漂移 9 处全重签（cgroup 四参/
+ * 逐行审计结论（2026-10-26）：①钩子签名漂移 9 处全重签（cgroup 四参/
  * binder restore 单参/do_futex 四参/futex 三件/hrtimer_setup/
  * wakeup_preempt/proc_handler const）；②消失钩子 4 个替代重签
  * （record_{mutex,rwsem,rtmutex,pcpu}_starttime → wait_start/acquired 面，
  * rtmutex 因 rt_mutex_base* 不匹配剪除）；③载体面：mutex 单 u64 不足 ⇒
- * 侧表（attach/clear/lookup），init 路径改 attach（#139 panic 修复）；
- * 174 轮 C 案：payload 读者死门控定案后锁侧半与侧表整体退役；
+ * 侧表（attach/clear/lookup），init 路径改 attach（panic 修复）；
+ * 2026-10-27 定案：payload 读者死门控后锁侧半与侧表整体退役；
  * rwsem [2] 同型零改；task 载体走 GKI 尾部 rodin_tail.h 双段；
- * user 走 uid 侧表；④防重入：do_rwsem_list_insert 在链守卫（#143 double
+ * user 走 uid 侧表；④防重入：do_rwsem_list_insert 在链守卫（double
  * add）；⑤字段实存核：rq->nr_running/rt.rt_nr_running/plist_head/
  * cgroup_threadgroup_rwsem 均实存；MI_FIELD 偏移面作用于 mi_task 自有
  * slab 载体非内核 task_struct（安全）；⑥顺序：metis(1257) 早于
@@ -286,7 +286,7 @@ void mi_alter_futex_plist_add(void *data, struct plist_node *node,
 		 * （kernel/futex/core.c:909 trace → :913 q->task=task），
 		 * 链上可能存在 task 未赋值的 futex_q（先前置 already_on_hb
 		 * 的 node 尚未由内核完成注册）——stock 6.6 时序无此状态；
-		 * 跳过该 entry（#144 首刷 30.5s plist_add NULL+0x548 Oops）。 */
+		 * 跳过该 entry（首刷 30.5s plist_add NULL+0x548 Oops）。 */
 		if (!waiter) {
 			cursor = next;
 			continue;
@@ -557,7 +557,7 @@ void do_rwsem_list_insert(struct metis618_rwsem_waiter *waiter,
 	 * （前次 already=true 未 add，waiter 仍挂在链上）；若本 waiter 已挂在
 	 * sem->wait_list（list 非空即视为在链——本链是唯一归属），直接置
 	 * already 返回，复现 stock "already on list" 语义并规避
-	 * list_add double add BUG（#143 实证 lmkd fork 路径）。 */
+	 * list_add double add BUG（lmkd fork 路径实证）。 */
 	if (!list_empty(&waiter->list)) {
 		*already_on_list = true;
 		return;
@@ -615,7 +615,7 @@ void mi_rwsem_list_add_hook(void *unused, struct rwsem_waiter *waiter_opaque,
 		return;
 	/* rodin 6.18 防重入强化：list_empty 只挡独占成环（首调 waiter 栈上
 	 * 未初始化、多 waiter 在链时亦为假），扫链命中本 waiter 即置 already
-	 * 返回——#143 多 waiter 重入形态闭包，且先于 qos/feat 各门。 */
+	 * 返回——多 waiter 重入形态闭包，且先于 qos/feat 各门。 */
 	{
 		struct list_head *cur = READ_ONCE(sem->wait_list.prev);
 

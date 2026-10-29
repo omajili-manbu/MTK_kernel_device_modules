@@ -613,7 +613,7 @@ static ssize_t show_hba_show(struct device *dev, struct device_attribute *attr, 
 			g_ufs_info->hba->ufs_stats.event[UFS_EVT_ABORT].cnt);
 
 	/* 6.18 provider 无 ufs_mtk_host.uic_stats（6.6 MTK 私有计数器已随上游删除），
-	 * 本段 6.6 真机不可达（hba 恒 NULL），按最近邻内核计数器挂接保行集（#166 记档）。
+	 * 本段 6.6 真机不可达（hba 恒 NULL），按最近邻内核计数器挂接保行集。
 	 */
 	host = ufshcd_get_variant(g_ufs_info->hba);
 	(void)host;

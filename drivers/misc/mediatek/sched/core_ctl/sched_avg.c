@@ -430,7 +430,7 @@ EXPORT_SYMBOL(sched_get_nr_over_thres_avg);
 
 static void over_thresh_chg_notify(void)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	int cpu;
@@ -652,7 +652,7 @@ void pelt_se_tp(void *data, struct sched_entity *se)
 	}
 
 	/*
-	 * rodin 6.18（A-75 同形）：DELAY_DEQUEUE 下的阻塞任务仍满足 on_rq ——
+	 * rodin 6.18（2026-10-16 同形）：DELAY_DEQUEUE 下的阻塞任务仍满足 on_rq ——
 	 * dequeue_task_fair() 拒绝出队、置 se->sched_delayed = 1 就提前返回，
 	 * 只有后续的收尾路径才真正把 se->on_rq 清零；而本处理器还会被
 	 * __update_load_avg_blocked_se()（pelt.c）这条阻塞路径触发。只判 on_rq
@@ -719,8 +719,8 @@ void inc_nr_over_thres_running(void *data, struct rq *rq, struct task_struct *p,
 		return;
 
 	/*
-	 * rodin 6.18（A-62 家族）：新任务复用一个仍是 delayed 的实体时
-	 * （task_new && se->sched_delayed），6.18 本轮不把它计入可运行
+	 * rodin 6.18（2026-10-17）：新任务复用一个仍是 delayed 的实体时
+	 * （task_new && se->sched_delayed），6.18 不把它计入可运行
 	 * （kernel/sched/fair.c:7243-7244 把 h_nr_runnable 置 0，实体留待
 	 * requeue_delayed_entity() 清延迟后才重新计数）。本钩子同步跳过，
 	 * 否则超额运行计数会比 cfs_rq 多一个僵尸。
@@ -952,7 +952,7 @@ static int init_attribs(void)
 
 int init_sched_avg(void)
 {
-	/* rodin 6.18（分区 A · 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
+	/* rodin 6.18（2026-10-12 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
 	 * gki_defconfig 内置 android_arch_task_struct_size=512）⇒ 只能运行期校验；
 	 * 不足则本族钩子/节点全部不注册（安全降级；绝不越界写 task_struct 邻区）。
 	 */

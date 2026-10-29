@@ -9,7 +9,7 @@
 #include <trace/hooks/vendor_hooks.h>
 #include <linux/platform_device.h> /* rodin r25: 6.18 header pruning */
 #include <trace/hooks/avc.h>
-/* rodin b247: creds 族 vendor hook（android_rvh_{commit,exit,override,revert}_creds）
+/* rodin 2026-10-12: creds 族 vendor hook（android_rvh_{commit,exit,override,revert}_creds）
  * 只存在于带 6.6 兼容层的内核树（调用点 kernel/cred.c + 声明 trace/hooks/creds.h，
  * port 树实证）；纯上游 android17-6.18-lts 两者皆无 ⇒ 本树内该族注册无意义
  * （hook 不存在 ⇒ 回调永不会被触发）。用 __has_include 守卫：换到带该族的内核树
@@ -189,7 +189,7 @@ static void probe_android_rvh_set_module_core_rw_nx(void *ignore,
 bool full_kernel_code_2m;
 #endif
 
-/* rodin b57: krn 面 rodata（含 grant-ticket 槽页 subscribe）保护落地标志。
+/* rodin 2026-09-30: krn 面 rodata（含 grant-ticket 槽页 subscribe）保护落地标志。
  * 必须是普通 .bss 变量——__ro_after_init 落在保护范围 [_etext,__init_begin]
  * 内，保护生效后再写会触发 GZ fault 路径。=y 内建态以它为 ESS_1 的门。 */
 static bool mkp_krn_protect_done;
@@ -217,11 +217,11 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 	unsigned long addr_start_2m = 0, addr_end_2m = 0;
 #endif
 
-	/* rodin b57: =y 内建态必须等到 system_state == SYSTEM_RUNNING（内核
+	/* rodin 2026-09-30: =y 内建态必须等到 system_state == SYSTEM_RUNNING（内核
 	 * mark_readonly() 之后）才落地 rodata 保护：__ro_after_init 全内核在
 	 * mark_readonly 前持续被写（OEM =m 的保护发生在用户态装载期，远晚于
 	 * mark_readonly，从无此窗口），保护早于它会把 OEM 不存在的
-	 * "保护后写 ro_after_init" 变成 GZ fault/注入（#105 实证）。=m 时
+	 * "保护后写 ro_after_init" 变成 GZ fault/注入（实证）。=m 时
 	 * 本门被 THIS_MODULE 恒假折叠，OEM 时序不变。 */
 	if (!THIS_MODULE && system_state != SYSTEM_RUNNING) {
 		if (--retry_num >= 0)
@@ -343,7 +343,7 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		else {
 			ret = mkp_set_mapping_ro(policy, handle);
 			pr_info("mkp: protect krn rodata done\n");
-			/* rodin b57: rodata 保护落地（覆盖 grant-ticket 槽页）——
+			/* rodin 2026-09-30: rodata 保护落地（覆盖 grant-ticket 槽页）——
 			 * 服务端 post-grant mapping op 的 ticket 只能由"对槽页的
 			 * 写入 fault"产生（GZ mkp_service produce_ticket 反汇编
 			 * 实证），故此处置位、并作为 =y ESS_1 的门。 */
@@ -351,7 +351,7 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		}
 	}
 
-	/* rodin b57: =y 的 start granting 在此执行（krn 面 rodata 保护落地
+	/* rodin 2026-09-30: =y 的 start granting 在此执行（krn 面 rodata 保护落地
 	 * 之后）：槽 magic 经受保护写 fault→GZ produce 跳过后仍为 magic，
 	 * ESS_1 换牌（ticket_key）后 post-grant ticket 纪律生效；此后内核
 	 * 自身不再写 ro_after_init（mark_readonly 已过），无违规写窗口。
@@ -378,8 +378,8 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 		return;
 	}
 	if (mod != THIS_MODULE && policy_ctrl[MKP_POLICY_DRV] != 0) {
-		/* rodin #159: 6.6 blob（mod->rodin_66，装载器 force-load 时置位）
-		 * 停用 DRV 面 S2 保护 op。真机 #159：grant（ESS_1, 5.568s）后
+		/* rodin 2026-10-03: 6.6 blob（mod->rodin_66，装载器 force-load 时置位）
+		 * 停用 DRV 面 S2 保护 op。真机：grant（ESS_1, 5.568s）后
 		 * 首个模块保护 op（scene_swappiness @6.370s 的 module_load 钩子，
 		 * grant 后唯一 mapping op 发起面）在 GZ mkp_service 内不返回：
 		 * 服务端反汇编（b57 tee/mkp_service）mapping op（HVC_FUNC
@@ -395,15 +395,15 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 		 * （map_for_2mb_mapping_compaction / reset_to_s2_mapping_attrs），
 		 * 模块页 PFN-group 的 op 触及含槽页的 2M 块时槽页 S2 RO 被重置，
 		 * 后续 poke 落地不再 fault => 无票 => 首 op 即 panic。同一内核
-		 * 代码、同一 blob 在 #151 时代（10-02）可通过 = 模块页 PA 布局
+		 * 代码、同一 blob 在早前（10-02）可通过 = 模块页 PA 布局
 		 * 随内核构建漂移，属结构性彩票而非单点回归；服务端闭源不可修。
 		 * =y 面 =m 全集即 blob（源码一律 =y，内建总计划），blob 文本由
 		 * 6.18 装载器 strict_module_rwx 自护，mkp S2 层对其属冗余加固
 		 * 却承载全部死机风险，故停用；源码 =m 模块（rodin_66=false）
-		 * 不受影响。krn code/rodata/TASK_CRED/AVC 面保留（#159 boot
+		 * 不受影响。krn code/rodata/TASK_CRED/AVC 面保留（boot
 		 * 5.57-6.37s cred 更新全程正常实证）。恢复：服务端票据路径
 		 * 真机稳定实证后按 b54-b57 方法回归再启用。 */
-		/* rodin b247: 原此处对 mod->rodin_66（兼容层给 struct module 加的
+		/* rodin 2026-10-12: 原此处对 mod->rodin_66（兼容层给 struct module 加的
 		 * "6.6 布局构建" 标记）早退，意图 = blob 页不停用本层保护。纯上游
 		 * android17-6.18-lts 无该字段 ⇒ 条件恒假，与该 if 之后的路径逐字等效
 		 * （即原注释"源码 =m 模块（rodin_66=false）不受影响"那一支）。 */
@@ -415,9 +415,9 @@ static void probe_android_rvh_set_module_permit_before_init(void *ignore,
 	}
 }
 
-/* rodin b559: 五个生产者（四 RVH + task_newtask）的推送结果原先全部
+/* rodin 2026-10-05: 五个生产者（四 RVH + task_newtask）的推送结果原先全部
  * 丢弃——任何一环丢写（含 secure 侧拒收）都让 check_cred 拿陈旧槽位
- * 误报且无痕迹（#197 盲区）；此处仅补失败可见性，不改推送语义。 */
+ * 误报且无痕迹（盲区）；此处仅补失败可见性，不改推送语义。 */
 #if __has_include(<trace/hooks/creds.h>)
 static void probe_android_rvh_commit_creds(void *ignore, const struct task_struct *task,
 	const struct cred *new)
@@ -957,7 +957,7 @@ static void probe_android_vh_check_bpf_syscall(void *ignore,
 
 static int __init protect_mkp_self(void)
 {
-	/* rodin b53: 内建态 THIS_MODULE 恒为 NULL（6.6 =m 时才指向自身
+	/* rodin 2026-09-30: 内建态 THIS_MODULE 恒为 NULL（6.6 =m 时才指向自身
 	 * module 结构）；内建代码的 text/rodata 属内核镜像，已由
 	 * mkp_protect_kernel_work_fn（protect krn code/rodata）统一覆盖，
 	 * 故仅 =m 形态保留模块面保护。 */
@@ -966,30 +966,30 @@ static int __init protect_mkp_self(void)
 		module_enable_nx(THIS_MODULE, MKP_POLICY_MKP);
 		module_enable_x(THIS_MODULE, MKP_POLICY_MKP);
 	}
-	/* rodin b55: ESS_1（start granting）恢复全形态执行——它是 grant 协议
+	/* rodin 2026-09-30: ESS_1（start granting）恢复全形态执行——它是 grant 协议
 	 * 的使能步，OEM 时序恒在 sharebuf 创建之前；b54 随三连调 =m-only 属
 	 * 过度矫正：#105 实证 =y 缺失时首个 AVC sharebuf 的 cookie 写被
 	 * secure 侧判违规并按其设计注入 dabt 打死内核（FAR=0xfedcba9876543210、
 	 * FSC=0x3f；pkvm_mkp/hyp/mkp_handler.c 同款"inject a dabt to EL1"）。
 	 * =y 无自面 handle 不影响本事件；b54 mkp_hvc_svc_lock 已保证单
-	 * secure-op 串行，#104 的并发窗已闭。
-	 * rodin b57: 服务端（GZ mkp_service 反汇编）ESS_1 = 校验槽 magic 并
+	 * secure-op 串行，并发窗已闭。
+	 * rodin 2026-09-30: 服务端（GZ mkp_service 反汇编）ESS_1 = 校验槽 magic 并
 	 * 以 per-boot ticket_key 换牌、置 start_granting；其门是"槽=magic"
 	 * 与"rodata 保护已落地"（post-grant ticket 纪律），不是 b56 猜的
 	 * owner 态。=m 维持 OEM 无条件时序；=y 以 mkp_krn_protect_done 为门
-	 * （#106：ESS_1 先于 rodata 保护 => post-grant 首 mapping op 无
+	 * （ESS_1 先于 rodata 保护 => post-grant 首 mapping op 无
 	 * ticket => do_action_panic(189) => GZ 静默死机）。 */
 	if (THIS_MODULE) {
-		/* rodin b57: =m 保持 OEM 时序：三连调后立即 start granting
+		/* rodin 2026-09-30: =m 保持 OEM 时序：三连调后立即 start granting
 		 * （OEM 的 krn 面 work 由模块装载时序保证远晚于内核
 		 * mark_readonly）。 */
 		mkp_start_granting_hvc_call();
 		return 0;
 	}
-	/* rodin b57: =y 的 ESS_1 推迟到 mkp_pk_work 内（SYSTEM_RUNNING 且
+	/* rodin 2026-09-30: =y 的 ESS_1 推迟到 mkp_pk_work 内（SYSTEM_RUNNING 且
 	 * krn 面 rodata 保护落地后）执行——见 mkp_protect_kernel_work_fn。
 	 * 此处不 grant：initcall 期 rodata 保护未落地，grant 后的
-	 * post-grant ticket 纪律无 ticket 可产（#106 机理）；sharebuf 等
+	 * post-grant ticket 纪律无 ticket 可产（机理）；sharebuf 等
 	 * 全部 op 停在 pre-grant 旁路态直到 work 完成 grant。 */
 	return 0;
 }
@@ -1236,14 +1236,14 @@ int __init mkp_demo_init(void)
 
 #if !IS_ENABLED(CONFIG_KASAN_GENERIC) && !IS_ENABLED(CONFIG_KASAN_SW_TAGS)
 #if !IS_ENABLED(CONFIG_GCOV_KERNEL)
-	/* rodin b57: krn 面保护与 ESS_1（start granting）都以 mkp_pk_work
+	/* rodin 2026-09-30: krn 面保护与 ESS_1（start granting）都以 mkp_pk_work
 	 * 执行；=y 内建态在 work 内再等 system_state == SYSTEM_RUNNING（内核
 	 * mark_readonly 之后）——__ro_after_init 全内核在 mark_readonly 前持续
-	 * 被写，rodata 保护早于它将制造 OEM 不存在的 fault 窗口（#105 实证：
+	 * 被写，rodata 保护早于它将制造 OEM 不存在的 fault 窗口（实证：
 	 * g_ro_avc_handle 写被 GZ 判违规注入 dabt）。=m 的 OEM 时序（模块装载
 	 * 期）天然满足该门，不受影响。post-grant mapping op 的 ticket 只能由
 	 * 对受保护槽页的写入 fault 产生（GZ mkp_service produce_ticket 反汇编
-	 * 实证），故 rodata 保护必须先于 ESS_1——#106 即 ESS_1 先行 =>
+	 * 实证），故 rodata 保护必须先于 ESS_1——即 ESS_1 先行 =>
 	 * 首 post-grant op 无 ticket => do_action_panic(189) => GZ 静默死机
 	 * （0.412s 起双 CPU 困 EL3、零回栈）。 */
 	schedule_delayed_work(&mkp_pk_work, 0);
@@ -1311,7 +1311,7 @@ int __init mkp_demo_init(void)
 		}
 	}
 #else /* !__has_include(<trace/hooks/creds.h>) */
-	/* rodin b247 复审 D3: 策略被请求但本树无 creds vendor hook —— 明确可见，不静默。 */
+	/* rodin 2026-10-12 复审: 策略被请求但本树无 creds vendor hook —— 明确可见，不静默。 */
 	if (policy_ctrl[MKP_POLICY_TASK_CRED] != 0)
 		MKP_ERR("TASK_CRED policy is enabled but this kernel has no creds vendor hooks "
 			"(trace/hooks/creds.h absent) -- cred policy stays inert\n");

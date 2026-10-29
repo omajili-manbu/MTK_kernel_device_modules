@@ -12,9 +12,9 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
-#include <linux/mod_devicetable.h> /* rodin b4: 6.18 of_device.h pruning */
+#include <linux/mod_devicetable.h> /* rodin 2026-09-26: 6.18 of_device.h pruning */
 #include <linux/workqueue.h>
-#include <soc/mediatek/mtk_smi_internal.h> /* rodin P1: vendor smi declarations (kernel smi.h shadows the vendor copy) */
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin: vendor smi declarations (kernel smi.h shadows the vendor copy) */
 
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 #include <aee.h>

@@ -23,7 +23,7 @@
 #endif
 #include <dt-bindings/memory/mtk-memory-port.h>
 /*
- * rodin A-92: the kernel tree's dt-bindings/memory/mtk-memory-port.h caps
+ * rodin 2026-10-12: the kernel tree's dt-bindings/memory/mtk-memory-port.h caps
  * MTK_M4U_TO_LARB at a 5-bit mask (0x1f, MTK_LARB_NR_MAX 32), while mt6899
  * has larbs up to 42 (mt6899-larb-port.h: M4U_L32..M4U_L42) and the vendor
  * value is a 6-bit mask.  In this build the vendor increment only reaches

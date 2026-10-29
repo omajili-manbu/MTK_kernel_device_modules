@@ -53,9 +53,9 @@ extern xiaomi_touch_t xiaomi_touch;
 
 /* current_log_level 定义在 xiaomi_touch_core.c（blob GLOBAL .data+0x150） */
 
-/* _b583-XT2：boost 子状态视图 —— blob 里它就是 xiaomi_touch_data_t 的尾部（同体！），
+/* rodin（2026-10-08）：boost 子状态视图 —— blob 里它就是 xiaomi_touch_data_t 的尾部（同体！），
  * 证据三重：① blob 的"boost 槽访问器"就是 get_xiaomi_touch_data @0x3f8（实参/串全同，
- * b567 因 =y 符号撞名才让名 _boost；本文件现直接复用之）；② 元素步长 0x2A78 == 本槽步长
+ * 因 =y 符号撞名才让名 _boost；本文件现直接复用之）；② 元素步长 0x2A78 == 本槽步长
  * 0x2A78（get_xiaomi_touch_data umaddl #0x2a78；两端闭合 &param[1]=.bss+0x2a90、
  * driver_param=.bss+0x5500）；③ 元素 ready 单槽 @0x2A20 后紧接 enable @0x2A24。
  * ⇒ 树侧原独立数组 xiaomi_touch_irq_slot[2]（重复 2×0x2A78）删除，改为元素尾部视图，
@@ -92,7 +92,7 @@ static_assert(sizeof(xiaomi_touch_data_t) == offsetof(xiaomi_touch_data_t, boost
 
 /* blob 里无独立 boost 访问器：两侧共用 get_xiaomi_touch_data @0x3f8（其两道串
  * "touch id %d hasn't select, return!"/"panel in touch id %d hasn't register, return!"
- * 即本函数原串，b567 已逐字对齐）。此处仅做类型视图转换，不再自带日志
+ * 即本函数原串，已逐字对齐）。此处仅做类型视图转换，不再自带日志
  * ⇒ 串面 tree-only 项 `get_xiaomi_touch_boost_data` 随之清零。 */
 struct xiaomi_touch_irq_boost *get_xiaomi_touch_boost_data(int id)
 {
@@ -289,7 +289,7 @@ static void init_touch_irq_boost(int id, struct device_node *np)
 		goto disable;
 	}
 
-	/* _b583-XT③：blob 0x376c-0x37a8 —— qos kcalloc 成功且 current_log_level>=3
+	/* rodin（2026-10-08）：blob 0x376c-0x37a8 —— qos kcalloc 成功且 current_log_level>=3
 	 * （0x3770 `cmp w8,#0x3`、0x3778 `b.hs 0x39f8`）时打一条 I 级日志：
 	 *   0x3a08 `ldr w4,[x22,#0x2a38]`（boost->policy_num）
 	 *   0x3a0c 串 = .rodata.str1.1+0x14a3 = "[MI_TP_I][%s:%d]: cpu: %d, policy num: %d"

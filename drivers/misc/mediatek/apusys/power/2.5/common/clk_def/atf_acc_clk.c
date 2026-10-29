@@ -4,7 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
 
 static int mt6877_clk_en;
 static struct mutex mt6877_clk_lock;

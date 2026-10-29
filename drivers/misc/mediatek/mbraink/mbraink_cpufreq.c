@@ -5,7 +5,7 @@
 
 #include <linux/pm_qos.h>
 #include <linux/vseq.h>
-#include <linux/workqueue.h> /* rodin b515 #115 */
+#include <linux/workqueue.h> /* rodin 2026-10-01 */
 #include <linux/hashtable.h>
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
@@ -28,7 +28,7 @@ static int is_hooked;
 static struct notifier_block *freq_qos_max_notifier, *freq_qos_min_notifier;
 static int cluster_num;
 
-/* rodin b515 #115: cpufreq policy 就绪前不建 freq qos hooks（=y 后本函数在 vseq_module_init
+/* rodin 2026-10-02: cpufreq policy 就绪前不建 freq qos hooks（=y 后本函数在 vseq_module_init
  * 1.12s 执行 ⇒ cluster_num=0 ⇒ kcalloc(0)+hooks 永久漏注册；6.6 靠 .ko 装载序 3.57s
  * 天然就绪）。200ms×50=10s 有界重试。 */
 static void mbraink_cpufreq_init_retry(struct work_struct *work);
@@ -378,7 +378,7 @@ static void clear_freq_qos_notifier(void)
 	kfree(freq_qos_min_notifier);
 }
 
-/* rodin b515 #115: 数 policy 集群数；==CPU_CLUSTER_SZ 才算就绪（防半程注册只挂部分簇）。 */
+/* rodin 2026-10-01: 数 policy 集群数；==CPU_CLUSTER_SZ 才算就绪（防半程注册只挂部分簇）。 */
 static int mbraink_cpufreq_policies_ready(void)
 {
 	struct cpufreq_policy *policy;
@@ -404,7 +404,7 @@ int mbraink_cpufreq_notify_init(void)
 {
 	is_hooked = 0;
 
-	/* rodin b515 #115: policy 未齐 ⇒ defer；超限按原行为继续并保留原警告作诊断
+	/* rodin 2026-10-01: policy 未齐 ⇒ defer；超限按原行为继续并保留原警告作诊断
 	 * （init_freq_qos_notifier 的 CPU_CLUSTER_SZ not aligned 打印即诊断锚）。 */
 	if (mbraink_cpufreq_policies_ready() != CPU_CLUSTER_SZ) {
 		if (mbraink_cpufreq_init_tries++ < 50) {
@@ -435,7 +435,7 @@ void mbraink_cpufreq_notify_exit(void)
 	struct h_node *cur = NULL;
 	struct hlist_node *tmp = NULL;
 
-	cancel_delayed_work_sync(&mbraink_cpufreq_init_work); /* rodin b515 #115 */
+	cancel_delayed_work_sync(&mbraink_cpufreq_init_work); /* rodin 2026-10-01 */
 	mbraink_remove_freq_qos_hook();
 	clear_freq_qos_notifier();
 	// Remove hash table

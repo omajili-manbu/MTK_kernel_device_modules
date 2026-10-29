@@ -23,7 +23,7 @@
 #include <linux/sched/clock.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/signal.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 #include <linux/spinlock.h>
 #include <linux/suspend.h>
 #include <linux/sysrq.h>
@@ -511,7 +511,7 @@ static void kwdt_time_sync(void)
 }
 
 /*
- * rodin P1: 6.18 dropped arch/arm64's ipi_desc[] array and its
+ * rodin: 6.18 dropped arch/arm64's ipi_desc[] array and its
  * ipi_desc_get() accessor (the 6.6/port kernels export both, nr_ipi_get()
  * is still exported), so the arm64 fast path no longer builds.  Use this
  * file's own portable enumeration instead: walk the irq descriptors and

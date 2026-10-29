@@ -148,7 +148,7 @@ void mi_mutex_lock_starttime(void *unused, struct mutex *lock)
 		pr_info("metis-link: record mutex lock, cs_stat_type: %d\n", (s32)stat);
 	task = current;
 	mi_record_lock_starttime(task, start, "mutex");
-	/* rodin 174 轮 C 案：vip_blocked_on_mutex 读者死门控（payload 无消费
+	/* rodin 6.18（2026-10-27）：vip_blocked_on_mutex 读者死门控（payload 无消费
 	 * 者），其后 0x2000/50-tick 接力块整体退役 —— stock 本就从未活体。 */
 }
 

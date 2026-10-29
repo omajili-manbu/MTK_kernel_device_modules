@@ -3239,7 +3239,7 @@ static int scp_device_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 #if SCP_RESERVED_MEM && defined(CONFIG_OF)
-	/* rodin b514 #114: 前移到 ipidev 注册之前 —— b513 的 "ipidev 就绪"
+	/* rodin 2026-10-01: 前移到 ipidev 注册之前 —— 早前 "ipidev 就绪"
 	 * 一次性通知链（mtk_ipi_dev_register_ready_notifier）不蕴含预留内存
 	 * 已建立；顺序反转后不变量 "ipidev ready ⇒ reserved mem ready" 成立。
 	 * memorydump_size_probe 与 ioremap 一起前移（scp_get_secure_dump_size()

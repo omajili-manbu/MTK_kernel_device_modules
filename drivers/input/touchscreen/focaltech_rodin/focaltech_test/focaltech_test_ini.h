@@ -26,7 +26,7 @@
 #define IC_CODE_OFFSET                          (16)
 #define FTS_MAX_COMPATIBLE_TYPE                  4
 
-/* _b571：CSV/TXT_SUPPORT 迁活区（原定义在 focaltech_test.h 的死区 #if 0 内，
+/* rodin（2026-10-06）：CSV/TXT_SUPPORT 迁活区（原定义在 focaltech_test.h 的死区 #if 0 内，
  * 导致 csv/txt 链整段被剔除——blob 二进制证明 csv 链 =1：csv_data_buffer
  * vmalloc(0x64000)@fts_test_init 0x16594 在）。
  * _b582-INTB 更正：TXT_SUPPORT=0——blob 无 testresult 分配（fts_test_main_init 仅一次
@@ -441,7 +441,7 @@ struct fts_test_fail_buf {
 #define FTS_TEST_OFF_BLACK		0x12d7f4
 #define FTS_TEST_OFF_DIFFER	0x1335b4
 #define FTS_TEST_SIZE		0x139378
-/* _b581：A-74 续行④ —— CSV 文本缓冲尺寸（blob fts_test_init 0x1658c 立即数
+/* rodin（2026-10-08）：续行④ —— CSV 文本缓冲尺寸（blob fts_test_init 0x1658c 立即数
  * 0x64000 = 409600；vmalloc 与 memset 同长） */
 #define FTS_TEST_CSV_BUF_SIZE	0x64000
 
@@ -468,13 +468,13 @@ struct fts_test {
     int *rawshift_fre_data;           /* 0x78 blob: 9*node_num ints（donor buffer 位） */
     u8 reserved_80[8];                /* 0x80..0x87 */
     int *item8_data;                  /* 0x88 第 8 个 malloc 数组（malloc/free_item_data 配对） */
-    /* _b582-TEST：A-80③ 偏移收口（全部为符号访问，重排对 C 代码透明；总尺寸不变）——
+    /* rodin（2026-10-08）：偏移收口（全部为符号访问，重排对 C 代码透明；总尺寸不变）——
      * blob 实证：buffer@0x90（fts_test_main_init 0x151e4 vzalloc 后 0x151ec str x0,[x19,#0x90]）、
      * buffer_length@0x98（0x151d4 str w2,[x19,#0x98]）、node_valid@0xa0（fts_test_malloc_free_thr
      * 0x1678c str x0,[x19,#0xa0]）、node_valid_sc@0xa8（0x167a8）、basic_thr_count@0xb0
      * （get_basic_threshold 0x1cf44 ldr w3,[x8,#0xb0]、0x1cf54 ldr w9,[x8,#0xb0]）。
      * 原树把 node_valid_sc/basic_thr_count 摆在 0x90/0x98、把 buffer/buffer_length 摆在
-     * 0x11a0/0x11a8（donor 位）⇒ 本轮按 blob 归位，0x9c-0x9f / 0xb4-0xb7 为洞。 */
+     * 0x11a0/0x11a8（donor 位）⇒ 已按 blob 归位，0x9c-0x9f / 0xb4-0xb7 为洞。 */
     int *buffer;                      /* 0x90 blob 实证（main_init str / start_test_ft5672 memset） */
     int buffer_length;                /* 0x98 blob 实证（main_init 0x151d4） */
     u8 reserved_9c[4];                /* 0x9c..0x9f 洞（blob 无成员） */
@@ -482,7 +482,7 @@ struct fts_test {
     int *node_valid_sc;               /* 0xa8 blob 实证（fts_test_malloc_free_thr 0x167a8/0x167d8） */
     int basic_thr_count;              /* 0xb0 blob 实证（get_basic_threshold 0x1cf44） */
     u8 reserved_b4[4];                /* 0xb4..0xb7 洞（blob 无成员） */
-    /* _b581：A-74 续行④ 归位 —— blob 的 CSV 文本缓冲在 struct fts_test+0xb8：
+    /* rodin（2026-10-08）：续行④ 归位 —— blob 的 CSV 文本缓冲在 struct fts_test+0xb8：
      *   fts_test_init 0x1658c-0x165c0: vmalloc(0x64000) -> str x0,[fts_ftest,#0xb8]
      *   -> memset(buf,0,0x64000)（失败打 "malloc csv_file_buf fail"）
      *   fts_csv_show   0x18844: ldr x0,[x1,#0xb8]（"tdata/csv_file_buf is null" 自名）
@@ -490,17 +490,17 @@ struct fts_test {
      * 前移至 0xa8 保留洞的尾 8 字节（其余偏移不变，struct 尺寸不变）。 */
     char *csv_data_buffer;            /* 0xb8 blob 实证（0x1659c str / 0x18844 ldr） */
     int csv_item_cnt;                 /* 0xc0 */
-    /* _b583-FT3683 A 组勘误：blob 机器码实测 +0xc4 = scap_cb 位图、+0xc8 = scap_rawdata
+    /* rodin（2026-10-08 勘误）：blob 机器码实测 +0xc4 = scap_cb 位图、+0xc8 = scap_rawdata
      * 位图（写侧 scap_cb_ccbypass 0x20644/0x2368c/0x23b5c `ldp [x19,#0xc0]`+orr 1/2/4 →
      * +0xc4；scap_rawdata 0x20548/0x22a?? orr → +0xc8；读侧 save_data L1 SCAP Rawdata
      * Test 门 0x24a4c ldr [x20,#0xc8]、SCAP CB Test 门 0x24aa0 ldr [x20,#0xc4]、T1
-     * 0x2519c/0x253fc、F3 0x270cc/0x2744c 同向）。原声明两字段名义互换，本轮更名归位。 */
+     * 0x2519c/0x253fc、F3 0x270cc/0x2744c 同向）。原声明两字段名义互换，已更名归位。 */
     int csv_item_scb;                 /* 0xc4 scap_cb 三段 WP 位图 bit0/1/2 = on/off/high */
     int csv_item_sraw;                /* 0xc8 scap_rawdata 位图 bit0/1/2 = on/off/(hi) */
     u32 data_valid_mask;              /* 0xcc seg3: bit0..5=6频点 bit6..8=min/max/differ */
     u32 rawshift_result_mask;         /* 0xd0 bit0=black bit1=white bit2=compared（pic 状态机） */
     int csv_item_af_noise;            /* 0xd4 */
-    /* _b583-FT3683：0xd8 归位（save_data JumpFreqNoise 记录 15 段位门控，
+    /* rodin（2026-10-08）：0xd8 归位（save_data JumpFreqNoise 记录 15 段位门控，
      * 0x27838-0x2795c 逐 case `ldrb w8,[x20,#0xd8]; tbz w8,#idx`） */
     int jump_fre_noise_item_mask;     /* 0xd8 15 组跳频对已测位图（bit i = 第 i 对） */
     u8 reserved_dc[0xc];              /* 0xdc..0xe7（blob 未见引用） */
@@ -518,7 +518,7 @@ struct fts_test {
     struct fts_test_data testdata;    /* 0x3d8 (0x808) */
     char *testresult;                 /* 0xbe0 */
     int testresult_len;               /* 0xbe8 */
-    /* _b581：0xbf0..0xbf7 = donor 的 csv 指针位；blob 该 8 字节无对应成员
+    /* rodin（2026-10-08）：0xbf0..0xbf7 = donor 的 csv 指针位；blob 该 8 字节无对应成员
      * （blob 的 csv 缓冲在 +0xb8），保留为洞以免破坏其后全部锚点偏移。 */
     u64 reserved_bf0[1];              /* 0xbf0..0xbf7 blob 无此成员（u64 保 8B 对齐） */
     int result;                       /* 0xbf8 */
@@ -532,7 +532,7 @@ struct fts_test {
     u8 lockdown_info[8];              /* 0x1158 start_test lockdown 8B 锚点 */
     int rawdata_max;                  /* 0x1160 seg2 save_data RawDataRecord */
     int rawdata_min;                  /* 0x1164 */
-    /* _b583-FT3683：0x1168-0x1197 由 reserved 归位（save_data F3 各记录节 max/min 实读点，
+    /* rodin（2026-10-08）：0x1168-0x1197 由 reserved 归位（save_data F3 各记录节 max/min 实读点，
      * 逐点 = blob save_data 汇编；命名 = 记录节归属）：
      *   Txlinearity 0x26a34/0x26a38 → 0x1168/0x116c
      *   Rxlinearity 0x26b54/0x26b58 → 0x1170/0x1174
@@ -554,13 +554,13 @@ struct fts_test {
     int scap_rawdata_off_result_min;  /* 0x1194 */
     int panel_differ_max;             /* 0x1198 */
     int panel_differ_min;             /* 0x119c */
-    /* _b583-FT3683：0x11a0-0x11a7 归位（NoiseRecord 0x26da8/0x26dac → 0x11a0/0x11a4） */
+    /* rodin（2026-10-08）：0x11a0-0x11a7 归位（NoiseRecord 0x26da8/0x26dac → 0x11a0/0x11a4） */
     int noise_result_max;             /* 0x11a0 */
     int noise_result_min;             /* 0x11a4 */
     u8 reserved_11a8[4];              /* 0x11a8..0x11ab（blob 未见引用） */
     int code1;                        /* 0x11ac */
     int uniformity_min_max_value;     /* 0x11b0（原树名 code2；save_data 0x26c58 读作 min/max 判定当前值） */
-    /* _b583-FT3683：0x11b4-0x125b 归位（save_data Aux/Jump 记录节逐 idx 实读点）：
+    /* rodin（2026-10-08）：0x11b4-0x125b 归位（save_data Aux/Jump 记录节逐 idx 实读点）：
      *   AuxiliaryFreq[%d]NoiseRecord 0x26fa4/0x26fa8 → tdata+idx*4+0x11b4 / +0x11cc（idx 0..5）
      *   JumpFreqNoise[i->j]Record   0x27974/0x27978 → tdata+idx*4+0x11e4 / +0x1220（idx 0..14） */
     int aux_noise_max[6];             /* 0x11b4 */
@@ -608,7 +608,7 @@ _Static_assert(__builtin_offsetof(struct fts_test, rawshift_pic_white_data) == F
 _Static_assert(__builtin_offsetof(struct fts_test, rawshift_pic_black_data) == FTS_TEST_OFF_BLACK, "black@0x12d7f4");
 _Static_assert(__builtin_offsetof(struct fts_test, rawshift_pic_differ_data) == FTS_TEST_OFF_DIFFER, "differ@0x1335b4");
 _Static_assert(sizeof(struct fts_test) == FTS_TEST_SIZE, "fts_test total 0x139378");
-/* _b582-TEST：A-80③ 偏移收口判据（blob 逐点实证；node_valid_sc/basic_thr_count 由
+/* rodin（2026-10-08）：偏移收口判据（blob 逐点实证；node_valid_sc/basic_thr_count 由
  * donor 的 0x90/0x98 归位到 blob 的 0xa8/0xb0，buffer/buffer_length 由 donor 的
  * 0x11a0/0x11a8 归位到 blob 的 0x90/0x98，proc_entry 由 global 归位到 0x3d0）。 */
 _Static_assert(__builtin_offsetof(struct fts_test, buffer) == 0x90, "buffer@0x90 (blob main_init 0x151ec)");
@@ -618,7 +618,7 @@ _Static_assert(__builtin_offsetof(struct fts_test, node_valid_sc) == 0xa8, "node
 _Static_assert(__builtin_offsetof(struct fts_test, basic_thr_count) == 0xb0, "basic_thr_count@0xb0 (blob get_basic_threshold 0x1cf44)");
 _Static_assert(__builtin_offsetof(struct fts_test, proc_entry) == 0x3d0, "proc_entry@0x3d0 (blob fts_test_init 0x16650)");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_cnt) == 0xc0, "csv_item_cnt@0xc0");
-/* _b581：A-74 续行④ 判据——blob 的 csv 文本缓冲在 +0xb8（fts_test_init 0x1659c
+/* rodin（2026-10-08）：续行④ 判据——blob 的 csv 文本缓冲在 +0xb8（fts_test_init 0x1659c
  * str / fts_csv_show 0x18844 ldr），与树侧同名字段必须同址；0xbf0 只许是洞。 */
 _Static_assert(__builtin_offsetof(struct fts_test, csv_data_buffer) == 0xb8, "csv_data_buffer@0xb8 (blob 0x1659c/0x18844)");
 _Static_assert(__builtin_offsetof(struct fts_test, csv_item_scb) == 0xc4, "csv_item_scb@0xc4 (blob scap_cb 位图, 0x20644/0x24aa0/0x2744c)");
@@ -627,7 +627,7 @@ _Static_assert(__builtin_offsetof(struct fts_test, csv_item_af_noise) == 0xd4, "
 _Static_assert(__builtin_offsetof(struct fts_test, item1_data) == 0x40, "item1@0x40");
 _Static_assert(__builtin_offsetof(struct fts_test, item7_data) == 0x70, "item7@0x70");
 _Static_assert(__builtin_offsetof(struct fts_test, rawshift_fre_data) == 0x78, "rawshift_fre_data@0x78");
-/* _b583-FT3683：F3 记录节 max/min 槽位锚点（blob save_data 逐点实证，见各字段注释） */
+/* rodin（2026-10-08）：F3 记录节 max/min 槽位锚点（blob save_data 逐点实证，见各字段注释） */
 _Static_assert(__builtin_offsetof(struct fts_test, tx_linearity_result_max) == 0x1168, "tx_lin_max@0x1168");
 _Static_assert(__builtin_offsetof(struct fts_test, rx_linearity_result_max) == 0x1170, "rx_lin_max@0x1170");
 _Static_assert(__builtin_offsetof(struct fts_test, scap_cb_on_result_max) == 0x1178, "cb_on_max@0x1178");
@@ -701,7 +701,7 @@ _Static_assert(__builtin_offsetof(struct test_funcs, free_item_data) == 0x78, "s
 }
 
 
-/* _b583-FT3683：blob 忠实形态 —— MC_SC 项目名表 = .rodata 0x8d6 起 12 槽 ×0x32 字节
+/* rodin（2026-10-08）：blob 忠实形态 —— MC_SC 项目名表 = .rodata 0x8d6 起 12 槽 ×0x32 字节
  * （RAWDATA_TEST/UNIFORMITY_TEST/SCAP_CB_TEST/SCAP_RAWDATA_TEST/WEAK_SHORT_CIRCUIT_TEST/
  *  PANEL_DIFFER_TEST/NOISE_TEST/SPI_TEST/RESET_PIN_TEST/RAWSHIFT_TEST/
  *  AUXILIARY_FRE_NOISE_TEST/JUMP_FRE_NOISE_TEST）。

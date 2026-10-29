@@ -31,7 +31,7 @@
 #include "eas_trace.h"
 
 /*
- * rodin 6.18（S6/P-32）：这个 8 是硬件 FLT SRAM 表布局契约（每 CPU 一项的
+ * rodin 6.18（2026-10-17）：这个 8 是硬件 FLT SRAM 表布局契约（每 CPU 一项的
  * 固定槽位，与 CONFIG_NR_CPUS=32 无关）——下面所有地址都由它推导。改成
  * nr_cpu_ids 会让寄存器表整体错位，禁止顺手对齐。
  */

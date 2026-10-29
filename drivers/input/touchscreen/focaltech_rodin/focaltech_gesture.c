@@ -244,7 +244,7 @@ static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
 {
     int gesture;
 
-    /* _b583-FTS（A2）：blob fts_gesture_readdata 内联 fts_gesture_report 段
+    /* rodin（2026-10-08）：blob fts_gesture_readdata 内联 fts_gesture_report 段
 	 * （0xE9CC..0xE9E8，__func__ = 0xEEFE "fts_gesture_report"）只有 "Gesture Code=%d"
 	 * 一条 DEBUG；"gesture_id:0x%x" 为树侧独有串（classify_intD ③树）⇒ 删。 */
     switch (gesture_id) {
@@ -327,7 +327,7 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 	int ret = 0;
 	int i = 0;
 	int index = 0;
-	/* _b583b-T6：blob var_48 清零跨度 = 28B（STR WZR+STP XZR XZR+STR XZR，SP+8..SP+0x23），
+	/* rodin（2026-10-15）：blob var_48 清零跨度 = 28B（STR WZR+STP XZR XZR+STR XZR，SP+8..SP+0x23），
 	 * 且 SCP/SPI 两分支都写 buf[2..27] ⇒ 数组按 blob 实际足迹开 28。 */
 	u8 buf[FTS_GESTURE_DATA_LEN + 2] = { 0 };
 	struct input_dev *input_dev = ts_data->input_dev;
@@ -336,9 +336,9 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 		FTS_ERROR("gesture no support");
 		return -EINVAL;
 	}
-	/* _b583-FTS（A2）：blob 头部按 IDA/objdump 逐点补齐（真身 0x175D0，旧注释 0xE5CC
+	/* rodin（2026-10-15）：blob 头部按 IDA/objdump 逐点补齐（真身 0x175D0，旧注释 0xE5CC
 	 * 系地址错引）：gesture_support 门 + scptp_cur_state 打印 + param0 三分支。
-	 * _b583b-T6：param0==3 分支 blob 0x17638-0x1765C = LDP X9,X10,[X8] + LDR X11,+0x10 +
+	 * rodin（2026-10-15）：param0==3 分支 blob 0x17638-0x1765C = LDP X9,X10,[X8] + LDR X11,+0x10 +
 	 * LDRH W8,+0x18（26B 自 scp_tp_param+0x30），**四条 store 目的全带 +2**
 	 * （STUR X9,[var_48+2] / STUR X10,[var_40+2] / STUR X11,[var_38+2] /
 	 * STRH W8,[var_30+2]）⇒ 拷到 buf[2..27]，与 SPI 路径 fts_read(&buf[2],1,&buf[2],
@@ -365,14 +365,14 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 	gesture->gesture_id = buf[2];
 	gesture->point_num = buf[3];
 	if (gesture->gesture_id == GESTURE_DOUBLECLICK && !(ts_data->gesture_status & 0x01)) {
-		/* _b583-FTS（A2）：blob 串 .rodata.str1.1+0xB08F =
+		/* rodin（2026-10-08）：blob 串 .rodata.str1.1+0xB08F =
 		 * b'\x016[FTS_TS_I][%s:%d]: double click is not enabled!'（无 ", gesture_status:%d"、
 		 * 无第 3 实参；classify ④ 对体 r=0.76）⇒ 逐字节收口。 */
 		FTS_INFO("double click is not enabled!");
 		return 1;
 	}
 	if (gesture->gesture_id == GESTURE_SINGLETAP && !(ts_data->gesture_status & 0x02)) {
-		/* _b583-FTS（A2）：blob 0xE71C-0xE7BC 逐点 ——
+		/* rodin（2026-10-08）：blob 0xE71C-0xE7BC 逐点 ——
 		 *   0xE724/0xE72C `mov w0,#0; mov w1,#0xA / #0x11; bl driver_get_touch_mode_common`
 		 *     ⇒ fod_status = driver_get_touch_mode_common(TOUCH_ID, DATA_MODE_10)（新查框架，
 		 *     不是读 ts_data->fod_status 缓存）；
@@ -410,7 +410,7 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *touch_buf)
 
 void fts_gesture_recovery(struct fts_ts_data *ts_data)
 {
-    /* _b583b-T4a：blob fts_gesture_recovery (0x17A34, EXPORT, 唯一调用点
+    /* rodin（2026-10-08）：blob fts_gesture_recovery (0x17A34, EXPORT, 唯一调用点
      * fts_tp_state_recovery+0x80) 逐点收口 ——
      *   0x17A34/0x17A3C  门 = [x0,#0x2E4](gesture_support) && [x0,#0x2D9](suspended)；
      *   0x17A50-0x17A5C  FTS_DEBUG("gesture recovery...")（debug>=4 门，串同树）；
@@ -440,7 +440,7 @@ void fts_fod_recovery(void)
 {
 	FTS_FUNC_ENTER();
 	if (fts_data->suspended) {
-		/* _b583-FTS（A1）：按 blob / IDA 0xEDA0 收口 —— 0xEDDC = `mov w0,#1 / mov w1,#1 /
+		/* rodin（2026-10-08）：按 blob / IDA 0xEDA0 收口 —— 0xEDDC = `mov w0,#1 / mov w1,#1 /
 		 * bl fts_gesture_reg_write` 之后**直接** fts_fod_reg_write（0xEDF0），全函数**无**
 		 * fts_write_reg（callface only-tree={'fts_write_reg':1}）；串实证
 		 * .rodata.str1.1+0x3B21 = b'\x016[FTS_TS_I][%s:%d]: %s, tp is in suspend mode,
@@ -467,7 +467,7 @@ int fts_fod_reg_write(u8 mask, bool enable)
 			reg_value &= ~mask;
 		/* If the value in the register is equal to the modified value, skip writing to the register */
 		if (reg_value == reg_value_last_time) {
-			/* _b582-INTA：族对齐 D→I（blob 0x11965 '\0016[FTS_TS_I][%s:%d]: reg 0xCF
+			/* rodin（2026-10-08）：族对齐 D→I（blob 0x11965 '\0016[FTS_TS_I][%s:%d]: reg 0xCF
 			 * do not need to be modified, reg_value = %02X'，blob 侧为死串（无引用）） */
 			FTS_INFO("reg 0xCF do not need to be modified, reg_value = %02X", reg_value);
 			return 0;
@@ -482,7 +482,7 @@ int fts_fod_reg_write(u8 mask, bool enable)
 		FTS_ERROR("[GESTURE]Write fod reg failed! fod reg status: %d\n", enable);
 		return -EIO;
 	}
-	/* _b582-INTA：族对齐 D→I（blob 0x27c '\0016[FTS_TS_I][%s:%d]: [GESTURE]Write fod reg
+	/* rodin（2026-10-08）：族对齐 D→I（blob 0x27c '\0016[FTS_TS_I][%s:%d]: [GESTURE]Write fod reg
 	 * success! fod reg status: %d\n'，引用点 fts_fod_reg_write+0x25c） */
 	FTS_INFO("[GESTURE]Write fod reg success! fod reg status: %d\n", enable);
 	return 0;
@@ -519,17 +519,17 @@ int fts_gesture_suspend(struct fts_ts_data *ts_data)
 	int ret;
 	u8 state = 0xFF;
     FTS_FUNC_ENTER();
-	/* _b583-FTS（A5）：blob 0xF2D4 起 = **无条件** `LDR W0,[X19,#0x2A8]; MOV W1,#1;
+	/* rodin（2026-10-08）：blob 0xF2D4 起 = **无条件** `LDR W0,[X19,#0x2A8]; MOV W1,#1;
 	 * BL irq_set_irq_wake` + 失败打印（0xF42C，门 debug>=4，串 "enable_irq_wake(irq:%d) fail"）
 	 * —— 全 ko 无 ts_data->irq_wake 读写（0x2DA..0x2DD 布尔区实证：0x2DA=fw_loading、
-	 * 0x2DB=irq_disabled、0x2DC=power_disabled，无第四槽）⇒ 删护栏与成员（见 core.h B9）。 */
+	 * 0x2DB=irq_disabled、0x2DC=power_disabled，无第四槽）⇒ 删护栏与成员（见 core.h 布尔区锚点）。 */
 	if (irq_set_irq_wake(ts_data->irq, 1)) {
 		if (fts_debug_log_level >= 4)
 			FTS_DEBUG("enable_irq_wake(irq:%d) fail", ts_data->irq);
 	}
 
 	for (i = 0; i < 5; i++) {
-		/* _b583-FTS（A5）：blob 循环体 0xF2F4-0xF358 = 6 次 0xFF 写 0xD1/0xD2/0xD5/0xD6/
+		/* rodin（2026-10-08）：blob 循环体 0xF2F4-0xF358 = 6 次 0xFF 写 0xD1/0xD2/0xD5/0xD6/
 		 * 0xD7/0xD8 + fts_write_reg(FTS_REG_GESTURE_EN(0xD0), ENABLE) + msleep(1) +
 		 * fts_read_reg(0xD0,&state)（callface blob fts_write_reg=7 / msleep=1 / read=1，
 		 * 树侧因把 6 写注释掉且改 0xD1←gesture_cmd 而 10/5/5）⇒ 按 blob 恢复 6 写、
@@ -546,7 +546,7 @@ int fts_gesture_suspend(struct fts_ts_data *ts_data)
 		if (state == ENABLE)
 			break;
 	}
-	/* _b583b-T5：blob 0x18374/0x1838C 两条退出路径**均无条件**调
+	/* rodin（2026-10-15）：blob 0x18374/0x1838C 两条退出路径**均无条件**调
 	 * fts_fod_reg_write(0x01,1)（0xCF |= DOUBLETAP 位）；全函数对 ts_data 仅访问
 	 * [X19,#0x2A8](irq)，无 fod_status 读点 ⇒ 删树侧 fod_status 门（donor 遗留）。 */
 #ifdef FTS_TOUCHSCREEN_FOD
@@ -570,7 +570,7 @@ int fts_gesture_resume(struct fts_ts_data *ts_data)
 	int ret;
 	u8 state = 0xFF;
 	FTS_FUNC_ENTER();
-	/* _b583-FTS（A5b）：blob 0x184B8 起 = 无条件 `LDR W0,[X19,#0x2A8]; MOV W1,#0;
+	/* rodin（2026-10-08）：blob 0x184B8 起 = 无条件 `LDR W0,[X19,#0x2A8]; MOV W1,#0;
 	 * BL irq_set_irq_wake` + 失败打印 0x18684（串 "disable_irq_wake(irq:%d) fail"，门 >=4）
 	 * —— 这是 callface `fts_gesture_resume only-blob={_printk:1}` 的唯一来源 ⇒ 按 blob 收口。 */
 	if (irq_set_irq_wake(ts_data->irq, 0)) {

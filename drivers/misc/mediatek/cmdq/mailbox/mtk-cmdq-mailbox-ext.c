@@ -27,12 +27,12 @@
 #include <linux/suspend.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/arm-smccc.h>
 #if IS_ENABLED(CONFIG_VHOST_CMDQ)
 #include <linux/libnvdimm.h>
-#include <linux/of.h> /* rodin b4: 6.18 header pruning */
-#include <linux/of_platform.h> /* rodin b4: 6.18 header pruning */
+#include <linux/of.h> /* rodin 2026-09-26: 6.18 header pruning */
+#include <linux/of_platform.h> /* rodin 2026-09-26: 6.18 header pruning */
 #endif
 
 #include <iommu_debug.h>

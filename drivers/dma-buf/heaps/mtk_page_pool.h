@@ -75,7 +75,7 @@ struct mtk_dmabuf_page_pool {
 	u64 shrink_time;
 	u64 log_time;
 
-/* rodin b262 (A-113): stock system_heap.ko flags the reserve pools
+/* rodin 2026-10-16: stock system_heap.ko flags the reserve pools
  * themselves (blob can_do_shrink/do_shrink byte at pool+0x50) so the
  * shrinker floors below only ever apply to the dynamic pools. */
 	bool is_reserve_pool;
@@ -105,7 +105,7 @@ int mtk_dmabuf_page_pool_do_shrink(struct mtk_dmabuf_page_pool *pool, gfp_t gfp_
 
 int mtk_cache_pool_init(void);
 
-/* rodin b262 (A-113): reserve pool face shared with mtk_system_heap.c
+/* rodin 2026-10-16: reserve pool face shared with mtk_system_heap.c
  * (rebuilt against stock system_heap.ko, see there for the drift log).
  * Numeric truth from the blob; floors are chunk-weighted (chunks <<
  * order), i.e. both orders encode a 100MB cap/floor. */

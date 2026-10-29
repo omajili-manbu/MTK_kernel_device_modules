@@ -58,7 +58,7 @@ enum _ex_mode {
 /*****************************************************************************
 * 6.Static function prototypes
 *******************************************************************************/
-/* _b582-INTA：A-80④② ex_mode helper 化 —— blob 的 MODE_CHARGER 走 fts_charger_on
+/* rodin（2026-10-08）：ex_mode helper 化 —— blob 的 MODE_CHARGER 走 fts_charger_on
  * （blob fts_charger_mode_store+0x54/+0x94 = `bl fts_charger_on`，实参 (fts_data, 1/0)；
  * 串 "MODE_CHARGER switch to %d fail" 的 __func__ = "fts_ex_mode_switch" 证明该 switch
  * 仍是源码里的独立函数），且 blob 全 ko **无** fts_ex_mode_switch 符号（3 个 store +

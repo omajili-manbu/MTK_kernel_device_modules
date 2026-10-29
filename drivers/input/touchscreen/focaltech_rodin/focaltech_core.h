@@ -183,7 +183,7 @@ extern struct scp_tp_params fts_scp_tp_param;   /* focaltech_scp_tp.c */
 int fts_scp_tp_init(void);
 void fts_scp_tp_exit(void);
 int fts_scp_tp_switch(u32 mode);
-/* _b583-FTS（A7-f）：fts_htc_set_double_scan 定义在 focaltech_scp_tp.c:556
+/* rodin（2026-10-08）：fts_htc_set_double_scan 定义在 focaltech_scp_tp.c:556
  * （blob GLOBAL 符号 0x2114，与 fts_htc_enter_idle 等同一族），fts_set_cur_value 的
  * DATA_MODE_163 分支直调它（blob 侧该 case 把它内联）。 */
 int fts_htc_set_double_scan(u8 value);
@@ -191,7 +191,7 @@ int fts_gesture_10diff_reg_write(u8 value);
 extern int fts_scp_tp_ipi_send(u32 arg0, u32 arg1, u32 arg2, u32 arg3);	/* _b571 patch G */
 extern bool fts_scp_tp_mistouch_close;		/* _b571 patch G */
 int fts_read_and_report_foddata(struct fts_ts_data *data);
-/* _b582-INTA：A-80④② —— fts_charger_on 定义在 focaltech_scp_tp.c:578，原无原型
+/* rodin（2026-10-08）： fts_charger_on 定义在 focaltech_scp_tp.c:578，原无原型
  * （② 的临时原型暂放 focaltech_core.c:92-95）；按 blob 收口后它同时被
  * fts_{charger,cover,glove}_mode_store → fts_ex_mode_switch（MODE_CHARGER）与
  * fts_ts_resume/fts_tp_state_recovery 直调 ⇒ 声明并入本块，删除 .c 内临时声明。 */
@@ -210,7 +210,7 @@ extern hardware_param_t hardware_param;
 * Private enumerations, structures and unions using typedef
 *****************************************************************************/
 
-/* _b582-TEST：A) 触控测试面 proc 收口——blob 的 struct ftxxxx_proc 只有 proc_entry +
+/* rodin（2026-10-08）：A) 触控测试面 proc 收口——blob 的 struct ftxxxx_proc 只有 proc_entry +
  * opmode/cmd_len/cmd[]（opmode@+0x08、sizeof=0x20，⑥-b 实证）；原 donor 的
  * tp_lockdown_info_proc/tp_fw_version_proc/tp_selftest_proc/tp_data_dump_proc 四个 v0 记录
  * 字段舍去：前两者 ⑥-b 已删其使用侧，后两者随 focaltech_test.c 的 tp_selftest_v0 /
@@ -222,7 +222,7 @@ struct ftxxxx_proc {
         u8 cmd[FTS_MAX_COMMMAND_LENGTH];
 };
 
-/* _b583b-B10：fts_ts_platform_data 按 blob 机器码全量归位（sizeof 0xC8 → 0x10C）。
+/* rodin（2026-10-08）：fts_ts_platform_data 按 blob 机器码全量归位（sizeof 0xC8 → 0x10C）。
  * 证据（全部为 fts_ts_probe(0x105BC) 内联 fts_parse_dt 的立即数落点，IDA 双证）：
  *   irq_gpio@0x00（0x109D0 STR W0,[X20] ← of_get_named_gpio("focaltech,irq-gpio")）
  *   reset_gpio@0x08（0x109E4 irq-gpio 之后 0x109E8 STR W0,[X20,#8]）
@@ -276,26 +276,26 @@ struct fts_ts_platform_data {
 	u32 touch_expert_array[4 * EXPERT_ARRAY_SIZE];	/* blob 0xDC */
 };
 /* _b583b-B10 编译期断言（与 blob 机器码立即数偏移等式，见上注证据） */
-_Static_assert(sizeof(struct fts_ts_platform_data) == 0x10C, "_b583b-B10 sizeof(pdata)==0x10C (blob probe 0x10660 kmalloc_trace)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, irq_gpio) == 0x00, "_b583b-B10 irq_gpio@0x00");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, reset_gpio) == 0x08, "_b583b-B10 reset_gpio@0x08");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, avdd_gpio) == 0x10, "_b583b-B10 avdd_gpio@0x10");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, avdd_reg_name) == 0x18, "_b583b-B10 avdd_reg_name@0x18 (probe 0x10A94 strncpy)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, iovdd_reg_name) == 0x40, "_b583b-B10 iovdd_reg_name@0x40 (probe 0x10AFC strncpy)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, have_key) == 0x68, "_b583b-B10 have_key@0x68 (probe 0x108F0 STRB)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_number) == 0x6C, "_b583b-B10 key_number@0x6C (probe 0x108F8)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, keys) == 0x70, "_b583b-B10 keys@0x70 (probe 0x10928)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_x_coords) == 0x80, "_b583b-B10 key_x_coords@0x80 (VK print 0x10990)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_y_coords) == 0x90, "_b583b-B10 key_y_coords@0x90 (VK print 0x10968)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, x_max) == 0xA0, "_b583b-B10 x_max@0xA0 (abs_params max=0xA0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, y_max) == 0xA4, "_b583b-B10 y_max@0xA4");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, x_min) == 0xA8, "_b583b-B10 x_min@0xA8 (abs_params min=0xA8)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, y_min) == 0xAC, "_b583b-B10 y_min@0xAC");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, max_touch_number) == 0xB0, "_b583b-B10 max_touch_number@0xB0 (probe 0x10BB0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, super_resolution_factors) == 0xB4, "_b583b-B10 super_resolution_factors@0xB4 (probe 0x10B5C)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_range_array) == 0xB8, "_b583b-B10 touch_range_array@0xB8 (probe 0x10BDC)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_def_array) == 0xCC, "_b583b-B10 touch_def_array@0xCC (probe 0x10BBC)");
-_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_expert_array) == 0xDC, "_b583b-B10 touch_expert_array@0xDC (probe 0x10BFC)");
+_Static_assert(sizeof(struct fts_ts_platform_data) == 0x10C, "sizeof(pdata)==0x10C (blob probe 0x10660 kmalloc_trace)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, irq_gpio) == 0x00, "irq_gpio@0x00");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, reset_gpio) == 0x08, "reset_gpio@0x08");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, avdd_gpio) == 0x10, "avdd_gpio@0x10");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, avdd_reg_name) == 0x18, "avdd_reg_name@0x18 (probe 0x10A94 strncpy)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, iovdd_reg_name) == 0x40, "iovdd_reg_name@0x40 (probe 0x10AFC strncpy)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, have_key) == 0x68, "have_key@0x68 (probe 0x108F0 STRB)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_number) == 0x6C, "key_number@0x6C (probe 0x108F8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, keys) == 0x70, "keys@0x70 (probe 0x10928)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_x_coords) == 0x80, "key_x_coords@0x80 (VK print 0x10990)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, key_y_coords) == 0x90, "key_y_coords@0x90 (VK print 0x10968)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, x_max) == 0xA0, "x_max@0xA0 (abs_params max=0xA0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, y_max) == 0xA4, "y_max@0xA4");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, x_min) == 0xA8, "x_min@0xA8 (abs_params min=0xA8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, y_min) == 0xAC, "y_min@0xAC");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, max_touch_number) == 0xB0, "max_touch_number@0xB0 (probe 0x10BB0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, super_resolution_factors) == 0xB4, "super_resolution_factors@0xB4 (probe 0x10B5C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_range_array) == 0xB8, "touch_range_array@0xB8 (probe 0x10BDC)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_def_array) == 0xCC, "touch_def_array@0xCC (probe 0x10BBC)");
+_Static_assert(__builtin_offsetof(struct fts_ts_platform_data, touch_expert_array) == 0xDC, "touch_expert_array@0xDC (probe 0x10BFC)");
 /*thp struct tp_raw*/
 #if 0
 #ifdef THP_FRAMEDATA_DEBUG
@@ -490,9 +490,9 @@ struct fts_ts_data {
         struct input_dev *input_dev;
 	struct class *fts_tp_class;
         struct input_dev *pen_dev;
-	/* _b582-INTA：A-80/③§6.2「前段 8B 缺口」收口 —— blob 反汇编逐点实证（工具
-	 * tools/_b582_intA/intA_strref.py + intA_fnstr.py，全部为**符号访问之外的**
-	 * 立即数偏移，故不受本轮改名影响）：
+	/* rodin（2026-10-08）：「前段 8B 缺口」收口 —— blob 反汇编逐点实证；
+	 * 全部为**符号访问之外的**
+	 * 立即数偏移，故不受本次改名影响）：
 	 *   input_dev  @0x18 与 blob **同址**（fts_ts_probe 0x823c `str x21,[x19,#0x18]`，
 	 *                    0x8440 `ldr x0,[x19,#0x18]` → input_unregister_device）；
 	 *   pdata      @0x38 vs 树 0x30（0x7774 kmalloc_trace(size=0x10c=sizeof(pdata)) →
@@ -537,7 +537,7 @@ struct fts_ts_data {
         u8 rodin_pad_rmutex[8];
         struct mutex bus_lock;
         u8 rodin_pad_bmutex[8];
-        /* _b582-INPUT：blob fts_irq_handler 用 cpu_latency_qos_add/remove_request
+        /* rodin（2026-10-08）：blob fts_irq_handler 用 cpu_latency_qos_add/remove_request
          * （blob 0x5e2c/0x6a98 直调），句柄槽 blob [ts+0x270] 恒 48B =
          * sizeof(struct pm_qos_request)（struct dev_pm_qos_request 为 56B）⇒ 按 blob
          * 换型换名，与 goodix（goodix_ts_core.h:pm_qos_req_irq）同形。 */
@@ -555,7 +555,7 @@ struct fts_ts_data {
         bool fw_loading;
         bool irq_disabled;
 /*****************************************************************************
- * _b583-FTS（B9）：blob `fts_ts_data` 布尔区实证（逐偏移、逐成员）——
+ * rodin（2026-10-08）：blob `fts_ts_data` 布尔区实证（逐偏移、逐成员）——
  *   suspended@0x2D9（fts_fod_recovery/fts_read_and_report_foddata/tp_state_recovery 等 31 点）、
  *   fw_loading@0x2DA（fts_resume_suspend/fwupg_work/upgrade_bin/test_*_store）、
  *   irq_disabled@0x2DB（fts_irq_disable/enable/focal_select_touchmode）、
@@ -595,7 +595,7 @@ struct fts_ts_data {
         u32 ta_size;
         u8 *ta_buf;
 
-	/* _b583b-B8：blob 0x468..0xAC7（0x660B）零访问区 —— 全 ko 对该区无任何
+	/* rodin（2026-10-08）：blob 0x468..0xAC7（0x660B）零访问区 —— 全 ko 对该区无任何
 	 * [ts,#imm] 立即数访问（blbscan_2e8_af0.txt + irq_handler 全量 ADD X,X19 穷举
 	 * = {0x210,0x270,0x2B8,0x318,0x32C,0x330,0x430,0x1B0}），树侧 frame_data
 	 * (struct frame_thp_data, 0x1D0) 唯一写者 fts_frame_parse_data 位于
@@ -607,11 +607,11 @@ struct fts_ts_data {
         int bus_type;					/* blob 0xAD8（hid2std/ft5008_upgrade/probe） */
 	struct regulator *iovdd;			/* blob 0xAE0（power_source_*） */
 	struct regulator *avdd;				/* blob 0xAE8 */
-	/* _b581：blob 全 ko 只向 +0xae0/+0xae8 写/读这两个稳压器指针（regulator_*
+	/* rodin（2026-10-08）：blob 全 ko 只向 +0xae0/+0xae8 写/读这两个稳压器指针（regulator_*
 	 * 各 2 次）；原 iovdd_source/avdd_source 成员为 donor 多余件，已删。 */
 	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];	/* blob 0xAF0..0xAF7 */
 #if FTS_PINCTRL_EN
-	/* _b583b-B8：11 指针段 0xAF8..0xB4F，序 = blob fts_power_source_init(0x11DD8)
+	/* rodin（2026-10-08）：11 指针段 0xAF8..0xB4F，序 = blob fts_power_source_init(0x11DD8)
 	 * 内联 pinctrl 初始化的存储顺序（0x11EF4..0x120CC）：
 	 *   pinctrl@0xAF8(devm_pinctrl_get) → active@0xB00 → suspend@0xB08 →
 	 *   release@0xB10 → spimode@0xB18 → dvdd_enable@0xB20 → dvdd_disable@0xB28
@@ -685,15 +685,15 @@ struct fts_ts_data {
 	int dump_type;					/* blob 0xD18（irq_handler 0xF5EC 存入 tp_frame->dump_type、set_cur_value 0xDAA4 读） */
 };
 
-/* _b582-TEST：ftxxxx_proc / proc_ta 布局判据（⑥-b 实证：opmode @+0x08、
+/* rodin（2026-10-08）：ftxxxx_proc / proc_ta 布局判据（实证：opmode @+0x08、
  * sizeof(struct ftxxxx_proc) = 0x20、proc_ta.proc_entry @ ts_data+0x1e8）。 */
-_Static_assert(__builtin_offsetof(struct ftxxxx_proc, opmode) == 0x08, "_b582-TEST opmode@0x08");
-_Static_assert(sizeof(struct ftxxxx_proc) == 0x20, "_b582-TEST sizeof(ftxxxx_proc)==0x20");
+_Static_assert(__builtin_offsetof(struct ftxxxx_proc, opmode) == 0x08, "opmode@0x08");
+_Static_assert(sizeof(struct ftxxxx_proc) == 0x20, "sizeof(ftxxxx_proc)==0x20");
 /* 相对不变量（与 blob 同构；前段 8B 缺口修复后仍成立）：两条 proc 记录相距 0x20。 */
 _Static_assert(__builtin_offsetof(struct fts_ts_data, proc_ta)
                - __builtin_offsetof(struct fts_ts_data, proc) == 0x20,
-               "_b582-TEST proc_ta-proc==0x20 (blob 0x1e8-0x1c8)");
-/* _b582-INTA（A-80/③§6.2 收口）：前段 8B 缺口按 blob 补齐后，③ 预留的硬断言启用
+               "proc_ta-proc==0x20 (blob 0x1e8-0x1c8)");
+/* rodin（2026-10-08）：前段 8B 缺口按 blob 补齐后，③ 预留的硬断言启用
  * （原为注释态）。blob 绝对目标（intA_strref/intA_fnstr 逐点）：
  *   proc@0x1c8 / proc_ta@0x1e8（fts_create_apk_debug_channel 0xa40c/0xa438）、
  *   pm_qos 槽@0x270（fts_irq_handler 0x5e2c cpu_latency_qos_add_request(&req)）、
@@ -701,21 +701,21 @@ _Static_assert(__builtin_offsetof(struct fts_ts_data, proc_ta)
  * （⑥-b 的 proc_ta@0x1e8 断言 = 本条；③ 原文里写 ==0x1e0 的版本为缺口未补时的
  *  中间态，本次按 blob 换成 ==0x1e8 并启用。） */
 _Static_assert(__builtin_offsetof(struct fts_ts_data, proc) == 0x1c8,
-               "_b582-INTA proc@0x1c8 (blob fts_create_apk_debug_channel 0xa40c)");
+               "proc@0x1c8 (blob fts_create_apk_debug_channel 0xa40c)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, proc_ta) == 0x1e8,
-               "_b582-INTA proc_ta@0x1e8 (blob fts_create_apk_debug_channel 0xa438)");
+               "proc_ta@0x1e8 (blob fts_create_apk_debug_channel 0xa438)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, pm_qos_req_irq) == 0x270,
-               "_b582-INTA pm_qos_req_irq@0x270 (blob fts_irq_handler 0x5e2c)");
+               "pm_qos_req_irq@0x270 (blob fts_irq_handler 0x5e2c)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, log_level) == 0x2ac,
-               "_b582-INTA log_level@0x2ac (blob fts_log_level_store 0xc9ec)");
-/* _b582-INTA：同链抽检（缺口补齐的旁证，非 ③ 三条判据） */
+               "log_level@0x2ac (blob fts_log_level_store 0xc9ec)");
+/* rodin（2026-10-08）：同链抽检（缺口补齐的旁证，非 ③ 三条判据） */
 _Static_assert(__builtin_offsetof(struct fts_ts_data, pdata) == 0x38,
-               "_b582-INTA pdata@0x38 (blob fts_ts_probe 0x7778)");
+               "pdata@0x38 (blob fts_ts_probe 0x7778)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, ic_info) == 0x40,
-               "_b582-INTA ic_info@0x40 (blob fts_get_ic_information 0x40/0x44/0x4c)");
+               "ic_info@0x40 (blob fts_get_ic_information 0x40/0x44/0x4c)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, irq) == 0x2a8,
-               "_b582-INTA irq@0x2a8 (blob fts_ts_remove 0x8b8c free_irq)");
-/* _b583-FTS（B9）：布尔区锚点 —— 证据 = blob 全模块 [reg,#imm] 偏移扫描
+               "irq@0x2a8 (blob fts_ts_remove 0x8b8c free_irq)");
+/* rodin（2026-10-08）：布尔区锚点 —— 证据 = blob 全模块 [reg,#imm] 偏移扫描
  * （tools/_b583_ftsface/blbscan.py，逐偏移带访问函数名）：
  *   0x2D9 suspended（fts_fod_recovery/fts_read_and_report_foddata/fts_resume_suspend/
  *         fts_tp_state_recovery/fts_test_* 等 31 点）、
@@ -725,103 +725,103 @@ _Static_assert(__builtin_offsetof(struct fts_ts_data, irq) == 0x2a8,
  *   0x2E4 gesture_support、0x2E5 gesture_bmode。
  * 等式两端：本断言的成员偏移（编译器 DWARF 口径）== blob 机器码立即数偏移。 */
 _Static_assert(__builtin_offsetof(struct fts_ts_data, pm_completion) == 0x2b8,
-               "_b583-FTS pm_completion@0x2b8 (blob fts_ts_probe 0x8890 str wzr)");
+               "pm_completion@0x2b8 (blob fts_ts_probe 0x8890 str wzr)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, pm_suspend) == 0x2d8,
-               "_b583-FTS pm_suspend@0x2d8 (blob fts_update_touchmode_data ldrb [x19,#0x2d8])");
+               "pm_suspend@0x2d8 (blob fts_update_touchmode_data ldrb [x19,#0x2d8])");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, suspended) == 0x2d9,
-               "_b583-FTS suspended@0x2d9 (blob fts_fod_recovery ldrb [x8,#0x2d9])");
+               "suspended@0x2d9 (blob fts_fod_recovery ldrb [x8,#0x2d9])");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, fw_loading) == 0x2da,
-               "_b583-FTS fw_loading@0x2da (blob fts_fwupg_work strb)");
+               "fw_loading@0x2da (blob fts_fwupg_work strb)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, irq_disabled) == 0x2db,
-               "_b583-FTS irq_disabled@0x2db (blob fts_irq_disable/enable ldrb+strb)");
+               "irq_disabled@0x2db (blob fts_irq_disable/enable ldrb+strb)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, power_disabled) == 0x2dc,
-               "_b583-FTS power_disabled@0x2dc (blob fts_power_source_ctrl+simplify)");
+               "power_disabled@0x2dc (blob fts_power_source_ctrl+simplify)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, glove_mode) == 0x2dd,
-               "_b583-FTS glove_mode@0x2dd (blob fts_glove_mode_show/store)");
+               "glove_mode@0x2dd (blob fts_glove_mode_show/store)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, cover_mode) == 0x2de,
-               "_b583-FTS cover_mode@0x2de (blob fts_cover_mode_store/ex_mode_recovery)");
+               "cover_mode@0x2de (blob fts_cover_mode_store/ex_mode_recovery)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, charger_mode) == 0x2df,
-               "_b583-FTS charger_mode@0x2df (blob fts_charger_mode_store/ex_mode_init)");
+               "charger_mode@0x2df (blob fts_charger_mode_store/ex_mode_init)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, touch_analysis_support) == 0x2e0,
-               "_b583-FTS touch_analysis_support@0x2e0 (blob fts_irq_handler 27 点)");
+               "touch_analysis_support@0x2e0 (blob fts_irq_handler 27 点)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, prc_support) == 0x2e1,
-               "_b583-FTS prc_support@0x2e1 (blob fts_prc_show/store/point_report_check_init)");
+               "prc_support@0x2e1 (blob fts_prc_show/store/point_report_check_init)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, prc_mode) == 0x2e2,
-               "_b583-FTS prc_mode@0x2e2 (blob fts_prc_queue_work ldrb+strb)");
+               "prc_mode@0x2e2 (blob fts_prc_queue_work ldrb+strb)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, esd_support) == 0x2e3,
-               "_b583-FTS esd_support@0x2e3 (blob fts_esdcheck_*)");
+               "esd_support@0x2e3 (blob fts_esdcheck_*)");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_support) == 0x2e4,
-               "_b583-FTS gesture_support@0x2e4 (blob fts_gesture_readdata ldrb [x0,#0x2e4])");
+               "gesture_support@0x2e4 (blob fts_gesture_readdata ldrb [x0,#0x2e4])");
 _Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_bmode) == 0x2e5,
-               "_b583-FTS gesture_bmode@0x2e5 (blob fts_gesture_bm_show/store)");
+               "gesture_bmode@0x2e5 (blob fts_gesture_bm_show/store)");
 
-/* ===== _b583b-B8/B10：中尾段布局断言（证据 = blob 全 ko [reg,#imm] 基址追踪，
+/* ===== rodin（2026-10-08）：中尾段布局断言（证据 = blob 全 ko [reg,#imm] 基址追踪，
  * tools/_b583_ftsface/{ida_dump.py,blbscan_2e8_af0.txt} + evidence_b583b.txt；
  * 等式右端 = blob 机器码立即数偏移，左端 = 本结构编译期 offsetof） ===== */
-_Static_assert(sizeof(struct pen_event) == 48, "_b583b-B8 sizeof(pen_event)==48 (blob events@0x318 边界反推)");
-_Static_assert(sizeof(struct mutex) == 0x28, "_b583b-B8 sizeof(mutex)==0x28 (rebase 纯 6.18 实际值；blob 世界的 0x30 差额由 rodin_pad_* 垫片吸收，内核树零改动)");
-_Static_assert(sizeof(struct delayed_work) == 0x68, "_b583b-B8 sizeof(delayed_work)==0x68 (rebase 纯 6.18 实际值；0xC90+0x88==0xD18 锚点衔接改由 rodin_pad_cd8 垫片维持)");
+_Static_assert(sizeof(struct pen_event) == 48, "sizeof(pen_event)==48 (blob events@0x318 边界反推)");
+_Static_assert(sizeof(struct mutex) == 0x28, "sizeof(mutex)==0x28 (rebase 纯 6.18 实际值；blob 世界的 0x30 差额由 rodin_pad_* 垫片吸收，内核树零改动)");
+_Static_assert(sizeof(struct delayed_work) == 0x68, "sizeof(delayed_work)==0x68 (rebase 纯 6.18 实际值；0xC90+0x88==0xD18 锚点衔接改由 rodin_pad_cd8 垫片维持)");
 /* 0x2E6..0x668 段（改动前后与 blob 同构，DWARF/IDA 双证） */
-_Static_assert(__builtin_offsetof(struct fts_ts_data, old_point_id) == 0x2e6, "_b583b-B8 old_point_id@0x2e6");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pen_etype) == 0x2e7, "_b583b-B8 pen_etype@0x2e7 (blob fts_pen_show/store ldrb/strb)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pevent) == 0x2e8, "_b583b-B8 pevent@0x2e8");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, events) == 0x318, "_b583b-B8 events@0x318 (blob irq_handler ADD X8,X19,#0x318 → input_report_b)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_addr) == 0x430, "_b583b-B8 touch_addr@0x430 (blob irq_handler STRB 0xEEA0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_size) == 0x434, "_b583b-B8 touch_size@0x434 (blob touch_size_show 0x15C1C)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_fod_addr) == 0x438, "_b583b-B8 touch_fod_addr@0x438 (blob fod STRB 0x438)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_fod_size) == 0x43c, "_b583b-B8 touch_fod_size@0x43c (blob fod STR 0x43c)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_buf) == 0x440, "_b583b-B8 touch_buf@0x440 (blob probe 0x1125C/irq 0xEE50)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_event_num) == 0x448, "_b583b-B8 touch_event_num@0x448 (blob irq 0xF3E4/report_b LDRSW 0x100C0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_points) == 0x44c, "_b583b-B8 touch_points@0x44c (blob report_b ldr/str)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, key_state) == 0x450, "_b583b-B8 key_state@0x450 (blob report_b 0x10164..)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_flag) == 0x454, "_b583b-B8 ta_flag@0x454 (blob ta_open/ta_read/irq 0xFA54..0xFA60)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_size) == 0x458, "_b583b-B8 ta_size@0x458 (blob irq 0xEEA4 = touch_size 同步、0xFA68 memcpy n)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_buf) == 0x460, "_b583b-B8 ta_buf@0x460 (blob ta_open 0x14124 kmalloc 落槽)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, old_point_id) == 0x2e6, "old_point_id@0x2e6");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pen_etype) == 0x2e7, "pen_etype@0x2e7 (blob fts_pen_show/store ldrb/strb)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pevent) == 0x2e8, "pevent@0x2e8");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, events) == 0x318, "events@0x318 (blob irq_handler ADD X8,X19,#0x318 → input_report_b)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_addr) == 0x430, "touch_addr@0x430 (blob irq_handler STRB 0xEEA0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_size) == 0x434, "touch_size@0x434 (blob touch_size_show 0x15C1C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_fod_addr) == 0x438, "touch_fod_addr@0x438 (blob fod STRB 0x438)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_fod_size) == 0x43c, "touch_fod_size@0x43c (blob fod STR 0x43c)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_buf) == 0x440, "touch_buf@0x440 (blob probe 0x1125C/irq 0xEE50)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_event_num) == 0x448, "touch_event_num@0x448 (blob irq 0xF3E4/report_b LDRSW 0x100C0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, touch_points) == 0x44c, "touch_points@0x44c (blob report_b ldr/str)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, key_state) == 0x450, "key_state@0x450 (blob report_b 0x10164..)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_flag) == 0x454, "ta_flag@0x454 (blob ta_open/ta_read/irq 0xFA54..0xFA60)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_size) == 0x458, "ta_size@0x458 (blob irq 0xEEA4 = touch_size 同步、0xFA68 memcpy n)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ta_buf) == 0x460, "ta_buf@0x460 (blob ta_open 0x14124 kmalloc 落槽)");
 /* bus/power/lockdown 段 */
-_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_tx_buf) == 0xac8, "_b583b-B8 bus_tx_buf@0xac8 (blob fts_bus_init/write/probe 0x11460)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_rx_buf) == 0xad0, "_b583b-B8 bus_rx_buf@0xad0 (blob fts_read/fts_bus_exit)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_type) == 0xad8, "_b583b-B8 bus_type@0xad8 (blob hid2std/ft5008_upgrade LDR W)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, iovdd) == 0xae0, "_b583b-B8 iovdd@0xae0 (blob power_source_* 0xae0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, avdd) == 0xae8, "_b583b-B8 avdd@0xae8 (blob power_source_* 0xae8)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, lockdown_info) == 0xaf0, "_b583b-B8 lockdown_info@0xaf0 (8B 锚点)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_tx_buf) == 0xac8, "bus_tx_buf@0xac8 (blob fts_bus_init/write/probe 0x11460)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_rx_buf) == 0xad0, "bus_rx_buf@0xad0 (blob fts_read/fts_bus_exit)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, bus_type) == 0xad8, "bus_type@0xad8 (blob hid2std/ft5008_upgrade LDR W)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, iovdd) == 0xae0, "iovdd@0xae0 (blob power_source_* 0xae0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, avdd) == 0xae8, "avdd@0xae8 (blob power_source_* 0xae8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, lockdown_info) == 0xaf0, "lockdown_info@0xaf0 (8B 锚点)");
 #if FTS_PINCTRL_EN
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl) == 0xaf8, "_b583b-B8 pinctrl@0xaf8 (blob power_source_exit 0x1275C)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_active) == 0xb00, "_b583b-B8 pins_active@0xb00 (blob init 0x11F10/power 0x12184)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_suspend) == 0xb08, "_b583b-B8 pins_suspend@0xb08");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_release) == 0xb10, "_b583b-B8 pins_release@0xb10 (blob power_source_exit 0x12768)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_spimode) == 0xb18, "_b583b-B8 spimode@0xb18 (blob power 0x121A4)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_dvdd_enable) == 0xb20, "_b583b-B8 dvdd_enable@0xb20 (死槽：init 只写零读)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_dvdd_disable) == 0xb28, "_b583b-B8 dvdd_disable@0xb28 (死槽：init 只写零读)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_cs_gpiomode) == 0xb30, "_b583b-B8 cs_gpio@0xb30 (blob ctrl 0x129AC + cs_gpio_mode 串)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_cs_spimode) == 0xb38, "_b583b-B8 cs_spi@0xb38 (blob ctrl 0x128D8 + cs_spi_mode 串)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_touch_mode_ap) == 0xb40, "_b583b-B8 touch_ap@0xb40");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_touch_mode_scp) == 0xb48, "_b583b-B8 touch_scp@0xb48");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl) == 0xaf8, "pinctrl@0xaf8 (blob power_source_exit 0x1275C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_active) == 0xb00, "pins_active@0xb00 (blob init 0x11F10/power 0x12184)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_suspend) == 0xb08, "pins_suspend@0xb08");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pins_release) == 0xb10, "pins_release@0xb10 (blob power_source_exit 0x12768)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_spimode) == 0xb18, "spimode@0xb18 (blob power 0x121A4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_dvdd_enable) == 0xb20, "dvdd_enable@0xb20 (死槽：init 只写零读)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_dvdd_disable) == 0xb28, "dvdd_disable@0xb28 (死槽：init 只写零读)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_cs_gpiomode) == 0xb30, "cs_gpio@0xb30 (blob ctrl 0x129AC + cs_gpio_mode 串)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_state_cs_spimode) == 0xb38, "cs_spi@0xb38 (blob ctrl 0x128D8 + cs_spi_mode 串)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_touch_mode_ap) == 0xb40, "touch_ap@0xb40");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, pinctrl_touch_mode_scp) == 0xb48, "touch_scp@0xb48");
 #endif
 #ifdef FTS_TOUCHSCREEN_FOD
-_Static_assert(__builtin_offsetof(struct fts_ts_data, finger_in_fod) == 0xb50, "_b583b-B8 finger_in_fod@0xb50 (blob irq 0xF5DC → tp_frame.fod_pressed)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, fod_finger_skip) == 0xb51, "_b583b-B8 fod_finger_skip@0xb51 (blob fod 报点 0xB7C0/release STRH 连清)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, overlap_area) == 0xb54, "_b583b-B8 overlap_area@0xb54 (blob fod 报点 0xA7FC/0xA810/0xA92C)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, point_id_changed) == 0xb88, "_b583b-B8 point_id_changed@0xb88 (blob fod 0xA6FC 写/release 0xA48C 清)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, finger_in_fod) == 0xb50, "finger_in_fod@0xb50 (blob irq 0xF5DC → tp_frame.fod_pressed)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, fod_finger_skip) == 0xb51, "fod_finger_skip@0xb51 (blob fod 报点 0xB7C0/release STRH 连清)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, overlap_area) == 0xb54, "overlap_area@0xb54 (blob fod 报点 0xA7FC/0xA810/0xA92C)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, point_id_changed) == 0xb88, "point_id_changed@0xb88 (blob fod 0xA6FC 写/release 0xA48C 清)");
 #endif
-_Static_assert(__builtin_offsetof(struct fts_ts_data, palm_status) == 0xbd8, "_b583b-B8 palm_status@0xbd8 (blob palm_sensor_write 0xDDA8 / irq 0x9410)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, poweroff_on_sleep) == 0xbdc, "_b583b-B8 poweroff_on_sleep@0xbdc (blob ic_switch_mode 0xCF50/0xCFC8、suspend 0x131E8)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_status) == 0xbdd, "_b583b-B8 gesture_status@0xbdd (blob update_gesture_state 0xEBA4..0xECB4)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, tpdbg_dentry) == 0xbe0, "_b583b-B8 裁决归位 tpdbg_dentry@0xbe0 (blob probe 0x11690 STR、0x119D4 父目录、remove 0x11B58；fts_ftest 系全局 .bss+0x5b0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, gamemode_enabled) == 0xbe8, "_b583b-B8 gamemode_enabled@0xbe8 (blob 0x93E4/0xE900/0xDD28)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, is_expert_mode) == 0xbea, "_b583b-B8 is_expert_mode@0xbea (blob game_mode_update 0xD218)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_cmd) == 0xbeb, "_b583b-B8 gesture_cmd@0xbeb (blob update_gesture_state 0xEBB4)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_cmd_delay) == 0xbec, "_b583b-B8 gesture_cmd_delay@0xbec (blob update_gesture_state 0xEBF4)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, current_fps) == 0xbf4, "_b583b-B8 current_fps@0xbf4 (blob probe 0x10D8C/game_mode_update 0xD260)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, enable_touch_raw) == 0xc88, "_b583b-B8 enable_touch_raw@0xc88 (blob 0xB410/0xD194/0xF614)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, thp_signal_work) == 0xc90, "_b583b-B8 thp_signal_work@0xc90 (blob probe INIT_DELAYED_WORK 0x106E0..0x10718)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, dump_type) == 0xd18, "_b583b-B8 dump_type@0xd18 (blob irq 0xF5EC → tp_frame+0x1018)");
-_Static_assert(sizeof(struct fts_ts_data) == 0xd20, "_b583b-B8 sizeof(fts_ts_data)==0xd20 (blob probe 0x10660 kmalloc_trace w2=0xD20)");
-/* 头段补钉（blob 侧证据链见 82/83 轮 + 本轮 set_charge_state 0x1A8/irq_handler 0x1B0/0x210） */
-_Static_assert(__builtin_offsetof(struct fts_ts_data, ts_workqueue) == 0x60, "_b583b-B8 ts_workqueue@0x60 (blob probe 0x10CF8)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, charger_status) == 0x1a8, "_b583b-B8 charger_status@0x1a8 (blob set_charge_state 0xCD8C/charger_on 0xAA30)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, ts_waitqueue) == 0x1b0, "_b583b-B8 ts_waitqueue@0x1b0 (blob irq_handler wake_up ADD X0,X19,#0x1B0)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, irq_lock) == 0x208, "_b583b-B8 irq_lock@0x208 (blob probe spin_lock_init 0x10D1C STR WZR)");
-_Static_assert(__builtin_offsetof(struct fts_ts_data, report_mutex) == 0x210, "_b583b-B8 report_mutex@0x210 (blob irq_handler mutex_lock ADD X21,X19,#0x210)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, palm_status) == 0xbd8, "palm_status@0xbd8 (blob palm_sensor_write 0xDDA8 / irq 0x9410)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, poweroff_on_sleep) == 0xbdc, "poweroff_on_sleep@0xbdc (blob ic_switch_mode 0xCF50/0xCFC8、suspend 0x131E8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_status) == 0xbdd, "gesture_status@0xbdd (blob update_gesture_state 0xEBA4..0xECB4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, tpdbg_dentry) == 0xbe0, "裁决归位 tpdbg_dentry@0xbe0 (blob probe 0x11690 STR、0x119D4 父目录、remove 0x11B58；fts_ftest 系全局 .bss+0x5b0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gamemode_enabled) == 0xbe8, "gamemode_enabled@0xbe8 (blob 0x93E4/0xE900/0xDD28)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, is_expert_mode) == 0xbea, "is_expert_mode@0xbea (blob game_mode_update 0xD218)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_cmd) == 0xbeb, "gesture_cmd@0xbeb (blob update_gesture_state 0xEBB4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, gesture_cmd_delay) == 0xbec, "gesture_cmd_delay@0xbec (blob update_gesture_state 0xEBF4)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, current_fps) == 0xbf4, "current_fps@0xbf4 (blob probe 0x10D8C/game_mode_update 0xD260)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, enable_touch_raw) == 0xc88, "enable_touch_raw@0xc88 (blob 0xB410/0xD194/0xF614)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, thp_signal_work) == 0xc90, "thp_signal_work@0xc90 (blob probe INIT_DELAYED_WORK 0x106E0..0x10718)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, dump_type) == 0xd18, "dump_type@0xd18 (blob irq 0xF5EC → tp_frame+0x1018)");
+_Static_assert(sizeof(struct fts_ts_data) == 0xd20, "sizeof(fts_ts_data)==0xd20 (blob probe 0x10660 kmalloc_trace w2=0xD20)");
+/* 头段补钉（blob 侧证据链见 2026-10-08 记录 + set_charge_state 0x1A8/irq_handler 0x1B0/0x210） */
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ts_workqueue) == 0x60, "ts_workqueue@0x60 (blob probe 0x10CF8)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, charger_status) == 0x1a8, "charger_status@0x1a8 (blob set_charge_state 0xCD8C/charger_on 0xAA30)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, ts_waitqueue) == 0x1b0, "ts_waitqueue@0x1b0 (blob irq_handler wake_up ADD X0,X19,#0x1B0)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, irq_lock) == 0x208, "irq_lock@0x208 (blob probe spin_lock_init 0x10D1C STR WZR)");
+_Static_assert(__builtin_offsetof(struct fts_ts_data, report_mutex) == 0x210, "report_mutex@0x210 (blob irq_handler mutex_lock ADD X21,X19,#0x210)");
 
 enum GESTURE_MODE_TYPE {
 	GESTURE_DOUBLETAP,
@@ -973,7 +973,7 @@ void fts_init_hardware_param(void);
 void fts_init_xiaomi_touchfeature_v3(struct fts_ts_data *ts_data);
 int fts_htc_ic_getModeValue(common_data_t *common_data);
 int fts_htc_ic_setModeValue(common_data_t *common_data);
-/* _b582-INTE：blob focal_get_ic_self_test_mode (0x14d90, 88B, [GLOBAL]) —— 读
+/* rodin（2026-10-08）：blob focal_get_ic_self_test_mode (0x14d90, 88B, [GLOBAL]) —— 读
  * ic_self_test_flag（blob .bss+0x5b8）；定义在 focaltech_scp_tp.c:520。
  * 全模块唯一调用点 = fts_htc_ic_setModeValue（blob CALL26 xref 仅 0x3344）。 */
 u8 focal_get_ic_self_test_mode(void);
@@ -1014,7 +1014,7 @@ void fts_esdcheck_resume(struct fts_ts_data *ts_data);
 int fts_test_init(struct fts_ts_data *ts_data);
 int fts_test_exit(struct fts_ts_data *ts_data);
 #endif
-/* _b582-INTA：fts_ic_self_test 的 blob teardown 直调 fts_test_malloc_free_thr
+/* rodin（2026-10-08）：fts_ic_self_test 的 blob teardown 直调 fts_test_malloc_free_thr
  * （blob fts_ic_self_test 0x14ff0；定义在 focaltech_test/focaltech_test.c:1796，
  * GLOBAL 符号）。原型原只在 focaltech_test/focaltech_test.h:696，而 core.c 的 TU
  * 不含该头（core.h 只 include focaltech_test_ini.h）⇒ 按 ② 处理 fts_charger_on 的

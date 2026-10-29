@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 #
-# Makefile for mi memory info (rodin #166: 6.6 blob mi_memory.ko 内建重建)
+# Makefile for mi memory info (rodin 2026-10-04: 6.6 blob mi_memory.ko 内建重建)
 #
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/ufs/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/ufs/vendor/

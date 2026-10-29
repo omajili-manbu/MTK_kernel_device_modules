@@ -3593,7 +3593,7 @@ static void __exit sih_i2c_exit(void)
 	i2c_del_driver(&sih_i2c_driver);
 }
 
-/* A-142（R2 慢单元异步化）：本机无 si-in 器件，probe 走 7×~2.6ms i2c ACK
+/* rodin 6.18（2026-10-21 慢单元异步化）：本机无 si-in 器件，probe 走 7×~2.6ms i2c ACK
  * fail 重试路径（真机 ~25ms）；无下游依赖。=y 后 probe 在 vseq 重放线上串行
  * 阻塞，故把 i2c_add_driver + misc 注册投到 system_wq，vseq 行立即返回。 */
 static void sih_async_register_workfn(struct work_struct *work)

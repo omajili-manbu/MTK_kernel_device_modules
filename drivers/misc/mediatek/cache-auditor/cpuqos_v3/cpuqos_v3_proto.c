@@ -1144,7 +1144,7 @@ static const struct proc_ops cpuqos_ctl_Fops = {
 
 static int __init cpuqos_v3_proto_init(void)
 {
-	/* rodin 6.18（分区 A · 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
+	/* rodin 6.18（2026-10-12 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
 	 * gki_defconfig 内置 android_arch_task_struct_size=512）⇒ 只能运行期校验；
 	 * 不足则本族钩子/节点全部不注册（安全降级；绝不越界写 task_struct 邻区）。
 	 */

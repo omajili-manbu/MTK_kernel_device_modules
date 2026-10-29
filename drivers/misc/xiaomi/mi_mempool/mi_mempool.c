@@ -12,7 +12,7 @@
  * the CCC/dash OS3.0.305 reconstruction as the generational reference; the
  * rodin blob's machine code / .data / .rodata is the sole truth for every
  * struct offset, tunable, whitelist entry and hook registration below
- * (evidence: tools/_b260_mempool, desktop mi_mempool.ko.asm).  The
+ * (evidence: blob mi_mempool.ko.asm).  The
  * _Static_asserts fail the build on layout drift against those offsets.
  *
  * 6.6 -> 6.18 rewrites (deliberate, semantics preserving):

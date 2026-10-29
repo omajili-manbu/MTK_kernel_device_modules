@@ -13,8 +13,8 @@
 #include <linux/sched/clock.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
-#include <linux/of.h> /* rodin b4: 6.18 header pruning */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/of.h> /* rodin 2026-09-26: 6.18 header pruning */
 
 #include <sound/soc.h>
 
@@ -1616,7 +1616,7 @@ static int mtk_btcvsd_snd_probe(struct platform_device *pdev)
 					       NULL, 0);
 }
 
-static void mtk_btcvsd_snd_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
+static void mtk_btcvsd_snd_remove(struct platform_device *pdev) /* rodin 2026-09-26: 6.18 remove void */
 {
 	struct mtk_btcvsd_snd *btcvsd = dev_get_drvdata(&pdev->dev);
 

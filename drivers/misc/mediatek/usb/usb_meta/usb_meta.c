@@ -52,7 +52,7 @@ extern void bootprof_log_boot(char *str);
 /****************************************************
  *   Begin - copy function from composite.c
  *
- * 同步契约（rodin b247 复审）：本块是 composite.c 的**手工副本**，内核演进
+ * 同步契约（rodin 2026-10-12 复审）：本块是 composite.c 的**手工副本**，内核演进
  * 不会带动它。2026-10-12 复审实测 reset_config 曾落后内核两处行为
  * （func_wakeup_armed 复位、android_set_unconfigured），已按内核 6.18 原文补齐；
  * 此后任何"重开副本块/改一处"的改动，都必须对 composite.c 同名函数**逐行核对**。

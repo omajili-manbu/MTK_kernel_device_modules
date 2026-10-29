@@ -989,7 +989,7 @@ static void probe_android_rvh_rtmutex_prepare_setprio(void *ignore, struct task_
 				rq = __task_rq_lock(p, &rf);
 				update_rq_clock(rq);
 
-				/* rodin 6.18（A-75）: delayed 僵尸的实体仍在树上，
+				/* rodin 6.18（2026-10-07）: delayed 僵尸的实体仍在树上，
 				 * 只允许经 core 的 requeue_delayed_entity()/pick 路径
 				 * 收尾；这里若照旧 deactivate/activate 会把 entity
 				 * 账目与其 sched_delayed 位拆开。权重变更由
@@ -2370,7 +2370,7 @@ static void tt_tick(void *data, struct rq *rq)
 
 static int __init init_task_turbo(void)
 {
-	/* rodin 6.18（分区 A · 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
+	/* rodin 6.18（2026-10-12 尾部载体守卫）：尾部尺寸由 boot cmdline 决定（本树
 	 * gki_defconfig 内置 android_arch_task_struct_size=512）⇒ 只能运行期校验；
 	 * 不足则本族钩子/节点全部不注册（安全降级；绝不越界写 task_struct 邻区）。
 	 */

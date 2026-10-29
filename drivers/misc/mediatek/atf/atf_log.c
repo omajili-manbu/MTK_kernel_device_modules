@@ -28,7 +28,7 @@
 #include <linux/atomic.h>
 #include <linux/irq.h>
 #include <linux/syscore_ops.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 #if CONFIG_OF_RESERVED_MEM
 #include <linux/of_reserved_mem.h>
 #define ATF_LOG_RESERVED_MEMORY_KEY "mediatek,atf-log-reserved"

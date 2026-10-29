@@ -65,7 +65,7 @@ struct mutex scp_awake_mutexs[SCP_CORE_TOTAL];
  *   trace  0/1 = 本文件 F6SMC 门控打点开关（默认关；本路径不在 F6SMC 17 通道内）
  *   status 只读：armed/trig_cnt/last_cpu/last_ms/trace
  * 注入路径全程关中断忙等，零睡眠原语（POLLING IPI 语境可进 atomic）。
- * 173 轮 SMC 外移后语义：organic 钩子在锁外 = 修复验收面（forever 注入仅丢
+ * 2026-10-27 SMC 外移后语义：organic 钩子在锁外 = 修复验收面（forever 注入仅丢
  * 调用核，其余核存活 + RCU/HLD 背踪留证）；direct 档刻意持真锁 stall =
  * 阴性对照（仍复现全核自旋蔓延楔死，证明楔点 = 锁本体）。
  */
@@ -308,7 +308,7 @@ int scp_awake_lock(void *_scp_id)
 	spin_unlock_irqrestore(&scp_awake_spinlock, spin_flags);
 
 	/* rodin scp_fi: organic one-shot —— 模拟首发 SMC 不返回
-	 * （173 轮 SMC 外移后本钩子在锁外：forever 注入仅丢调用核，其余核存活） */
+	 * （2026-10-27 SMC 外移后本钩子在锁外：forever 注入仅丢调用核，其余核存活） */
 	{
 		u32 fi_ms = xchg(&scp_fi_armed_ms, 0);
 
@@ -321,7 +321,7 @@ int scp_awake_lock(void *_scp_id)
 	scp_fi_ent(MTK_TINYSYS_SCP_KERNEL_OP_INFRA_REQ, 0);
 	scp_fi_ret(scp_lpm_req_infra());
 
-	/* 173 轮 SMC 外移：重入锁只为寄存器窗口（临界区内零固件调用） */
+	/* rodin 6.18（2026-10-27 SMC 外移）：重入锁只为寄存器窗口（临界区内零固件调用） */
 	spin_lock_irqsave(&scp_awake_spinlock, spin_flags);
 	scp_fi_ev("LOCK acq cpu=%u cnt=%d (%s window)\n",
 		  raw_smp_processor_id(), *scp_awake_count, __func__);
@@ -396,7 +396,7 @@ int scp_awake_lock(void *_scp_id)
 		  raw_smp_processor_id(), *scp_awake_count, __func__);
 	spin_unlock_irqrestore(&scp_awake_spinlock, spin_flags);
 
-	/* 173 轮 SMC 外移：AWAKE_CTRL 在解锁后发（SCP 已被寄存器握手唤醒，
+	/* rodin 6.18（2026-10-27 SMC 外移）：AWAKE_CTRL 在解锁后发（SCP 已被寄存器握手唤醒，
 	 * ctrl 仅向固件记账；失败路径原先也在锁外，语义对齐） */
 	if (ret != -1) {
 		scp_fi_ent(MTK_TINYSYS_SCP_KERNEL_OP_AWAKE_CTRL, IS_AWAKE_LOCK);
@@ -499,7 +499,7 @@ int scp_awake_unlock(void *_scp_id)
 	scp_fi_ent(MTK_TINYSYS_SCP_KERNEL_OP_INFRA_REQ, 0);
 	scp_fi_ret(scp_lpm_req_infra());
 
-	/* 173 轮 SMC 外移：重入锁只为寄存器窗口（临界区内零固件调用） */
+	/* rodin 6.18（2026-10-27 SMC 外移）：重入锁只为寄存器窗口（临界区内零固件调用） */
 	spin_lock_irqsave(&scp_awake_spinlock, spin_flags);
 	scp_fi_ev("LOCK acq cpu=%u cnt=%d (%s window)\n",
 		  raw_smp_processor_id(), *scp_awake_count, __func__);
@@ -579,7 +579,7 @@ int scp_awake_unlock(void *_scp_id)
 		  raw_smp_processor_id(), *scp_awake_count, __func__);
 	spin_unlock_irqrestore(&scp_awake_spinlock, spin_flags);
 
-	/* 173 轮 SMC 外移：AWAKE_CTRL 在解锁后发（解锁寄存器握手已完成） */
+	/* rodin 6.18（2026-10-27 SMC 外移）：AWAKE_CTRL 在解锁后发（解锁寄存器握手已完成） */
 	if (ret != -1) {
 		scp_fi_ent(MTK_TINYSYS_SCP_KERNEL_OP_AWAKE_CTRL, IS_AWAKE_UNLOCK);
 		scp_fi_ret(scp_smc_awake_ctrl(IS_AWAKE_UNLOCK));

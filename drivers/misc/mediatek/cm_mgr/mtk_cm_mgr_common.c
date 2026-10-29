@@ -48,7 +48,7 @@
 
 #include "mtk_cm_mgr_common.h"
 
-unsigned int cm_dbg_info; /* rodin: 定义收口到 common.c（批4-5），无条件段 */
+unsigned int cm_dbg_info; /* rodin: 定义收口到 common.c，无条件段 */
 #if IS_ENABLED(CONFIG_MTK_CM_IPI)
 #include "mtk_cm_ipi.h"
 #endif /* CONFIG_MTK_CM_IPI */

@@ -309,7 +309,7 @@ static int mtk_cpu_power_throttling_probe(struct platform_device *pdev)
 	ret = parse_cpu_limit_table(&pdev->dev);
 	if (ret != 0)
 		return ret;
-	/* rodin b514 #114: =y 内建后本 probe 可早于 cpufreq 提供者（6.6 是 .ko，
+	/* rodin 2026-10-01: =y 内建后本 probe 可早于 cpufreq 提供者（6.6 是 .ko，
 	 * 装载序天然在后）。任一 CPU 无 policy 即整体延迟重试——原实现 continue
 	 * 会让该 CPU 的限频回调永久缺失（且 k 计数错位）。*/
 	for_each_possible_cpu(cpu) {
@@ -379,7 +379,7 @@ static int mtk_cpu_power_throttling_probe(struct platform_device *pdev)
 
 	return 0;
 }
-static void mtk_cpu_power_throttling_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
+static void mtk_cpu_power_throttling_remove(struct platform_device *pdev) /* rodin 2026-09-26: 6.18 remove void */
 {
 	struct cpu_pt_policy *pt_policy, *pt_policy_t;
 	list_for_each_entry_safe(pt_policy, pt_policy_t, &pt_policy_list, cpu_pt_list) {

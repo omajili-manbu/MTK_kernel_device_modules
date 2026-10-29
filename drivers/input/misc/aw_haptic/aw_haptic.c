@@ -1374,7 +1374,7 @@ static struct i2c_driver awinic_i2c_driver = {
 	.id_table = awinic_i2c_id,
 };
 
-/* A-142（R2 慢单元异步化）：本机无 awinic 器件，probe 走 pinctrl + 2×8ms i2c
+/* rodin 6.18（2026-10-21 慢单元异步化）：本机无 awinic 器件，probe 走 pinctrl + 2×8ms i2c
  * 重试 fail 路径（真机 ~40ms）；原厂 .ko 语境本单元在 vendor_dlkm 波（>2.8s），
  * 无任何下游依赖（纯 input/misc 设备驱动）。=y 后 probe 在 vseq 重放线上串行
  * 阻塞，故把 i2c_add_driver 投到 system_wq，vseq 行立即返回。 */

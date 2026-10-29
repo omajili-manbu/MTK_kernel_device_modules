@@ -91,7 +91,7 @@ static int fts_spi_transfer(u8 *tx_buf, u8 *rx_buf, u32 len)
 	}
 #endif
 
-    /* _b582-INTA：补树侧完全缺失的 `spi_sync retry:%d` 站点（blob fts_spi_transfer
+    /* rodin（2026-10-08）：补树侧完全缺失的 `spi_sync retry:%d` 站点（blob fts_spi_transfer
      * 0x2ff90-0x30054，3 次重试全展开）：
      *   每失败一次 udelay(2000)（0x8312b0/0x10c7 = 2000us，__const_udelay），
      *   重试计数 retry = 失败次数（1/2/3）；
@@ -281,7 +281,7 @@ int fts_write_reg(u8 addr, u8 value)
 {
     u8 writebuf[2] = { 0 };
 
-    /* _b584a-B1#2：blob '\x016[FTS_TS_D][%s:%d]: addr: 0x%x, value: %d' +0x8116（无尾
+    /* rodin（2026-10-08）：blob '\x016[FTS_TS_D][%s:%d]: addr: 0x%x, value: %d' +0x8116（无尾
      * '\n'），唯一引用 .rela.text +0x30134/0x30138 → fts_write_reg loc_39130（cmp w8,#4
      * b.cs D 门，行 0x109；实参 = 入参 addr/value，先打印后写）⇒ 函数头补打印 */
     FTS_DEBUG("addr: 0x%x, value: %d", addr, value);

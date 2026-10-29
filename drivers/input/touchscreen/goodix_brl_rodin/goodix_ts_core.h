@@ -36,7 +36,7 @@
 
 // #define GOODIX_DEBUG_SPI
 
-/* #228（b581）blob .rodata.str1.1+0x8aa0 = "gt9916-2025.07.24-01"（rodin 变体），
+/* rodin（2026-10-08）：blob .rodata.str1.1+0x8aa0 = "gt9916-2025.07.24-01"（rodin 变体），
  * 原树 warsaw 值 "gt9916-2025.8.19-01" 属偏离，按 blob 收口 */
 #define GOODIX_DRIVER_VERSION			"gt9916-2025.07.24-01"
 
@@ -57,7 +57,7 @@
 #define GOODIX_RETRY_5					5
 #define GOODIX_RETRY_10					10
 
-/* #228（b581）blob .rodata+0x8e0 = "goodix_firmware.bin"、.rodata+0x909 =
+/* rodin（2026-10-08）：blob .rodata+0x8e0 = "goodix_firmware.bin"、.rodata+0x909 =
  * "goodix_cfg_group.bin"（blob 无 "_warsaw"/"_1" 变体串），原树 warsaw 命名
  * 为偏离，按 blob 收口；TS_DEFAULT_FIRMWARE_1/CFG_BIN_1 为未引用宏，保留 */
 #define TS_DEFAULT_FIRMWARE			"goodix_firmware.bin"
@@ -65,7 +65,7 @@
 #define TS_DEFAULT_CFG_BIN 			"goodix_cfg_group.bin"
 #define TS_DEFAULT_CFG_BIN_1 			"goodix_cfg_group_1.bin"
 
-/* #228（b581）blob .rodata+0x932 只含 "goodix_test_limits"（无 "_aftersale"），
+/* rodin（2026-10-08）：blob .rodata+0x932 只含 "goodix_test_limits"（无 "_aftersale"），
  * 且 CONFIG_TOUCH_FACTORY_BUILD/CONFIG_FACTORY_BUILD 在本构建（含 stock 6.6）
  * 均未定义 —— 原树 #else 分支取的 "_aftersale" 是偏离，按 blob 固定该默认值 */
 #define TS_DEFAULT_LIMIT_CSV 			"goodix_test_limits"
@@ -540,7 +540,7 @@ struct goodix_pen_data {
 };
 
 #ifdef TOUCH_THP_SUPPORT
-/* _b583-GX：struct tp_frame 按 blob 收口（goodix_core_rodin.ko brl_event_handler）：
+/* rodin（2026-10-08）：struct tp_frame 按 blob 收口（goodix_core_rodin.ko brl_event_handler）：
  *   0x633c  add x23, x0, #0x18         frame_ptr = &tp_frame->thp_frame
  *   0x634c  mov w3, #0x9c4 (=2500)     常规帧读入 slot+0x18
  *   0x65f8  str w8, [x21, #0x9dc]      tp_frame->dump_type @0x9dc（紧随 2500 帧）
@@ -564,7 +564,7 @@ struct tp_frame {
 	u8 thp_frame[GOODIX_THP_FRAME_SIZE];
 #endif
 };
-/* _b583-GX：blob 布局锚点（编译期门）——地址见 struct 上方注释；第二缓冲尺寸取
+/* rodin（2026-10-08）：blob 布局锚点（编译期门）——地址见 struct 上方注释；第二缓冲尺寸取
  * GOODIX_THP_FRAME_DUMP_SIZE（vendor 宏，注释 "For P12X fw report diffdata" 即
  * dump 帧用途；剥离符号的 blob 无法读出声明尺寸，可证的是偏移锚点 0x9dc/0x9e0）。 */
 _Static_assert(__builtin_offsetof(struct tp_frame, thp_frame) == 0x18,
@@ -1034,7 +1034,7 @@ int get_limit_csv_file_version(struct goodix_ts_core *ts_core, char *limit_versi
 #ifdef TOUCH_THP_SUPPORT
 int goodix_htc_enable(int en);
 int goodix_htc_enter_idle(int *value);
-/* _b583b-GX/T2：goodix_htc_ref_hopping_set 声明删除（blob 无此函数，
+/* rodin（2026-10-08）：goodix_htc_ref_hopping_set 声明删除（blob 无此函数，
  * mode 1106 落 default） */
 int goodix_htc_enter_glove(int *value);
 int goodix_htc_start_calibration(void);
@@ -1056,7 +1056,7 @@ int goodix_htc_set_double_scan(int index);
 int goodix_htc_set_normalize_study(int *index);
 int goodix_htc_set_gesture_feedback(int index);
 int goodix_htc_set_idle_threshold(int threshold);
-/* _b583b-GX/T2：goodix_htc_set_display_fps 声明删除（blob 无此函数，
+/* rodin（2026-10-08）：goodix_htc_set_display_fps 声明删除（blob 无此函数，
  * mode 1012 在跳表内落 default） */
 
 int goodix_htc_enable_empty_int(bool en);
@@ -1080,7 +1080,7 @@ void goodix_ts_esd_on(struct goodix_ts_core *cd);
 
 #endif
 
-/* ==================== _b571：SCP-TP 对外面（scp_debug 节点用）==================== */
+/* ==================== rodin（2026-10-06）：SCP-TP 对外面（scp_debug 节点用）==================== */
 struct scp_tp_params {
 	u32 param0;		/* 0x00 状态机 */
 	u32 unknown_04;

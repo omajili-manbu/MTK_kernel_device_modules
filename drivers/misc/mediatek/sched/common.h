@@ -19,7 +19,7 @@
 		ARRAY_SIZE(((kstruct *)0)->android_vendor_data1)))
 
 
-/* rodin 6.18（A-62/A-75 口径）：钩子账里的"真在队列上"判定。语义 =
+/* rodin 6.18（2026-10-30 口径）：钩子账里的"真在队列上"判定。语义 =
  * task_on_rq_queued(p) && !p->se.sched_delayed；此处按
  * kernel/sched/sched.h:2366 的实现原样内联，以免 const 形参在
  * task_on_rq_queued()（形参非 const）上丢限定符。
@@ -44,7 +44,7 @@ static inline bool mtk_task_on_rq_active(const struct task_struct *p)
 
 /* 搬家资格 = mtk_task_on_rq_active() + blocked_on 门，只给搬家判定点用。
  *
- * A-75：core 自己所有"把任务当活任务搬/激活"的地方都显式排除
+ * core 自己所有"把任务当活任务搬/激活"的地方都显式排除
  * se.sched_delayed（can_migrate_task() kernel/sched/fair.c:9846 直接
  * return 0；__set_next_task_fair()/switched_to_fair()/try_to_wake_up() 均带
  * WARN_ON_ONCE(se->sched_delayed) 断言；pick_next_entity() 对选中的 delayed
@@ -202,7 +202,7 @@ struct mtk_tg {
 	struct vip_task_group vtg;
 };
 
-/* rodin 6.18（分区 A · 载体迁移）：per-task 载体从 task_struct 静态槽
+/* rodin 6.18（2026-10-12 载体迁移）：per-task 载体从 task_struct 静态槽
  * （android_vendor_data1，6.18 上游缩到 6×u64=48B）迁到 GKI 动态尾部：
  * CONFIG_GKI_DYNAMIC_TASK_STRUCT_SIZE=y 时 task_struct 按 arch_task_struct_size
  * 分配，尾部由 android_task_vendor_data(p) 取得（init_task 特例 = vendor_data_pad[]）。
@@ -328,7 +328,7 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_rq,
 #endif
 
 /*
- * rodin 6.18（A-116/B2）：消费面出口的包络夹取原语 —— 6.18
+ * rodin 6.18（2026-10-17）：消费面出口的包络夹取原语 —— 6.18
  * sugov_effective_cpu_perf()（kernel/sched/cpufreq_schedutil.c:216-231）去掉
  * map_util_perf() headroom 的本树等价形：
  *

@@ -1768,8 +1768,8 @@ static int mtk_iommu_set_dev_dma(struct device *dev)
 #define MTK_IOMMU_HW_VERIFY_MAX_RETRY	600
 
 /*
- * rodin #144: 6.18 注册期扫描在 mtk_iommu_probe 内同步 attach 全部消费者
- * (b528 实证 0.549s T1)，APU SMMU 电源未上，一次性 hw_init 的写入全部
+ * rodin 2026-10-02: 6.18 注册期扫描在 mtk_iommu_probe 内同步 attach 全部消费者
+ * (实证 0.549s)，APU SMMU 电源未上，一次性 hw_init 的写入全部
  * 丢失(全寄存器读 0，PT_BASE 回读 0x0)。框架侧不会再有第二次 attach
  * (消费者已分组，后续 probe 走 fwspec 早退)，自愈只能驱动侧做：
  * 周期重放 hw_init + PT_BASE，直到回读非 0 才把 HW init 记为成功。
@@ -1900,7 +1900,7 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
 		writel(dom->cfg.arm_v7s_cfg.ttbr, data->base + REG_MMU_PT_BASE_ADDR);
 
 		/*
-		 * rodin #144: HW init 只在 PT_BASE 回读落地后才算成立。电源
+		 * rodin 2026-10-02: HW init 只在 PT_BASE 回读落地后才算成立。电源
 		 * 未上时写入全部丢失(回读 0x0)，此处不下"init 成功"的结论，
 		 * 置未验证标记并启动周期重放，直到回读非 0。
 		 */
@@ -2140,13 +2140,13 @@ static void mtk_iommu_release_device(struct device *dev)
 	larbid = MTK_M4U_TO_LARB(fwspec->ids[0]);
 	larbdev = data->larb_imu[larbid].dev;
 	/*
-	 * rodin b512 #112: consumer<->larb device_link 本树从不创建
+	 * rodin 2026-09-30: consumer<->larb device_link 本树从不创建
 	 * （probe_device 无 device_link_add，APU 的 LINK_WITH_APU 加的是
 	 * apudev<->m4u 反向链接），此 remove 本就是 no-op；而 6.18 注册期
 	 * 扫描/早于 smi-larb probe(6.6 实证 0.598s) 的任何 release 路径里
 	 * larb_imu[].dev 为 NULL（APU 实例无 mediatek,larbs 恒 NULL），
 	 * device_link_remove 对 NULL supplier 解引用
-	 * supplier->links.consumers 必崩（#112 pc=device_link_remove+0x34
+	 * supplier->links.consumers 必崩（pc=device_link_remove+0x34
 	 * 读 [0xe0]，注销拆除链实证）。
 	 */
 	if (larbdev)
@@ -3110,7 +3110,7 @@ out:
 		dev_err(dev, "%s, can't find mediatek,larbs !\n", __func__);
 		return larb_nr;
 	}
-	/* rodin b247 复审 D2: 上游 6.18 mtk_iommu_mm_dts_parse 有、此处缺的两条校验——
+	/* rodin 2026-10-12 复审: 上游 6.18 mtk_iommu_mm_dts_parse 有、此处缺的两条校验——
 	 * larb_nr==0 会让循环后的 smi-supply 解析用未初始化的 larbnode；
 	 * larb_nr>MTK_LARB_NR_MAX 会越界。合法 DT 不会触发，纯加固。 */
 	if (larb_nr == 0 || larb_nr > MTK_LARB_NR_MAX) {
@@ -3136,7 +3136,7 @@ out:
 		if (ret)/* The id is consecutive if there is no this property */
 			id = i;
 
-		/* rodin b247 复审 D2: 上游 6.18 有、此处缺 —— 防止 DT 给出越界 larb-id
+		/* rodin 2026-10-12 复审: 上游 6.18 有、此处缺 —— 防止 DT 给出越界 larb-id
 		 * 时 data->larb_imu[id] 越界写（数组 MTK_LARB_NR_MAX 项）。 */
 		if (id >= MTK_LARB_NR_MAX) {
 			dev_err(dev, "%s, larb-id %u out of range !\n", __func__, id);
@@ -3229,11 +3229,11 @@ skip_smi:
 		goto out_link_remove;
 
 	/*
-	 * rodin b511 #111: 6.18 iommu core 在 iommu_device_register() 内对整条
+	 * rodin 2026-09-30: 6.18 iommu core 在 iommu_device_register() 内对整条
 	 * bus 上无 fwspec 的无主设备同步代跑 dma_configure（of_xlate ->
 	 * probe_device -> device_group -> default domain attach，见
 	 * iommu_init_device()）。hw_list 与 tlb_lock 必须先于注册可见：
-	 * device_group 的 get_first_data(hw_list) 读 [NULL] 即 Oops（#111
+	 * device_group 的 get_first_data(hw_list) 读 [NULL] 即 Oops（
 	 * 实证 pc=mtk_iommu_device_group+0x30），attach 的 tlb flush 会踩
 	 * 未初始化锁。6.6 =m 时消费者 bind 晚于注册+probe 完成，无此窗口。
 	 */
@@ -3323,7 +3323,7 @@ static void mtk_iommu_remove(struct platform_device *pdev)
 {
 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
 
-	/* rodin #144: 先停掉重放 work 再拆除 */
+	/* rodin 2026-10-02: 先停掉重放 work 再拆除 */
 	cancel_delayed_work_sync(&data->hw_verify_work);
 
 	iommu_device_sysfs_remove(&data->iommu);

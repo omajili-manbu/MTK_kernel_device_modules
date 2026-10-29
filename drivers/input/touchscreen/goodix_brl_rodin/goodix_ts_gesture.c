@@ -45,7 +45,7 @@ static bool module_initialized;
 #define IRQ_EVENT_HEAD_LEN          8
 #define FOD_EVENT_LEN               10
 #define GOODIX_GESTURE_EVENT        0x20
-/* _b582-GXI：blob gesture_event_handler 0x169c8 的 6[GTP_I] "touch_head %*ph"
+/* rodin（2026-10-08）：blob gesture_event_handler 0x169c8 的 6[GTP_I] "touch_head %*ph"
  * 其 w3=0x20（读满 goodix_gesture_ist 的 gesture_data[32]）⇒ 常量按 blob 为 32。 */
 #define IRQ_EVENT_HEAD_LEN_LARGER   32
 
@@ -59,7 +59,7 @@ static int gesture_event_handler(struct goodix_ts_core *cd,
 	int ret = 0;
 	bool sync_late = false;
 
-	/* _b583b-GX：blob 0x164c0（handler:78，I 级）入口即打 SCP 状态 */
+	/* rodin（2026-10-08）：blob 0x164c0（handler:78，I 级）入口即打 SCP 状态 */
 	ts_info("scptp_cur_state=%d\n", scp_tp_param.param0);
 
 	/* blob 0x163ac：param0==3 时手势体来自 SCP ddr 缓冲（gesture_len 运行期，
@@ -112,7 +112,7 @@ static int gesture_event_handler(struct goodix_ts_core *cd,
 	}
 
 	event_status = pre_buf[0];
-	/* _b582-GXI：blob 该点 = 6[GTP_I]（0x169c8，__func__ gesture_event_handler，
+	/* rodin（2026-10-08）：blob 该点 = 6[GTP_I]（0x169c8，__func__ gesture_event_handler，
 	 * 32 字节）；树原 D 级 16 字节为 warsaw 残项。 */
 	ts_info("touch_head %*ph", IRQ_EVENT_HEAD_LEN_LARGER, pre_buf);
 	if (event_status & GOODIX_GESTURE_EVENT || sync_late) {
@@ -189,9 +189,9 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 		fody = gesture_data[10] | (gesture_data[11] << 8);
 		fodx *= cd->board_data.super_resolution_factor;
 		fody *= cd->board_data.super_resolution_factor;
-		ts_debug("gesture coordinate fodx: %d, fody: %d, fod_id: %d, overlay_area: %d",	/* #228：blob 等级 D */
+		ts_debug("gesture coordinate fodx: %d, fody: %d, fod_id: %d, overlay_area: %d",	/* 2026-10-08：blob 等级 D */
 					fodx, fody, fod_id, overlay_area);
-		/* _b583b-GX：blob FOD down 上报序列以 BTN_INFO(1)+sync 开头
+		/* rodin（2026-10-08）：blob FOD down 上报序列以 BTN_INFO(1)+sync 开头
 		 * （0x16a44-0x16a6c），树原缺这两个事件 */
 		input_report_key(cd->input_dev, BTN_INFO, 1);
 		input_sync(cd->input_dev);
@@ -225,7 +225,7 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 		if (cd->fod_finger) {
 			ts_info("gesture fod up, overlay_area: %d", overlay_area);
 			cd->fod_finger = false;
-			/* _b583b-GX：blob FOD up 序列 = BTN_INFO(0)+sync 开头、
+			/* rodin（2026-10-08）：blob FOD up 序列 = BTN_INFO(0)+sync 开头、
 			 * BTN_TOUCH/TOOL_FINGER(0)+sync 结尾（0x167fc-0x168ac），
 			 * 树原以 WMAJ/WMIN(0) 收尾为 warsaw 残项 */
 			input_report_key(cd->input_dev, BTN_INFO, 0);
@@ -274,7 +274,7 @@ int goodix_gesture_ist(struct goodix_ts_core *cd)
 	}
 
 re_send_ges_cmd:
-	/* _b583b-GX：blob 0x16688-0x16690 SCP 接管（param0==3）时不重发手势命令 */
+	/* rodin（2026-10-08）：blob 0x16688-0x16690 SCP 接管（param0==3）时不重发手势命令 */
 	if (scp_tp_param.param0 != 3) {
 		if (hw_ops->gesture(cd, cd->gesture_enabled))
 			ts_info("warning: failed re_send gesture cmd");
@@ -305,7 +305,7 @@ int gsx_gesture_before_suspend(struct goodix_ts_core *cd)
 		ts_info("enter gesture mode");
 
 	cd->work_status = TP_GESTURE;
-	/* #228（b581）blob gsx_gesture_before_suspend @0x16c1c：
+	/* rodin（2026-10-08）：blob gsx_gesture_before_suspend @0x16c1c：
 	 *   16c90 ldrb w8,[scp_tp_mistouch_close]; 16c98 str w9(=1),[x19,#0x680]
 	 *   16c9c cbz  w8, 0x16ce0（直接 return）
 	 * → irq_enable + irq_set_irq_wake 被 goodix_scp_tp_mistouch_close **非零**

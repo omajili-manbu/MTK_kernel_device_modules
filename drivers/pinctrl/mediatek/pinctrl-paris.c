@@ -310,7 +310,7 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 	 * （203a83112e09，enum 随 INPUT_SCHMITT_UV 插入而位移）——DT 的
 	 * output-high/output-low 现在只落这个 param。6.6 版驱动没有该分支，
 	 * 组级配置一律走 default: -ENOTSUPP(-524) ⇒ pin_config_group_set
-	 * op failed（#205 实证 26 条；相机三 sensor / focaltech 触屏 /
+	 * op failed（实证 26 条；相机三 sensor / focaltech 触屏 /
 	 * awinic+ics 马达 reset 三面同根）。语义照上游 paris：先写 DO 再置
 	 * DIR=OUTPUT。
 	 */

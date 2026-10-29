@@ -1016,7 +1016,7 @@ int init_legacy_capacity_table(void)
 			goto err;
 
 		/*
-		 * rodin 6.18（S1b/P-09）：EM 表是 __rcu 且可热更新，6.18 唯一的
+		 * rodin 6.18（2026-10-17）：EM 表是 __rcu 且可热更新，6.18 唯一的
 		 * 合法写入口是 em_dev_update_perf_domain()（dup → 重算 cost →
 		 * RCU 发布 → 释放本地引用）。原来就地覆写 pd->em_table->state[]
 		 * 既绕过该协议，也绕过了换表后的 kref 生命周期。
@@ -1146,7 +1146,7 @@ int em_opp2freq(int cpu, int opp)
 	}
 	opp = clamp_val(opp, 0, pd->nr_perf_states - 1);
 
-	/* rodin 6.18（A-61′）：__rcu 表一次取表、锁内读成标量。 */
+	/* rodin 6.18（2026-10-17）：__rcu 表一次取表、锁内读成标量。 */
 	rcu_read_lock();
 	states = em_perf_state_from_pd(pd);
 	if (states[0].frequency > states[1].frequency)
@@ -1190,7 +1190,7 @@ int em_opp2cap(int cpu, int opp)
 		}
 		opp = clamp_val(opp, 0, pd->nr_perf_states - 1);
 
-		/* rodin 6.18（A-61′）：__rcu 表一次取表、锁内读成标量。 */
+		/* rodin 6.18（2026-10-17）：__rcu 表一次取表、锁内读成标量。 */
 		rcu_read_lock();
 		states = em_perf_state_from_pd(pd);
 		if (states[0].frequency > states[1].frequency) {
@@ -1220,7 +1220,7 @@ int em_opp2pwr_eff(int cpu, int opp)
 	}
 	opp = clamp_val(opp, 0, pd->nr_perf_states - 1);
 
-	/* rodin 6.18（A-61′）：__rcu 表一次取表、锁内读成标量。 */
+	/* rodin 6.18（2026-10-17）：__rcu 表一次取表、锁内读成标量。 */
 	rcu_read_lock();
 	states = em_perf_state_from_pd(pd);
 	if (states[0].frequency > states[1].frequency)
@@ -2161,7 +2161,7 @@ int init_opp_cap_info(struct proc_dir_entry *dir)
 		set_turn_point_freq(i, 0);
 	}
 
-	/* rodin 6.18（A-147 第三批）：wl 分支 dormant（is_wl_support() 恒
+	/* rodin 6.18（2026-10-26）：wl 分支 dormant（is_wl_support() 恒
 	 * false）删除；dsu_pwr_swpm_init/init_eas_dsu_ctrl/l3ctl 取址随支入灭。
 	 */
 #endif

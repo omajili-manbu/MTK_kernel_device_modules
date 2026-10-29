@@ -197,7 +197,7 @@ static void fixup_busy_time(struct task_struct *p, int new_cpu)
 		FLT_LOGI("on CPU %d task %s(%d) not on src_rq %d",
 			raw_smp_processor_id(), p->comm, p->pid, src_rq->cpu);
 		/*
-		 * rodin 6.18（S6/P-31）：任务已不在 src_rq 上，后面的
+		 * rodin 6.18（2026-10-17）：任务已不在 src_rq 上，后面的
 		 * flt_update_task_ravg() 会按错的 rq 记账；只打日志不早退等于
 		 * 把一次失配变成两次污染。仍须先解锁再走。
 		 */
@@ -595,7 +595,7 @@ void flt_rvh_enqueue_task(void *data, struct rq *rq,
 	lockdep_assert_rq_held(rq);
 
 	/*
-	 * rodin 6.18（A-62 家族）：DELAY_DEQUEUE 下实体可以"挂着队但不可运行"。
+	 * rodin 6.18（2026-10-17）：DELAY_DEQUEUE 下实体可以"挂着队但不可运行"。
 	 * 口径照 core uclamp_rq_inc()（kernel/sched/core.c:1914）：延迟实体只有
 	 * 在 ENQUEUE_DELAYED 这次真唤醒时才重新计入可运行；其余情形跳过，
 	 * 否则 group_nr_running 会把僵尸算成在跑，污染 grp_awr 的目标 util。
@@ -640,7 +640,7 @@ void flt_rvh_dequeue_task(void *data, struct rq *rq,
 	lockdep_assert_rq_held(rq);
 
 	/*
-	 * rodin 6.18（A-62 家族）：与 uclamp_rq_dec()（kernel/sched/core.c:1941）
+	 * rodin 6.18（2026-10-17）：与 uclamp_rq_dec()（kernel/sched/core.c:1941）
 	 * 对称——已是延迟出队僵尸的实体不再占"可运行"名额：首次延迟出队
 	 * （sched_delayed 尚未置位）已经减过一次，此后对它的 dequeue 一律跳过。
 	 */

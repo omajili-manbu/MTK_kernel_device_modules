@@ -80,7 +80,7 @@ static inline bool check_has_overutilize_cpu(struct cpumask *grp)
 
 	for_each_cpu(cpu, grp) {
 		/*
-		 * rodin 6.18（A-62 家族）：nr_running 含 se.sched_delayed 的延迟
+		 * rodin 6.18（2026-10-17）：nr_running 含 se.sched_delayed 的延迟
 		 * 出队僵尸（挂队但不可运行），拿它当"≥2 个可运行任务"会制造虚假
 		 * overutilize、多触发 newidle balance。6.18 的可运行计数是
 		 * cfs_rq->h_nr_runnable（set_delayed() 递减、clear_delayed() 递增）。
@@ -784,7 +784,7 @@ void check_for_migration(struct task_struct *p)
 	irq_log_store();
 
 	/*
-	 * rodin 6.18（S4/P-39）：本函数由 android_vh_scheduler_tick 调用
+	 * rodin 6.18（2026-10-17）：本函数由 android_vh_scheduler_tick 调用
 	 * （core.c:6338，位于 rq_unlock 之后），入口这几处读都没有 rq lock
 	 * 保护，而 core 在 fair.c:5392/5400 的锁内写 rq->misfit_task_load。
 	 * 这些读只是启发式决策的起点，真正的迁移在后面的
@@ -811,7 +811,7 @@ void check_for_migration(struct task_struct *p)
 			return;
 
 		/*
-		 * rodin 6.18（A-61）：em_perf_domain::em_table 是
+		 * rodin 6.18（2026-10-16）：em_perf_domain::em_table 是
 		 * struct em_perf_table __rcu *（EM 表可热更新/retable），上游读者
 		 * 一律 rcu_read_lock() + rcu_dereference()，这里直接用同头提供的
 		 * em_perf_state_from_pd() 访问器（与 em_cpu_energy() 同形）。
@@ -884,7 +884,7 @@ void hook_scheduler_tick(void *data, struct rq *rq)
 		return;
 
 	/*
-	 * rodin 6.18（A-147 首批）：rotate 层删除后 rd->android_vendor_data1
+	 * rodin 6.18（2026-10-26）：rotate 层删除后 rd->android_vendor_data1
 	 * 的唯一写者（system_has_many_heavy_task，rotate.c）不复存在；读侧
 	 * （fair.c 迁移挑任务）读到恒 0 —— 与删除前完全一致（写者本就在
 	 * get_eas_hook()=0 的早退之后，从未实际执行）。
@@ -1174,7 +1174,7 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 	*need_update = false;
 
 	/*
-	 * rodin 6.18（S6/F4）：补 core 的"已经在本任务允许的最大核上"早退
+	 * rodin 6.18（2026-10-17）：补 core 的"已经在本任务允许的最大核上"早退
 	 * （kernel/sched/fair.c:5389）。少了这一条，同容量域里的 tick 会把
 	 * 任务反复标成 misfit，白跑一次 task_h_load()。
 	 */
@@ -1217,7 +1217,7 @@ int set_util_est_ctrl(bool enable)
 
 int set_cpus_allowed_ptr_by_kernel(struct task_struct *p, const struct cpumask *new_mask)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return -ENODEV;
 	struct cpumask *kernel_allowed_mask;

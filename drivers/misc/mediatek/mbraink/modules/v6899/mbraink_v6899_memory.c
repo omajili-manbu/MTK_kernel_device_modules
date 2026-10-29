@@ -9,7 +9,7 @@
 
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
-#include <linux/workqueue.h> /* rodin b515 #115 */
+#include <linux/workqueue.h> /* rodin 2026-10-01 */
 #include <mbraink_modules_ops_def.h>
 #include "mbraink_v6899_memory.h"
 
@@ -18,7 +18,7 @@
 
 struct device *mbraink_v6899_device;
 
-/* rodin b515 #115: ufsnotify 注册重试。=y probe(1.12s) 早于 UFS probe（6.6 靠 .ko
+/* rodin 2026-10-01: ufsnotify 注册重试。=y probe(1.12s) 早于 UFS probe（6.6 靠 .ko
  * 装载序 3.57s >> 1.44s 保证 drvdata 就绪）；ufs_mb_register 返回 -EPROBE_DEFER 时
  * 200ms×50=10s 有界重试，就绪后完整注册。 */
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
@@ -286,7 +286,7 @@ int mbraink_v6899_memory_init(struct device *dev)
 			if (phy_pdev) {
 				int ufs_ret = ufs_mb_register(phy_pdev, ufs2mbrain_event_notify);
 
-				/* rodin b515 #115: UFS 未 probe ⇒ defer，交给重试 work；
+				/* rodin 2026-10-01: UFS 未 probe ⇒ defer，交给重试 work；
 				 * 其余错误码保持 6.6 语义（丢弃、不影响 probe 返回值）。 */
 				if (ufs_ret == -EPROBE_DEFER) {
 					pr_info("[MBK_v6899] %s: ufsnotify register deferred, will retry\n",
@@ -314,7 +314,7 @@ int mbraink_v6899_memory_deinit(struct device *dev)
 #endif
 
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
-	cancel_delayed_work_sync(&mbraink_v6899_ufs_reg_work); /* rodin b515 #115: 防去注册与重试竞争 */
+	cancel_delayed_work_sync(&mbraink_v6899_ufs_reg_work); /* rodin 2026-10-01: 防去注册与重试竞争 */
 #endif
 	ret = unregister_mbraink_memory_ops();
 

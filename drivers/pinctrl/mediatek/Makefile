@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 ccflags-y += -I$(srctree)/drivers/pinctrl/mediatek
 
-# rodin b247（分区 B · 6.18 对齐）：vendor × 内核同名实现 → 链接期 duplicate symbol。
+# rodin 2026-10-12（6.18 对齐）：vendor × 内核同名实现 → 链接期 duplicate symbol。
 # 内核树 drivers/pinctrl/mediatek/{mtk-eint,pinctrl-mtk-common-v2,pinctrl-paris}.c
 # 在本树打开（\.config 的 CONFIG_PINCTRL_MT6858/MT6878=y 经 Kconfig default ARM64
 # && ARCH_MEDIATEK 打开并 select PINCTRL_MTK_PARIS/V2/EINT_MTK），对 rodin 却是惰性

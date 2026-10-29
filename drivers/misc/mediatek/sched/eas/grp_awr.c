@@ -47,7 +47,7 @@ EXPORT_SYMBOL(grp_awr_update_cpu_tar_util_hook);
 void set_grp_awr_marg_ctrl(int val)
 {
 	/*
-	 * rodin 6.18（S0 补扫）：val == 100 会让 (100 - val) 为 0 触发除零；
+	 * rodin 6.18（2026-10-17）：val == 100 会让 (100 - val) 为 0 触发除零；
 	 * val 超出 (0,100] 也会给出无意义的 margin。本函数当前无调用者、
 	 * blob 侧也零消费者，但它是 EXPORT_SYMBOL 面，按可传任意值的入口处理。
 	 */
@@ -176,7 +176,7 @@ void set_grp_awr_thr(int gear_id, int group_id, int freq)
 	int opp;
 
 	/*
-	 * rodin 6.18（S0 补扫）：原守卫只挡了 group_id >= GROUP_ID_RECORD_MAX，
+	 * rodin 6.18（2026-10-17）：原守卫只挡了 group_id >= GROUP_ID_RECORD_MAX，
 	 * 漏了负值。本函数是 EXPORT_SYMBOL，实参经
 	 * /proc/easmgr/eas_ioctl 的 EAS_SET_GAS_MARG_THR 从用户空间
 	 * copy_from_user 而来（sched_main.c:889-895），且该结构的默认初值
@@ -232,7 +232,7 @@ void set_grp_awr_min_opp_margin(int gear_id, int group_id, int val)
 {
 	int cpu_idx;
 
-	/* rodin 6.18（S0 补扫）：同上，补 group_id < 0 守卫。 */
+	/* rodin 6.18（2026-10-17）：同上，补 group_id < 0 守卫。 */
 	if (grp_awr_init_finished == false ||
 		gear_id == -1 ||
 		gas_force_ctrl == 1 ||
@@ -403,7 +403,7 @@ void grp_awr_update_cpu_tar_util(int cpu)
 	struct flt_rq *fsrq;
 
 	/*
-	 * rodin 6.18（S0 补扫）：本函数挂到导出的
+	 * rodin 6.18（2026-10-17）：本函数挂到导出的
 	 * sugov_grp_awr_update_cpu_tar_util_hook 上，cpu 来自外部调用方；
 	 * per_cpu(flt_rq, cpu) 与后面的 pcpu_pgrp_tar_u[cpu] 都要求 cpu 合法。
 	 */
@@ -422,7 +422,7 @@ void grp_awr_update_cpu_tar_util(int cpu)
 }
 
 /*
- * rodin 6.18（S0 补扫）：下列 6 个导出 setter 的 grp_idx / cpu 都是直接下标，
+ * rodin 6.18（2026-10-17）：下列 6 个导出 setter 的 grp_idx / cpu 都是直接下标，
  * 原实现只判了 grp_awr_init_finished，没有任何边界检查。它们对
  * MTK_kernel_modules-rodin 与 blob 都无消费者（全树 grep + ko 符号面零命中），
  * 但仍是 EXPORT_SYMBOL 面 —— 补对称的上下界守卫，避免将来接入方传入
@@ -515,11 +515,11 @@ int grp_awr_init(void)
 	pr_info("group aware init\n");
 
 	/*
-	 * rodin 6.18（S0 补扫）：下面所有 per-CPU 表都按 FLT_NR_CPUS（=
+	 * rodin 6.18（2026-10-17）：下面所有 per-CPU 表都按 FLT_NR_CPUS（=
 	 * CONFIG_MAX_NR_CPUS，本树 8）分配，而遍历用 for_each_possible_cpu
 	 * （上界是 nr_cpu_ids，不受 MAX_NR_CPUS 约束）⇒ 若 CPU 数超过
 	 * FLT_NR_CPUS，分配阶段就会数组越界写 kcalloc 块的下一行。gki_defconfig
-	 * 里的 8 是本批关键项（MAX_NR_CPUS = 本机 CPU 数），这里加一道断言
+	 * 里的 8 是关键项（MAX_NR_CPUS = 本机 CPU 数），这里加一道断言
 	 * 把"换 DT 上更多核"这一情形挡住。
 	 */
 	if (nr_cpu_ids > FLT_NR_CPUS) {

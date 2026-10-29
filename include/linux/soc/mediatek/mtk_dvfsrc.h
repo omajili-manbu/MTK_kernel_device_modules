@@ -6,7 +6,7 @@
 #define __SOC_MTK_DVFSRC_H
 
 /*
- * rodin b247（分区 B · 6.18 对齐）：vendor × 内核同名实现 → 链接期 duplicate symbol。
+ * rodin 2026-10-12（6.18 对齐）：vendor × 内核同名实现 → 链接期 duplicate symbol。
  * 内核树 drivers/soc/mediatek/mtk-dvfsrc.c（纯上游）也定义并导出
  * mtk_dvfsrc_send_request / mtk_dvfsrc_query_info，其 of_match 只覆盖
  * mt6893/mt8183/mt8195（mt6899 节点匹配不到 ⇒ 对 rodin 是死代码，但 .o 在

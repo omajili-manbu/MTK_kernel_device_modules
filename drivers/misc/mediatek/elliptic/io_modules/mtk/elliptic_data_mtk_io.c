@@ -50,7 +50,7 @@ static elliptic_ipi_scp_to_host_message_t usnd_ipi_receive;
 static struct scp_elliptic_reserved_mem_t debug_segment;
 static struct elliptic_ipi_handler_data_t elliptic_ipi_handler_data;
 
-/* rodin b513 #113: io 资源（fifo/tasklet）是否已建立，供 cleanup 判定 */
+/* rodin 2026-10-01: io 资源（fifo/tasklet）是否已建立，供 cleanup 判定 */
 static bool elliptic_io_inited;
 
 
@@ -66,7 +66,7 @@ int32_t elliptic_debug_io_open(void)
 		phys_addr_t dbg_size =
 			scp_get_reserve_mem_size(SCP_ELLIPTIC_DEBUG_MEM);
 
-		/* rodin b514 #114: 预留内存未建立时取到 0，原实现立即置
+		/* rodin 2026-10-01: 预留内存未建立时取到 0，原实现立即置
 		 * reserved=1 ⇒ 0 被永久缓存（IPI 任务随后按 dram_payload
 		 * 解引用）。三值全非零才缓存，否则下次 open 重取。*/
 		if (dbg_phys && dbg_virt && dbg_size) {
@@ -291,7 +291,7 @@ int elliptic_data_io_initialize(void)
 
 	tasklet_init(&elliptic_ipi_handler_data.handle_task, elliptic_data_io_ipi_handle_task, 0);
 	elliptic_ipi_handler_data.task_running = 0;
-	/* rodin b513 #113: fifo/tasklet 已建，从此刻起由 cleanup 拆除
+	/* rodin 2026-10-01: fifo/tasklet 已建，从此刻起由 cleanup 拆除
 	 * （后续 scp ipi 注册失败同样会走 cleanup，不再泄漏）。 */
 	elliptic_io_inited = true;
 
@@ -370,7 +370,7 @@ int32_t elliptic_data_io_write(uint32_t message_id, const char *data,
 
 int elliptic_data_io_cleanup(void)
 {
-	/* rodin b513 #113: 只在 initialize 建立过资源后才拆 —— 原实现无条件
+	/* rodin 2026-10-01: 只在 initialize 建立过资源后才拆 —— 原实现无条件
 	 * tasklet_kill 未 tasklet_init 的对象、kfifo_free 未 alloc 的 fifo。 */
 	if (!elliptic_io_inited)
 		return 0;
@@ -378,7 +378,7 @@ int elliptic_data_io_cleanup(void)
 	elliptic_io_inited = false;
 	pr_debug("[ELUS] io cleanup");
 	tasklet_kill(&elliptic_ipi_handler_data.handle_task);
-	/* rodin b513 #113: 原 spin_unlock 未配对（本轮 pstore 1.001360 的
+	/* rodin 2026-10-01: 原 spin_unlock 未配对（pstore 1.001360 的
 	 * preemption imbalance 就是它），删除；本函数不加锁。 */
 	kfifo_free(&elliptic_ipi_handler_data.fifo);
 	return 0;

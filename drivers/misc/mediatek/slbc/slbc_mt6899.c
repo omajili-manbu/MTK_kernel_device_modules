@@ -50,7 +50,7 @@
 #endif /* CONFIG_MTK_L3C_PART */
 
 #include <linux/arm-smccc.h>    /* for Kernel Native SMC API */
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 
 enum mtk_slbc_kernel_ops {
 	MTK_SLBC_KERNEL_OP_CPU_DCC = 0,
@@ -2303,7 +2303,7 @@ static int slbc_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static void slbc_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
+static void slbc_remove(struct platform_device *pdev) /* rodin 2026-09-26: 6.18 remove void */
 {
 	struct device *dev = &pdev->dev;
 

@@ -1177,7 +1177,7 @@ void ffa_device_match_uuid(struct ffa_device *ffa_dev, const uuid_t *uuid)
 	struct ffa_partition_info *pbuf, *tpbuf;
 
 	/*
-	 * rodin (#148): mitee.ko (6.6 blob) binds only through ffa UUID match.
+	 * rodin 2026-10-03: mitee.ko (6.6 blob) binds only through ffa UUID match.
 	 * On 6.18 the partition list captured at ffa_init time can leave this
 	 * device with a null UUID, and the v1.1-only early return kept the
 	 * blob's probe from ever firing, so its first ffa call dereferenced a
@@ -1256,7 +1256,7 @@ static void ffa_setup_partitions(void)
 }
 
 /*
- * rodin (#148): the SPMC partition list captured at ffa_init time may miss
+ * rodin 2026-10-03: the SPMC partition list captured at ffa_init time may miss
  * partitions that register later (6.6 saw the MTEE service by the time
  * mitee.ko loaded; the 6.18 vseq-replayed ffa_init queries earlier). When a
  * driver registers, re-query the firmware for its UUIDs and create any

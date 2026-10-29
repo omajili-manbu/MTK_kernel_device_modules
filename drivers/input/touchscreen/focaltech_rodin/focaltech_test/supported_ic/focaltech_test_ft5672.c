@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * focaltech_test_ft5672.c — rodin FT5672 工厂测试套件（A-70 ③，blob 机器码重建）
+ * focaltech_test_ft5672.c — rodin FT5672 工厂测试套件（blob 机器码重建）
  * 拼装自 tools/_b570_a70/src/{seg1,seg2,seg3,compare_new}，证据链见各 recon 文档。
  * 分段顺序 = blob .text 地址序；对象初始化置尾（blob .data 0x26d8 128B，12 槽）。
  */
@@ -31,7 +31,7 @@
 #define FT5672_REG_NOISE_STATE          0x00    /* noise scan 状态寄存器        */
 
 /* 裸 printf 前缀（blob 中直接以字面量出现，非 FTS_TEST_* 宏）
- * _b583-FT3683：ab_ch 三连打印按 blob 改用 pr_info("[FTS_TS]ab_ch:") / pr_info("%2d ") /
+ * rodin（2026-10-08）：ab_ch 三连打印按 blob 改用 pr_info("[FTS_TS]ab_ch:") / pr_info("%2d ") /
  * pr_info("\n")（编译产物 = '\x016[FTS_TS]ab_ch:' / '\x016%2d ' / '\x016\n'，
  * 与 blob 0x29118/0x29138/0x29164 逐字节一致）；原 FT5672_DBG_AB_CH{,_VAL,_NL}
  * 经 FTS_TEST_DBG("%s",...) 使用会额外发射 '%s\n' 宏字面量且 __func__ 错误 ⇒ 删除。 */
@@ -441,7 +441,7 @@ static int get_cb_ft5672(int *cb_buf, int byte_num)
  *     R0x00<-0xC0 → 循环 { sys_delay(18); Rd R0x00; DBG reg%x=%x,retry:%d（计数先+1） } 至 0x40
  *   - 超时 → "scan timeout" + return -EIO（blob w19=-5）
  *   - read_mass_data(0xCE, node_num*2, noise_data)
- * _b583-FT3683：等待循环上界 = tdata+0x194（编译期断言 = thr.basic.noise_framenum，探针实证）。
+ * rodin（2026-10-08）：等待循环上界 = tdata+0x194（编译期断言 = thr.basic.noise_framenum，探针实证）。
  */
 static __attribute__((always_inline)) inline int start_scan_ft5672(void)
 {
@@ -451,7 +451,7 @@ static __attribute__((always_inline)) inline int start_scan_ft5672(void)
     int frames = tdata->ic.mc_sc.thr.basic.noise_framenum;   /* blob [x21+0x194] */
     u8 state = 0xc0;
 
-    /* _b583-FT3683：blob 0x2a070-0x2a080 —— R0x00<-0xC0（启动扫描） */
+    /* rodin（2026-10-08）：blob 0x2a070-0x2a080 —— R0x00<-0xC0（启动扫描） */
     ret = fts_test_write_reg(FT5672_REG_NOISE_STATE, 0xc0);
     if (ret < 0) {
         FTS_TEST_SAVE_ERR("write start scan mode fail\n");	/* 0x29b5 无 ,ret= 实参 */
@@ -545,7 +545,7 @@ static int get_null_noise(struct fts_test *tdata)
 
 	buf = (int *)kmalloc(total * sizeof(int), GFP_KERNEL); /* 0x2a578 sbfiz*4 + __kmalloc(0xdc0) */
 	if (!buf) {
-		FTS_TEST_ERROR("null_noise malloc fail");    /* 0x2a588；_b582-INTB：blob E 族无 append（无 standalone 字面量） */
+		FTS_TEST_ERROR("null_noise malloc fail");    /* 0x2a588；rodin（2026-10-08）：blob E 族无 append（无 standalone 字面量） */
 		return 0;
 	}
 
@@ -561,7 +561,7 @@ static int get_null_noise(struct fts_test *tdata)
 	}
 	tdata->null_noise_value = buf[0];                      /* 0x2a6a8 str w3,[x20,#0xe8] */
 	FTS_TEST_SAVE_INFO("null noise:%d\n", buf[0]);        /* 0x2a6c0 串 +0xf352 */
-	/* _b582-INTB：blob 该站点无 DBG 族串（0 命中）⇒ 按 blob 删除该 DBG 行 */
+	/* rodin（2026-10-08）：blob 该站点无 DBG 族串（0 命中）⇒ 按 blob 删除该 DBG 行 */
 	print_buffer(buf + 1, tdata->node.rx_num * tdata->fre_num,
 		     tdata->node.rx_num);                      /* 0x2a700: x0=buf+4 w1=rx*fre w2=rx_num */
 out:
@@ -581,9 +581,9 @@ out:
  *     节点数组 = base+4 + n*20，字段 tx/rx/val/min，1..1500 上限 brk 保护）
  *   - NG 分支追加 xiaomi 事件 + FTS_TEST_DBG；PASS 分支仅 SAVE_INFO（blob 无第 2 次 INFO print）
  *   - 尾部无 enter_work_mode()
- * _b583-FT3683：ab_ch 三连打印按 blob 为裸 printk（'\x016[FTS_TS]ab_ch:' / '\x016%2d ' / '\x016\n'），
+ * rodin（2026-10-08）：ab_ch 三连打印按 blob 为裸 printk（'\x016[FTS_TS]ab_ch:' / '\x016%2d ' / '\x016\n'），
  *   非 FTS_TEST_DBG（后者会带 __func__ 与 %s 形参字面量）。
- * _b583-FT3683：always_inline —— blob symtab 无 short_test_ch_to_all 符号（GCC 内联），
+ * rodin（2026-10-08）：always_inline —— blob symtab 无 short_test_ch_to_all 符号（GCC 内联），
  *   加属性后 clang 同为内联体，符号面一致（__func__ 串仍在）。
  */
 static __attribute__((always_inline)) inline int short_test_ch_to_all(struct fts_test *tdata, int *short_res,
@@ -698,7 +698,7 @@ test_err:
         FTS_TEST_SAVE_ERR("------ short test NG\n");
         xiaomi_touch_mievent_report_int_common(FT5672_XIAOMI_EVT_SHORT, 0,
                                               "TpShortTestFail", FT5672_XIAOMI_MODULE, ret);
-        FTS_TEST_DBG("------ short test NG");   /* _b582-INTB：blob DBG 族无尾 \n */
+        FTS_TEST_DBG("------ short test NG");   /* rodin（2026-10-08）：blob DBG 族无尾 \n */
     }
     FTS_TEST_FUNC_EXIT();             /* __LINE__ 需 = 1190 */
     return ret;
@@ -737,7 +737,7 @@ static int ft5672_panel_differ_test(struct fts_test *tdata, bool *test_result)
         *test_result = false;
         xiaomi_touch_mievent_report_int_common(FT5672_XIAOMI_EVT_PANEL_DIFFER, 0,
                                               "TpOpenTestFail", FT5672_XIAOMI_MODULE, ret);
-        FTS_TEST_DBG("------ panel differ test NG");   /* _b582-INTB：blob DBG 族无尾 \n */
+        FTS_TEST_DBG("------ panel differ test NG");   /* rodin（2026-10-08）：blob DBG 族无尾 \n */
         FTS_TEST_FUNC_EXIT();         /* __LINE__ 需 = 1368 */
         return ret;
     }
@@ -926,7 +926,7 @@ static int ft5672_rawshift_pic_test(struct fts_test *tdata, bool *test_result, u
         black_ok = true;
         ret = get_rawshift_fre_data(tdata, black_data, 0x81, frames, &black_ok);
         if (ret < 0) {
-            /* _b582-INTB：blob ft5672_rawshift_pic_test 串面 0 命中（无此日志）⇒ 按 blob 删除 */
+            /* rodin（2026-10-08）：blob ft5672_rawshift_pic_test 串面 0 命中（无此日志）⇒ 按 blob 删除 */
             pic_ok = false;
             goto verdict;
         }
@@ -938,7 +938,7 @@ static int ft5672_rawshift_pic_test(struct fts_test *tdata, bool *test_result, u
     } else {                           /* white */
         ret = get_rawshift_fre_data(tdata, white_data, 0x81, frames, &white_ok);
         if (ret < 0) {
-            /* _b582-INTB：blob ft5672_rawshift_pic_test 串面 0 命中（无此日志）⇒ 按 blob 删除 */
+            /* rodin（2026-10-08）：blob ft5672_rawshift_pic_test 串面 0 命中（无此日志）⇒ 按 blob 删除 */
             pic_ok = false;
             goto verdict;
         }
@@ -1366,13 +1366,13 @@ static __attribute__((always_inline)) inline int ft5672_read_lockdown(void)
 	regval[2] = 0x00;
 	ret = fts_test_write(0xac, regval, 3);			/* 0x21654 */
 	if (ret < 0) {
-		FTS_TEST_ERROR("set read addr fail!!!");	/* 0x2165c；_b582-INTB：blob E 族无 append */
+		FTS_TEST_ERROR("set read addr fail!!!");	/* 0x2165c；rodin（2026-10-08）：blob E 族无 append */
 		goto read_0x90;					/* → 0x21714/0x21760/0x217ac */
 	}
 	msleep(5);						/* 0x216f4/0x218a8/0x218d0 */
 	ret = fts_test_read(0x03, regval, 8);			/* 0x21704 */
 	if (ret < 0) {
-		FTS_TEST_ERROR("read lockdown info fail!!!");	/* 0x2170c；_b582-INTB：blob E 族无 append */
+		FTS_TEST_ERROR("read lockdown info fail!!!");	/* 0x2170c；rodin（2026-10-08）：blob E 族无 append */
 		goto read_0x90;
 	}
 	memcpy(&tdata->lockdown_info[0], regval, 8);		/* 0x218fc: str x8,[x20,#0x1158] */
@@ -1386,8 +1386,8 @@ read_0x90:
 	fts_test_write_reg(0xfc, 0x55);
 	msleep(80);
 	fts_test_read(0x90, regval, 2);
-	FTS_TEST_ERROR("read 0x90 fail!!!");		/* 0x21758/0x217a4；_b582-INTB：blob E 族无 append */
-	/* _b583-FT3683：blob 0x217c0-0x21814 —— 失败落 NG 打印后汇入公共尾
+	FTS_TEST_ERROR("read 0x90 fail!!!");		/* 0x21758/0x217a4；rodin（2026-10-08）：blob E 族无 append */
+	/* rodin（2026-10-08）：blob 0x217c0-0x21814 —— 失败落 NG 打印后汇入公共尾
 	 *（write_command(0x07)/msleep(200)/enter_factory_mode 在调用方 start_test 尾块） */
 	FTS_TEST_SAVE_ERR("------ read lockdown NG\n");	/* 0x217d4/0x21804（__func__=ft5672_read_lockdown） */
 	return -EIO;
@@ -1461,14 +1461,14 @@ static __attribute__((always_inline)) inline bool ft5672_ex_rst_test(struct fts_
 	/* 0x21a6c: b 0x21468 → 汇入公共尾（写回 0xad） */
 
 out:
-	/* _b583-FT3683：blob 0x21468 汇合尾 = write_reg(0xad, value_1) 后返回 false；
+	/* rodin（2026-10-08）：blob 0x21468 汇合尾 = write_reg(0xad, value_1) 后返回 false；
 	 * PASS/NG 打印在 blob 用 __func__='ft5672_rst_test'（0xd798，外层）⇒ 已移至外层。 */
 	fts_test_write_reg(0xad, value_1);				/* 0x21468 */
 	*test_result = tmp_result;					/* 0x21474 strb wzr（失败路） */
 	return tmp_result;
 }
 
-/* _b583-FT3683：always_inline —— blob symtab 无 ft5672_rst_test 符号且 start_test 侧无 CALL26
+/* rodin（2026-10-08）：always_inline —— blob symtab 无 ft5672_rst_test 符号且 start_test 侧无 CALL26
  * （GCC 全内联）；加属性后 clang 同为内联体（符号面 + 调用面一致，串面不变）。 */
 static __attribute__((always_inline)) inline int ft5672_rst_test(struct fts_test *tdata, bool *test_result)
 {
@@ -1476,7 +1476,7 @@ static __attribute__((always_inline)) inline int ft5672_rst_test(struct fts_test
 	int ret = 0;
 
 	ret = ft5672_ex_rst_test(tdata, &tmp_result);
-	/* _b583-FT3683：blob 0x219b8-0x219e8 / 0x21494-0x214d4 ——
+	/* rodin（2026-10-08）：blob 0x219b8-0x219e8 / 0x21494-0x214d4 ——
 	 * PASS/NG 打印的 __func__ 串 = 'ft5672_rst_test'（外层），故落在此处。 */
 	if (tmp_result) {
 		*test_result = true;
@@ -1906,7 +1906,7 @@ static __attribute__((always_inline)) inline int ft5672_rawdata_test(struct fts_
 				   thr->rawdata_h_min, thr->rawdata_h_max, false);/* 0x1f5ac */
 
 restore_reg:
-	/* _b583-FT3683：blob 逐指令重建（func='ft5672_rawdata_test'，冷块 0x20314-0x20468）：
+	/* rodin（2026-10-08）：blob 逐指令重建（func='ft5672_rawdata_test'，冷块 0x20314-0x20468）：
 	 *   Wr 0x0A<-fre → "restore reg0A fail" → wait_state_update → "wait state update fail"
 	 *   → Wr 0x06<-data_type → "set raw type fail" → fts_free_proc → 结果。
 	 * 原树 'restore 0x5B fail' / 'restore data_sel fail' 两条不在 blob start_test 串面
@@ -2098,7 +2098,7 @@ static __attribute__((always_inline)) inline int ft5672_scap_cb_test(struct fts_
 		tmp_result = false;
 		goto test_err;
 	}
-	/* _b583-FT3683：blob 0x1e450 读 0x44 后直接进 ccbypass（0x1ed28），
+	/* rodin（2026-10-08）：blob 0x1e450 读 0x44 后直接进 ccbypass（0x1ed28），
 	 * 无空扫预热（原树侧 3×start_scan 为推测，删除；'scan fail' 仍由
 	 * rawdata/ft3658_get_rawdata 侧发射，串面不受影响）。 */
 	ret = scap_cb_ccbypass(tdata, scap_cb, &tmp_result);		/* 0x1ed2c 内联 */
@@ -2524,7 +2524,7 @@ static __attribute__((always_inline)) inline int ft5672_auxiliary_freq_noise_tes
 		af_max = *af_thr[i] * touch_value;			/* 0x223b0 mul */
 		ret = get_noise_ft5672(tdata, buf, i,
 				       thr_b->basic.auxiliary_fre_noise_scan_mode,
-				       false);/*0x223d4 w3=scan_mode(_b583b: blob 0x1e9c4 LDR W20,[x19+0x1d8]=aux scan_mode→0x1b)*/
+				       false);/*0x223d4 w3=scan_mode（blob 0x1e9c4 LDR W20,[x19+0x1d8]=aux scan_mode→0x1b)*/
 		if (ret < 0) {
 			FTS_TEST_SAVE_ERR("get noise fails,ret=%d\n", ret);/* 0x234c0 域 */
 			result = false;
@@ -2637,7 +2637,7 @@ static __attribute__((always_inline)) inline int ft5672_jump_freq_noise_test(str
 	FTS_TEST_FUNC_ENTER();						/* 0x20c5c */
 	FTS_TEST_SAVE_INFO("\n============ Test Item: Jump Freq Noise Test\n");/*0x20ca8*/
 	noise = tdata->item8_data;					/* 0x20d00 +0x88 */
-	/* _b583b 勘误①：blob 0x20c5c(IDA 0x29c60) `LDR W20,[X19,#0x210]` —— param_init_ft5672
+	/* rodin（2026-10-08 勘误①）：blob 0x20c5c(IDA 0x29c60) `LDR W20,[X19,#0x210]` —— param_init_ft5672
 	 * 0x26a58(IDA) 键 "Jump_Fre_Noise_Test_Scan_Mode"→thr+0x210、"…_Frames"→+0x214 实证，
 	 * +0x210 = jump_fre_noise_scan_mode。W20 全程只作 get_noise_ft5672 第 4 实参
 	 * （函数体 0x2a048 `write 0x1B<-w3`），并非帧数。 */
@@ -2907,7 +2907,7 @@ static int start_test_ft5672(void)
 	}
 	/* 10) bit8 rst_test */
 	if (true == test_item->rst_test) {				/* 0x211dc */
-		ret = ft5672_rst_test(tdata, &temp_result);		/* _b583-FT3683：blob 调用外层 rst（0xd798 串面） */
+		ret = ft5672_rst_test(tdata, &temp_result);		/* rodin（2026-10-08）：blob 调用外层 rst（0xd798 串面） */
 		if ((ret < 0) || (false == temp_result)) {
 			tdata->item_fail_flag |= 0x80;			/* 0x214d8 */
 		}
@@ -3141,7 +3141,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 				cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "\n");
 		}
 	}
-	/* noise：item6_data + null_noise_value（_b583：blob 0x26e48 读 [x20+0xe8]） */
+	/* noise：item6_data + null_noise_value（blob 0x26e48 读 [x20+0xe8]） */
 	if (true == test_item->noise_test && tdata->item6_data) {
 		for (i = 0; i < tdata->node.node_num; i++) {
 			cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "%d,",
@@ -3189,7 +3189,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "\n\n\n");
 
 	/* ---- 总体结果 / IC / 版本 / lockdown（0x25744-0x25864） ---- */
-	/* _b582-INTB：blob 0x25744-0x2576c 用 csel 选格式串（两独立字面量，非 %s 参数） */
+	/* rodin（2026-10-08）：blob 0x25744-0x2576c 用 csel 选格式串（两独立字面量，非 %s 参数） */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag == 0) ? "TP test result: OK\n" : "TP test result: NG\n");
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt, "IC name: %s\n",
@@ -3204,34 +3204,34 @@ static void save_data_ft5672(char *buf, int *data_length)
 	/* ---- 每项 pass/fail 文字（0x258e0-0x25a94） ---- */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x1) ? "Item name=\"rawdata test\" reslut=NG\n"
-					      : "Item name=\"rawdata test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"rawdata test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x2) ? "Item name=\"uniformity test\" reslut=NG\n"
-					      : "Item name=\"uniformity test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"uniformity test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x4) ? "Item name=\"panel diff test\" reslut=NG\n"
-					      : "Item name=\"panel diff test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"panel diff test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x8) ? "Item name=\"noise test\" reslut=NG\n"
-					      : "Item name=\"noise test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"noise test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x10) ? "Item name=\"scap rawdata test\" reslut=NG\n"
-					      : "Item name=\"scap rawdata test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"scap rawdata test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x20) ? "Item name=\"cb test\" reslut=NG\n"
-					      : "Item name=\"cb test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"cb test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x40) ? "Item name=\"short test\" reslut=NG\n"
-					      : "Item name=\"short test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"short test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x80) ? "Item name=\"reset test\" reslut=NG\n"
-					      : "Item name=\"reset test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"reset test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x100) ? "Item name=\"rawshift test\" reslut=NG\n"
-					      : "Item name=\"rawshift test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"rawshift test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag & 0x200) ? "Item name=\"auxiliary freq noise test\" reslut=NG\n"
-					      : "Item name=\"auxiliary freq noise test\" reslut=OK\n");   /* _b582-INTB：blob csel 选格式串 */
+					      : "Item name=\"auxiliary freq noise test\" reslut=OK\n");   /* rodin（2026-10-08）：blob csel 选格式串 */
 
 	/* ---- 阈值表（0x25a98-0x2690c）----
 	 * 每张表："XxxLimitStart\n" + node_num 个 "%d,"（每 rx 换行）+ "XxxLimitEnd\n"
@@ -3345,7 +3345,7 @@ static void save_data_ft5672(char *buf, int *data_length)
 			}
 		}
 	}
-	/* ---- F3 其余记录节（_b583-FT3683：按 blob 0x26a00-0x27d50 逐块重建）----
+	/* ---- F3 其余记录节（按 blob 0x26a00-0x27d50 逐块重建）----
 	 * 每节 = [标题(+max/min)] → 数据阵列(%d,，每 rx 换行) → fail[n] 记录循环。
 	 * 三种记录格式（均双空格）：
 	 *   node(%4d  %4d)=%5d  range=(%5d  %5d)  —— uniformity/panel/noise/aux/jump/rawshiftpic
@@ -3701,10 +3701,10 @@ static void save_data_ft5672(char *buf, int *data_length)
 #undef SAVE_FAIL_CH
 
 	/* ---- 尾部 test_result 汇总（0x27d6c-0x27f50）---- */
-	/* _b582-INTB：blob 两独立字面量（test_result:[PASS] / [Failure]，无尾 \n） */
+	/* rodin（2026-10-08）：blob 两独立字面量（test_result:[PASS] / [Failure]，无尾 \n） */
 	cnt += snprintf(buf + cnt, CSV_BUFFER_LEN - cnt,
 			(tdata->item_fail_flag == 0) ? "test_result:[PASS]" : "test_result:[Failure]");
-	/* _b583-FT3683：blob 0x27d94-0x27f48 = 10 组（bit 0x1..0x200 → -0F/-0P … -9F/-9P），
+	/* rodin（2026-10-08）：blob 0x27d94-0x27f48 = 10 组（bit 0x1..0x200 → -0F/-0P … -9F/-9P），
 	 * 每块 = `ldr mask` → `tst 位` → `csel("-kF","-kP")` → snprintf（0x27d9c-0x27f34
 	 * 逐块实证）。csel 两操作数为代码引用字面量 —— 故写成 10 组三目（与上方 R1
 	 * 节同形），不用静态表（表形态为 .data 引用，fnstr 代码口径不可见）。 */
@@ -3859,7 +3859,7 @@ static int get_rawshift_fre_data(struct fts_test *tdata, int *data, u8 fre,
 	ret = fts_test_write_reg(0x0A, fre);
 	if (ret < 0) {
 		/* 0x2add0: SAVE_INFO 用真 snprintf（带 %d 实参）*/
-		FTS_TEST_SAVE_ERR("set fre%d fail,ret=%d\n", fre, ret);   /* _b582-INTB：blob 为 E 族（SAVE_ERR） */
+		FTS_TEST_SAVE_ERR("set fre%d fail,ret=%d\n", fre, ret);   /* rodin（2026-10-08）：blob 为 E 族（SAVE_ERR） */
 		goto out_valid;
 	}
 	sys_delay(18);				/* 0x2abd8: w0=18 */

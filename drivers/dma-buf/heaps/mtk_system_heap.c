@@ -23,7 +23,7 @@
 #include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include <linux/kernel.h>
-/* rodin b262 (A-113): reserve pool face (rebuilt against stock
+/* rodin 2026-10-16: reserve pool face (rebuilt against stock
  * system_heap.ko, whose GPL drop predates the feature) */
 #include <linux/kthread.h>
 #include <linux/kobject.h>
@@ -86,7 +86,7 @@ struct system_heap_buffer {
 };
 
 /*
- * rodin b262 (A-113): reserve_pool face, rebuilt against the stock
+ * rodin 2026-10-16: reserve_pool face, rebuilt against the stock
  * system_heap.ko machine code (Desktop system_heap.ko.asm:
  * need_free_to_reserve_pool 0xE0E4 / mtk_sys_heap_reserve_pool_init 0xE1E4 /
  * reserve_pool_refill_kthread 0xE570 / mtk_extend_sys_heap_alloc_largest_available
@@ -1724,7 +1724,7 @@ static void system_heap_buf_free(struct mtk_deferred_freelist_item *item,
 					pool->count[POOL_HIGHPAGE];
 				spin_unlock(&pool->lock);
 
-				/* rodin b262 (A-113): blob system_heap_buf_free
+				/* rodin 2026-10-25: blob system_heap_buf_free
 				 * 0x1F18-0x1F34（0x6400 lsr order 后 cmp，b.lt
 				 * 归动态池）-- 动态池达 100MB cap 时溢出的释放
 				 * chunk 才转投 reserve pool（且其 lowmark 仍有
@@ -2142,7 +2142,7 @@ static struct dma_buf *system_heap_do_allocate(struct dma_heap *heap,
 			goto free_buffer;
 		}
 
-		/* rodin b262 (A-113): blob 0x8BF4 -- when the reserve face is on,
+		/* rodin 2026-10-16: blob 0x8BF4 -- when the reserve face is on,
 		 * allocations route through the reserve-pool-aware allocator
 		 * (whitelist gate + reserve fallback + slow-path instrumentation) */
 		if (reserve_extend_info.enabled)
@@ -2432,7 +2432,7 @@ static int mtk_heap_create(const char *name, const struct dma_heap_ops *ops,
 		}
 	}
 
-	/* rodin b262 (A-113): blob 0x869C -- the "system" heap owns the
+	/* rodin 2026-10-16: blob 0x869C -- the "system" heap owns the
 	 * global reserve pools; running inside mtk_system_heap_create keeps
 	 * the stock 0.53s creation phase (6.6 dmesg anchor). */
 	if (!strcmp(name, "system"))

@@ -338,7 +338,7 @@ static void qi_alter_mutex_list(void *unused, struct mutex *lock, struct mutex_w
 	if (IS_ERR_OR_NULL(lock) || IS_ERR_OR_NULL(waiter) ||
 	    IS_ERR_OR_NULL(head) || IS_ERR_OR_NULL(already) || *already)
 		return;
-	/* rodin 6.18 防重入：alter 钩子可能对同一 waiter 二次触发（#143 同类
+	/* rodin 6.18 防重入：alter 钩子可能对同一 waiter 二次触发（同类
 	 * ——前次已插链、内核未 del 前重入；本次 *already 是新调用的 false，
 	 * 仅查出参挡不住）。扫链命中本 waiter 即置 already 返回，且置于 feat
 	 * 门之前（特性位翻转不得旁路）；stock 侧按契约跳过 list_add_tail。 */
@@ -467,7 +467,7 @@ static void qi_alter_rwsem_list(void *unused, struct rwsem_waiter *waiter,
 	if (IS_ERR_OR_NULL(sem) || IS_ERR_OR_NULL(waiter) ||
 	    IS_ERR_OR_NULL(already) || *already)
 		return;
-	/* rodin 6.18 防重入：#143 同类闭包——rwsem 慢路径可能带链重入 alter
+	/* rodin 6.18 防重入：同类闭包——rwsem 慢路径可能带链重入 alter
 	 * 钩子，扫链命中本 waiter 即置 already 返回（置于 feat 门之前）；
 	 * stock 侧按契约跳过 list_add_tail。 */
 	list_for_each_entry(entry, &sem->wait_list, list) {

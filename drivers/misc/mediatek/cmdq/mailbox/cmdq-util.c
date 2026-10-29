@@ -6,13 +6,13 @@
 #include <linux/mailbox_controller.h>
 #include <linux/kernel.h>
 #include <linux/io.h>
-#include <linux/vmalloc.h> /* rodin b4: 6.18 header pruning */
+#include <linux/vmalloc.h> /* rodin 2026-09-26: 6.18 header pruning */
 #include <linux/debugfs.h>
 #include <linux/proc_fs.h>
 #include <linux/dma-mapping.h>
 #include <linux/sched/clock.h>
 #include <linux/soc/mediatek/mtk-cmdq-ext.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/arm-smccc.h>
 #include <linux/proc_fs.h>
 #include "linux/seq_file.h"
@@ -27,7 +27,7 @@
 #endif
 
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_SMI)
-#include <soc/mediatek/mtk_smi_internal.h> /* rodin P1: vendor smi declarations (kernel smi.h shadows the vendor copy) */
+#include <soc/mediatek/mtk_smi_internal.h> /* rodin: vendor smi declarations (kernel smi.h shadows the vendor copy) */
 #endif
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_DEVAPC)
 #include <linux/soc/mediatek/devapc_public.h>

@@ -1804,7 +1804,7 @@ static struct i2c_driver ics_haptic_driver =
     .remove = ics_haptic_remove,
 };
 
-/* A-142（R2 慢单元异步化）：本单元三地址 probe（1 成功 + 2 无器件 fail），
+/* rodin 6.18（2026-10-21 慢单元异步化）：本单元三地址 probe（1 成功 + 2 无器件 fail），
  * 真机 ~3ms，与 aw/si 同簇统一后置（vseq 序列每省一段串行 i2c 等待即收益，
  * 且保持马达三供应商驱动装载语义一体）；无下游依赖。 */
 static void ics_async_register_workfn(struct work_struct *work)

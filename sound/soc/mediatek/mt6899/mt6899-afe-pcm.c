@@ -18,7 +18,7 @@
 #include <linux/regmap.h>
 #include <linux/of_device.h>
 #include <linux/arm-smccc.h> /* for Kernel Native SMC API */
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 
 #include "mt6899-afe-common.h"
 #include "mtk-afe-debug.h"
@@ -10262,7 +10262,7 @@ static const dai_register_cb dai_register_cbs[] = {
 	mt6899_dai_memif_register,
 };
 
-/* rodin b521 (#134): AUDIO_TOP_CON3 free-run owner, set at probe end; the
+/* rodin 2026-10-02: AUDIO_TOP_CON3 free-run owner, set at probe end; the
  * vseq_late_initcall at the file tail uses it to reproduce the 6.6 free-run window. */
 static struct mtk_base_afe *mt6899_afe_con3_owner;
 
@@ -10567,12 +10567,12 @@ static struct platform_driver mt6899_afe_pcm_driver = {
 };
 
 /*
- * rodin b521 (#134, #133 终验 FAIL 修正): any write that clears an AUDIO_TOP_CON3
+ * rodin 2026-10-02（终验 FAIL 修正）: any write that clears an AUDIO_TOP_CON3
  * PDN bit (audiosys+0xc, the five ASRC power-downs, CON3=0x3e00000) while the ASRC
  * source clocks are dead never completes: the MMIO store stalls, lastbus times out
- * and the CPU hard-locks.  #132 hit this from the disable-unused walk (audiosys@8f
+ * and the CPU hard-locks.  Hit from the disable-unused walk (audiosys@8f
  * entry [44], parent-enable of afe_general3_asrc, the first CON3 write of the boot);
- * #133 hit it again from a direct regmap_write with only the SPM 26M request set --
+ * Hit again from a direct regmap_write with only the SPM 26M request set --
  * the request is acked by SPM but CON4 kept CG_AUDIO_HOPPING/F26M/APLL gated
  * (raw CON4=0x301f), so the ASRC power-up handshake never sees a clock.
  *
@@ -10583,13 +10583,13 @@ static struct platform_driver mt6899_afe_pcm_driver = {
  * whole boot -- which is why the 6.6-era late walk and every late consumer could
  * touch CON3 safely.  On 6.18 that resume never ran: the probe-time resume skipped
  * the regmap (as on 6.6) and the second, register-writing resume is gated behind
- * the sound card probe (A-28, snd-scp-ultra).
+ * the sound card probe (snd-scp-ultra).
  *
  * Reproduce the 6.6 free-run window from the register owner at vseq_late_initcall
  * (level 7, statically before the disable_unused walk's vseq_late_initcall_sync):
  * resume prefix (clocks + REQ + CON4/CON0/1/2) -> CON3 = 0x0 -> suspend suffix
  * (CON4 = 0x3fff, REQ = 0, clocks off).  The end state is the 6.6 post-boot
- * steady state; the A-28 card fix, once it lands, re-runs the same no-op writes.
+ * steady state; the sound-card fix re-runs the same no-op writes.
  */
 static int mt6899_afe_con3_freerun_late_init(void)
 {

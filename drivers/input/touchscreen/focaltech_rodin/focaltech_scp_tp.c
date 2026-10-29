@@ -20,7 +20,7 @@
  *   fts_charger_on (0x1950,232)           fts_palm_on (0x1a3c,164)
  *   fts_test_write_command (0x111c8,88)   wait_state_update (0x11f10,492)
  *
- * 纪律（b567）：
+ * 纪律（2026-10-06）：
  *   - =y 撞名：本文件所有框架符号用 fts_ 前缀（scp_tp_* -> fts_scp_tp_*、
  *     wait_scp_ack -> fts_wait_scp_ack、ddr_* -> fts_ddr_*、ap_wait_queue ->
  *     fts_ap_wait_queue、scp_tp_param -> fts_scp_tp_param、
@@ -63,17 +63,17 @@ static int fts_scp_tp_ipi_handler(unsigned int ipi_id, void *prdata, void *data,
 void focal_scp_gesture(void);
 int focal_select_touchmode(u32 mode);
 
-/* =y 撞名纪律（b567 §84）：goodix 保留 debug_log_level 原名，focaltech 侧
+/* =y 撞名纪律（2026-10-06）：goodix 保留 debug_log_level 原名，focaltech 侧
  * 静态重命名到 fts_debug_log_level（本 TU 生效）；骨架 focaltech_core.c 的
  * debug_log_level 定义同步改名（见 apply_scp_tp_wire2 的 core.c 补丁）。 */
 #define debug_log_level fts_debug_log_level
 
-/* =y 撞名纪律（b567 §84）：goodix 保留 debug_log_level 原名，focaltech 侧
+/* =y 撞名纪律（2026-10-06）：goodix 保留 debug_log_level 原名，focaltech 侧
  * 静态重命名到 fts_debug_log_level（本 TU 生效）；骨架 focaltech_core.c 的
  * debug_log_level 定义同步改名（见 apply_scp_tp_wire2 的 core.c 补丁）。 */
 
 
-/* =y 撞名纪律（b567 §84）：goodix 保留 debug_log_level 原名，focaltech 侧
+/* =y 撞名纪律（2026-10-06）：goodix 保留 debug_log_level 原名，focaltech 侧
  * 静态重命名到 fts_debug_log_level（本 TU 生效）；骨架 focaltech_core.c 的
  * debug_log_level 定义同步改名（见 apply_scp_tp_wire2 的 core.c 补丁）。 */
 

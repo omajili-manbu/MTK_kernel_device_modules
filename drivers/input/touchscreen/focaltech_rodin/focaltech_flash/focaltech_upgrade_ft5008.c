@@ -22,7 +22,7 @@
  *   同常量、同错误分支），差异仅 (a) IC 改名/对象值 (b) donor 的 fts_read_lockdown_info
  *   被删除、_proc 版被简化为 8B 直读直拷（blob 实证）(c) 纯代码生成差异。详见 recon §4/§5/§6。
  *
- * 纪律（b570）：
+ * 纪律（2026-10-06）：
  *   - blob 无 fts_read_lockdown_info 符号（donor 有）：本文件不提供该函数；活树对它的
  *     唯一引用在 focaltech_ex_fun.c:1542（位于整段被注释掉的 fts_lockdown_show 内），
  *     无活动调用点，不破坏链接。

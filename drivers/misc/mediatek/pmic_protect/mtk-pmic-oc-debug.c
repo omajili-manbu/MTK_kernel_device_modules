@@ -217,7 +217,7 @@ static int register_oc_notifier(struct platform_device *pdev,
 		if (PTR_ERR(reg) == -EPROBE_DEFER)
 			return PTR_ERR(reg);
 		else if (IS_ERR(reg)) {
-			/* rodin b514 #114: 本节点 DT 无 *-supply ⇒ 走 regulator 按名
+			/* rodin 2026-10-01: 本节点 DT 无 *-supply ⇒ 走 regulator 按名
 			 * 查找；=y 内建后 probe(1.01s) 早于 mt6363/6373 regulator
 			 * 注册（6.6 是两个 .ko，装载序天然在后：2.77s 时按名命中共
 			 * 0 条该告警）。开机阶段按"尚未就绪"延迟重试（内核

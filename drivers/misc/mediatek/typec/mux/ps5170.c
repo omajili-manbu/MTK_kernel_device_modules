@@ -20,7 +20,7 @@
 #include <linux/regmap.h>
 #include <linux/of_device.h>
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids (kernel sip header shadows the vendor copy) */
 #include <linux/usb/typec_dp.h>
 
 #if IS_ENABLED(CONFIG_MTK_USB_TYPEC_MUX)

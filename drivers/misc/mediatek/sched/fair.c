@@ -194,7 +194,7 @@ static inline void eenv_pd_busy_time(struct energy_env *eenv,
 					NULL, 0, 1024, NULL, NULL);
 #else
 		/*
-		 * rodin 6.18（S6/P-14）：enum cpu_util_type 已被 6.18 删除，
+		 * rodin 6.18（2026-10-17）：enum cpu_util_type 已被 6.18 删除，
 		 * effective_cpu_util() 改收 min/max 出参 —— 原写法在
 		 * CONFIG_MTK_CPUFREQ_SUGOV_EXT=n 时编不过。此处只要 util。
 		 */
@@ -236,7 +236,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 			 * NOTE: in case RT tasks are running, by default the
 			 * FREQUENCY_UTIL's utilization can be max OPP.
 			 *
-			 * rodin 6.18（A-116）：包络由 mtk_cpu_util() 出参给出，
+			 * rodin 6.18（2026-10-17）：包络由 mtk_cpu_util() 出参给出，
 			 * 出口夹一次（对应 fair.c:8595 sugov_effective_cpu_perf()
 			 * 的包络半边；headroom 仍归 mtk_map_util_freq()，不在此计）。
 			 */
@@ -251,7 +251,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 			cpu_util = mtk_eff_perf(cpu_util, util_min, util_max);
 #else
 			/*
-			 * rodin 6.18（S6/P-14）：原写法沿用已删除的
+			 * rodin 6.18（2026-10-17）：原写法沿用已删除的
 			 * enum cpu_util_type 形参，SUGOV_EXT=n 时编不过；按 6.18
 			 * 出参形态改写并做同源出口夹取。
 			 */
@@ -287,7 +287,7 @@ eenv_pd_max_util(struct energy_env *eenv, struct cpumask *pd_cpus,
 					0, 1024, NULL, NULL);
 #else
 			/*
-			 * rodin 6.18（S6/P-14）：原写法既用了已删除的
+			 * rodin 6.18（2026-10-17）：原写法既用了已删除的
 			 * enum cpu_util_type 形参，又把 dst 的 util 传进 base 计算
 			 * （应为 util_base）。按 6.18 出参形态改写。
 			 */
@@ -946,7 +946,7 @@ EXPORT_SYMBOL_GPL(get_background_cpumask);
 
 void set_task_ls(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -966,7 +966,7 @@ EXPORT_SYMBOL_GPL(set_task_ls);
 
 void unset_task_ls(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -1057,7 +1057,7 @@ bool is_task_ls_uclamp(struct task_struct *p)
 
 inline bool is_task_latency_sensitive(struct task_struct *p)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口恒 false（= 零化载体语义）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口恒 false（= 零化载体语义）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return false;
 	struct soft_affinity_task *sa_task;
@@ -1128,7 +1128,7 @@ void mtk_can_migrate_task(void *data, struct task_struct *p,
 	}
 
 	/*
-	 * rodin 6.18（S6/P-15）：6.18 的等价判据是
+	 * rodin 6.18（2026-10-17）：6.18 的等价判据是
 	 * is_rd_overutilized() = !sched_energy_enabled() || READ_ONCE(rd->overutilized)。
 	 * 本树不补前半句：真机绑 sugov_ext，sched_energy_enabled() 恒为 false，
 	 * 补上等于把 vendor 的 misfit 迁移判据永久短路。此处只保留 READ_ONCE
@@ -1497,7 +1497,7 @@ void __set_gear_indices(struct task_struct *p, int gear_start, int num_gear, int
 
 int set_gear_indices(int pid, int gear_start, int num_gear, int reverse)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return -ENODEV;
 	struct task_struct *p;
@@ -1537,7 +1537,7 @@ EXPORT_SYMBOL_GPL(set_gear_indices);
 
 int unset_gear_indices(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口失败返回（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return -ENODEV;
 	struct task_struct *p;
@@ -2558,7 +2558,7 @@ static struct task_struct *detach_a_hint_task(struct rq *src_rq, int dst_cpu)
 		if (task_on_cpu(src_rq, p))
 			continue;
 
-		/* rodin 6.18（A-75）: DELAY_DEQUEUE 只拒绝出队、不摘
+		/* rodin 6.18（2026-10-07）: DELAY_DEQUEUE 只拒绝出队、不摘
 		 * cfs_tasks 链，阻塞中的僵尸仍挂在本 rq 的链表上；这种
 		 * 任务只允许由 core 的唤醒/block 路径收尾，不得迁移。
 		 */
@@ -2616,7 +2616,7 @@ static int mtk_active_load_balance_cpu_stop(void *data)
 		target_rq == busiest_rq)
 		goto out_unlock;
 
-	/* rodin 6.18（A-75）: arming 时任务还在跑，stopper 真正执行时可能
+	/* rodin 6.18（2026-10-07）: arming 时任务还在跑，stopper 真正执行时可能
 	 * 已经 futex_wait→block 成 delayed 僵尸（on_rq 仍 QUEUED），
 	 * 照旧搬它会把 sched_delayed 与账目拆开。
 	 */
@@ -2666,7 +2666,7 @@ int migrate_running_task(int this_cpu, struct task_struct *p, struct rq *target,
 	raw_spin_rq_lock_irqsave(target, flags);
 	if (!target->active_balance &&
 		(task_rq(p) == target) && READ_ONCE((p)->__state) != TASK_DEAD &&
-		 /* rodin 6.18（A-75）: delayed 僵尸不 arm stopper */
+		 /* rodin 6.18（2026-10-07）: delayed 僵尸不 arm stopper */
 		 mtk_task_migratable(p) &&
 		 !(latency_sensitive && !cpumask_test_cpu(this_cpu, &effective_softmask))) {
 		target->active_balance = 1;
@@ -2743,7 +2743,7 @@ void try_to_pull_VVIP(int this_cpu, bool *had_pull_vvip, struct rq_flags *src_rf
 				update_rq_clock(src_rq);
 			p = next_vip_runnable_in_cpu(src_rq, VVIP);
 			if (p && cpumask_test_cpu(this_cpu, p->cpus_ptr)) {
-				/* rodin 6.18（A-75）: 先在 src_rq 锁下钉住候选并
+				/* rodin 6.18（2026-10-07）: 先在 src_rq 锁下钉住候选并
 				 * 取引用，再用 core 的 pi_lock -> rq_lock 顺序复锁
 				 * 复核（复核前任务可能已被 core/别的迁移器搬走，
 				 * 或转成 delayed 僵尸）；复核不过就放弃。

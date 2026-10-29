@@ -3721,7 +3721,7 @@ static struct i2c_driver fg_driver = {
 	.shutdown	= fg_shutdown,
 };
 
-/* A-142（R2 慢单元异步化）：原厂本单元 = bq28z610.ko，6.6 装载于 vendor_dlkm
+/* rodin 6.18（2026-10-21 慢单元异步化）：原厂本单元 = bq28z610.ko，6.6 装载于 vendor_dlkm
  * 波（>2.8s），下游消费面（mtk_charger 等）对 psy 缺席均有 NULL 守卫（真机
  * dmesg "No battery_psy!" 同款，框架先行后补注册即原厂语义）。=y 后 vseq 重放
  * 串行语义使 probe 提前到 1.09s 且独占推进线：probe 内 7 次 fg_mac_read/write

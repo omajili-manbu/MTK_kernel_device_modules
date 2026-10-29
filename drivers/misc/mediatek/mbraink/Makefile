@@ -21,7 +21,7 @@ subdir-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/mbraink/mbrai
 
 # rodin 6.9（V3）：原 `ifeq ($(CONFIG_X),m)` 在 =y 内建时**静默不成立** ⇒
 # 丢 -I 并连带丢功能（编译期无感知）。统一改 `ifneq ($(filter y m,$(CONFIG_X)),)`。
-# 设备真值 =m、本树 =y ⇒ 必须真进（mbraink.c 需要 lpm_dbg_logger.h，B3）。
+# 设备真值 =m、本树 =y ⇒ 必须真进（mbraink.c 需要 lpm_dbg_logger.h）。
 ifneq ($(filter y m,$(CONFIG_MTK_LOW_POWER_MODULE)),)
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/lpm/modules/debug/v2
 subdir-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/lpm/modules/debug/v2
@@ -32,9 +32,9 @@ endif
 
 # rodin 6.9（V3）：原 `ifeq ($(CONFIG_X),m)` 在 =y 内建时**静默不成立** ⇒
 # 丢 -I 并连带丢功能（编译期无感知）。统一改 `ifneq ($(filter y m,$(CONFIG_X)),)`。
-# 设备真值 =m、本树 =y ⇒ 必须真进（mbraink_video.c 需要 mtk_vcodec_drv.h，B2）。
+# 设备真值 =m、本树 =y ⇒ 必须真进（mbraink_video.c 需要 mtk_vcodec_drv.h）。
 ifneq ($(filter y m,$(CONFIG_DEVICE_MODULES_VIDEO_MEDIATEK_VCODEC)),)
-# rodin 6.9（B2）：原 subdir 行少了 drivers/ 一级（路径解析不到）。另外正牌
+# rodin 6.9：原 subdir 行少了 drivers/ 一级（路径解析不到）。另外正牌
 # mtk_vcodec_drv.h（drivers/media/platform/mtk-vcodec/）会继续 #include <slbc_ops.h>
 # ⇒ 复用 vcodec/Makefile 自己的那两条 -I。
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/videocodec/

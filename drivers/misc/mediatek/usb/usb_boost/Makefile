@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/mt-plat
-# xhci trace/dbg family is served by the kernel copy (b246 handback)
+# xhci trace/dbg family is served by the kernel copy (2026-10-11 handback)
 ccflags-y += -I$(srctree)/drivers/usb/host
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/usb/mtu3
 

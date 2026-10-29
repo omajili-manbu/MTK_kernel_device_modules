@@ -77,7 +77,7 @@ static inline bool mtk_cpu_allowed(struct task_struct *p, int cpu)
 		return cpu_active(cpu) && allowed;
 
 	/*
-	 * rodin 6.18（A-116/S4）：is_per_cpu_kthread() 只按
+	 * rodin 6.18（2026-10-17）：is_per_cpu_kthread() 只按
 	 * PF_KTHREAD + nr_cpus_allowed==1 判，会把"被临时绑到单 CPU 的普通
 	 * kthread"误当成 per-CPU 线程允许留驻暂停核。6.18 的判据是
 	 * kthread_is_per_cpu()（查 KTHREAD_IS_PER_CPU，core.c:2668 同源）。
@@ -166,7 +166,7 @@ static struct task_struct *drain_pick_rt(struct rq *rq)
  * pick_task() 可能与 fair 服务器交互（服务器即 CFS 的带宽代理）而 repin
  * rq->lock ⇒ 传入本层真正的 @rf，与 core 的 __pick_next_task() 同一做法。
  *
- * rodin 6.18（S0 复核 · §4-10 裁决 (b)）：dl_sched_class.pick_task() 不是纯
+ * rodin 6.18（2026-10-17 复核）：dl_sched_class.pick_task() 不是纯
  * 只读 —— 命中带宽服务器时它会改写 rq->dl_server，必要时还 dl_server_stop()；
  * core 因此每次进 __pick_next_task() 都先 rq->dl_server = NULL
  * （core.c:6660）。本排空路径不照做：（1）排空期间本 CPU 已被暂停、不会再
@@ -269,7 +269,7 @@ static enum drain_act drain_push(struct rq **rqp, struct rq_flags *rf,
 	}
 
 	/*
-	 * rodin 6.18（S5）：move_queued_task() 以 DEQUEUE_NOCLOCK 出队，契约要求
+	 * rodin 6.18（2026-10-26）：move_queued_task() 以 DEQUEUE_NOCLOCK 出队，契约要求
 	 * 此刻 rq->clock 已更新。drain_rq() 入口的 update_rq_clock() 经历本函数
 	 * 的 unlock/relock 周期后本应由 rq_unpin_lock()/rq_repin_lock() 的
 	 * stash 保障，但真机在排空事件上仍炸出 assert_clock_updated()
@@ -403,7 +403,7 @@ int __ref try_drain_rqs(void *data)
 			continue;
 
 		/*
-		 * rodin 6.18（S0/P-25）：标准等待形态 —— 先置睡眠态，再在
+		 * rodin 6.18（2026-10-17）：标准等待形态 —— 先置睡眠态，再在
 		 * drain_pending_lock 内复查条件，最后才 schedule()。
 		 * 原写法先放锁、再置睡眠态：pause_cpus() 若恰好落在这段窗口里
 		 * 补上待排空 CPU 并 wake_up_process()，唤醒打在仍 RUNNING 的线程
@@ -585,7 +585,7 @@ EXPORT_SYMBOL(sched_resume_cpu);
 void hook_rvh_is_cpus_allowed(void *unused, struct task_struct *p, int cpu, bool *allowed)
 {
 	if (cpu_paused(cpu)) {
-		/* rodin 6.18（S4）：同 mtk_cpu_allowed()，按 KTHREAD_IS_PER_CPU 判。 */
+		/* rodin 6.18（2026-10-17）：同 mtk_cpu_allowed()，按 KTHREAD_IS_PER_CPU 判。 */
 		if (kthread_is_per_cpu(p))
 			*allowed = true;
 		else

@@ -41,7 +41,7 @@ struct conap_scp_ipi_cb g_ipi_cb;
 static char g_ipi_ack_data[128];
 static int scp_ctrl_event_handler(struct notifier_block *this,
 	unsigned long event, void *ptr);
-/* rodin b514 #114: SCP_EVENT_READY 分支补初始化用（定义在文件后部） */
+/* rodin 2026-10-01: SCP_EVENT_READY 分支补初始化用（定义在文件后部） */
 static int conap_scp_shm_init(void);
 
 static struct notifier_block scp_ctrl_notifier = {
@@ -111,7 +111,7 @@ int scp_ctrl_event_handler(struct notifier_block *this,
 		break;
 	case SCP_EVENT_READY:
 		pr_info("[%s] SCP READY", __func__);
-		/* rodin b514 #114: initcall 期 SCP 预留内存未建立 ⇒ shm 未初始化
+		/* rodin 2026-10-01: initcall 期 SCP 预留内存未建立 ⇒ shm 未初始化
 		 * （enable=false），就绪后补一次；幂等。（原实现只通知 ctrl 回调，
 		 * shm 永久 disabled ⇒ >MAX_MSG_SZ_BY_IPI 的大消息路径不可用。）*/
 		if (!g_conap_shm_ctx.enable)
@@ -383,7 +383,7 @@ int conap_scp_ipi_init(struct conap_scp_ipi_cb *cb)
 
 	memcpy(&g_ipi_cb, cb, sizeof(struct conap_scp_ipi_cb));
 
-	/* rodin b514 #114: 原实现丢弃返回值；initcall 期 SCP 预留内存未建立
+	/* rodin 2026-10-01: 原实现丢弃返回值；initcall 期 SCP 预留内存未建立
 	 * ⇒ shm 未初始化（enable=false），就绪后由 READY 分支补。*/
 	if (conap_scp_shm_init() != 0)
 		pr_info("[%s] shm not ready at init, will retry on SCP READY", __func__);

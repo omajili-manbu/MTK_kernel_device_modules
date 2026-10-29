@@ -127,7 +127,7 @@ int mtk_ipi_device_register(struct mtk_ipi_device *ipidev,
 		unsigned int ipi_chan_count);
 int mtk_ipi_device_reset(struct mtk_ipi_device *ipidev);
 
-/* rodin b513 #113: one-shot ipidev-ready notifier for built-in consumers
+/* rodin 2026-10-01: one-shot ipidev-ready notifier for built-in consumers
  * whose initcalls can outrun the provider probe (see mtk_tinysys_ipi.c).
  * 只注册函数声明；struct mtk_ipi_device 布局不变（6.6 blob 可能内嵌）。 */
 int mtk_ipi_dev_register_ready_notifier(struct notifier_block *nb);

@@ -10,7 +10,7 @@
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
 #include <linux/arm-smccc.h> /* for Kernel Native SMC API */
-#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin P1: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
+#include <linux/soc/mediatek/mtk_sip_svc_internal.h> /* rodin: vendor SMC ids, for SMC ID table (kernel sip header shadows the vendor copy) */
 
 #include "mt6899-afe-common.h"
 #include "mt6899-afe-clk.h"

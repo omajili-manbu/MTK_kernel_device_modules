@@ -331,7 +331,7 @@ static void mtk_cpufreq_register_em(struct cpufreq_policy *policy)
  * cpufreq_freq_attr_scaling_available_freqs) makes the drv_attr loop create
  * the same file a second time -> sysfs EEXIST -> cpufreq_online() fails ->
  * every policy is torn down and cpufreq is dead for the whole boot. On-device
- * proof from the port line, b517 #117:
+ * proof from the port line, 2026-10-12:
  * "cpufreq: cannot create duplicate filename ... scaling_available_frequencies"
  * x8 + mbraink_policies_ready() stuck at 0 + power_throttling deferred forever.
  */

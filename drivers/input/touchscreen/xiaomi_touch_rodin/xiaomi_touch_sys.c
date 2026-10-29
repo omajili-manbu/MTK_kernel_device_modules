@@ -144,12 +144,12 @@ int update_palm_sensor_value_common(int value)
 }
 EXPORT_SYMBOL(update_palm_sensor_value_common);
 
-/* _b581-XT③：update_palm_sensor_value_second_panel / palm_value_1 为 donor 残留——
+/* rodin（2026-10-08）：update_palm_sensor_value_second_panel / palm_value_1 为 donor 残留——
  * blob def/dynsym 面均无该符号（blob 仅 update_palm_sensor_value_common @0x754c +
  * 单一全局 palm_value@bss+0x8b48），且树内已无调用者（mode.c SET_CMD_FOR_DRIVER 已按 blob
  * 收口为单面板调用）；rodin 无 panel1 的 palm_sensor_1 节点。按 blob 删除，不动导出面。 */
 
-/* _b583-XT2（跨侧定论：fts 侧 A1 双证后已删其 2 处调用）：
+/* rodin（2026-10-08）：fts 侧双证后已删其 2 处调用：
  * `update_weak_doubletap_value` 与串 "weak_doubletap_sensor" 在 blob **确无** ——
  *   ① blob 符号面（框架 def/dynsym + fts UND）0 命中；
  *   ② blob .strings/.rostr 0 命中 "weak_doubletap_sensor"；
@@ -362,7 +362,7 @@ CREATE_ATTR(palm_sensor, {
 		if (xiaomi_touch_driver_param && xiaomi_touch_driver_param->hardware_operation.palm_sensor_write)
 			xiaomi_touch_driver_param->hardware_operation.palm_sensor_write(!!input);
 
-		/* _b580-A74①（站点5）：blob 0x8398-0x83d0 第二段 = 对 touch_id 1 再取一次
+		/* rodin（2026-10-08）：blob 0x8398-0x83d0 第二段 = 对 touch_id 1 再取一次
 		 * driver_param（blob 取 [x+0x1b0] = palm_sensor_write；6.18 pahole =
 		 * driver_param+0x1e0，树侧编译偏移实测 0x1e0）并以同一布尔值直通；
 		 * 两段顺序在 common-data 推送（0x83d4-0x83e8，mode=26 len=1）之前。 */
@@ -381,7 +381,7 @@ CREATE_ATTR(touch_thp_ic_cmd, {
 		return 0;
 	},
 	{
-		/* _b580-A74①（站点1）：blob 0x89c0-0x8c5c 全形重建（三处代差：
+		/* rodin（2026-10-08）：blob 0x89c0-0x8c5c 全形重建（三处代差：
 		 *   ① 解析 = blob 内联十进制解析 0x8a10-0x8a98（数字累乘入 input[i]；','/' ' 分隔；
 		 *      前一字符为数字才推进槽位；首字符非数字/分隔即止），**无** kstrtoint/strsep/
 		 *      kzalloc+kfree（树侧 donor 形态的四处调用全部消失）；
@@ -530,7 +530,7 @@ CREATE_ATTR(touch_thp_ic_cmd_data, {
 /* blob 还原：show = snprintf("%s\n", scp_tp_mistouch_close ? "close" : "open")；
  * store = sscanf %d → printk(E 门控) → scp_tp_mistouch_close = (val != 0) →
  * param ops 的 scp_mistouch_enable 回调（blob param+0x178 KCFI 指针，ops 布局
- * 漂移记账：popsicle ops 结构与 blob 不同代，落为命名成员）。 */
+ * 漂移记录：popsicle ops 结构与 blob 不同代，落为命名成员）。 */
 CREATE_ATTR(scp_tp_mistouch_enable, {
 		return snprintf(buf, PAGE_SIZE, "%s\n",
 				scp_tp_mistouch_close ? "close" : "open");
@@ -625,7 +625,7 @@ CREATE_ATTR(touch_log_level, {
 		xiaomi_touch_driver_param_t *xiaomi_touch_driver_param =
 			get_xiaomi_touch_driver_param(TOUCH_ID);
 
-		/* _b581-XT①（站点1）：blob @0x8dac 形态 =
+		/* rodin（2026-10-08）：blob @0x8dac 形态 =
 		 *   p = get_xiaomi_touch_driver_param(0)           （单次取参数，w0=0=TOUCH_ID）
 		 *   sscanf(buf, "%d %d"(0x2c11), &input@sp+4, &vendor_input 全局@.data+0x528)
 		 *   current_log_level = input                      （str w8→current_log_level）

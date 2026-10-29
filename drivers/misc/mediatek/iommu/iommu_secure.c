@@ -23,7 +23,7 @@
 #include "iommu_secure.h"
 #include "iommu_debug.h"
 
-/* rodin b247 复审 D1: 值收敛到单一权威源 —— sip 内部头
+/* rodin 2026-10-12 复审: 值收敛到单一权威源 —— sip 内部头
  * （其内先 include 内核版 mtk_sip_svc.h，故 vendor 名与内核名都在场），
  * 此处不再本地定义，只留编译期等值锚（防两处取值漂移）。 */
 #ifdef MTK_SIP_KERNEL_IOMMU_CONTROL

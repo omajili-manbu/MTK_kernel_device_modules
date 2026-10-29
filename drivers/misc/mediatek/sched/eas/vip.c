@@ -266,7 +266,7 @@ struct task_struct *next_vip_runnable_in_cpu(struct rq *rq, int type)
 			continue;
 
 		p = vts_to_ts(tmp_vts);
-		/* rodin 6.18（A-75）: 链表项可能已不在本 rq 的"真可跑"
+		/* rodin 6.18（2026-10-07）: 链表项可能已不在本 rq 的"真可跑"
 		 * 集合里（delayed 僵尸/已迁走），只挑真在队列上的。
 		 */
 		if (!mtk_task_migratable(p))
@@ -611,7 +611,7 @@ bool is_VIP_latency_sensitive(struct task_struct *p)
 
 void set_task_vvip_and_throttle(int pid, unsigned int throttle_time)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -637,7 +637,7 @@ EXPORT_SYMBOL(set_task_vvip_and_throttle);
 
 void set_task_vvip(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -662,7 +662,7 @@ EXPORT_SYMBOL_GPL(set_task_vvip);
 
 void unset_task_vvip(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -690,7 +690,7 @@ EXPORT_SYMBOL(unset_task_vvip);
 /* priority based VIP interface */
 void set_task_priority_based_vip_and_throttle(int pid, int prio, unsigned int throttle_time)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -717,7 +717,7 @@ EXPORT_SYMBOL(set_task_priority_based_vip_and_throttle);
 
 void set_task_priority_based_vip(int pid, int prio)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -743,7 +743,7 @@ EXPORT_SYMBOL_GPL(set_task_priority_based_vip);
 
 void unset_task_priority_based_vip(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -935,7 +935,7 @@ EXPORT_SYMBOL(set_task_basic_vip_and_throttle);
 
 void set_task_basic_vip(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -960,7 +960,7 @@ EXPORT_SYMBOL(set_task_basic_vip);
 
 void unset_task_basic_vip(int pid)
 {
-	/* rodin 6.18（分区 A）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	/* rodin 6.18（2026-10-12）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
 	if (MTK_TASK_DATA_ABSENT())
 		return;
 	struct task_struct *p;
@@ -1125,7 +1125,7 @@ static void account_vip_runtime(struct rq *rq, struct task_struct *curr)
 }
 
 /*
- * rodin 6.18（S8/P-22 · §4-10 裁决 (b)）：本函数在本树是死码 ——
+ * rodin 6.18（2026-10-17）：本函数在本树是死码 ——
  * android_rvh_check_preempt_wakeup 是 port 树兼容层新增的 MTK 私有钩子，
  * 本树内核既无声明也无调用点，register_vip_hooks() 里已明确不注册
  * （见该函数内的说明）。按裁决保留本体（不删），但两处读 rq->curr 改为
@@ -1216,7 +1216,7 @@ void vip_cfs_tick(struct rq *rq)
 	 * see if we can run any other task including VIP tasks.
 	 */
 	/*
-	 * rodin 6.18（A-62）：h_nr_queued 含 se.sched_delayed 的延迟出队僵尸
+	 * rodin 6.18（2026-10-16）：h_nr_queued 含 se.sched_delayed 的延迟出队僵尸
 	 * （挂队但不可运行），判"还有别的 CFS 任务可跑"须用 h_nr_runnable，
 	 * 否则多一次无谓的 resched_curr()。
 	 */
@@ -1305,7 +1305,7 @@ void vip_dequeue_task(void *unused, struct rq *rq, struct task_struct *p, int fl
 		return;
 
 	/*
-	 * rodin 6.18（A-62 家族）：6.18 的 DELAY_DEQUEUE 允许 dequeue 只把实体
+	 * rodin 6.18（2026-10-17）：6.18 的 DELAY_DEQUEUE 允许 dequeue 只把实体
 	 * 标成 sched_delayed（dequeue_entities() 返回 -1，任务仍挂在 rq 上、
 	 * 只是不可运行），此时 dequeue_task_fair() 返回 false。
 	 *
@@ -1437,7 +1437,7 @@ void vip_push_runnable(struct rq *src_rq)
 	if (in_interrupt())
 		goto unlock;
 
-	/* rodin 6.18（A-75）: task_to_pushed 是 switch-out 时留下的 prev，
+	/* rodin 6.18（2026-10-07）: task_to_pushed 是 switch-out 时留下的 prev，
 	 * 此后可能已 futex_wait→block 成 delayed 僵尸；本回调入口已持
 	 * src_rq 锁、另持 dst_rq 锁（double_lock_balance），等价 core
 	 * __migrate_swap_task()/detach_task()+attach_task() 的锁形态，
@@ -1494,7 +1494,7 @@ put_task:
 
 DEFINE_PER_CPU(struct balance_callback, vip_push_head);
 /*
- * rodin 6.18（S4/P-20 改判）：调研报告建议把这里的 prev 换成 rq->donor，
+ * rodin 6.18（2026-10-17 改判）：调研报告建议把这里的 prev 换成 rq->donor，
  * 但 android_rvh_schedule 的投递点在 core.c:7819，而 rq->donor 已在
  * :7774/:7810 rq_set_donor(rq, next) 里推进成 next —— 钩子内读 rq->donor
  * 拿到的是"要切进来的任务"，会推错对象；切换前的旧 donor 在 core 局部变量
@@ -1518,7 +1518,7 @@ void vip_sched_switch(struct task_struct *prev, struct task_struct *next, struct
 		return;
 
 	/*
-	 * rodin 6.18（A-62 家族）：原判据 READ_ONCE(prev->__state) != TASK_RUNNING
+	 * rodin 6.18（2026-10-17）：原判据 READ_ONCE(prev->__state) != TASK_RUNNING
 	 * 把"是否还能被推走"混在任务状态上。DELAY_DEQUEUE 下延迟出队僵尸的
 	 * __state 已不是 RUNNING、实体却仍挂在 rq 上，状态位既不能证明它在队、
 	 * 也不能证明它可运行。统一走 mtk_task_migratable()（on_rq==QUEUED 且

@@ -295,7 +295,7 @@ int brl_gesture(struct goodix_ts_core *cd, int gesture_type)
 	ts_debug("BRL cmd 0 is 0x%x", cmd.data[0]);
 	ts_debug("BRL cmd 1 is 0x%x", cmd.data[1]);
 	if (cd->hw_ops->send_cmd(cd, &cmd))
-		/* _b583b-GX：blob brl_gesture 0x155c 带 '[GESTURE CMD ERROR]' 前缀 */
+		/* rodin（2026-10-08）：blob brl_gesture 0x155c 带 '[GESTURE CMD ERROR]' 前缀 */
 		ts_err("[GESTURE CMD ERROR]failed send gesture cmd");
 
 	return 0;
@@ -377,7 +377,7 @@ static int brl_read(struct goodix_ts_core *cd, unsigned int addr, unsigned char 
 {
 	struct goodix_bus_interface *bus = cd->bus;
 
-	/* _b583b-GX/T4：blob brl_read（0x3e9c，60B）= 纯转发 bus->read，
+	/* rodin（2026-10-08）：blob brl_read（0x3e9c，60B）= 纯转发 bus->read，
 	 * 无 ts_verbose dump（only-tree 串 '[0x%04X]:%*ph'/'brl_read'） */
 	return bus->read(bus->dev, addr, data, len);
 }
@@ -387,7 +387,7 @@ static int brl_write(struct goodix_ts_core *cd, unsigned int addr,
 {
 	struct goodix_bus_interface *bus = cd->bus;
 
-	/* _b583b-GX/T4：blob brl_write（0x3edc，64B）同上纯转发 */
+	/* rodin（2026-10-08）：blob brl_write（0x3edc，64B）同上纯转发 */
 	return bus->write(bus->dev, addr, data, len);
 }
 
@@ -407,10 +407,10 @@ static int brl_send_cmd(struct goodix_ts_core *cd,
 	struct goodix_ic_info_misc *misc = &cd->ic_info.misc;
 	struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
 
-	/* _b582-GXI：原树此处是 warsaw 的 `if (cd->is_inspecting) ts_err("doing inspect,
+	/* rodin（2026-10-08）：原树此处是 warsaw 的 `if (cd->is_inspecting) ts_err("doing inspect,
 	 * skip cmd")` 门 —— blob 无该串、也无 is_inspecting 读写点（切掉 warsaw inspect
 	 * 包装层后全树已无 is_inspecting=true 赋值点，该门为死面）⇒ 按 blob 删除。 */
-	/* _b582-INTC：blob brl_send_cmd 0x4608-0x4644 = 占该位的 **scp-tp 面**门，逐条：
+	/* rodin（2026-10-08）：blob brl_send_cmd 0x4608-0x4644 = 占该位的 **scp-tp 面**门，逐条：
 	 *   0x4608 ldr w8,[scp_tp_param] —— .bss+0x5ad0 struct scp_tp_params 首字段 param0
 	 *          （状态机：3 = SCP 已接管工作态，见 goodix_scp_tp.c 结构体段注）
 	 *   0x4614 cmp w8,#3 / 0x4618 b.ne → 非 3 走原流程（0x4648 起）
@@ -453,7 +453,7 @@ static int brl_send_cmd(struct goodix_ts_core *cd,
 			ts_debug("cmd ack data %*ph",
 				(int)sizeof(cmd_ack), cmd_ack.buf);
 			if (cmd_ack.ack == CMD_ACK_OK) {
-				/* #228（b581）blob brl_send_cmd 0x4720 b.eq → 0x47d0：
+				/* rodin（2026-10-08）：blob brl_send_cmd 0x4720 b.eq → 0x47d0：
 				 * ACK OK 路径是 msleep(15)（w0=15）后 ret=0 返回，
 				 * 全函数无 usleep_range(4000,4100)；树侧 4ms 为偏离 */
 				msleep(15);
@@ -526,7 +526,7 @@ resend_cmd:
 		return ret;
 	}
 	for (i = 0; i < retry_count; i++) {
-		/* _b583b-GX/T4：blob 0x7af4 循环头直接读，无 20ms 前置 sleep
+		/* rodin（2026-10-08）：blob 0x7af4 循环头直接读，无 20ms 前置 sleep
 		 *（calldiff only-tree msleep:1）；读失败路径的 usleep(5000,5100)
 		 * 与成功路径 usleep 相同（blob 0x7ad8/0x7c5c） */
 		ret = brl_read(cd, cmd_addr, tmp_buf, sizeof(tmp_buf));
@@ -702,7 +702,7 @@ static int wait_cmd_status(struct goodix_ts_core *cd,
 	struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
 	int i, ret;
 
-	/* _b583b-GX：blob 把本函数整体内联进 send_cfg_cmd（0x7d98-0x7eb4，
+	/* rodin（2026-10-08）：blob 把本函数整体内联进 send_cfg_cmd（0x7d98-0x7eb4，
 	 * blob 无 wait_cmd_status 符号）；循环体树同形。超时打印为短式
 	 * 'cmd status not ready, retry %d, ack 0x%x, status 0x%x, ret %d'
 	 * （blob only-blob 串，实参 retry/ack/state/ret，0x7e88-0x7eac），
@@ -727,7 +727,7 @@ static int send_cfg_cmd(struct goodix_ts_core *cd,
 	struct goodix_ts_cmd *cfg_cmd, u8 target_status)
 {
 	int ret;
-	/* _b583b-GX/T4：blob 0x7ce8-0x7edc：
+	/* rodin（2026-10-08）：blob 0x7ce8-0x7edc：
 	 * ① 无 'enter cmd:0x%*ph' 入口打印（only-tree 串）；
 	 * ② 失败打印短式 'failed write cfg prepare cmd %d'（0x7d54，行 686）；
 	 * ③ wait_cmd_status 内联。 */
@@ -777,7 +777,7 @@ static int brl_package_config(u8 *cfg, int len, u8 *buf)
 	buf[2] = (checksum >> 16) & 0xFF;
 	buf[3] = (checksum >> 24) & 0xFF;
 
-	/* _b583b-GX：blob brl_package_config 无 'buf:0x%*ph' 打印（relref 0 命中），删 */
+	/* rodin（2026-10-08）：blob brl_package_config 无 'buf:0x%*ph' 打印（relref 0 命中），删 */
 
 	return 0;
 }
@@ -820,7 +820,7 @@ static int brl_send_config(struct goodix_ts_core *cd, u8 *cfg, int len)
 
 	tmp_buf = kzalloc(tx_len, GFP_KERNEL);
 	if (!tmp_buf) {
-		/* _b583b-GX：blob 无 'try alloc (tx_len=%d) memory err' 串，删打印留守卫 */
+		/* rodin（2026-10-08）：blob 无 'try alloc (tx_len=%d) memory err' 串，删打印留守卫 */
 		return -ENOMEM;
 	}
 
@@ -966,7 +966,7 @@ static int brl_read_version(struct goodix_ts_core *cd,
 	u8 buf[sizeof(struct goodix_fw_version)] = {0};
 	u8 temp_pid[8] = {0};
 
-	ts_debug("enter.");	/* _b583-GX：blob L906（站点 0x534c，D 级） */
+	ts_debug("enter.");	/* rodin（2026-10-08）：blob L906（站点 0x534c，D 级） */
 	if (cd->bus->ic_type == IC_TYPE_BERLIN_A)
 		fw_addr = FW_VERSION_INFO_ADDR_BRA;
 	else
@@ -1003,7 +1003,7 @@ static int brl_read_version(struct goodix_ts_core *cd,
 	ts_info("vid:%*ph", (int)sizeof(version->patch_vid),
 		version->patch_vid);
 	ts_info("sensor_id:%d", version->sensor_id);
-	ts_debug("exit.");	/* _b583-GX：blob L941（站点 0x54a4，D 级） */
+	ts_debug("exit.");	/* rodin（2026-10-08）：blob L941（站点 0x54a4，D 级） */
 
 	return 0;
 }
@@ -1213,8 +1213,8 @@ static void print_ic_info(struct goodix_ic_info *ic_info)
 		misc->panel_x);
 	ts_debug("panel_y:                       %d",
 		misc->panel_y);
-	ts_debug("panel_max_x:                   %d", other->screen_max_x);	/* #228：blob 等级 D */
-	ts_debug("panel_max_y:                   %d", other->screen_max_y);	/* #228：blob 等级 D */
+	ts_debug("panel_max_x:                   %d", other->screen_max_x);	/* 2026-10-08：blob 等级 D */
+	ts_debug("panel_max_y:                   %d", other->screen_max_y);	/* 2026-10-08：blob 等级 D */
 	ts_debug("mutual_rawdata_addr:           0x%04X",
 		misc->mutual_rawdata_addr);
 	ts_debug("mutual_diffdata_addr:          0x%04X",
@@ -1540,7 +1540,7 @@ static int goodix_touch_handler(struct goodix_ts_core *cd,
 	return 0;
 }
 
-/* _b582-GXI：blob 独有 static get_debug_data_size（__func__ 串 .rodata+0x7ad8、
+/* rodin（2026-10-08）：blob 独有 static get_debug_data_size（__func__ 串 .rodata+0x7ad8、
  * 打印 "debug_data_size:%d" 6[GTP_V]，源行 1487；0x6608-0x6654 内联于 brl_event_handler）：
  *   size = 2 缺省；goodix_core_data 非空时 size = ic_info.parm.drv_num *
  *          ic_info.parm.sen_num * 2（blob [x9+0x48]/[x9+0x49]，6.6 偏移）；
@@ -1588,7 +1588,7 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 #ifdef GOODIX_DEBUG_SPI
 		TOUCH_TRACE_FRAME_CNT_BEGIN(frame_cnt, frame_cnt - 1);
 #endif
-		/* _b582-GXI：blob brl_event_handler 0x6334-0x636c 先无条件读
+		/* rodin（2026-10-08）：blob brl_event_handler 0x6334-0x636c 先无条件读
 		 * GOODIX_THP_FRAME_SIZE(2500)（无 dump 分叉）；0x65f4-0x6684 在事件命中后
 		 * 写 dump_type，仅 DUMP_ON 再按 get_debug_data_size(cd) 读回帧。
 		 * 原树 warsaw 序（前置 4096 分叉读）按 blob 收口。 */
@@ -1620,7 +1620,7 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 				/* blob 0x6600-0x6688：size = get_debug_data_size(cd)
 				 * （drv*sen*2 并回写 cd->debug_data_size），
 				 * 读失败 = "failed get frame data"（行 1543）。
-				 * _b583-GX：blob 0x6640 `add x21,x21,#0x9e0` ⇒ dump 帧读入
+				 * rodin（2026-10-08）：blob 0x6640 `add x21,x21,#0x9e0` ⇒ dump 帧读入
 				 * 第二缓冲 tp_frame->thp_frame_dump（0x9e0），不覆盖 2500
 				 * 常规帧缓冲（0x18）；树原为读回同一个 4096 缓冲，按 blob 收口。 */
 				ret = hw_ops->read(cd, misc->frame_data_addr,
@@ -1643,7 +1643,7 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 #endif
 			return 0;
 		} else {
-			ts_debug("invalid event type: %d", event_status);	/* #228：blob 等级 D（levelcmp） */
+			ts_debug("invalid event type: %d", event_status);	/* 2026-10-08：blob 等级 D（levelcmp） */
 #ifdef GOODIX_DEBUG_SPI
 			TOUCH_TRACE_FRAME_CNT_END();
 #endif
@@ -1670,7 +1670,7 @@ static int brl_event_handler(struct goodix_ts_core *cd,
 
 	large_touch_status = pre_buf[2];
 	event_status = pre_buf[0];
-	/* _b582-GXI：blob brl_event_handler 0x67b4 = 6[GTP_V]（ts_verbose），树原 D 级
+	/* rodin（2026-10-08）：blob brl_event_handler 0x67b4 = 6[GTP_V]（ts_verbose），树原 D 级
 	 * 为 warsaw 残项（blob 全 ko 无 6[GTP_D][%s:%d]: touch_head %*ph 串）。 */
 	ts_verbose("touch_head %*ph", IRQ_EVENT_HEAD_LEN, pre_buf);
 
@@ -2174,7 +2174,7 @@ static int goodix_htc_enable_touch_coord(int en)
 
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	/* _b583b-GX：blob 0x1784/0x181c（enable_touch_coord 内联体）：
+	/* rodin（2026-10-08）：blob 0x1784/0x181c（enable_touch_coord 内联体）：
 	 * E '%s...cmd %d, ret %d' / I 'success send touch data cmd %d'（无 ret），
 	 * %d = data[0]；树原 '(%02x) data %d' 为 warsaw 残项 */
 	if (ret)
@@ -2225,7 +2225,7 @@ int goodix_htc_enable_b_array(void)
 		raw_cmd.data[0] = 0x87;
 	raw_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &raw_cmd);
-	/* _b583b-GX：blob 0x18e0 E 'failed send b array cmd %d'(ret) /
+	/* rodin（2026-10-08）：blob 0x18e0 E 'failed send b array cmd %d'(ret) /
 	 * 0x1914 I 'success send b array cmd'（无 sync_mode 实参） */
 	if (ret)
 		ts_err("failed send b array cmd %d", ret);
@@ -2387,7 +2387,7 @@ int goodix_htc_enter_idle(int *value)
 	}
 
 	ret = hw_ops->send_cmd(goodix_core_data, &idle_cmd);
-	/* _b583b-GX：blob 0x1de0（I 级）'%s send idle cmd %d, ret %d'，
+	/* rodin（2026-10-08）：blob 0x1de0（I 级）'%s send idle cmd %d, ret %d'，
 	 * 只打 en 一个实参（w4=value[0]，0x1cc8 ldp w21,[x0]） */
 	ts_info("%s send idle cmd %d, ret %d",
 		ret ? "failed" : "success", en, ret);
@@ -2400,10 +2400,10 @@ int goodix_htc_enter_idle(int *value)
 * 00 00 06 D3 data0 data1 sum0 sum1，data0：基准所在的频点，data1：备用
 */
 
-/* _b583b-GX/T2：goodix_htc_ref_hopping_set 按 blob 删除——blob 无该符号
+/* rodin（2026-10-08）：goodix_htc_ref_hopping_set 按 blob 删除——blob 无该符号
  * （symdiff only-tree）亦无 'ref_hopping_set' 串；其调用点 mode 1106
  * （THP_REF_HOPPING_SET）在 blob 跳表（1000-1103）之外落 default
- * 'not support mode!'，case 已随本轮删除 */
+ * 'not support mode!'，case 已删除 */
 
 /*
  * update idle base line.
@@ -2423,7 +2423,7 @@ int goodix_htc_update_idle_baseline(void)
 	tmp_cmd.cmd = GOODIX_CMD_UPDATE_IDLE_BASELINE;
 	tmp_cmd.len = 4;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	/* _b583b-GX：blob 0x1ed0（D 级）'%s send update idle baseline cmd, ret %d'，
+	/* rodin（2026-10-08）：blob 0x1ed0（D 级）'%s send update idle baseline cmd, ret %d'，
 	 * 无 cmd(%02x)；树原 I 级为等级偏离 */
 	ts_debug("%s send update idle baseline cmd, ret %d",
 		ret ? "failed" : "success", ret);
@@ -2534,7 +2534,7 @@ int goodix_htc_set_idle_threshold(int threshold)
 	//tmp_cmd.data[1] = (u8)((threshold >> 8) & 0xFF);
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	/* _b583b-GX：blob 0x21d0（D 级）'%s send idle threshold cmd %d, ret %d'
+	/* rodin（2026-10-08）：blob 0x21d0（D 级）'%s send idle threshold cmd %d, ret %d'
 	 * 直接打 threshold，无 cmd(%02x)、无 'date' 笔误 */
 	ts_debug("%s send idle threshold cmd %d, ret %d",
 		ret ? "failed" : "success", tmp_cmd.data[0], ret);
@@ -2551,10 +2551,10 @@ int goodix_htc_set_idle_threshold(int threshold)
  * others                   -----> value = 120
  * return: 0 on success, otherwise return < 0.
  */
-/* _b583b-GX/T2：goodix_htc_set_display_fps 按 blob 删除——blob 无该符号
+/* rodin（2026-10-08）：goodix_htc_set_display_fps 按 blob 删除——blob 无该符号
  * （symdiff only-tree）与 'send fps cmd'/'fps %d change to %d' 两串；
  * mode 1012（THP_HAL_DISPLAY_FPS）在 blob 跳表内映射到 default
- * 'not support mode!'（0xfbf4），case 已随本轮删除 */
+ * 'not support mode!'（0xfbf4），case 已删除 */
 
 /*
  * set ic freq hopping value
@@ -2577,7 +2577,7 @@ int goodix_htc_set_freq_hopping(int index)
 	tmp_cmd.len = 5;
 	if (hw_ops->send_cmd)
 		ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	/* _b583b-GX：blob 0x2304 '%s send freq hopping index %x, ret %d'（I 级），
+	/* rodin（2026-10-08）：blob 0x2304 '%s send freq hopping index %x, ret %d'（I 级），
 	 * 直接打 index，无 cmd(%02x) data 前缀 */
 	ts_info("%s send freq hopping index %x, ret %d",
 		ret ? "failed" : "success", index, ret);
@@ -2605,7 +2605,7 @@ int goodix_htc_set_soft_reset(int index)
 	tmp_cmd.data[0] = index & 0xff;
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	/* _b583b-GX：blob 0x2408 '%s send soft reset index %x, ret %d'（I 级） */
+	/* rodin（2026-10-08）：blob 0x2408 '%s send soft reset index %x, ret %d'（I 级） */
 	ts_info("%s send soft reset index %x, ret %d",
 		ret ? "failed" : "success", index, ret);
 
@@ -2715,7 +2715,7 @@ int goodix_htc_enable_freq_shift(bool en)
 
 	tmp_cmd.len = 5;
 	ret = hw_ops->send_cmd(goodix_core_data, &tmp_cmd);
-	/* _b583b-GX：blob 0x27e0（D 级）'%s send freq shift cmd %d, ret %d'，
+	/* rodin（2026-10-08）：blob 0x27e0（D 级）'%s send freq shift cmd %d, ret %d'，
 	 * 直接打 data[0]，无 cmd(%02x) */
 	ts_debug("%s send freq shift cmd %d, ret %d",
 		ret ? "failed" : "success", tmp_cmd.data[0], ret);

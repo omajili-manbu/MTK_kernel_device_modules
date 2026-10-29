@@ -743,7 +743,7 @@ void fts_release_apk_debug_channel(struct fts_ts_data *ts_data)
 }
 
 
-/* _b582-PROC：A-80⑥-b —— dev 层 blob 串面确无此族，删 donor 的 v0 proc 记录节点。
+/* rodin（2026-10-08）： dev 层 blob 串面确无此族，删 donor 的 v0 proc 记录节点。
  * blob 实证（llvm-objdump -dr + .rodata.str1.1 全表，见 tools/_b582_proc/nodeface.py）：
  *   ① 全 ko 无 "tp_lockdown_info*"/"tp_fw_version*"/"tp_selftest*"/"tp_data_dump*" 串；
  *      且未导入 proc_create（只 proc_create_data）⇒ blob 侧零 proc_create 调用点。

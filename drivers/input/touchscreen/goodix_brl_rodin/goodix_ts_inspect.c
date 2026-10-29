@@ -61,7 +61,7 @@
 #define CSV_TP_NOISE_LIMIT "noise_data_limit"
 #define CSV_TP_SELFNOISE_LIMIT "noise_selfdata_limit"
 #define CSV_TP_TEST_CONFIG "test_config"
-/* _b582-GXI：blob 全 ko 无 diff_shift_max / adcdump_max_min_threshold 两 CSV 键
+/* rodin（2026-10-08）：blob 全 ko 无 diff_shift_max / adcdump_max_min_threshold 两 CSV 键
  * （对应 diff-shift 与 adcdump 两块 warsaw 独有面，连同其解析/判定/落盘一并按 blob 删除）。 */
 #define CSV_TP_FILE_VERSION "version"
 
@@ -400,12 +400,12 @@ static int ts_test_write(struct goodix_ts_test *ts_test, u32 addr, u8 *data, u32
 	return ts_test->ts->hw_ops->write(ts_test->ts, addr, data, len);
 }
 
-/* _b582-GXI：blob 无 ts_test_send_cmd 符号，且全 ko 无 "write cmd [0x%04X]"/"read ack
+/* rodin（2026-10-08）：blob 无 ts_test_send_cmd 符号，且全 ko 无 "write cmd [0x%04X]"/"read ack
  * [0x%04X]"/"can't receive cmd ack" 三串 ⇒ 厂商此 helper 为**裸转发**（rc 全内联）：
  * blob goodix_capacitance_test 0x17c3c/0x18760/0x18834/0x18954/0x19340/0x19394、
  * goodix_shortcircut_test 0x19de4/0x1a118 处均为 `ldr x8,[x8,#0x58](send_cmd); blr x8`
  * 间接调用；ack 轮询/打印在其 blob 内联体中不存在（brl_send_cmd 自带轮询 + msleep(15)，
- * b581 已对齐）。原树 warsaw 变体（自写 cmd_addr + 5 次 ack 轮询 + msleep(20) + 2 打印）
+ * 已对齐）。原树 warsaw 变体（自写 cmd_addr + 5 次 ack 轮询 + msleep(20) + 2 打印）
  * 按 blob 收口。 */
 static int ts_test_send_cmd(struct goodix_ts_test *ts_test,
 		struct goodix_ts_cmd *cmd)
@@ -691,7 +691,7 @@ static int goodix_init_testlimits(struct goodix_ts_test *ts_test)
 	char tmp_str[64] = {0};
 	int freq_cnt;
 
-	/* _b582-GXI：blob goodix_tptest_prepare 内联体 0x17230-0x172d8：limit_file 直接
+	/* rodin（2026-10-08）：blob goodix_tptest_prepare 内联体 0x17230-0x172d8：limit_file 直接
 	 * `sprintf("%s_%d.csv", cd->board_data.limit_csv_name, cd->fw_version.sensor_id)`，
 	 * 无 goodix_get_ic_self_test_mode 门控、无 "use default limit file"/
 	 * "use g_limit_file_name" 两打印（blob 全 ko 无此二串、无 g_limit_file_name 全局）
@@ -803,7 +803,7 @@ static int goodix_init_testlimits(struct goodix_ts_test *ts_test)
 		test_params->test_items[GTP_SELFNOISE_TEST] = true;
 	}
 
-	/* _b582-GXI：blob 无 adcdump_max_min_threshold CSV 解析（键串/两打印全 ko 无；
+	/* rodin（2026-10-08）：blob 无 adcdump_max_min_threshold CSV 解析（键串/两打印全 ko 无；
 	 * 与 goodix_check_chn_adc 及 <AdcDump*> 落盘同属 warsaw 独有 adcdump 面）→ 删除。 */
 
 	/* obtain short_params */
@@ -841,7 +841,7 @@ static int goodix_init_testlimits(struct goodix_ts_test *ts_test)
 		}
 	}
 
-	/* _b582-GXI：blob 无 diff_shift_max CSV 解析（键串、"parse_csvfile %s, freq %d OK"、
+	/* rodin（2026-10-08）：blob 无 diff_shift_max CSV 解析（键串、"parse_csvfile %s, freq %d OK"、
 	 * "failed get freq diff shift max %d"、"%s: test freq num %d" 全 ko 无；
 	 * 连同 goodix_diff_shift_test_* / save_diff_shift_data 整族 warsaw 面按 blob 删除）。 */
 
@@ -878,7 +878,7 @@ static int goodix_tptest_prepare(struct goodix_ts_test *ts_test)
 	return 0;
 }
 
-/* _b582-GXI：blob 名为 ts_test_send_config —— goodix_tptest_finish 内联体的
+/* rodin（2026-10-08）：blob 名为 ts_test_send_config —— goodix_tptest_finish 内联体的
  * "no valid normal config found" 打印（blob 0x1f5ec-0x1f604，__func__ 串
  * .rodata+0xb040 = "ts_test_send_config"，厂商源行 402）证明：厂商的
  * ts_test_send_config 就是本 helper（normal config 重发）；而 cap_test_prepare 送测试
@@ -1505,7 +1505,7 @@ static void goodix_shortcircut_test(struct goodix_ts_test *ts_test)
 		ts_test->test_result[GTP_SHORT_TEST] = GTP_PANEL_REASON;
 		return;
 	}
-	/* _b582-GXI：blob goodix_shortcircut_test 内联体的分析返回处（0x1bc0c
+	/* rodin（2026-10-08）：blob goodix_shortcircut_test 内联体的分析返回处（0x1bc0c
 	 * `tbz w20,#31`）失败只置位、**无** "shortcircut analysis failed" 打印；
 	 * goodix_check_chn_adc（adc dump 面）符号与全部 6 串（<AdcDump*> Value 档、
 	 * b_adc_*_ng、adc dump data checksum error、check chn adc failed）blob 全无
@@ -1534,7 +1534,7 @@ static int goodix_cap_test_prepare(struct goodix_ts_test *ts_test)
 	/* send test config if exist */
 	if (cfg->len > 0) {
 		ts_info("Test config exists and send it");
-		/* _b582-GXI：blob 0x17bc8-0x17bf8 = `x1=test_config.data; w2=len;
+		/* rodin（2026-10-08）：blob 0x17bc8-0x17bf8 = `x1=test_config.data; w2=len;
 		 * hw_ops->send_config(cd,...)`（[x8,#0x60] 间接调用），非 warsaw
 		 * 起/写/止命令序列（该序列 3 条打印串 blob 全无）。 */
 		ret = ts_test->ts->hw_ops->send_config(ts_test->ts,
@@ -1813,7 +1813,7 @@ static int goodix_cache_self_rawdata(struct goodix_ts_test *ts_test)
 	return ret;
 }
 
-/* _b582-GXI：warsaw 的 goodix_switch_data_mode 唯一调用者（diff_shift_test_start）
+/* rodin（2026-10-08）：warsaw 的 goodix_switch_data_mode 唯一调用者（diff_shift_test_start）
  * 已随 diff-shift 面删除；blob 侧该切换在各调用点内联（cap_test_prepare 0x17c10、
  * cache_noisedata 0x18748），无该符号 → 按 blob 删除（消 unused-function）。 */
 static int goodix_cache_noisedata(struct goodix_ts_test *ts_test)
@@ -1901,7 +1901,7 @@ static int goodix_cache_noisedata(struct goodix_ts_test *ts_test)
 						cd->ic_info.misc.fw_log_len +
 						data_size * sizeof(s16) +
 						1024;
-				/* _b582-GXI：blob 无 "frame_len exceed limit %d > %lu" 串、
+				/* rodin（2026-10-08）：blob 无 "frame_len exceed limit %d > %lu" 串、
 				 * 无 frame_buf 容量比较（0x2000 常量在其内联体全无）→ 删除。 */
 				ret = ts_test_read(ts_test, flag_addr, frame_buf, frame_len);
 				if (ret < 0)
@@ -2267,7 +2267,7 @@ static void goodix_capacitance_test(struct goodix_ts_test *ts_test)
 {
 	int ret;
 
-	/* _b582-GXI：blob goodix_capacitance_test 0x17b20 起手即（按等级）打印
+	/* rodin（2026-10-08）：blob goodix_capacitance_test 0x17b20 起手即（按等级）打印
 	 * "cap_test begin"（0x1809c），无 ts_test/=NULL 校验打印（全 ko 无该串）
 	 * 无校验分支 → 按 blob 去 NULL 校验。 */
 	ts_info("---------------------- cap_test begin ----------------------");
@@ -2582,12 +2582,12 @@ static void goodix_data_statistics(s16 *data, size_t data_size, char *result, si
 }
 
 #ifdef SAVE_IN_CSV
-/* #228（b581）fs_write 语义串台收口：blob 的 fs_write 是「写 auto_test seq 文件」的
+/* rodin（2026-10-08）：fs_write 语义串台收口：blob 的 fs_write 是「写 auto_test seq 文件」的
  * 内联 static（__func__="fs_write"，错误行 2410，串 "6[GTP_E][%s:%d]: seq file is NULL"
  * @.rodata.str1.1+0xd15b）：blob goodix_save_self_data 内联体依次
  *   L2410 seq file is NULL → _printk；L2990 尾 → seq_write
  * 即 { if (!g_seq) { ts_err("seq file is NULL"); return -EINVAL; } return seq_write(g_seq, buf, size); }
- * 且 blob 全模块无 "test result too much"／无 SAVE_IN_CSV 环形缓冲（B0 串）。
+ * 且 blob 全模块无 "test result too much"／无 SAVE_IN_CSV 环形缓冲。
  * 树侧原 fs_write 走 vmalloc(DEFAULT_SEQ_FILE_SIZE) 缓冲（warsaw 变体），
  * 而 auto_test 路径已用 auto_test_seq_write 直写 seq —— 两条写路径分叉导致
  * 测试输出进不了 proc。按 blob 收口为单一 seq 写入口。 */
@@ -2755,7 +2755,7 @@ static int goodix_save_header(struct goodix_ts_test *ts_test)
 			bytes += sprintf(&data[bytes], "<Item name=\"Self Rawdata Upper Limit Test\" result=\"NG\"/>\n");
 	}
 
-	/* _b582-GXI：blob 全 ko 无 "Diff shift test"/<DiffShift*> 串 → warsaw diff-shift
+	/* rodin（2026-10-08）：blob 全 ko 无 "Diff shift test"/<DiffShift*> 串 → warsaw diff-shift
 	 * 条目（含 save_limits 段与 data_record 段）按 blob 删除。 */
 	if (ts_test->test_result[GTP_SHORT_TEST]) {
 		if (GTP_TEST_PASS == ts_test->test_result[GTP_SHORT_TEST])
@@ -2867,7 +2867,7 @@ static int goodix_save_limits(struct goodix_ts_test *ts_test)
 				bytes += sprintf(&data[bytes], "Chn2=\"Rx%d\" ShortResistor= \"%dKom\"/>\n", chn2 & 0x7f, r);
 		}
 
-		/* _b582-GXI：blob 全 ko 无 <AdcDumpNegative>/<AdcDumpForward>/<AdcDumpMM>
+		/* rodin（2026-10-08）：blob 全 ko 无 <AdcDumpNegative>/<AdcDumpForward>/<AdcDumpMM>
 		 * 及其 *Value 档标签 → warsaw adcdump 落盘段按 blob 删除。 */
 
 		bytes += sprintf(&data[bytes], "</Item>\n");
@@ -3308,7 +3308,7 @@ static int goodix_save_tail(struct goodix_ts_test *ts_test)
 	return ret;
 }
 
-/* _b582-GXI：blob 无 goodix_save_result_data 符号（static 单调用点被内联进
+/* rodin（2026-10-08）：blob 无 goodix_save_result_data 符号（static 单调用点被内联进
  * goodix_put_test_result：blob 0x1c430 起直接是 save_header 的 kmalloc(28000)+
  * "<?xml version=...\n" 组装，sprintf×80/seq_write×20/kmalloc_large×8/kfree×9 全在
  * put_test_result 体内）→ 原树独立函数体就地展开到 put_test_result 尾部。 */
@@ -3429,7 +3429,7 @@ static void goodix_put_test_result(struct goodix_ts_test *ts_test,
 	goodix_strncat(ts_test->test_info, "\n",
 		TS_RAWDATA_RESULT_MAX);
 
-	/* _b582-GXI：blob 0x1c41c 把 test_info 搬进 info->result（+0x36b4,
+	/* rodin（2026-10-08）：blob 0x1c41c 把 test_info 搬进 info->result（+0x36b4,
 	 * w2=0x63=TS_RAWDATA_RESULT_MAX-1）后即进落盘流水；无 ts_info("%s", test_info)
 	 * （blob 全 ko 无 "6[GTP_I][%s:%d]: %s" 串）。 */
 	strncpy(info->result, ts_test->test_info, TS_RAWDATA_RESULT_MAX - 1);
@@ -3459,7 +3459,7 @@ static void goodix_put_test_result(struct goodix_ts_test *ts_test,
 #endif
 }
 
-/* _b582-GXI：blob 的 inspect 入口 = static goodix_do_inspect(cd, info)
+/* rodin（2026-10-08）：blob 的 inspect 入口 = static goodix_do_inspect(cd, info)
  * （__func__ 串 "goodix_do_inspect"、源行 3261/3274/3278，被内联进
  * auto_test_result_show = blob 0x201c8 体内 0x20440-0x20990）；blob 全模块无
  * goodix_do_inspect_thread / goodix_inspect_run / kthread_run / complete /
@@ -3514,7 +3514,7 @@ exit_free_ts:
 	return ret;
 }
 
-/* #228（b581）donor inspect 遗留清除：blob 全模块无 show_result* 符号、
+/* rodin（2026-10-08）：donor inspect 遗留清除：blob 全模块无 show_result* 符号、
  * 无 "no test result, please retry"／"PASS"／"FAIL" 输出体（B0 串），
  * 且 inspect_module_init 仅建 goodix_ts/auto_test 一个 proc（v571 已定案）。
  * 原 show_result_all_show/show_result_show/show_result_*_open 及两套 ops 表
@@ -3525,7 +3525,7 @@ int goodix_get_rawdata(struct device *dev, struct ts_rawdata_info *info)
 	int ret;
 	struct goodix_ts_test *ts_test = NULL;
 
-	/* #228（b581）blob goodix_get_rawdata 打印序列 L3365 "tp self test start"
+	/* rodin（2026-10-08）：blob goodix_get_rawdata 打印序列 L3365 "tp self test start"
 	 * 起手，**不调用** goodix_get_ic_self_test_mode()（tree 原多一次该调用：
 	 * callcmp only-tree get_ic_self_test_mode/strncpy×2），也不做第二次
 	 * info->result 搬运（blob 只有 put_test_result 内一次 strncpy×1）。 */
@@ -3566,7 +3566,7 @@ exit_finish:
 }
 
 /* ==================== _b571 缺件重建：auto_test proc（blob 机器码）==================== */
-/* #228（b581）g_auto_test_seq 定义上移到 fs_write 前（fs_write 即 blob 的
+/* rodin（2026-10-08）：g_auto_test_seq 定义上移到 fs_write 前（fs_write 即 blob 的
  * fs_write 语义体）；原 auto_test_seq_write() 与之同体，按 blob 去重删除。 */
 
 static int auto_test_result_show(struct seq_file *m, void *v);	/* 前向声明：open 引用它 */
@@ -3604,7 +3604,7 @@ static int auto_test_open(struct inode *inode, struct file *file)
  *      line 2266/2240/2245/2259/2279/2312/2317/2333/2339)、"goodix_custom_info_test"(0x2346,
  *      line 2312/2317/2339)…），说明 blob 源里这 4 个测试函数各只被调用一次 → 被完全内联，
  *      符号表里因此没有它们（树侧 .o 同样只有内联后的 goodix_do_inspect_thread）。
- * 关键内存/结构事实（本轮实测）：
+ * 关键内存/结构事实（实测）：
  *   m->private（seq_file+0x80）= cd（proc_create_data 的 core_data）
  *   28000B 缓冲（x19）：最终 sprintf(...,"test_result:%s\n",info->result) 的输出缓冲
  *   sizeof(struct ts_rawdata_info)=14104（第二次 kmalloc 的常量 0x3718），且
@@ -3672,7 +3672,7 @@ static int auto_test_result_show(struct seq_file *m, void *v)
 exit_free_info:
 	/* —— 结果回写（blob: sprintf → fs_write 内联(seq_write) → kfree → end 日志 → return 0）—— */
 	ret = sprintf(buf, "test_result:%s\n", info->result);	/* .rodata.str1.1+0x5bdd */
-	ret = fs_write(buf, ret);	/* #228：blob 内联 fs_write()（seq 直写，原 auto_test_seq_write 已并入） */
+	ret = fs_write(buf, ret);	/* 2026-10-08：blob 内联 fs_write()（seq 直写，原 auto_test_seq_write 已并入） */
 	if (ret < 0) {
 		ts_err("fs_write failed");			/* line 3329 */
 		ts_info("test_result:%s", info->result);	/* line 3331 [TODO-VERIFY-5] 位置 */
@@ -3702,7 +3702,7 @@ int inspect_module_init(struct goodix_ts_core *core_data)
 		return 0;
 	}
 
-	/* _b571：blob 忠实形态（inspect_module_init 仅建 auto_test @0x1f614；donor show_result* 移除） */
+	/* rodin（2026-10-06）：blob 忠实形态（inspect_module_init 仅建 auto_test @0x1f614；donor show_result* 移除） */
 	if (!proc_create_data("goodix_ts/auto_test", 0660, NULL, &auto_test_ops, core_data)) {
 		ts_err("failed to create proc entry");
 		return -ENOMEM;

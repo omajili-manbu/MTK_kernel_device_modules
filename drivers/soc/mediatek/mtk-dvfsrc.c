@@ -2414,7 +2414,7 @@ static struct platform_driver mtk_dvfsrc_driver = {
 	.probe	= mtk_dvfsrc_probe,
 	.remove	= mtk_dvfsrc_remove,
 	.driver = {
-		/* rodin b247（分区 B）：内核树同名平台驱动（"mtk-dvfsrc"，
+		/* rodin 2026-10-12：内核树同名平台驱动（"mtk-dvfsrc"，
 		 * device_initcall 先注册）会把本驱动挤出注册（-EBUSY），
 		 * 而 mt6899 只匹配本驱动的 of_match ⇒ 改名保注册。
 		 * 全树唯一引用点（其余代码无 "mtk-dvfsrc" 字面）。 */

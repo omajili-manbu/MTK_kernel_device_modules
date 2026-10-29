@@ -4,7 +4,7 @@
  */
 
 /*
- * rodin P1 (SMI/IOMMU fixwave): vendor SIP SMC-id internal header.
+ * rodin (SMI/IOMMU fixwave): vendor SIP SMC-id internal header.
  *
  * The vendor include/linux/soc/mediatek/mtk_sip_svc.h never reached any
  * consumer: kbuild puts the kernel ./include before every vendor -I path, so

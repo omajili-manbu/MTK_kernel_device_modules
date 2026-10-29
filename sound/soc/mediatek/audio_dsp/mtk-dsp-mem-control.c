@@ -1400,7 +1400,7 @@ int init_mtk_adsp_dram_segment(void)
 		dram->va_addr = (u64)dram->vir_addr;
 
 		if (!dram->phy_addr || !dram->size || !dram->vir_addr) {
-			/* rodin b514 #114: 提供者 adspsys 更晚（6.18 =y 下
+			/* rodin 2026-10-01: 提供者 adspsys 更晚（6.18 =y 下
 			 * dsp_pcm_driver_init6 早于 platform_adsp_init6）；
 			 * 原 -ENOMEM 被 err_platform 吞掉 ⇒ 永久降级。延迟重试。*/
 			return -EPROBE_DEFER;

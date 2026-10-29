@@ -43,7 +43,7 @@ obj-$(CONFIG_MTK_WIFI_THERMAL) += wifi_cooling.o
 
 obj-$(CONFIG_MTK_FAN_THERMAL) += fan_cooling.o
 
-# rodin #166: cpu_isolate_cooling（6.6 blob 内建重建；core_ctl.h 提供
+# rodin 2026-10-04: cpu_isolate_cooling（6.6 blob 内建重建；core_ctl.h 提供
 # core_ctl_force_pause_cpu，provider 已内建）
 ccflags-$(CONFIG_MTK_CPU_ISOLATE_THERMAL) += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/sched/core_ctl
 obj-$(CONFIG_MTK_CPU_ISOLATE_THERMAL) += cpu_isolate_cooling.o

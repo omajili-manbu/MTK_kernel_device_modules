@@ -59,7 +59,7 @@ unsigned long get_cpu_power(unsigned int mtk_em, unsigned int get_lkg,
 	 * （include/linux/energy_model.h:200-206），struct em_perf_domain 也已无
 	 * min_ps/max_ps 成员 ⇒ 按 mainline 调用形态改写（同头 :267 样例）。 */
 	/*
-	 * rodin 6.18（A-61）：em_table 是 __rcu 指针（EM 表可热更新），读者
+	 * rodin 6.18（2026-10-16）：em_table 是 __rcu 指针（EM 表可热更新），读者
 	 * 必须持 rcu_read_lock() 并经 em_perf_state_from_pd() 取表；cost 在
 	 * 锁内读成标量，锁外不再触碰表内存。
 	 */
@@ -125,7 +125,7 @@ void eenv_dsu_init(void *private, int quant, unsigned int wl,
 		int PERCORE_L3_BW, unsigned int cpumask_val, unsigned long *pd_base_freq,
 		unsigned int *val, unsigned int *output)
 {
-	/* rodin 6.18（A-147 第三批）：hook 恒 NULL（全树无赋值者）⇒ 调用体删除；
+	/* rodin 6.18（2026-10-26）：hook 恒 NULL（全树无赋值者）⇒ 调用体删除；
 	 * 函数壳与指针保留（EXPORT 面，blob ABI）。
 	 */
 	if (eenv_dsu_init_hook) {
@@ -177,7 +177,7 @@ unsigned long get_dsu_pwr(int wl, int dst_cpu, unsigned long task_util,
 		unsigned long ret;
 		int data[8];
 
-		/* rodin 6.18（A-147 第三批）：get_clkg_sram_base_addr() 调用点随
+		/* rodin 6.18（2026-10-26）：get_clkg_sram_base_addr() 调用点随
 		 * hook 恒 NULL 分支删除；data[8] 填零保持 trace 面类型完整。
 		 */
 		memset(data, 0, sizeof(data));
