@@ -7,6 +7,11 @@
 #include <sched/sched.h>
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cgroup.h>
+#include <linux/debugfs.h>
+#include <linux/delay.h>
+#include <linux/atomic.h>
+#include <linux/kthread.h>
+#include <linux/err.h>
 #include "common.h"
 #include "vip.h"
 #include "sched_trace.h"
@@ -14,6 +19,25 @@
 
 unsigned int ls_vip_threshold                   =  DEFAULT_VIP_PRIO_THRESHOLD;
 bool vip_enable;
+
+/* ==== rodin vip_fi: 冻结线竞态触发器（2026-10-29，用户令） ====
+ * 机制 = TOP1（审计①fc31501+96048f1：mtk_task_migratable() 不滤 blocked_on，
+ * PROXY_EXEC 下双 rq 锁内搬"QUEUED 但 blocked_on 在身"的 VIP）的窗口放大器：
+ * double_lock_balance（双 rq 锁+关中断）窗内 udelay 拉宽竞态窗，让另一核的
+ * find_proxy_task / activate_blocked_waiters 走链与搬移必然相撞；搬移本身
+ * 走下方原路径不改装。死亡签名预期 = frzq rq 锁多核连发行（对齐两份已采
+ * 死亡帧）。/sys/kernel/debug/vip_fi/{arm,delay_us,mode,status}。
+ * v2 = trigger 构造性触发（echo 即跑）：写 rounds 起 worker 自选
+ * "QUEUED+blocked_on" 任务执行 双锁→拉窗→搬移 N 轮；campaign 期间 frzq
+ * 静音（frzq_set_mute），只留 R 轮次行——楔死则轮次行戛止 = 死在当轮。
+ */
+extern void frzq_set_mute(int m);
+
+static atomic_t vip_fi_armed = ATOMIC_INIT(0);
+static atomic_t vip_fi_fired = ATOMIC_INIT(0);
+static unsigned int vip_fi_delay_us;	/* 0..5000，双锁窗内 udelay */
+static unsigned int vip_fi_mode;	/* 0=仅 blocked_on 窗口引信 1=任何合格 push */
+static atomic_t vip_fi_running = ATOMIC_INIT(0);
 
 #define link_with_others(lh) (!list_empty(lh))
 #define NUM_MAXIMUM_TGID 12
@@ -1412,6 +1436,29 @@ void vip_push_runnable(struct rq *src_rq)
 	if (in_interrupt())
 		goto unlock;
 
+	/* rodin vip_fi：双锁窗内引信——拉宽窗口 + 留痕，随后落入下方正常搬移 */
+	if (unlikely(atomic_read(&vip_fi_armed) > 0)) {
+		int fire = (vip_fi_mode != 0) ||
+			   (task_on_rq_queued(task_to_pushed) &&
+			    !task_to_pushed->se.sched_delayed &&
+			    task_to_pushed->blocked_on.lock != NULL);
+
+		if (fire) {
+			atomic_dec(&vip_fi_armed);
+			atomic_inc(&vip_fi_fired);
+			pr_info("vip_fi: fire pid=%d comm=%s src=%d dst=%d bo_lock=0x%p bo_type=%d state=0x%x delayed=%u delay_us=%u\n",
+				task_to_pushed->pid, task_to_pushed->comm,
+				this_cpu, new_cpu,
+				task_to_pushed->blocked_on.lock,
+				(int)task_to_pushed->blocked_on.type,
+				task_to_pushed->__state,
+				(unsigned)task_to_pushed->se.sched_delayed,
+				vip_fi_delay_us);
+			if (vip_fi_delay_us)
+				udelay(vip_fi_delay_us);
+		}
+	}
+
 	/* rodin 6.18（A-75）: task_to_pushed 是 switch-out 时留下的 prev，
 	 * 此后可能已 futex_wait→block 成 delayed 僵尸；本回调入口已持
 	 * src_rq 锁、另持 dst_rq 锁（double_lock_balance），等价 core
@@ -1587,3 +1634,214 @@ void vip_init(void)
 	register_vip_hooks();
 	vip_enable = sched_vip_enable_get();
 }
+
+/* ==== rodin vip_fi: debugfs 节点 ==== */
+static ssize_t vip_fi_arm_write(struct file *filp, const char __user *ubuf,
+				size_t len, loff_t *off)
+{
+	char kbuf[16];
+	unsigned int v;
+
+	if (len >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, ubuf, len))
+		return -EFAULT;
+	kbuf[len] = '\0';
+	if (kstrtouint(strim(kbuf), 0, &v))
+		return -EINVAL;
+	atomic_set(&vip_fi_armed, v);
+	pr_info("vip_fi: armed=%u mode=%u delay_us=%u\n",
+		v, vip_fi_mode, vip_fi_delay_us);
+	return len;
+}
+
+static ssize_t vip_fi_parm_write(struct file *filp, const char __user *ubuf,
+				 size_t len, loff_t *off)
+{
+	char kbuf[16];
+	unsigned int v;
+
+	if (len >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, ubuf, len))
+		return -EFAULT;
+	kbuf[len] = '\0';
+	if (kstrtouint(strim(kbuf), 0, &v))
+		return -EINVAL;
+	if (filp->f_path.dentry->d_name.name[0] == 'd')
+		vip_fi_delay_us = min(v, 5000U);
+	else
+		vip_fi_mode = (v != 0);
+	pr_info("vip_fi: %s=%u\n", filp->f_path.dentry->d_name.name,
+		filp->f_path.dentry->d_name.name[0] == 'd' ?
+		vip_fi_delay_us : vip_fi_mode);
+	return len;
+}
+
+static ssize_t vip_fi_status_read(struct file *filp, char __user *ubuf,
+				  size_t len, loff_t *off)
+{
+	char buf[128];
+	int n;
+
+	n = scnprintf(buf, sizeof(buf),
+		      "armed=%d fired=%d delay_us=%u mode=%u\n",
+		      atomic_read(&vip_fi_armed), atomic_read(&vip_fi_fired),
+		      vip_fi_delay_us, vip_fi_mode);
+	return simple_read_from_buffer(ubuf, len, off, buf, n);
+}
+
+static const struct file_operations vip_fi_arm_fops = {
+	.owner = THIS_MODULE,
+	.write = vip_fi_arm_write,
+};
+static const struct file_operations vip_fi_parm_fops = {
+	.owner = THIS_MODULE,
+	.write = vip_fi_parm_write,
+};
+static const struct file_operations vip_fi_status_fops = {
+	.owner = THIS_MODULE,
+	.read = vip_fi_status_read,
+};
+
+/* ==== rodin vip_fi v2: trigger 构造性触发（echo 即跑） ==== */
+static struct task_struct *vip_fi_pick(void)
+{
+	struct task_struct *g, *t, *found = NULL;
+
+	rcu_read_lock();
+	for_each_process_thread(g, t) {
+		if (!task_on_rq_queued(t) || t->se.sched_delayed ||
+		    !t->blocked_on.lock || is_migration_disabled(t))
+			continue;
+		if (!found || task_is_vip(t, NOT_VIP)) {
+			found = t;
+			if (task_is_vip(t, NOT_VIP))
+				break;	/* VIP 直接要 */
+		}
+	}
+	if (found)
+		get_task_struct(found);
+	rcu_read_unlock();
+	return found;
+}
+
+static int vip_fi_thread(void *data)
+{
+	int rounds = (int)(long)data;
+	int r, done = 0;
+
+	frzq_set_mute(1);
+	pr_notice("vip_fi: campaign start rounds=%d delay_us=%u\n",
+		  rounds, vip_fi_delay_us);
+
+	for (r = 1; r <= rounds; r++) {
+		struct task_struct *p;
+		struct rq *src_rq, *dst_rq;
+		int src_cpu, dst_cpu = -1, it;
+
+		if (fatal_signal_pending(current))
+			break;
+
+		/* 选任务：QUEUED + !delayed + blocked_on 在身（VIP 优先） */
+		p = vip_fi_pick();
+		if (!p) {
+			pr_notice("vip_fi: R%d/%d no candidate\n", r, rounds);
+			msleep(5);
+			continue;
+		}
+
+		src_cpu = task_cpu(p);
+		for (it = 0; it < nr_cpu_ids; it++) {
+			int c = (src_cpu + 1 + it) % nr_cpu_ids;
+
+			if (cpu_online(c) && !cpu_paused(c) &&
+			    cpumask_test_cpu(c, p->cpus_ptr)) {
+				dst_cpu = c;
+				break;
+			}
+		}
+		if (dst_cpu < 0) {
+			put_task_struct(p);
+			continue;
+		}
+
+		src_rq = cpu_rq(src_cpu);
+		dst_rq = cpu_rq(dst_cpu);
+		double_lock_balance(src_rq, dst_rq);
+
+		/* 锁下复验：仍在原 rq、仍 QUEUED、仍 blocked_on */
+		if (task_rq(p) == src_rq && task_on_rq_queued(p) &&
+		    !p->se.sched_delayed && p->blocked_on.lock &&
+		    !is_migration_disabled(p)) {
+			pr_notice("vip_fi: R%d/%d pid=%d comm=%s %d->%d bo_lock=0x%p bo_type=%d\n",
+				  r, rounds, p->pid, p->comm, src_cpu, dst_cpu,
+				  p->blocked_on.lock,
+				  (int)p->blocked_on.type);
+			if (vip_fi_delay_us)
+				udelay(vip_fi_delay_us);
+			update_rq_clock(src_rq);
+			deactivate_task(src_rq, p, DEQUEUE_NOCLOCK);
+			set_task_cpu(p, dst_cpu);
+			update_rq_clock(dst_rq);
+			activate_task(dst_rq, p, ENQUEUE_NOCLOCK);
+			wakeup_preempt(dst_rq, p, 0);
+			done++;
+		}
+		double_unlock_balance(src_rq, dst_rq);
+		put_task_struct(p);
+		msleep(3);
+	}
+
+	frzq_set_mute(0);
+	pr_notice("vip_fi: campaign END done=%d/%d (reached END = no freeze this run)\n",
+		  done, rounds);
+	atomic_set(&vip_fi_running, 0);
+	return 0;
+}
+
+static ssize_t vip_fi_trigger_write(struct file *filp, const char __user *ubuf,
+				    size_t len, loff_t *off)
+{
+	char kbuf[16];
+	unsigned int v;
+	struct task_struct *t;
+
+	if (len >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, ubuf, len))
+		return -EFAULT;
+	kbuf[len] = '\0';
+	if (kstrtouint(strim(kbuf), 0, &v) || v == 0 || v > 2000)
+		return -EINVAL;
+	if (atomic_xchg(&vip_fi_running, 1))
+		return -EBUSY;
+	t = kthread_run(vip_fi_thread, (void *)(long)v, "vip_fi_worker");
+	if (IS_ERR(t)) {
+		atomic_set(&vip_fi_running, 0);
+		return PTR_ERR(t);
+	}
+	return len;
+}
+
+static const struct file_operations vip_fi_trigger_fops = {
+	.owner = THIS_MODULE,
+	.write = vip_fi_trigger_write,
+};
+
+static int __init vip_fi_debugfs_init(void)
+{
+	struct dentry *dir;
+
+	dir = debugfs_create_dir("vip_fi", NULL);
+	if (IS_ERR(dir))
+		return 0;
+	debugfs_create_file("arm", 0200, dir, NULL, &vip_fi_arm_fops);
+	debugfs_create_file("delay_us", 0200, dir, NULL, &vip_fi_parm_fops);
+	debugfs_create_file("mode", 0200, dir, NULL, &vip_fi_parm_fops);
+	debugfs_create_file("status", 0400, dir, NULL, &vip_fi_status_fops);
+	debugfs_create_file("trigger", 0200, dir, NULL, &vip_fi_trigger_fops);
+	pr_info("vip_fi: debugfs ready /sys/kernel/debug/vip_fi/ (trigger=echo N 即跑)\n");
+	return 0;
+}
+late_initcall(vip_fi_debugfs_init);
