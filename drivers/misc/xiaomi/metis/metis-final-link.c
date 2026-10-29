@@ -167,7 +167,14 @@ u32 do_set_lock_vip(struct task_struct *owner, struct task_struct *waiter,
 			clean_mi_vip_task_common(owner, 0x2000);
 		}
 	}
-	set_mi_vip_task_common(owner, 0x2000, 50);
+	/* rodin 6.18（2026-10-30）：本函数由 mutex/rwsem wait_start 钩子在
+	 * wait_lock 持中调用，stock 的 task_rq_lock(owner) 重排队与
+	 * PROXY_EXEC 的 find_proxy_task（rq→wait_lock）互为反序，两 CPU 可成环
+	 * 楔死；donor 继承已原生覆盖“让 owner 更快执行”的意图，这里只保留
+	 * VIP 旗标（noresched 变体）。FIFO/RR 排除是 stock resched 变体的
+	 * policy 门，noresched 变体自身无门，在调用点保留。 */
+	if (owner->policy - 3U < 0xfffffffeU)
+		set_mi_vip_task_common_noresched(owner, 0x2000, 50);
 	if (link_debug)
 		pr_info("metis-link: metis link: %s vtsk %d src task, pid = %d, name = %s\n",
 			type, owner->pid, waiter->pid, waiter->comm);
