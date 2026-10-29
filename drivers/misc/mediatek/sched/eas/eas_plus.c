@@ -909,6 +909,12 @@ void mtk_hook_after_enqueue_task(void *data, struct rq *rq,
 	irq_log_store();
 
 #if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
+	/*
+	 * rodin 6.18（2026-10-30 审计警示）：本函数入口 get_eas_hook() 门恒死，
+	 * vip_enqueue_task 实际从未执行 ⇒ vrq->vip_tasks 运行期恒空，pick 侧
+	 * replace_next/tick 记账/requeue 全部空转（vip.c 已加空链快路径）。
+	 * 复活 = mtk_eas_hook 总闸（nonlinear_opp_cap.c 注释），勿单独在此接线。
+	 */
 	if (vip_fair_task(p))
 		vip_enqueue_task(rq, p);
 #endif

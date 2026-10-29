@@ -1282,6 +1282,22 @@ int em_util2opp(int cpu, int util)
 /* em */
 
 /* hook API */
+/*
+ * rodin 6.18（2026-10-30 审计警示）：本指针全树（devmod/kmod/内核树）无人
+ * 赋值，get_eas_hook() 恒 0 —— 它是约十个 6.6 vendor 调度子系统的总闸死门：
+ * vendor fair.c 均衡全簇（mtk_can_migrate_task/mtk_sched_newidle_balance/
+ * migrate_running_task/try_to_pull_VVIP/active-LB stopper）、vip push 整链
+ * （vip_sched_switch → vip_push_runnable）、mtk_hook_after_enqueue_task
+ * （vip_enqueue_task + sugov_data enq 面）、sched_queue_task_hook（flt
+ * 记账曾被本门连坐死、现已直挂解耦）、rt.c 面、hook_scheduler_tick。
+ * 赋值即一次性复活全部面，其中 vip push 是 PROXY_EXEC 下对已排队任务
+ * 裸搬移的高危原语（rq convoy 死锁帧主角，mtk_task_migratable 门只盖
+ * blocked_on 一类），vendor fair.c 簇从未在 6.18+proxy 下验证。接闸前
+ * 必过：锁序反序全量审计报告（2026-10-30）§三/§四逐面重审 + proxy
+ * 不变量复审 + 冻率对照；VIP 跨核放置的正确梯子 = uclamp/唤醒
+ * placement → 单 rq pick 侧优先 → 最后才谈搬家（详见 vip.c
+ * vip_push_runnable 处警告）。
+ */
 int (*mtk_eas_hook)(void);
 EXPORT_SYMBOL(mtk_eas_hook);
 int get_eas_hook(void)

@@ -1393,6 +1393,20 @@ void init_vip_group(void)
 }
 
 DEFINE_PER_CPU(struct task_struct *, runnable_vip);
+/*
+ * rodin 6.18（2026-10-30 审计警示）：本函数在 6.18 上是死码（唯一入队点
+ * vip_sched_switch 经 mtk_sched_switch 的 get_eas_hook() 死门），保留
+ * 本体勿删，复活前必读三点：①对已排队任务裸搬移（double_lock_balance +
+ * deactivate/set_task_cpu/activate）= PROXY_EXEC 时代最危险的树外迁移
+ * 原语之一，rq convoy 五帧同构死锁的主角；mtk_task_migratable() 门只盖
+ * blocked_on 一类，LTS 每次合入新 proxy 不变量都须重新对审。②与
+ * native EAS 抢跨核管辖权：switch-out 时刻信息比唤醒时刻旧一步，
+ * mtk_find_energy_efficient_cpu 的 vendor EM 与内核 DT/EM 非一套账，
+ * 答案相异即乒乓（native 放 A、本函数搬 B、下次唤醒搬回）。③VIP
+ * "排队干等"窗口按梯子解：uclamp/唤醒 placement → 单 rq pick 侧优先
+ * （入队链表 + replace_next，零搬移）→ 最后才谈跨核。当前活体分工 =
+ * VIP 旗标驱动 metis cluster boost、跨核 placement 归 native EAS。
+ */
 void vip_push_runnable(struct rq *src_rq)
 {
 	int this_cpu = cpu_of(src_rq);
@@ -1488,6 +1502,12 @@ DEFINE_PER_CPU(struct balance_callback, vip_push_head);
  * PROXY_EXEC=y 下 prev 是真正丢掉 CPU 的执行上下文：它若仍 on_rq 就是可推的
  * 候选（proxy 本身也是本 rq 上合法的可运行任务），若已阻塞则由紧随其后的
  * mtk_task_migratable() 判据滤掉。故保留 prev，不换成 rq->donor。
+ */
+/*
+ * rodin 6.18（2026-10-30 审计警示）：本函数当前恒不被调用——唯一可达路径
+ * mtk_sched_switch（eas_plus.c）入口即 get_eas_hook() 死门（总闸注释见
+ * nonlinear_opp_cap.c）。此处是 vip push 的唯一 queue_balance_callback
+ * 点；复活须走 vip_push_runnable 处警告的完整流程，勿单独接线。
  */
 void vip_sched_switch(struct task_struct *prev, struct task_struct *next, struct rq *rq)
 {
