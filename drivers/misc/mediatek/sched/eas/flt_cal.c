@@ -1329,6 +1329,24 @@ static void flt_register_kernel_hooks(void)
 		flt_android_rvh_tick_entry, NULL);
 	if (ret)
 		pr_info("register android_rvh_tick_entry failed\n");
+
+	/*
+	 * rodin 6.18：enqueue/dequeue 记账钩子从 sched_queue_task_hook() 摘出
+	 * 直挂——原挂点整体在 get_eas_hook() 门后（6.18 上恒死），记账被连坐，
+	 * group_nr_running 只剩 group.c 挂组/摘组在维护，sugov_ext 的
+	 * grp_tar_util 消费到的是挂组数而非运行态。直挂后与门解耦，运行态
+	 * 口径（只认 sched_delayed，见 flt_rvh_enqueue_task 内注释）恢复为
+	 * 记账真口径（与 group.c 挂组点的 mtk_task_on_rq_active 同口径）。
+	 */
+	ret = register_trace_android_rvh_enqueue_task(
+		flt_rvh_enqueue_task, NULL);
+	if (ret)
+		pr_info("register android_rvh_enqueue_task failed\n");
+
+	ret = register_trace_android_rvh_dequeue_task(
+		flt_rvh_dequeue_task, NULL);
+	if (ret)
+		pr_info("register android_rvh_dequeue_task failed\n");
 }
 
 void flt_cal_init(void)

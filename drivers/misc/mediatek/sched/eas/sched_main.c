@@ -202,12 +202,12 @@ static void sched_queue_task_hook(void *data, struct rq *rq, struct task_struct 
 
 	irq_log_store();
 
-#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
-	if (type == enqueue)
-		flt_rvh_enqueue_task(data, rq, p, flags);
-	else if (type == dequeue)
-		flt_rvh_dequeue_task(data, rq, p, flags);
-#endif
+	/*
+	 * rodin 6.18：flt enqueue/dequeue 记账不再经本钩子——本钩子整体在
+	 * get_eas_hook() 门后（6.18 上恒死），记账被连坐。两钩已改在
+	 * flt_register_kernel_hooks() 直挂（android_rvh_enqueue/dequeue_task）
+	 * 与门解耦；此处保持摘除，防将来门复活时对同一事件双计。
+	 */
 
 	if (type == enqueue) {
 		struct uclamp_se *uc_min_req, *uc_max_req;
