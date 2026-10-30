@@ -38,6 +38,11 @@
  * `monitor_get_pmsg` keeps its mapping for the rest of the boot, and the
  * printk level numbers of the stock unit are preserved at their sites
  * (fail/info lines are KERN_ERR, enter/exit lines KERN_INFO).
+ *
+ * The handful of stock defect paths keep validity exits here instead of the
+ * machine code: the pmsg page-array allocation failure (the stock unit walks
+ * on into a NULL dereference) and the kthread creation failure (the stock
+ * unit files the ERR_PTR away in its global as success).
  */
 #define pr_fmt(fmt) "bootmonitor: " fmt
 
@@ -151,13 +156,15 @@ static struct bm_boot_event bm_boot_events[BM_EVENT_NR] = {
 };
 
 /* boot context, filled by the platform device probe from DT */
-static struct {
+struct bm_boot_cxt {
 	unsigned long mem_size;
 	phys_addr_t mem_address;
 	unsigned long console_size;
 	unsigned long pmsg_size;
 	void *oops_buf;
-} boot_cxt;
+};
+
+static struct bm_boot_cxt boot_cxt;
 
 static void *bm_write_buffer;
 static char bm_boot_mode[10];
@@ -176,12 +183,12 @@ static struct log_t **bootprof_2;
 static u8 version_change;
 static int bootindex;
 
-static int blackbox;
-module_param(blackbox, int, 0600);
-MODULE_PARM_DESC(blackbox, "blackbox (default 0)");
 module_param_string(bootmode, bm_boot_mode, sizeof(bm_boot_mode), 0644);
 module_param_string(fingerprint, build_fingerprint, sizeof(build_fingerprint),
 		    0644);
+static int blackbox;
+module_param(blackbox, int, 0600);
+MODULE_PARM_DESC(blackbox, "blackbox (default 0)");
 module_param_string(devname, bm_devices_name, sizeof(bm_devices_name), 0644);
 
 /* blackbox partition handle (opened by the writer) */
@@ -262,10 +269,11 @@ static struct boot_monitor_header boot_monitor_header;
 
 static int monitor_main_thread_body(void *unused);
 static int get_bm_devices(void);
-static int write_blackbox_header(struct black_box_log_table_header *hdr);
+static int write_blackbox_header(struct bm_boot_cxt *cxt, char *buf,
+				 int event);
 static void exit_boot_monitor(void);
-static int monitor_get_kmsg(char *buf, size_t len);
-static int monitor_get_pmsg(void);
+static void monitor_get_kmsg(char *buf);
+static void monitor_get_pmsg(struct bm_boot_cxt *cxt);
 static int _partition_bm_read(loff_t pos, void *buf, size_t len);
 static int partition_bm_write(loff_t pos, size_t len, const void *buf);
 static void printerrorheader(void);
@@ -374,9 +382,11 @@ static int partition_bm_write(loff_t pos, size_t len, const void *buf)
 /*
  * Open the monitor device.  The stock unit rewrites the name buffer with the
  * by-name path every time (the devname parameter is overwritten, kept here
- * as-is), then opens with up to six attempts while the partition node
- * appears: wait_for_device_probe before each retry, 250 jiffies of sleep
- * between.
+ * as-is), then opens once more with up to six retries while the partition
+ * node appears: every attempt is claimed with THIS_MODULE as holder, every
+ * retry sets TASK_INTERRUPTIBLE, prints its attempt index, sleeps 250
+ * jiffies unless it is the first, waits for device probing, opens and marks
+ * the attempt done.
  */
 static int get_bm_devices(void)
 {
@@ -386,23 +396,30 @@ static int get_bm_devices(void)
 
 	bdev_file = bdev_file_open_by_path(bm_devices_name,
 					   BLK_OPEN_READ | BLK_OPEN_WRITE,
-					   NULL, NULL);
-	if (IS_ERR(bdev_file)) {
+					   THIS_MODULE, NULL);
+	pr_err("<monitor info>%s-%d:block2mtd: str %s:%zu\n", __func__, 147,
+	       bm_devices_name, strnlen(bm_devices_name, 128));
+	if (IS_ERR(bdev_file))
 		bdev_file = NULL;
-		pr_err("<monitor fail>%s-%d:blkdev_get_by_dev end !\n", __func__,
-		       167);
-	}
 
-	for (i = 1; i < 6 && !bdev_file; i++) {
+	for (i = 0; i < 6 && !bdev_file; i++) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		pr_err("<monitor fail>%s-%d:block2mtd: i %d\n", __func__, 155,
+		       i);
+		if (i)
+			schedule_timeout(BM_ROUND_JIFFIES);
 		wait_for_device_probe();
 		bdev_file = bdev_file_open_by_path(bm_devices_name,
 						   BLK_OPEN_READ |
-						   BLK_OPEN_WRITE, NULL, NULL);
-		if (IS_ERR(bdev_file)) {
+						   BLK_OPEN_WRITE, THIS_MODULE,
+						   NULL);
+		pr_err("<monitor fail>%s-%d:blkdev_get_by_dev end !\n",
+		       __func__, 167);
+		if (IS_ERR(bdev_file))
 			bdev_file = NULL;
-			schedule_timeout(BM_ROUND_JIFFIES);
-		}
 	}
+
+	set_current_state(TASK_RUNNING);
 
 	if (!bdev_file) {
 		pr_err("<monitor fail>%s-%d: error: cannot open device %s\n",
@@ -410,8 +427,8 @@ static int get_bm_devices(void)
 		return -1;
 	}
 
-	pr_err("<monitor info>%s-%d:block2mtd: str %s:%zu\n", __func__, 180,
-	       bm_devices_name, strlen(bm_devices_name));
+	pr_err("<monitor fail>%s-%d: mapping is 0x%p\n", __func__, 180,
+	       file_bdev(bdev_file)->bd_mapping);
 	return 0;
 }
 
@@ -484,11 +501,13 @@ static void add_timeout_header(char *dst)
  * (index max(1, event_count - 1), stride 0x1000) gets the stage's error type
  * and name and bumps its occurrence counter.
  */
-static int write_blackbox_header(struct black_box_log_table_header *hdr)
+static int write_blackbox_header(struct bm_boot_cxt *cxt, char *buf,
+				 int event)
 {
+	struct black_box_log_table_header *hdr = &black_box_log_table_header;
 	struct error_header *eh = &error_header;
 	struct boot_monitor_header *bh = &boot_monitor_header;
-	int idx = bm_event_counts > 1 ? bm_event_counts - 1 : 1;
+	int idx = event > 1 ? event - 1 : 1;
 	int ret = 0;
 
 	pr_info(">>>enter  %s: line: 293.\n", __func__);
@@ -502,17 +521,17 @@ static int write_blackbox_header(struct black_box_log_table_header *hdr)
 		       306);
 		return -1;
 	}
-	pr_err("<monitor info>%s-%d:event_count is %d\n", __func__, 306, idx);
+	pr_err("<monitor info>%s-%d:event_count is %d\n", __func__, 309, idx);
 
 	ret = _partition_bm_read(BM_LOG_TABLE_OFF, hdr, BM_LOG_TABLE_LEN);
 	if (ret) {
 		pr_err("<monitor fail>%s-%d:_partition_bm_read fail\n", __func__,
-		       309);
+		       314);
 		return ret;
 	}
 	if (hdr->magic != BM_LOG_TABLE_MAGIC) {
 		pr_err("<monitor fail>%s-%d:black_box_log_table_header.magic error\n",
-		       __func__, 314);
+		       __func__, 318);
 		memset(hdr, 0, sizeof(*hdr));
 		hdr->magic = BM_LOG_TABLE_MAGIC;
 		hdr->version = BM_VER;
@@ -547,12 +566,12 @@ static int write_blackbox_header(struct black_box_log_table_header *hdr)
 				 sizeof(error_type_header));
 	if (ret) {
 		pr_err("<monitor fail>%s-%d:_partition_bm_read fail\n", __func__,
-		       314);
+		       337);
 		return ret;
 	}
 	if (error_type_header.magic != BM_ERR_TYPE_MAGIC) {
 		pr_err("<monitor fail>%s-%d:error_type_header.magic error\n",
-		       __func__, 318);
+		       __func__, 341);
 		memset(&error_type_header, 0, sizeof(error_type_header));
 		error_type_header.magic = BM_ERR_TYPE_MAGIC;
 		error_type_header.version = BM_VER;
@@ -598,7 +617,7 @@ static int write_blackbox_header(struct black_box_log_table_header *hdr)
 	eh->error_type = error_init_type_table[idx];
 	eh->boot_index = hdr->boot_index;
 	eh->error_current = 1;
-	strncpy(eh->error_record, bm_boot_events[bm_event_counts].name,
+	strncpy(eh->error_record, bm_boot_events[event].name,
 		sizeof(eh->error_record) - 1);
 	printerrorheader();
 	ret = partition_bm_write(hdr->boot_content_offset +
@@ -637,7 +656,7 @@ static int write_blackbox_header(struct black_box_log_table_header *hdr)
 	bh->boot_index = hdr->boot_index;
 	bh->version_change = version_change;
 	strncpy(bh->os_version, build_fingerprint, sizeof(bh->os_version) - 1);
-	strncpy(bh->event, bm_boot_events[bm_event_counts].name,
+	strncpy(bh->event, bm_boot_events[event].name,
 		sizeof(bh->event) - 1);
 	printbootheader();
 	ret = partition_bm_write(hdr->boot_content_offset + BM_BM_HDR_BODY_OFF,
@@ -648,8 +667,8 @@ static int write_blackbox_header(struct black_box_log_table_header *hdr)
 		return ret;
 	}
 
-	add_timeout_header(bm_write_buffer);
-	add_timeout_header(boot_cxt.oops_buf);
+	add_timeout_header(buf);
+	add_timeout_header(cxt->oops_buf);
 
 	pr_info("<<<exit  %s: line 428.\n", __func__);
 	return 0;
@@ -659,20 +678,18 @@ static int write_blackbox_header(struct black_box_log_table_header *hdr)
 /* kmsg / pmsg capture                                                */
 /* ------------------------------------------------------------------ */
 
-static int monitor_get_kmsg(char *buf, size_t len)
+static void monitor_get_kmsg(char *buf)
 {
 	struct kmsg_dump_iter iter;
 	size_t out = 0;
 
-	pr_info(">>>enter  %s: line: 465.\n", __func__);
-	if (!buf || len == 0)
-		return -1;
 	memset(&iter, 0, sizeof(iter));
 	kmsg_dump_rewind(&iter);
-	kmsg_dump_get_buffer(&iter, true, buf, len, &out);
+	pr_info(">>>enter  %s: line: 465.\n", __func__);
+	kmsg_dump_get_buffer(&iter, true, buf + BM_OOPS_DATA_OFF,
+			     BM_WRITE_BUF_SIZE - BM_OOPS_DATA_OFF, &out);
 	pr_err("<monitor fail>ret_len is %zu\n", out);
 	pr_info("<<<exit  %s: line 470.\n", __func__);
-	return 0;
 }
 
 /* ramoops pmsg window signature at the head of the window */
@@ -683,26 +700,27 @@ static int monitor_get_kmsg(char *buf, size_t len)
  * fs/pstore/ram_core.c: pages of the window (reserved memory right after the
  * console window) are mapped with VM_MAP | VM_IOREMAP and the mapping is
  * kept for the rest of the boot; a window whose signature is not the ramoops
- * one is skipped.  The stock unit checks neither the allocation nor the vmap
- * result, and this unit keeps that shape.
+ * one is skipped (its mismatch line falls through to the exit line).  The
+ * stock unit checks neither the allocation nor the vmap result; only the
+ * page-array allocation keeps a validity exit here (see the header note).
  */
-static int monitor_get_pmsg(void)
+static void monitor_get_pmsg(struct bm_boot_cxt *cxt)
 {
-	phys_addr_t base = boot_cxt.mem_address + boot_cxt.console_size;
-	unsigned long size = boot_cxt.pmsg_size;
+	phys_addr_t base = cxt->mem_address + cxt->console_size;
+	unsigned long size = cxt->pmsg_size;
 	unsigned long npages, off, i;
 	struct page **arr;
 	char *va, *dst;
 	u32 sig, head, ring, n;
 
-	pr_info(">>>enter  %s: line: 489.\n", __func__);
+	pr_info(">>>enter  %s: line: 513.\n", __func__);
 
 	npages = (size + (base & 0xfff) + 0xfff) >> 12;
 	arr = kmalloc_array(npages, sizeof(*arr), GFP_KERNEL);
 	if (!arr) {
 		pr_err("%s: Failed to allocate array for %u pages\n", "ram_vmap",
 		       (unsigned)npages);
-		return -1;
+		return;
 	}
 	for (i = 0; i < npages; i++)
 		arr[i] = pfn_to_page((base >> PAGE_SHIFT) + i);
@@ -715,21 +733,20 @@ static int monitor_get_pmsg(void)
 	if (sig != BM_PMSG_SIG) {
 		pr_err("<monitor info>mtdoops: read pmsg failed sig = 0x%x \n",
 		       sig);
-		return -1;
-	}
-
-	head = *(u32 *)(va + off + 4);
-	ring = *(u32 *)(va + off + 8);
-	n = min_t(u32, ring, 0x1ffe00);
-	dst = (char *)boot_cxt.oops_buf + BM_OOPS_DATA_OFF;
-	if ((int)n > (int)head) {
-		memcpy(dst, va + off + 0xc + ring - (n - head), n - head);
-		memcpy(dst + (n - head), va + off + 0xc, head);
 	} else {
-		memcpy(dst, va + off + 0xc, n);
+		head = *(u32 *)(va + off + 4);
+		ring = *(u32 *)(va + off + 8);
+		n = min_t(u32, ring, 0x1ffe00);
+		dst = (char *)cxt->oops_buf + BM_OOPS_DATA_OFF;
+		if ((int)n > (int)head) {
+			memcpy(dst, va + off + 0xc + ring - (n - head),
+			       n - head);
+			memcpy(dst + (n - head), va + off + 0xc, head);
+		} else {
+			memcpy(dst, va + off + 0xc, n);
+		}
 	}
-	pr_info("<<<exit  %s: line 537.\n", __func__);
-	return 0;
+	pr_info("<<<exit  %s: line 539.\n", __func__);
 }
 
 /* ------------------------------------------------------------------ */
@@ -787,15 +804,21 @@ static int monitor_main_thread_body(void *unused)
 				struct log_t *entries = bootprof_2 ?
 					bootprof_2[slot] : NULL;
 
-				ringnums++;
-				count++;
-				if (!entries || !entries[idx].comm_event)
-					continue;
-				if (strstr(entries[idx].comm_event +
+				/* stock unit: on a hit ringnums stays at the
+				 * entry, so the next stage rescans it; one
+				 * ring line naming adjacent stages then
+				 * hits for both */
+				if (entries && entries[idx].comm_event &&
+				    strstr(entries[idx].comm_event +
 					   TASK_COMM_LEN, ev->name)) {
+					count++;
+					pr_err("<monitor fail>%s done\n",
+					       ev->name);
 					found = 1;
 					break;
 				}
+				ringnums++;
+				count++;
 			}
 			spin_unlock(&bootprof_lock);
 
@@ -803,16 +826,8 @@ static int monitor_main_thread_body(void *unused)
 				break;
 
 			if (k == budget - 1) {
-				if (k != (unsigned int)ev->warntime) {
-					if (boottime == BM_TIMEOUT_SECS) {
-						pr_err("<monitor info>%s timeout:boottime is %d line=%d\n",
-						       __func__, BM_TIMEOUT_SECS,
-						       179);
-						boottime = 0;
-					}
-					failed = 1;
-					break;
-				}
+				if (k != (unsigned int)ev->warntime)
+					goto judge;
 				pr_err("<monitor info>counts = bm_boot_events[%d].errortimes = %d\n",
 				       stage, ev->errortimes);
 				budget = (unsigned int)ev->errortimes + 1;
@@ -821,13 +836,22 @@ static int monitor_main_thread_body(void *unused)
 			schedule_timeout(BM_ROUND_JIFFIES);
 			k++;
 			boottime++;
+			if (k >= budget)
+				goto judge_noprint;
 		}
 
-		if (found)
-			pr_err("<monitor fail>%s done\n", ev->name);
+judge:
+		if (boottime == BM_TIMEOUT_SECS)
+			pr_err("<monitor info>%s timeout:boottime is %d line=%d\n",
+			       __func__, BM_TIMEOUT_SECS, 179);
+judge_noprint:
 		pr_err("<monitor fail>%s-%d:set task to running\n", __func__,
 		       185);
 		set_current_state(TASK_RUNNING);
+
+		if (!found && (k == (unsigned int)ev->errortimes ||
+			       boottime == BM_TIMEOUT_SECS))
+			failed = 1;
 
 		if (failed)
 			break;
@@ -844,6 +868,7 @@ static int monitor_main_thread_body(void *unused)
 
 	{
 		char errbuf[64] = "error:";
+		int ret;
 
 		strncpy(errbuf + strlen(errbuf), ev->name,
 			sizeof(errbuf) - strlen(errbuf) - 1);
@@ -856,23 +881,44 @@ static int monitor_main_thread_body(void *unused)
 		}
 		if (!bm_write_buffer || !boot_cxt.oops_buf) {
 			pr_err("<monitor fail>%s-%d:cxt->oops_buf or buffer is NULL\n",
-			       __func__, 369);
+			       "write_log_to_dev", 104);
 			pr_err("<monitor info>error write end\n");
 			exit_boot_monitor();
 			return 0;
 		}
 
-		monitor_get_kmsg(bm_write_buffer + BM_OOPS_DATA_OFF,
-				 BM_WRITE_BUF_SIZE - BM_OOPS_DATA_OFF);
-		monitor_get_pmsg();
-		write_blackbox_header(&black_box_log_table_header);
-		partition_bm_write(BM_LOG_BUF_OFF, BM_WRITE_BUF_SIZE,
-				   bm_write_buffer);
-		partition_bm_write(BM_OOPS_OFF, BM_OOPS_LEN,
-				   boot_cxt.oops_buf);
+		/* stock unit: both windows are wiped before the capture so a
+		 * power cut mid-dump cannot leave a stale mixture behind;
+		 * write failures only warn and the tail always runs */
+		ret = partition_bm_write(BM_LOG_BUF_OFF, BM_WRITE_BUF_SIZE,
+					 bm_write_buffer);
+		if (ret)
+			pr_err("<monitor fail>%s-%d:partition_bm_write error\n",
+			       "write_log_to_dev", 110);
+		ret = partition_bm_write(BM_OOPS_OFF, BM_OOPS_LEN,
+					 boot_cxt.oops_buf);
+		if (ret)
+			pr_err("<monitor fail>%s-%d:partition_bm_write error\n",
+			       "write_log_to_dev", 115);
+		monitor_get_kmsg(bm_write_buffer);
+		monitor_get_pmsg(&boot_cxt);
+		ret = write_blackbox_header(&boot_cxt, bm_write_buffer,
+					    bm_event_counts);
+		if (ret)
+			pr_err("<monitor fail>%s-%d:write_blackbox_header error\n",
+			       "write_log_to_dev", 124);
+		ret = partition_bm_write(BM_LOG_BUF_OFF, BM_WRITE_BUF_SIZE,
+					 bm_write_buffer);
+		if (ret)
+			pr_err("<monitor fail>%s-%d:partition_bm_write error\n",
+			       "write_log_to_dev", 130);
+		ret = partition_bm_write(BM_OOPS_OFF, BM_OOPS_LEN,
+					 boot_cxt.oops_buf);
+		if (ret)
+			pr_err("<monitor fail>%s-%d:partition_bm_write error\n",
+			       "write_log_to_dev", 135);
 		pr_err("<monitor info>error write end\n");
 		exit_boot_monitor();
-		pr_info("<<<exit  %s: line 201.\n", __func__);
 		return 0;
 	}
 }
@@ -1053,10 +1099,9 @@ static void exit_boot_monitor(void)
 	if (bdev_file) {
 		sync_blockdev(file_bdev(bdev_file));
 		invalidate_mapping_pages(file_bdev(bdev_file)->bd_mapping, 0, -1);
+		bdev_fput(bdev_file);
 		pr_err("<monitor fail>%s-%d:invalidate_mapping_pages end\n",
 		       __func__, 53);
-		bdev_fput(bdev_file);
-		bdev_file = NULL;
 	} else {
 		pr_err("<monitor fail>%s-%d:bdev no init\n", __func__, 47);
 	}
@@ -1082,12 +1127,10 @@ static void __exit boot_monitor_exit(void)
 	if (bdev_file) {
 		sync_blockdev(file_bdev(bdev_file));
 		invalidate_mapping_pages(file_bdev(bdev_file)->bd_mapping, 0, -1);
-		pr_err("<monitor fail>%s-%d:invalidate_mapping_pages end\n",
-		       __func__, 328);
 		bdev_fput(bdev_file);
-		bdev_file = NULL;
+		pr_err("<monitor fail>invalidate_mapping_pages end\n");
 	} else {
-		pr_err("<monitor fail>%s-%d:bdev no\n", __func__, 110);
+		pr_err("<monitor fail>%s-%d:bdev no\n", __func__, 328);
 	}
 	if (bm_write_buffer) {
 		pr_err("<monitor fail>%s-%d:bm_write_buffer is %p\n", __func__,
@@ -1099,9 +1142,11 @@ static void __exit boot_monitor_exit(void)
 		       boot_cxt.oops_buf);
 		vfree(boot_cxt.oops_buf);
 	}
-	pr_err("<monitor fail>%s-%d:bootmonitor_entry release\n", __func__,
-	       345);
-	proc_remove(bootmonitor_entry);
+	if (bootmonitor_entry) {
+		pr_err("<monitor fail>%s-%d:bootmonitor_entry release\n",
+		       __func__, 345);
+		proc_remove(bootmonitor_entry);
+	}
 	if (monitor_main) {
 		pr_err("<monitor fail>kthread_stop monitor_main\n");
 		platform_driver_unregister(&boot_monitor_driver);
@@ -1113,5 +1158,4 @@ static void __exit boot_monitor_exit(void)
 vseq_module_init(boot_monitor_init);
 module_exit(boot_monitor_exit);
 
-MODULE_DESCRIPTION("Xiaomi boot monitor");
 MODULE_LICENSE("GPL v2");
