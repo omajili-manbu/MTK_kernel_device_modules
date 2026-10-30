@@ -5360,7 +5360,6 @@ static void process_dbg_opt(const char *opt)
 		int ret;
 		unsigned int i, j;
 		unsigned int *spr_ip_params;
-		struct mtk_drm_private *priv = drm_dev->dev_private;
 		struct device_node *node = NULL;
 		int val = 0;
 
@@ -6333,7 +6332,7 @@ void mtk_ovl_set_aod_scp_hrt(void)
 	struct mtk_drm_crtc *mtk_crtc;
 	struct mtk_ddp_comp *ovl_comp;
 	u32 bw_base;
-	unsigned int i, j, k;
+	unsigned int i, j;
 
 	/* this debug cmd only for crtc0 */
 	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,

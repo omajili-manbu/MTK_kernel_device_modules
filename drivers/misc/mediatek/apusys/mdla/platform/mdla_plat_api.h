@@ -35,6 +35,12 @@ const struct of_device_id *mdla_plat_get_device(void);
 #define mdla_plat_get_device() NULL
 #endif
 
+struct platform_device;
+
+struct platform_device;
+
+struct platform_device;
+
 int mdla_plat_init(struct platform_device *pdev);
 void mdla_plat_deinit(struct platform_device *pdev);
 

@@ -7845,14 +7845,14 @@ const struct mtk_disp_ddp_data mt6768_ddp_driver_data = {
 const struct mtk_disp_ddp_data mt6761_ddp_driver_data = {
 	.mutex_mod = mt6761_mutex_mod,
 	.mutex_sof = mt6761_mutex_sof,
-	.mutex_mod_reg = MT6761_DISP_MUTEX0_MOD0,
+	.mutex_mod_reg = {MT6761_DISP_MUTEX0_MOD0},
 	.mutex_sof_reg = MT6761_DISP_MUTEX0_SOF,
 };
 
 const struct mtk_disp_ddp_data mt6765_ddp_driver_data = {
 	.mutex_mod = mt6765_mutex_mod,
 	.mutex_sof = mt6765_mutex_sof,
-	.mutex_mod_reg = MT6765_DISP_MUTEX0_MOD0,
+	.mutex_mod_reg = {MT6765_DISP_MUTEX0_MOD0},
 	.mutex_sof_reg = MT6765_DISP_MUTEX0_SOF,
 };
 
@@ -7991,7 +7991,7 @@ static const struct mtk_disp_ddp_data mt6877_ddp_driver_data = {
 static const struct mtk_disp_ddp_data mt6781_ddp_driver_data = {
 	.mutex_mod = mt6781_mutex_mod,
 	.mutex_sof = mt6781_mutex_sof,
-	.mutex_mod_reg = MT6781_DISP_MUTEX0_MOD0,
+	.mutex_mod_reg = {MT6781_DISP_MUTEX0_MOD0},
 	.mutex_sof_reg = MT6781_DISP_MUTEX0_SOF,
 };
 
@@ -13007,7 +13007,7 @@ static char *ddp_signal_0_mt6781(int bit)
 	}
 }
 
-static char *ddp_signal_1_mt6781(int bit)
+static __maybe_unused char *ddp_signal_1_mt6781(int bit)
 {
 	switch (bit) {
 	case 0:

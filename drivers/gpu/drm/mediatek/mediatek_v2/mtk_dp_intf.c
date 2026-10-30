@@ -1133,7 +1133,6 @@ static void mtk_dp_intf_golden_setting(struct mtk_ddp_comp *comp,
 static void mtk_dp_intf_golden_setting_mt6899(struct mtk_ddp_comp *comp,
 					    struct cmdq_pkt *handle)
 {
-	struct mtk_dp_intf *dp_intf = comp_to_dp_intf(comp);
 	/*mt6899 setting*/
 	u32 dp_buf_sodi_high = 2966;
 	u32 dp_buf_sodi_low = 2089;
@@ -1190,7 +1189,6 @@ static void mtk_dp_intf_config(struct mtk_ddp_comp *comp,
 	unsigned int bg_top = 0, bg_bot = 0;
 	unsigned int rw_times = 0;
 	u32 val = 0, line_time;
-	u32 dp_vfp_mutex = 0;
 	mtk_crtc = dp_intf->ddp_comp.mtk_crtc;
 	priv = mtk_crtc->base.dev->dev_private;
 

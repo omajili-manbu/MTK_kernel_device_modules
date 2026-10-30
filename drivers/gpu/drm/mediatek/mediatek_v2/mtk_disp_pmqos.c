@@ -577,6 +577,8 @@ unsigned int mtk_disp_get_channel_idx_MT6991(enum CHANNEL_TYPE type, unsigned in
 	case CHANNEL_HRT_WRITE:
 		idx = i * 4 + 3;//3,7,11,15
 		break;
+	default:
+		break;
 	}
 
 	return idx;
@@ -625,11 +627,8 @@ void mtk_disp_update_channel_hrt_MT6991(struct mtk_drm_crtc *mtk_crtc,
 						unsigned int bw_base, unsigned int channel_bw[])
 {
 	int i = 0, j;
-	int max_ovl_phy_layer = 12; // 6991 phy ovl layer num
 	unsigned int subcomm_bw_sum[4] = {0};
 	struct drm_crtc *crtc = &mtk_crtc->base;
-	struct mtk_drm_private *priv = crtc->dev->dev_private;
-	unsigned int crtc_idx = drm_crtc_index(crtc);
 	unsigned int compr_ratio = 90;
 	int oddmr_hrt = 0;
 	struct mtk_ddp_comp *comp;

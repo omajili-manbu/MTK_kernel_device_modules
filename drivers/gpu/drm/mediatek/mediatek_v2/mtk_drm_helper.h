@@ -141,6 +141,8 @@ int mtk_drm_helper_set_opt_by_name(struct mtk_drm_helper *helper_opt,
 				   const char *name, int value);
 int mtk_drm_helper_get_opt_list(struct mtk_drm_helper *helper_opt,
 				char *stringbuf, int buf_len);
+struct device;
+
 void mtk_drm_helper_init(struct device *dev,
 			 struct mtk_drm_helper **helper_opt);
 

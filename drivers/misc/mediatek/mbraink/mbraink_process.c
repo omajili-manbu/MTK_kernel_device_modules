@@ -175,7 +175,7 @@ void mbraink_get_process_stat_info(pid_t current_pid, unsigned int cnt,
 	read_unlock(&tasklist_lock);
 }
 
-void mbraink_get_thread_stat_info(pid_t current_pid_idx, pid_t current_tid,
+void mbraink_get_thread_stat_info(pid_t current_pid_idx, pid_t __always_unused current_tid,
 				unsigned int cnt,
 				struct mbraink_thread_stat_data *thread_stat_buffer)
 {

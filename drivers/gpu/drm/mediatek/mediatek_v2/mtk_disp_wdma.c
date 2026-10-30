@@ -2425,7 +2425,6 @@ static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		unsigned int force_update = 0; /* force_update repeat last qos BW */
 		unsigned int update_pending = 0;
 		struct mtk_drm_private *priv;
-		struct mtk_disp_wdma *wdma = comp_to_wdma(comp);
 
 		priv = comp->mtk_crtc->base.dev->dev_private;
 

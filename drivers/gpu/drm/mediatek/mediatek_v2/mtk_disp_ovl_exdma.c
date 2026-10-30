@@ -3313,7 +3313,6 @@ static void mtk_ovl_exdma_addon_config(struct mtk_ddp_comp *comp,
 
 static void mtk_ovl_exdma_config_begin(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle, const u32 idx)
 {
-	struct mtk_disp_ovl_exdma *ovl = comp_to_ovl_exdma(comp);
 	unsigned int value = 0, mask = 0;
 	struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
 	struct drm_crtc *crtc = &mtk_crtc->base;
@@ -3998,8 +3997,8 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 	}
 	case PMQOS_SET_HRT_BW_DELAY_POST: {
 		u32 bw_val = 0;
+		unsigned int phy_id = 0;
 		struct mtk_disp_ovl_exdma *ovl = comp_to_ovl_exdma(comp);
-		unsigned int phy_id = 0, usage_ovl_fmt = 0, usage_ovl_compr = 0;
 		struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
 		u32 hdr_bw_val = 0;
 		u32 stash_bw_val = 0;
@@ -4356,7 +4355,6 @@ void mtk_ovl_exdma_dump_golden_setting(struct mtk_ddp_comp *comp)
 
 int mtk_ovl_exdma_dump(struct mtk_ddp_comp *comp)
 {
-	struct mtk_disp_ovl_exdma *ovl = comp_to_ovl_exdma(comp);
 	void __iomem *baddr = comp->regs;
 	int i;
 	int offset;

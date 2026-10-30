@@ -803,7 +803,6 @@ static void disp_tdshp_bypass(struct mtk_ddp_comp *comp, int bypass,
 static int disp_tdshp_user_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 	unsigned int cmd, void *data)
 {
-	struct mtk_disp_tdshp *tdshp = comp_to_tdshp(comp);
 
 	pr_notice("%s, cmd: %d\n", __func__, cmd);
 	switch (cmd) {

@@ -289,8 +289,6 @@ static void ovl_dump_bld_layer_info(struct mtk_ddp_comp *comp, int layer)
 	/*  enum UNIFIED_COLOR_FMT fmt; */
 	void __iomem *baddr = comp->regs;
 	void __iomem *Lx_base;
-	static const char * const pixel_src[] = { "mem", "color", "ufod", "pq" };
-
 	Lx_base = baddr;
 	con = readl(OVL_BLD_L_CON2(layer) + Lx_base);
 	lsrc = readl(DISP_REG_OVL_BLD_L_EN(layer) + Lx_base);

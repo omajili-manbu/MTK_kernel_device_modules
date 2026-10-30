@@ -421,7 +421,7 @@ static void mtk_ovl_outproc_layer_config(struct mtk_ddp_comp *comp, unsigned int
 	DDPDBG("%s+ %s\n", __func__, mtk_dump_comp_str(comp));
 }
 
-static void
+static __maybe_unused void
 mtk_ovl_outproc_addon_rsz_config(struct mtk_ddp_comp *comp, enum mtk_ddp_comp_id prev,
 			 enum mtk_ddp_comp_id next, struct mtk_rect rsz_src_roi,
 			 struct mtk_rect rsz_dst_roi, struct cmdq_pkt *handle)

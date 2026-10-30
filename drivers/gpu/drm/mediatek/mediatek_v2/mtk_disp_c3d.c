@@ -476,7 +476,7 @@ static int disp_c3d_set_3dlut(struct mtk_ddp_comp *comp,
 				(primary_data->c3d_reg.lut3d_reg[i+2] << 20);
 		}
 	} else {
-		pr_notice("%s, c3d copyfrom use fail", __func__, c3d->bin_num);
+		pr_notice("%s, c3d copyfrom use fail %d\n", __func__, c3d->bin_num);
 		return -1;
 	}
 
@@ -647,7 +647,6 @@ static void disp_c3d_bypass(struct mtk_ddp_comp *comp, int bypass,
 static int disp_c3d_user_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 	unsigned int cmd, void *data)
 {
-	struct mtk_disp_c3d *c3d_data = comp_to_c3d(comp);
 
 	C3DFLOW_LOG("cmd: %d\n", cmd);
 	switch (cmd) {

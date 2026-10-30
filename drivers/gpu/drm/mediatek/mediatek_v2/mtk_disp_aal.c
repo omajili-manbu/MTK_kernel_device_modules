@@ -1127,7 +1127,6 @@ static int disp_aal_update_dre3_sram(struct mtk_ddp_comp *comp,
 
 static void disp_aal_write_dre3_curve_full(struct mtk_ddp_comp *comp)
 {
-	void __iomem *dre3_va = disp_aal_dre3_va(comp);
 	uint32_t reg_value = 0, reg_mask = 0;
 	struct mtk_disp_aal *aal_data = comp_to_aal(comp);
 	struct mtk_ddp_comp *dmdp_aal = aal_data->comp_dmdp_aal;
@@ -1303,7 +1302,7 @@ static void disp_aal_dre3_reset_to_linear(struct mtk_ddp_comp *comp, int check)
 			/* write each block dre curve */
 			if (!disp_aal_dre3_write_linear_curve(aal_data,
 				dre3_gain, blk_x, blk_y, dre_blk_x_num, check)) {
-				AALERR("%s write_linear_curve error\n");
+				AALERR("%s write_linear_curve error\n", __func__);
 				return;
 			}
 		}
@@ -1311,7 +1310,7 @@ static void disp_aal_dre3_reset_to_linear(struct mtk_ddp_comp *comp, int check)
 	/* write each block dre curve last point */
 	if (!disp_aal_dre3_write_linear_curve16(aal_data,
 		dre3_gain, dre_blk_x_num, dre_blk_y_num, check))
-		AALERR("%s write_linear_curve16 error\n");
+		AALERR("%s write_linear_curve16 error\n", __func__);
 }
 
 static void disp_aal_init_dre3_curve(struct mtk_ddp_comp *comp)
@@ -2008,17 +2007,26 @@ static int disp_aal_set_dre3_curve(struct mtk_ddp_comp *comp,
 	struct cmdq_pkt *handle, const struct DISP_AAL_PARAM *param)
 {
 	struct mtk_disp_aal *aal_data = comp_to_aal(comp);
-	struct DISP_DRE30_PARAM dre30_gain;
+	struct DISP_DRE30_PARAM *dre30_gain;
 
 	AALFLOW_LOG("\n");
 	if (atomic_read(&aal_data->primary_data->change_to_dre30) == 0x3) {
-		if (copy_from_user(&dre30_gain, (struct DISP_DRE30_PARAM *)param->dre30_gain,
+		/* rodin 6.18（2026-10-30）：2KB DRE30 参数由栈改堆（内联进
+		 * disp_aal_set_param 后栈帧 2256B 超 2048 限）；OOM 返回
+		 * -ENOMEM（copy_from_user 失败维持 stock 的 -1）。 */
+		dre30_gain = kmalloc(sizeof(*dre30_gain), GFP_KERNEL);
+		if (!dre30_gain)
+			return -ENOMEM;
+		if (copy_from_user(dre30_gain, (struct DISP_DRE30_PARAM *)param->dre30_gain,
 				    sizeof(struct DISP_DRE30_PARAM)) == 0) {
 			mutex_lock(&aal_data->primary_data->config_lock);
-			memcpy(&aal_data->primary_data->dre30_gain, &dre30_gain, sizeof(struct DISP_DRE30_PARAM));
+			memcpy(&aal_data->primary_data->dre30_gain, dre30_gain, sizeof(struct DISP_DRE30_PARAM));
 			mutex_unlock(&aal_data->primary_data->config_lock);
-		} else
+		} else {
+			kfree(dre30_gain);
 			return -1;
+		}
+		kfree(dre30_gain);
 	}
 
 	return 0;
@@ -2497,17 +2505,26 @@ static int disp_aal_copy_hist_to_user(struct mtk_ddp_comp *comp,
 	unsigned long flags;
 	int ret = 0;
 	struct mtk_disp_aal *aal_data = comp_to_aal(comp);
-	struct DISP_DRE30_HIST dre30_hist;
+	struct DISP_DRE30_HIST *dre30_hist = NULL;
 
 	if (hist == NULL) {
 		AALERR("%s DstHist is NULL\n", __func__);
 		return -1;
 	}
 
+	/* rodin 6.18（2026-10-30）：6KB DRE30 快照由栈改堆（该函数内联后栈帧 6224B
+	 * 超 2048 限）；仅 DRE30 使能时分配，OOM 走 -ENOMEM 提前返回（原先栈上
+	 * 必成，此为唯一行为差）。 */
+	if (aal_data->primary_data->aal_fo->mtk_dre30_support && aal_data->primary_data->dre30_enabled) {
+		dre30_hist = kmalloc(sizeof(*dre30_hist), GFP_KERNEL);
+		if (!dre30_hist)
+			return -ENOMEM;
+	}
+
 	/* We assume only one thread will call this function */
 	spin_lock_irqsave(&aal_data->primary_data->hist_lock, flags);
 	if (aal_data->primary_data->aal_fo->mtk_dre30_support && aal_data->primary_data->dre30_enabled)
-		memcpy(&dre30_hist, &aal_data->primary_data->dre30_hist, sizeof(struct DISP_DRE30_HIST));
+		memcpy(dre30_hist, &aal_data->primary_data->dre30_hist, sizeof(struct DISP_DRE30_HIST));
 	aal_data->primary_data->hist.panel_type = atomic_read(&aal_data->primary_data->panel_type);
 	aal_data->primary_data->hist.essStrengthIndex = aal_data->primary_data->ess_level;
 	aal_data->primary_data->hist.ess_enable = aal_data->primary_data->ess_en;
@@ -2536,7 +2553,8 @@ static int disp_aal_copy_hist_to_user(struct mtk_ddp_comp *comp,
 	spin_unlock_irqrestore(&aal_data->primary_data->hist_lock, flags);
 
 	if (aal_data->primary_data->aal_fo->mtk_dre30_support && aal_data->primary_data->dre30_enabled)
-		ret = copy_to_user((void *)hist->dre30_hist, &dre30_hist, sizeof(struct DISP_DRE30_HIST));
+		ret = copy_to_user((void *)hist->dre30_hist, dre30_hist, sizeof(struct DISP_DRE30_HIST));
+	kfree(dre30_hist);
 	aal_data->primary_data->hist.serviceFlags = 0;
 	atomic_set(&aal_data->hist_available, 0);
 	atomic_set(&aal_data->dre20_hist_is_ready, 0);
@@ -2580,7 +2598,6 @@ int disp_aal_act_set_ess20_spect_param(struct mtk_ddp_comp *comp, void *data)
 int disp_aal_act_init_dre30(struct mtk_ddp_comp *comp, void *data)
 {
 	struct mtk_disp_aal *aal_data = comp_to_aal(comp);
-	struct DISP_DRE30_INIT *init_dre3;
 
 	if (aal_data->primary_data->aal_fo->mtk_dre30_support) {
 		AALFLOW_LOG("\n");

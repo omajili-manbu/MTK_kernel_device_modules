@@ -734,7 +734,6 @@ void mhal_DPTx_PG_HorizontalRamping(struct mtk_dp *mtk_dp, BYTE BGR,
 {
 	DWORD Ramp = 0x3FFF;
 
-	ColorDepth = 0x0000;
 
 	msWriteByteMask(mtk_dp, REG_3038_DP_ENCODER0_P0 + 1, BIT(3), BIT(3));
 	msWriteByteMask(mtk_dp, REG_31B0_DP_ENCODER0_P0, BIT(5), MASKBIT(6:4));
@@ -1832,7 +1831,7 @@ UINT8 mhal_DPTx_AuxRead_Bytes(struct mtk_dp *mtk_dp, BYTE ubCmd,
 	unsigned int WaitReplyCount = AuxWaitReplyLpCntNum;
 	u32 aux_state = 0;
 
-	if (mtk_dp->fake_comeplete_irq && (ubCmd == AUX_CMD_NATIVE_R))
+	if (mtk_dp->fake_comeplete_irq && (ubCmd == AUX_CMD_NATIVE_R)) {
 		if (mtk_dp->priv->data->mmsys_id == MMSYS_MT6991 ||
 		  mtk_dp->priv->data->mmsys_id == MMSYS_MT6899)
 			msWrite4ByteMask(mtk_dp, REG_36F4_AUX_TX_P0,
@@ -1840,6 +1839,7 @@ UINT8 mhal_DPTx_AuxRead_Bytes(struct mtk_dp *mtk_dp, BYTE ubCmd,
 				IDLE_TO_PRECHARGE_DATA_ONE_EN_AUX_TX_P0_FLDMASK);
 		else
 			msWriteByteMask(mtk_dp, REG_3614_AUX_TX_P0, 0x18, MASKBIT(6 : 0));
+	}
 
 	msWriteByte(mtk_dp, REG_3640_AUX_TX_P0, 0x7F);
 	udelay(AUX_WRITE_READ_WAIT_TIME);

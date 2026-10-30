@@ -1490,7 +1490,7 @@ void mdrv_DPTx_ColorSet(int bpc, int format)
 		DPTXERR("%s: dp not initial\n", __func__);
 		return;
 	}
-	DPTXMSG("adb set bpc:%d format:%d\n", __func__, bpc, format);
+	DPTXMSG("adb set bpc:%d format:%d\n", bpc, format);
 	// bpc 0/1/2/3/4: 6/8/10/12/16
 	// format 0/1/2/3/4 RGB/YUV422/YUV420/YONLY/RAW
 	g_mtk_dp->info.depth = bpc;

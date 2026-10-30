@@ -2335,7 +2335,7 @@ static int mtk_disp_spr_probe(struct platform_device *pdev)
 		} else {
 			priv->ddp_comp.regs_pa = res->start;
 			priv->ddp_comp.regs = ioremap(res->start, (res->end - res->start + 1));
-			DDPMSG("%s regs_pa:0x%lx, regs:0x%pK\n", __func__,
+			DDPMSG("%s regs_pa:0x%llx, regs:0x%pK\n", __func__,
 				priv->ddp_comp.regs_pa, priv->ddp_comp.regs);
 		}
 	}

@@ -1795,7 +1795,7 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 				last_fbt_weight = weight;
 				DDPDBG_BWM("GPUC: fbt layer frame_idx:%u key:%llu\n",
 					frame_idx, key_value);
-				DDPDBG_BWM("GPUC: ratio:%u weight:%lu\n",
+				DDPDBG_BWM("GPUC: ratio:%u weight:%llu\n",
 					fbt_layer_compress_ratio_tb[i].peak_ratio, weight);
 
 				if (disp_info->disp_caps[HRT_PRIMARY] & MTK_GLES_FBT_UNCHANGED) {
@@ -1808,11 +1808,11 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 				index = (fbt_layer_compress_ratio_tb[i].peak_ratio*256)/(1000*16);
 				if (index) {
 					weight = div_u64(weight*10000, emi_eff_tb[index-1]);
-					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%lu\n",
+					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%llu\n",
 						__LINE__, index, emi_eff_tb[index-1], weight);
 				} else {
 					weight = div_u64(weight*10000, emi_eff_tb[0]);
-					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%lu\n",
+					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%llu\n",
 							__LINE__, index, emi_eff_tb[0], weight);
 				}
 				return weight * bpp;
@@ -1859,7 +1859,7 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 					weight *= peak_ratio;
 
 				do_div(weight, 1000);
-				DDPDBG_BWM("BWM: unchgd f_idx:%u allocid:%llu ratio:%u weight:%lu\n",
+				DDPDBG_BWM("BWM: unchgd f_idx:%u allocid:%llu ratio:%u weight:%llu\n",
 					frame_idx, layer_info->buffer_alloc_id,
 					peak_ratio, weight);
 
@@ -1867,11 +1867,11 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 				index = (peak_ratio * 256) / (1000 * 16);
 				if (index) {
 					weight = div_u64(weight*10000, emi_eff_tb[index-1]);
-					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%lu\n",
+					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%llu\n",
 						__LINE__, index, emi_eff_tb[index-1], weight);
 				} else {
 					weight = div_u64(weight*10000, emi_eff_tb[0]);
-					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%lu\n",
+					DDPDBG_BWM("%d BWM:index:%u eff:%u weight:%llu\n",
 						__LINE__, index, emi_eff_tb[0], weight);
 				}
 				layer_info->layer_caps |= MTK_DISP_UNCHANGED_RATIO_VALID;
@@ -1905,18 +1905,18 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 					weight *= peak_ratio;
 
 				do_div(weight, 1000);
-				DDPDBG_BWM("BWM:fidx:%u allocid:%llu key:%llu ratio:%u weight:%lu\n",
+				DDPDBG_BWM("BWM:fidx:%u allocid:%llu key:%llu ratio:%u weight:%llu\n",
 					frame_idx, layer_info->buffer_alloc_id, key_value,
 					peak_ratio, weight);
 
 				index = (peak_ratio * 256) / (1000 * 16);
 				if (index) {
 					weight = div_u64(weight*10000, emi_eff_tb[index-1]);
-					DDPDBG("%d BWM:index:%u eff:%u weight:%lu\n",
+					DDPDBG("%d BWM:index:%u eff:%u weight:%llu\n",
 						__LINE__, index, emi_eff_tb[index-1], weight);
 				} else {
 					weight = div_u64(weight*10000, emi_eff_tb[0]);
-					DDPDBG("%d BWM:index:%u eff:%u weight:%lu\n",
+					DDPDBG("%d BWM:index:%u eff:%u weight:%llu\n",
 						__LINE__, index, emi_eff_tb[0], weight);
 				}
 				layer_info->layer_caps |= MTK_DISP_UNCHANGED_RATIO_VALID;
@@ -3519,7 +3519,6 @@ static int dispatch_gles_range(struct drm_mtk_layering_info *disp_info,
 {
 	int disp_idx;
 	bool no_disp = true;
-	struct mtk_drm_private *priv = drm_dev->dev_private;
 	unsigned int disp = 0;
 
 	if (get_layering_opt(LYE_OPT_SPHRT))
@@ -4319,11 +4318,9 @@ static enum mml_mode query_mml_mode(struct drm_device *dev, struct drm_crtc *crt
 					enum mml_mode query_mode)
 {
 	enum mml_mode mode = MML_MODE_UNKNOWN;
-	enum MTK_LAYERING_CAPS ret = MTK_MML_DISP_NOT_SUPPORT;
 	struct mtk_drm_crtc *mtk_crtc = NULL;
 	struct mtk_drm_private *priv = NULL;
 	struct drm_crtc *crtcx = NULL;
-	struct mml_drm_ctx *mml_ctx = NULL;
 	int mml_decouple2 = 0;
 	int reason = 0;
 
@@ -4375,7 +4372,6 @@ static enum MTK_LAYERING_CAPS query_MML(struct drm_device *dev, struct drm_crtc 
 	enum MTK_LAYERING_CAPS ret = MTK_MML_DISP_NOT_SUPPORT;
 	struct mtk_drm_crtc *mtk_crtc = NULL;
 	struct mtk_drm_private *priv = NULL;
-	struct drm_crtc *crtcx = NULL;
 	struct mml_drm_ctx *mml_ctx = NULL;
 
 	if (!dev || !crtc) {

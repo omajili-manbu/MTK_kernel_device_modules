@@ -617,9 +617,21 @@ unsigned int ovl_comp_frame_done_event_MT6989(struct mtk_ddp_comp *comp)
 #define CMDQ_EVENT_OVL1_DISP_OVL1_2L_FRAME_DONE 154
 #define CMDQ_EVENT_OVL1_DISP_OVL0_2L_FRAME_DONE 155
 
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE 217
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE */
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE */
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE 218
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE */
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE */
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE 219
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE */
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE */
 
 	switch (comp->id) {
 	case DDP_COMPONENT_OVL0_2L:
@@ -673,7 +685,9 @@ unsigned int mtk_ovl_sys_mapping_MT6899(struct mtk_ddp_comp *comp)
 unsigned int ovl_comp_frame_done_event_MT6899(struct mtk_ddp_comp *comp)
 {
 
+#ifndef CMDQ_EVENT_OVL0_DISP_OVL3_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL3_2L_FRAME_DONE 215
+#endif /* CMDQ_EVENT_OVL0_DISP_OVL3_2L_FRAME_DONE */
 #define CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE 216
 #define CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE 217
 #define CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE 218
@@ -937,7 +951,6 @@ static void mtk_ovl_update_hrt_usage(struct mtk_drm_crtc *mtk_crtc,
 	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
 	unsigned int lye_id = plane_state->comp_state.lye_id;
 	unsigned int ext_lye_id = plane_state->comp_state.ext_lye_id;
-	int crtc_idx = drm_crtc_index(&mtk_crtc->base);
 	unsigned int fmt;
 	unsigned int phy_id = 0;
 

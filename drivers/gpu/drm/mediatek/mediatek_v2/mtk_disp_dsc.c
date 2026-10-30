@@ -30,7 +30,10 @@
 #endif
 #include "mtk_disp_dsc.h"
 #include "platform/mtk_drm_platform.h"
+#include <linux/minmax.h>
+#ifndef MIN
 #define MIN(X, Y) ((X) <= (Y) ? (X) : (Y))
+#endif /* MIN */
 
 #define DISP_REG_DSC_CON			0x0000
 	#define DSC_EN BIT(0)
@@ -274,7 +277,6 @@ static void mtk_dsc_unprepare(struct mtk_ddp_comp *comp)
 
 struct mtk_panel_dsc_params *mtk_dsc_default_setting(void)
 {
-	u8 dsc_cap[16] = {0};
 	static struct mtk_panel_dsc_params dsc_params = {
 		.enable = 1,
 		.ver = 2,

@@ -122,7 +122,10 @@
 
 
 #define ABS(val)			((val < 0)? -(val) : val)
+#include <linux/minmax.h>
+#ifndef MAX
 #define MAX(a, b)			((a > b)? a : b)
+#endif /* MAX */
 
 static bool module_initialized;
 

@@ -1059,7 +1059,6 @@ static void mtk_mdp_rsz_addon_config(struct mtk_ddp_comp *comp,
 	u32 reg_val = 0;
 	u32 tile_idx = 0;
 	u32 in_w = 0, in_h = 0, out_w = 0, out_h = 0;
-	unsigned int overhead_v;
 	u32 con3 = 0;
 
 	if (!rsz_config) {

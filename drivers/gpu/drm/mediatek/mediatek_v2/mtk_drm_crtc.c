@@ -151,7 +151,7 @@ static unsigned int cmdq_client_num;
 
 struct timespec64 atomic_flush_tval;
 struct timespec64 rdma_sof_tval;
-static void mmqos_hrt_dump(void);
+void mmqos_hrt_dump(void);
 
 bool hdr_en;
 static const char * const crtc_gce_client_str[] = {
@@ -993,7 +993,6 @@ void mtk_drm_crtc_mini_dump(struct drm_crtc *crtc)
 			mtk_dump_reg(comp);
 	}
 
-done_return:
 	if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL) {
 		mtk_vidle_user_power_release(DISP_VIDLE_USER_DPC_DUMP);
 		mtk_drm_pm_ctrl(priv, DISP_PM_PUT);
@@ -1279,7 +1278,6 @@ void mtk_drm_crtc_dump(struct drm_crtc *crtc)
 			mtk_dump_reg(priv->ddp_comp[DDP_COMPONENT_DSC1]);
 	}
 
-done_return:
 	if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL) {
 		mtk_vidle_user_power_release(DISP_VIDLE_USER_DPC_DUMP);
 		mtk_drm_pm_ctrl(priv, DISP_PM_PUT);
@@ -1831,7 +1829,6 @@ void mtk_drm_crtc_analysis(struct drm_crtc *crtc)
 		mtk_drm_crtc_addon_analysis(crtc, addon_data);
 	}
 
-done_return:
 	if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL) {
 		mtk_vidle_user_power_release(DISP_VIDLE_USER_DPC_DUMP);
 		mtk_drm_pm_ctrl(priv, DISP_PM_PUT);
@@ -3994,7 +3991,7 @@ static void mml_addon_module_disconnect(struct drm_crtc *crtc,
 	}
 }
 
-static void mtk_addon_path_io_cmd(struct drm_crtc *crtc, const enum addon_scenario scn,
+static __maybe_unused void mtk_addon_path_io_cmd(struct drm_crtc *crtc, const enum addon_scenario scn,
 	enum mtk_ddp_io_cmd io_cmd, void *params)
 {
 	int i, j;
@@ -5825,7 +5822,7 @@ void mtk_disp_set_module_hrt(struct mtk_drm_crtc *mtk_crtc, unsigned int bw_base
 	struct mtk_crtc_state *mtk_crtc_state = to_mtk_crtc_state(crtc->state);
 	struct mtk_drm_private *priv = crtc->dev->dev_private;
 	struct mtk_ddp_comp *comp;
-	int i, j, ret = 0;
+	int i, j;
 
 	if (mtk_crtc == NULL)
 		return;
@@ -5876,7 +5873,7 @@ static void mtk_crtc_update_hrt_state(struct drm_crtc *crtc,
 	struct mtk_drm_private *priv = crtc->dev->dev_private;
 	int en = 0;
 	bool opt_mmqos = 0;
-	bool opt_mmdvfs = 0, channel_bw_chk = 0;
+	bool opt_mmdvfs = 0;
 	bool is_force_high_step = atomic_read(&mtk_crtc->force_high_step);
 	unsigned int channel_hrt[BW_CHANNEL_NR] = {0};
 	struct mtk_ddp_comp *cwb_comp = NULL;
@@ -7837,7 +7834,6 @@ static int _mtk_crtc_cmdq_retrig(void *data)
 static int _mtk_crtc_cmdq_smi_info_dump(void *data)
 {
 	struct mtk_drm_crtc *mtk_crtc = (struct mtk_drm_crtc *) data;
-	struct drm_crtc *crtc = &mtk_crtc->base;
 	struct sched_param param = {.sched_priority = 94 };
 	int ret;
 
@@ -8283,7 +8279,7 @@ static void mtk_crtc_update_hrt_qos(struct drm_crtc *crtc,
 			mtk_crtc->base.dev->dev_private;
 	struct mtk_ddp_comp *comp;
 	static u32 pre_rpo_lye;
-	unsigned int cur_hrt_bw, cur_max_chan_bw, cur_chan_hrt_bw;
+	unsigned int cur_hrt_bw, cur_chan_hrt_bw;
 	unsigned int hrt_idx, crtc_idx, flag = DISP_BW_UPDATE_PENDING;
 	int i, j;
 
@@ -8513,7 +8509,6 @@ static void mtk_drm_ovl_bw_monitor_ratio_get(struct drm_crtc *crtc,
 			DISP_SLOT_LAYER_PEAK_RATIO(index));
 		dma_addr_t pre_avg_slot = 0x0;
 		dma_addr_t pre_peak_slot = 0x0;
-		int lye_offset = 0x8, slot_offset = 0x4;
 		unsigned int expand = 1 << 24;
 		unsigned int narrow = 14;
 		unsigned int avg_inter_value = 0;
@@ -8970,7 +8965,7 @@ static void mtk_drm_ovl_bw_monitor_ratio_get(struct drm_crtc *crtc,
 static void mtk_drm_ovl_bw_monitor_ratio_save(struct mtk_drm_crtc *mtk_crtc,
 	unsigned int frame_idx)
 {
-	unsigned int i = 0, j = 0;
+	unsigned int i = 0;
 	bool is_force_high_step = atomic_read(&mtk_crtc->force_high_step);
 	struct mtk_drm_private *priv = mtk_crtc->base.dev->dev_private;
 
@@ -9588,10 +9583,6 @@ static void ddp_cmdq_cb(struct cmdq_cb_data data)
 	unsigned int is_vfp_period = 0;
 	unsigned int _dsi_state_dbg7 = 0;
 	unsigned int _dsi_state_dbg7_2 = 0;
-	int k = 0;
-	unsigned int *avg = NULL;
-	unsigned int *peak = NULL;
-	unsigned int reg_avg, reg_peak;
 	unsigned int time_0, time_1, time_2, time_3;
 	int crtc_state_stylus = to_mtk_crtc_state(crtc_state)->prop_val[CRTC_PROP_STYLUS];
 
@@ -12224,7 +12215,6 @@ static int __mtk_check_trigger(struct mtk_drm_crtc *mtk_crtc)
 	} else
 		CRTC_MMP_MARK(index, check_trigger, next_tgt_dur, CT_PRETE_DUR);
 
-do_set_dirty:
 	mtk_state = to_mtk_crtc_state(crtc->state);
 	if (!mtk_state->prop_val[CRTC_PROP_DOZE_ACTIVE] ||
 	    (mtk_state->prop_val[CRTC_PROP_DOZE_ACTIVE] && atomic_read(&mtk_crtc->already_config)))
@@ -16556,13 +16546,14 @@ void mtk_drm_layer_dispatch_to_dual_pipe(
 						plane_state_r->pending.dst_x;
 	}
 
-	if (mtk_crtc->path_data->is_exdma_dual_layer)
+	if (mtk_crtc->path_data->is_exdma_dual_layer) {
 		if (left_bg <= plane_state->pending.dst_x)
 			plane_state_r->pending.offset = plane_state_r->pending.dst_y << 16 |
 						(plane_state->pending.dst_x);
 		else
 			plane_state_r->pending.offset = plane_state_r->pending.dst_y << 16 |
 						(plane_state_l->pending.dst_x + plane_state_l->pending.width);
+	}
 
 	DDPDBG("plane_r (%u,%u) (%u,%u), (%u,%u)\n",
 		plane_state_r->pending.src_x, plane_state_r->pending.src_y,
@@ -17187,7 +17178,6 @@ static void mtk_crtc_dl_config_color_matrix(struct drm_crtc *crtc,
 	int i;
 	bool linear;
 	struct mtk_ddp_comp *comp;
-	struct mtk_disp_ccorr *ccorr_data;
 	struct mtk_crtc_state *state = to_mtk_crtc_state(crtc->state);
 
 	if (!ccorr_config)

@@ -121,8 +121,13 @@
 #define FPSGO_BAFFINITY_TOTAL 7
 
 
+#include <linux/minmax.h>
+#ifndef MAX
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif /* MAX */
+#ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif /* MIN */
 
 struct fbt_cpu_dvfs_info {
 	unsigned int *power;

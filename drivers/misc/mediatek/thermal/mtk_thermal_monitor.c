@@ -871,7 +871,10 @@ static const struct proc_ops _mtkthermal_tz_fops = {
 	.proc_release = single_release,
 };
 
+#include <linux/minmax.h>
+#ifndef MIN
 #define MIN(_a_, _b_) ((_a_) < (_b_) ? (_a_) : (_b_))
+#endif /* MIN */
 
 /* No parameter check in this internal function */
 static long _mtkthermal_update_and_get_sma
