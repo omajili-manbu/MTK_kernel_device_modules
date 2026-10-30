@@ -48,7 +48,6 @@ static bool metis_audit_btf(void)
 	s32 id;
 	u16 vlen, i;
 	u32 got_size = 0, got_task = 0, got_timeout = 0;
-	bool kflag;
 	int err = 0;
 
 	btf = bpf_get_btf_vmlinux();
@@ -64,11 +63,12 @@ static bool metis_audit_btf(void)
 	t = btf_type_by_id(btf, id);
 	got_size = t->size;
 	vlen = BTF_INFO_VLEN(t->info);
-	kflag = BTF_INFO_KFLAG(t->info);
 	m = btf_type_member(t);
 	for (i = 0; i < vlen; i++) {
-		u32 bytes = kflag ? BTF_MEMBER_BIT_OFFSET(m[i].offset) / 8
-				  : m[i].offset;
+		/* rodin 6.18（2026-10-31）：BTF member offset 恒为 bit 单位
+		 * （kflag 只控 bitfield_size 域）；旧版 kflag=false 分支裸用
+		 * bit 值致 task@128/timeout@256 假失配——恒除 8。 */
+		u32 bytes = BTF_MEMBER_BIT_OFFSET(m[i].offset) / 8;
 
 		mname = btf_name_by_offset(btf, m[i].name_off);
 		if (!mname)
@@ -117,47 +117,54 @@ fail:
 static bool metis_audit_rwsem_reentry(void)
 {
 	struct rw_semaphore sem;
-	struct metis_audit_fake_waiter w;
+	struct metis_audit_fake_waiter w_onsrc, w_prio, w_fresh;
+	LIST_HEAD(onsrc);
 	bool already;
 	bool ok = true;
 
 	memset(&sem, 0, sizeof(sem));
 	INIT_LIST_HEAD(&sem.wait_list);
 
-	/* 同类微回归防线：waiter 已在链（自链 = 非空）→ 守卫置 already 且不插。 */
-	memset(&w, 0, sizeof(w));
-	INIT_LIST_HEAD(&w.list);
+	/* 在链守卫：waiter.list 非空才视为在链（list_empty 语义：自指 = 空 =
+	 * 不在链）。挂上宿主链制造非空 → 守卫置 already 且不插。旧版误用
+	 * INIT_LIST_HEAD 造出空链，守卫不触发反而真插，并把脏链状态带进
+	 * 后续用例——2026-10-31 修正。 */
+	memset(&w_onsrc, 0, sizeof(w_onsrc));
+	list_add(&w_onsrc.list, &onsrc);
 	already = false;
-	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w, &sem,
+	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w_onsrc, &sem,
 			     &already, 0);
 	if (!already || sem.wait_list.next != &sem.wait_list)
 		ok = false;
 	pr_info("metis-audit: rwsem reentry guard: %s (already=%d)\n",
 		(already && sem.wait_list.next == &sem.wait_list) ? "ok" :
-								    "MISMATCH",
+							  "MISMATCH",
 		already);
+	list_del(&w_onsrc.list);
 
 	/* priority==5 门：already 原样、不插。 */
-	memset(&w, 0, sizeof(w));
-	INIT_LIST_HEAD(&w.list);
+	memset(&w_prio, 0, sizeof(w_prio));
+	INIT_LIST_HEAD(&w_prio.list);
 	already = false;
-	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w, &sem,
+	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w_prio, &sem,
 			     &already, 5);
 	if (already || sem.wait_list.next != &sem.wait_list)
 		ok = false;
 	pr_info("metis-audit: rwsem prio5 gate: %s\n",
 		!already ? "ok" : "MISMATCH");
 
-	/* 空链首插：挂头节点 + already=true（stock "already on list" 语义）。 */
-	memset(&w, 0, sizeof(w));
-	INIT_LIST_HEAD(&w.list);
+	/* 空链首插：fresh waiter（list 空）→ 挂头节点 + already=true
+	 * （stock "already on list" 语义）。 */
+	memset(&w_fresh, 0, sizeof(w_fresh));
+	INIT_LIST_HEAD(&w_fresh.list);
 	already = false;
-	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w, &sem,
+	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w_fresh, &sem,
 			     &already, 0);
-	if (!already || sem.wait_list.next != &w.list)
+	if (!already || sem.wait_list.next != &w_fresh.list)
 		ok = false;
 	pr_info("metis-audit: rwsem fresh insert: %s\n",
-		(already && sem.wait_list.next == &w.list) ? "ok" : "MISMATCH");
+		(already && sem.wait_list.next == &w_fresh.list) ? "ok" :
+							  "MISMATCH");
 	return ok;
 }
 
