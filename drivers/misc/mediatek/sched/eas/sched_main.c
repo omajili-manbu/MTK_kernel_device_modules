@@ -189,69 +189,11 @@ static void sched_rq_load_hook(void *data, struct cfs_rq *rq)
 		trace_sched_rq_load(rq);
 }
 
-static int enqueue;
-static int dequeue;
-static void sched_queue_task_hook(void *data, struct rq *rq, struct task_struct *p, int flags)
-{
-	int cpu = rq->cpu;
-	int type = *(int *)data;
-	struct sugov_rq_data *sugov_data_ptr;
-
-	if (!get_eas_hook())
-		return;
-
-	irq_log_store();
-
-	/*
-	 * rodin 6.18：flt enqueue/dequeue 记账不再经本钩子——本钩子整体在
-	 * get_eas_hook() 门后（6.18 上恒死），记账被连坐。两钩已改在
-	 * flt_register_kernel_hooks() 直挂（android_rvh_enqueue/dequeue_task）
-	 * 与门解耦；此处保持摘除，防将来门复活时对同一事件双计。
-	 */
-
-	if (type == enqueue) {
-		struct uclamp_se *uc_min_req, *uc_max_req;
-
-		sugov_data_ptr = &per_cpu(rq_data, rq->cpu)->sugov_data;
-		WRITE_ONCE(sugov_data_ptr->enq_ing, true);
-
-		uc_min_req = &p->uclamp_req[UCLAMP_MIN];
-		uc_max_req = &p->uclamp_req[UCLAMP_MAX];
-
-		if (uc_min_req->user_defined || uc_max_req->user_defined) {
-			bool uclamp_diff = false;
-
-			uclamp_diff = (READ_ONCE(sugov_data_ptr->uclamp[UCLAMP_MIN])
-				!= READ_ONCE(rq->uclamp[UCLAMP_MIN].value));
-
-			uclamp_diff = (uclamp_diff
-				|| (READ_ONCE(sugov_data_ptr->uclamp[UCLAMP_MAX])
-				!= READ_ONCE(rq->uclamp[UCLAMP_MAX].value)));
-
-			if (uclamp_diff) {
-				int this_cpu = smp_processor_id();
-
-				sugov_data_ptr = &per_cpu(rq_data, this_cpu)->sugov_data;
-				WRITE_ONCE(sugov_data_ptr->enq_dvfs, true);
-			}
-		}
-	}
-
-	if (trace_sched_queue_task_enabled()) {
-		unsigned long util = READ_ONCE(rq->cfs.avg.util_avg);
-
-		util = max_t(unsigned long, util,
-			     READ_ONCE(rq->cfs.avg.util_est));
-
-		trace_sched_queue_task(cpu, p->pid, type, util,
-				rq->uclamp[UCLAMP_MIN].value, rq->uclamp[UCLAMP_MAX].value,
-				p->uclamp[UCLAMP_MIN].value, p->uclamp[UCLAMP_MAX].value,
-				p->cpus_ptr->bits[0]);
-	}
-
-	irq_log_store();
-}
-
+/* rodin 6.18（2026-10-31）：sched_queue_task_hook 撤场。handler 整体在
+ * get_eas_hook() 门后恒死（mtk_eas_hook 空 + legacy_api_support=0），
+ * 且 flt 直挂先行翻开 static key 后，带 data 的再注册被
+ * WARN_ON(key_enabled && data) 拒绝——每次开机 2 组 WARN 即源于此。
+ * flt 记账已在 flt_register_kernel_hooks() 直挂，本处无对应消费者。 */
 
 #if IS_ENABLED(CONFIG_DETECT_HUNG_TASK)
 
@@ -495,16 +437,6 @@ static void sched_irq_mon_init(void)
 static void mtk_sched_trace_init(void)
 {
 	int ret = 0;
-
-	enqueue = 1;
-	dequeue = -1;
-
-	ret = register_trace_android_rvh_enqueue_task(sched_queue_task_hook, &enqueue);
-	if (ret)
-		pr_info("register android_rvh_enqueue_task failed!\n");
-	ret = register_trace_android_rvh_dequeue_task(sched_queue_task_hook, &dequeue);
-	if (ret)
-		pr_info("register android_rvh_dequeue_task failed!\n");
 
 	ret = register_trace_pelt_se_tp(sched_task_util_hook, NULL);
 	if (ret)
