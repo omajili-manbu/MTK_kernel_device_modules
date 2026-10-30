@@ -1864,7 +1864,7 @@ static __attribute__((always_inline)) inline int ft5672_rawdata_test(struct fts_
 	}
 	ret = wait_state_update(TEST_RETVAL_AA);
 	if (ret < 0) {
-		FTS_TEST_SAVE_ERR("wait state update fail\n", ret);
+		FTS_TEST_SAVE_ERR("wait state update fail\n");
 		goto restore_reg;
 	}
 	ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 0);
@@ -1879,7 +1879,7 @@ static __attribute__((always_inline)) inline int ft5672_rawdata_test(struct fts_
 	}
 	ret = fts_test_write_reg(FACTORY_REG_DATA_TYPE, 0x01);
 	if (ret) {
-		FTS_TEST_SAVE_ERR("set data type fail,ret=%d\n");
+		FTS_TEST_SAVE_ERR("set data type fail,ret=%d\n", ret);
 		goto restore_reg;
 	}
 	for (i = 0; i < 3; i++) {
@@ -2068,7 +2068,6 @@ static __attribute__((always_inline)) inline int ft5672_scap_cb_test(struct fts_
 {
 	int ret = 0;
 	u8 sc_mode = 0;
-	u8 sc_cb[4] = { 0 };
 	bool tmp_result = false;
 	int *scap_cb = NULL;
 
@@ -2822,7 +2821,6 @@ static int start_test_ft5672(void)
 	struct mc_sc_testitem *test_item = &tdata->ic.mc_sc.u.item;
 	bool temp_result = false;
 	bool test_result = true;
-	int i = 0;
 
 	FTS_TEST_FUNC_ENTER();						/* 0x1dc74 */
 	tdata->item_fail_flag = 0;					/* 0x1dcac (+0x12bc) */

@@ -747,7 +747,7 @@ static void mtk_uart_apdma_start_tx(struct mtk_chan *c)
 
 		if (u_state != NULL) {
 			if (c->rec_info[idx].trans_len <= UART_RECORD_MAXLEN)
-				kfifo_out_peek(&u_state->port.xmit_fifo,
+				(void)kfifo_out_peek(&u_state->port.xmit_fifo,
 					c->rec_info[idx].rec_buf,
 					min_t(unsigned int, dump_len,
 					      (unsigned int)c->rec_info[idx].trans_len));

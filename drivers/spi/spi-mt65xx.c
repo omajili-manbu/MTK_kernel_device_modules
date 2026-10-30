@@ -525,7 +525,7 @@ static void spi_dump_config(struct spi_controller *master, struct spi_message *m
 	spi_debug("chip_config->spi_mode:0x%x\n", spi->mode);
 	spi_debug("chip_config->sample_sel:%d\n", chip_config->sample_sel);
 	spi_debug("chip_config->chip_select:%d,chip_config->pad_sel:%d\n",
-			spi->chip_select, mdata->pad_sel[MTK_SPI_PAD_SEL]);
+			spi->chip_select[0], mdata->pad_sel[MTK_SPI_PAD_SEL]);
 	spi_debug("||**************%s end**************||\n", __func__);
 }
 

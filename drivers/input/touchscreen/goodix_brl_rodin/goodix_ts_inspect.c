@@ -113,7 +113,9 @@
 #define ABS(val)			(((val) < 0)? -(val) : val)
 #define MAX_ABS(a, b)			((ABS(a) > ABS(b))? a : b)
 #define MIN_ABS(a, b)			((ABS(a) > ABS(b))? b : a)
+#ifndef MAX
 #define MAX(a, b) ((a > b) ? a : b)
+#endif /* MAX */
 
 enum GTP_TEST_ITEMS {
 	GTP_CAP_TEST = 0,

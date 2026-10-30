@@ -307,7 +307,7 @@ enum DISP_VBLANK_REC_JOB_TYPE {
 
 #define SET_VAL_MASK(o_val, o_mask, i_val, i_fld)                              \
 	do {                                                                   \
-		o_val |= (i_val << REG_FLD_SHIFT(i_fld));                      \
+		o_val |= ((i_val) << REG_FLD_SHIFT(i_fld));                    \
 		o_mask |= (REG_FLD_MASK(i_fld));                               \
 	} while (0)
 

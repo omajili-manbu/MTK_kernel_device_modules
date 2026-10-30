@@ -44,7 +44,6 @@ static struct attribute_group xiaomi_touch_attrs;
 
 #ifdef TOUCH_FOD_SUPPORT
 static int fod_press_status_value = 0;
-static int fod_attn_test = 2;
 #endif
 
 #ifdef TOUCH_STYLUS_SUPPORT

@@ -32,6 +32,8 @@ struct scmi_tinysys_slbc_ctrl_status {
  * struct scmi_tinysys_ops - represents the various operations provided
  *	by MTK Tinysys Protocol
  */
+struct scmi_protocol_handle;
+
 struct scmi_tinysys_proto_ops {
 	int (*common_set)(const struct scmi_protocol_handle *ph,
 		u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5);

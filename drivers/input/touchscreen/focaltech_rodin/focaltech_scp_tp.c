@@ -530,7 +530,6 @@ u8 focal_get_ic_self_test_mode(void)
 int fts_gesture_10diff_reg_write(u8 value)
 {
 	u8 read_buf = 0;
-	int ret = 0;
 	int i;
 
 	for (i = 0; i < 5; i++) {			/* blob: 5 次展开 */

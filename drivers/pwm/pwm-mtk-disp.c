@@ -425,8 +425,6 @@ static int mtk_disp_pwm_probe(struct platform_device *pdev)
 
 static void mtk_disp_pwm_remove(struct platform_device *pdev) /* rodin b4: 6.18 remove void */
 {
-	struct mtk_disp_pwm *mdp = platform_get_drvdata(pdev);
-
 	/* rodin b4: devm_pwmchip_add 接管 pwmchip_remove */
 }
 

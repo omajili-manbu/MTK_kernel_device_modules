@@ -628,14 +628,13 @@ static int mmdvfs_probe(struct platform_device *pdev)
 	u32 num_clksrc, hopping_rate, num_hopping_rate;
 	u32 num_lp_clksrc = 0;
 	struct property *mux_prop, *clksrc_prop;
-	struct property *hopping_prop, *hopping_rate_prop;
+	struct property *hopping_prop;
 	struct property *aov_prop;
 	struct property *lp_mux_prop;
 	const char *mux_name, *clksrc_name, *hopping_name;
 	char prop_name[32];
 	const char *aov_prop_name;
 	const char *lp_clksrc_name;
-	const __be32 *p;
 	s32 ret, i = 0;
 	unsigned long freq;
 	struct dev_pm_opp *opp;

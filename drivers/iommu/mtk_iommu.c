@@ -3310,7 +3310,6 @@ out_list_del:
 	iommu_device_unregister(&data->iommu);
 out_list_del_hw:
 	list_del(&data->list);
-out_sysfs_remove:
 	iommu_device_sysfs_remove(&data->iommu);
 out_link_remove:
 	device_link_remove(data->smicomm_dev, dev);

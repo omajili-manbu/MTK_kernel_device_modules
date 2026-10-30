@@ -2406,7 +2406,6 @@ static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
 
 static void mtk_dsi_set_prefetch_time(struct mtk_dsi *dsi)
 {
-	struct mtk_panel_ext *panel_ext = NULL;
 	u32 val = 0, mask = 0, prefetch_time = 0;
 
 	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
@@ -4030,7 +4029,6 @@ void mtk_dsi_cur_pos_dump(struct mtk_ddp_comp *comp)
 {
 	void __iomem *baddr;
 	unsigned int reg_val;
-	unsigned long offset;
 	struct mtk_dsi *dsi;
 
 	if(!comp)
@@ -5954,7 +5952,6 @@ out:
 #endif
 	return;
 
-err_dsi_power_off:
 	mtk_dsi_stop(dsi);
 	mtk_dsi_poweroff(dsi);
 	mtk_vidle_force_power_ctrl_by_cpu(false);

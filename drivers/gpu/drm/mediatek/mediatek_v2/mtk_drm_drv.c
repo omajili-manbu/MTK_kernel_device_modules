@@ -186,8 +186,6 @@ struct mtk_se_dma_map {
 	struct list_head list;
 };
 
-static struct mtk_se_dma_map dma_map_list;
-
 #ifdef DRM_OVL_SELF_PATTERN
 struct drm_crtc *test_crtc;
 void *test_va;
@@ -8301,7 +8299,7 @@ static enum mtk_ddp_comp_id panel_crtc_map[] = {
 	[MTK_PANEL_DSI2] = DDP_COMPONENT_DSI2,
 };
 
-static int mtk_drm_get_crtc_id(enum MTK_PANEL_ID panel_id, struct mtk_drm_private *private)
+static __maybe_unused int mtk_drm_get_crtc_id(enum MTK_PANEL_ID panel_id, struct mtk_drm_private *private)
 {
 	struct mtk_drm_crtc *mtk_crtc;
 	struct mtk_ddp_comp *comp;
@@ -9568,7 +9566,6 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 
 	return 0;
 
-err_unset_dma_parms:
 	if (private->dma_parms_allocated)
 		dma_dev->dma_parms = NULL;
 put_dma_dev:

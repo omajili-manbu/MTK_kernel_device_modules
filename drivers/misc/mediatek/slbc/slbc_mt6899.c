@@ -432,7 +432,7 @@ void slbc_force_cmd(unsigned int force)
 	slbc_force_scmi_cmd(force);
 }
 
-int slbc_force_cache_ratio_mt6899(enum slc_ach_uid uid, unsigned int ratio)
+static __maybe_unused int slbc_force_cache_ratio_mt6899(enum slc_ach_uid uid, unsigned int ratio)
 {
 	unsigned int force_cmd;
 
@@ -445,7 +445,7 @@ int slbc_force_cache_ratio_mt6899(enum slc_ach_uid uid, unsigned int ratio)
 	return slbc_force_scmi_cmd(force_cmd);
 }
 
-int slbc_force_cache_mt6899(enum slc_ach_uid uid, unsigned int size)
+static __maybe_unused int slbc_force_cache_mt6899(enum slc_ach_uid uid, unsigned int size)
 {
 	unsigned int force_cmd;
 
@@ -1454,7 +1454,7 @@ int slbc_disable_dcc_mt6899(bool disable)
 	return 0;
 }
 
-int slbc_disable_slc_mt6899(bool disable)
+static __maybe_unused int slbc_disable_slc_mt6899(bool disable)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	slc_disable = (int)disable;
@@ -1466,7 +1466,7 @@ int slbc_disable_slc_mt6899(bool disable)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_size_mt6899(enum slc_ach_uid uid)
+static __maybe_unused int slbc_get_cache_size_mt6899(enum slc_ach_uid uid)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1482,7 +1482,7 @@ int slbc_get_cache_size_mt6899(enum slc_ach_uid uid)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_hit_rate_mt6899(enum slc_ach_uid uid)
+static __maybe_unused int slbc_get_cache_hit_rate_mt6899(enum slc_ach_uid uid)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1498,7 +1498,7 @@ int slbc_get_cache_hit_rate_mt6899(enum slc_ach_uid uid)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_hit_bw_mt6899(enum slc_ach_uid uid)
+static __maybe_unused int slbc_get_cache_hit_bw_mt6899(enum slc_ach_uid uid)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;
@@ -1514,7 +1514,7 @@ int slbc_get_cache_hit_bw_mt6899(enum slc_ach_uid uid)
 #endif /* CONFIG_MTK_TINYSYS_SCMI */
 }
 
-int slbc_get_cache_usage_mt6899(int *cpu, int *gpu, int *other)
+static __maybe_unused int slbc_get_cache_usage_mt6899(int *cpu, int *gpu, int *other)
 {
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_SCMI)
 	int ret = 0;

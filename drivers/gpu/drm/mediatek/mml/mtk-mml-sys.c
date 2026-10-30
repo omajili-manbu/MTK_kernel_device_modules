@@ -1445,7 +1445,6 @@ static int sys_comp_init(struct device *dev, struct mml_sys *sys,
 	int cnt, i;
 	struct property *prop;
 	const char *name;
-	const __be32 *p;
 	u32 value, comp_id, selbit, selmask;
 	s32 ret;
 
