@@ -1356,12 +1356,21 @@ int cmdq_proc_create(void)
 {
 	struct proc_dir_entry *debugDirEntry = NULL;
 	struct proc_dir_entry *entry = NULL;
+	static bool created;
+
+	/* rodin 6.18（2026-10-31）：gce0/gce_m 两实例共用本 util 级全局
+	 * proc 目录，第二次创建注定重名（stock 6.6 同款 WARN）——首建后
+	 * 复用，与原失败继续形态等价，省一组 WARN + dump_stack。 */
+	if (created)
+		return 0;
 
 	debugDirEntry = proc_mkdir("mtk_cmdq_debug", NULL);
 	if (!debugDirEntry) {
 		cmdq_err("debugfs_create_dir cmdq failed");
 		return -EINVAL;
 	}
+
+	created = true;
 
 	if (!cmdq_proc_debug_off) {
 		entry = proc_create("cmdq-status", 0440, debugDirEntry,

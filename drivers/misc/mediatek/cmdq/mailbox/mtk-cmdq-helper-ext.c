@@ -501,6 +501,14 @@ struct cmdq_client *cmdq_mbox_create(struct device *dev, int index)
 	client->client.dev = dev;
 	client->client.tx_block = false;
 	client->client.knows_txdone = true;
+	/* rodin 6.18（2026-10-31）：控制器节点（gce0/gce_m）无 "mboxes"
+	 * 属性，mbox_request_channel 注定 -ENOENT——直接走原失败返回形态
+	 * （kfree + NULL），省每次开机 2 组 cmdq_err + dump_stack；
+	 * 真客户端节点（带 mboxes）不受影响。 */
+	if (!of_property_present(dev->of_node, "mboxes")) {
+		kfree(client);
+		return NULL;
+	}
 	client->chan = mbox_request_channel(&client->client, index);
 	if (IS_ERR(client->chan)) {
 		cmdq_err("channel request fail:%ld idx:%d",
