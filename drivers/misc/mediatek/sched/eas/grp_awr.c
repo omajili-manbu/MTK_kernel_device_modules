@@ -424,7 +424,7 @@ void grp_awr_update_cpu_tar_util(int cpu)
 /*
  * rodin 6.18（2026-10-17）：下列 6 个导出 setter 的 grp_idx / cpu 都是直接下标，
  * 原实现只判了 grp_awr_init_finished，没有任何边界检查。它们对
- * MTK_kernel_modules-rodin 与 blob 都无消费者（全树 grep + ko 符号面零命中），
+ * MTK_kernel_modules 与 blob 都无消费者（全树 grep + ko 符号面零命中），
  * 但仍是 EXPORT_SYMBOL 面 —— 补对称的上下界守卫，避免将来接入方传入
  * 越界值即踩 heap。行为对合法入参零变化。
  */

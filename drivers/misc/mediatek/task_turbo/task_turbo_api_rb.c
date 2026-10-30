@@ -4,7 +4,7 @@
  * Copyright (c) 2026 rodin project.
  *
  * rodin 6.18（2026-10-31）：本文件是 task_turbo 算法层 blob
- * （MTK_kernel_modules-rodin/task_turbo_cus/src/task_turbo_api_no_cfi.o_shipped,
+ * （MTK_kernel_modules/task_turbo_cus/src/task_turbo_api_no_cfi.o_shipped,
  * 31KB, 10 函数）的全量逆向重建。基准 = llvm-objdump -dr 逐函数反汇编
  * 对账（E:\tools\_turbo_rebuild_20261031\api_no_cfi.dis），接口签名以
  * task_turbo_api.h 为真值；数据布局以 .rela.data 4 条 ABS64 自指重定位
