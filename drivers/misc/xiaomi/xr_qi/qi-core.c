@@ -314,11 +314,13 @@ static struct kobj_attribute inherit_enable_attr = __ATTR(inherit_enable, 0640,
 		inherit_enable_show, inherit_enable_store);
 static struct attribute *qi_attrs[] = { &inherit_enable_attr.attr, NULL };
 static const struct attribute_group qi_attr_group = { .attrs = qi_attrs };
+/* rodin 6.18（2026-10-31）：register_sysctl = register_sysctl_sz(ARRAY_SIZE)
+ * 精确计数，尾哨兵会被当有效表项检查（procname is null）而整表拒收——
+ * 本树不写哨兵（对齐 clu-aff 口径）。 */
 static struct ctl_table mqos_sysctls[] = {
 	{ .procname = "mutex_qos_opt_spin_time_ns", .data = &sysctl_mutex_qos_opt_spin_time_ns,
 	  .maxlen = sizeof(unsigned int), .mode = 0644, .proc_handler = proc_douintvec_minmax,
 	  .extra1 = SYSCTL_ZERO, .extra2 = SYSCTL_INT_MAX },
-	{ }
 };
 static int qi_sysctl_register(void)
 {
