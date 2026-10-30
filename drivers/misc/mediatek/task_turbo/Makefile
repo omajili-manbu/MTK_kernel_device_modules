@@ -15,3 +15,7 @@ ccflags-y += -I$(srctree)/$(src)              # needed for trace events
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/sched/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/performance/fpsgo_v3/fstb
 obj-$(CONFIG_MTK_TASK_TURBO) += task_turbo.o
+# rodin 6.18（2026-10-31）：tt_vip 算法层重建（原 blob task_turbo_api_no_cfi.o_shipped
+# 从未链接；hook 指针由此接线复活）。回滚 = 删两行并还原 task_turbo.c。
+obj-$(CONFIG_MTK_TASK_TURBO) += task_turbo_hook_rb.o
+obj-$(CONFIG_MTK_TASK_TURBO) += task_turbo_api_rb.o

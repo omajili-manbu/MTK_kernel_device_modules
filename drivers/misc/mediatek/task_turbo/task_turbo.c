@@ -2558,6 +2558,12 @@ static int __init init_task_turbo(void)
 
 	task_turbo_enforce_ct_to_vip_fp = enforce_ct_to_vip;
 
+	extern void init_task_turbo_hook(void);
+	/* rodin 6.18（2026-10-31）：接通 tt_vip 算法层 hook 指针（task_turbo_api_rb.c
+	 * 重建实现）。此前指针恒 NULL，update_win_pid_status/tt_vip_algo/set_tdtgd
+	 * 等通道全部假绿（retval=0 但无任何动作）。 */
+	init_task_turbo_hook();
+
 failed:
 	if (ret)
 		pr_err("register hooks failed, ret %d line %d\n", ret, ret_erri_line);
