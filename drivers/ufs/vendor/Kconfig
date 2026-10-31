@@ -100,8 +100,11 @@ config UFS_MEDIATEK_MCQ
 	bool "Mediatek Proprietary MCQ Support"
 	depends on SCSI_UFSHCD && DEVICE_MODULES_SCSI_UFS_MEDIATEK
 	help
-	  Enable on platform that implemented MediaTek non-standard MCQ.
-	  This require Kernel support on mcq vendor hook like in kernel 5.15.
+	  Gate MediaTek proprietary MCQ support in the UFS host driver.
+	  When enabled, MCQ still activates at runtime only if the controller
+	  advertises MCQ support in its capabilities register and the platform
+	  device provides the per-queue interrupts. When disabled, the driver
+	  rejects the MCQ MAC query so the controller stays in legacy SDB mode.
 
 config UFS_MEDIATEK_MT6893
 	bool "Mediatek Proprietary platform 6893 Support"

@@ -58,7 +58,9 @@
 #define UFS_WAKE_LOCK_TIMEOUT_MS	5000
 
 extern void mt_irq_dump_status(unsigned int irq);
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static int ufs_mtk_config_mcq(struct ufs_hba *hba, bool irq);
+#endif
 static void _ufs_mtk_clk_scale(struct ufs_hba *hba, bool scale_up);
 
 #define CREATE_TRACE_POINTS
@@ -66,9 +68,11 @@ static void _ufs_mtk_clk_scale(struct ufs_hba *hba, bool scale_up);
 #undef CREATE_TRACE_POINTS
 
 #define MAX_SUPP_MAC 64
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 #define MCQ_QUEUE_OFFSET(c) ((((c) >> 16) & 0xFF) * 0x200)
 #define MCQ_QCFG_SIZE 0x40
 #define MCQ_CFG_n(r, i) ((r) + MCQ_QCFG_SIZE * (i))
+#endif
 #define QUEUE_EN_OFFSET 31
 #define QUEUE_ID_OFFSET 16
 
@@ -791,14 +795,18 @@ static void ufs_mtk_init_host_caps(struct ufs_hba *hba)
 	if (of_property_read_bool(np, "mediatek,ufs-tx-skew-fix"))
 		host->caps |= UFS_MTK_CAP_TX_SKEW_FIX;
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (of_property_read_bool(np, "mediatek,ufs-disable-mcq"))
 		host->caps |= UFS_MTK_CAP_DISABLE_MCQ;
+#endif
 
 	if (of_property_read_bool(np, "mediatek,ufs-rtff-mtcmos"))
 		host->caps |= UFS_MTK_CAP_RTFF_MTCMOS;
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (of_property_read_bool(np, "mediatek,ufs-broken-rtc"))
 		host->caps |= UFS_MTK_CAP_MCQ_BROKEN_RTC;
+#endif
 
 	if (of_property_read_bool(np, "mediatek,ufs-clkscale-only-by-user"))
 		host->caps |= UFS_MTK_CAP_CLK_SCALE_ONLY_BY_USER;
@@ -820,6 +828,7 @@ static void ufs_mtk_init_host_caps(struct ufs_hba *hba)
 
 }
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static void ufs_mtk_mcq_disable_irq(struct ufs_hba *hba)
 {
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
@@ -863,6 +872,7 @@ static void ufs_mtk_mcq_enable_irq(struct ufs_hba *hba)
 	}
 	host->is_mcq_intr_enabled = true;
 }
+#endif
 
 /**
  * ufs_mtk_setup_clocks - enables/disable clocks
@@ -913,7 +923,9 @@ static int ufs_mtk_setup_clocks(struct ufs_hba *hba, bool on,
 			ufs_mtk_setup_ref_clk(hba, on);
 			phy_power_off(host->mphy);
 		}
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 		ufs_mtk_mcq_disable_irq(hba);
+#endif
 	} else if (on && status == POST_CHANGE) {
 		phy_power_on(host->mphy);
 		ufs_mtk_setup_ref_clk(hba, on);
@@ -921,12 +933,15 @@ static int ufs_mtk_setup_clocks(struct ufs_hba *hba, bool on,
 		if (!ufshcd_is_clkscaling_supported(hba) ||
 		    !hba->clk_scaling.is_enabled)
 			ufs_mtk_pm_qos(hba, on);
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 		ufs_mtk_mcq_enable_irq(hba);
+#endif
 	}
 
 	return ret;
 }
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static u32 ufs_mtk_mcq_get_irq(struct ufs_hba *hba, unsigned int cpu)
 {
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
@@ -966,6 +981,7 @@ static void ufs_mtk_mcq_set_irq_affinity(struct ufs_hba *hba, unsigned int cpu)
 	}
 	dev_info(hba->dev, "set irq %d affinity to CPU: %d\n", irq, _cpu);
 }
+#endif
 
 #define UFS_VEND_SAMSUNG  (1 << 0)
 
@@ -1459,6 +1475,7 @@ static void ufs_mtk_delay_eh_work_fn(struct work_struct *dwork)
 	queue_work(hba->eh_wq, &hba->eh_work);
 }
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static void ufs_mtk_init_mcq_irq(struct ufs_hba *hba)
 {
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
@@ -1491,6 +1508,7 @@ static void ufs_mtk_init_mcq_irq(struct ufs_hba *hba)
 failed:
 	host->mcq_nr_intr = 0;
 }
+#endif
 
 #ifdef CONFIG_PM_SLEEP
 static enum hrtimer_restart rq_timer_fn(struct hrtimer *timer)
@@ -1509,12 +1527,14 @@ static enum hrtimer_restart rq_timer_fn(struct hrtimer *timer)
 }
 #endif
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static bool ufs_host_mcq_support(struct ufs_hba *hba)
 {
 	u32 cap = ufshcd_readl(hba, REG_CONTROLLER_CAPABILITIES);
 
 	return FIELD_GET(MASK_MCQ_SUPPORT, cap);
 }
+#endif
 
 
 static int ufs_mtk_cpu_online_notify(unsigned int cpu, struct hlist_node *node)
@@ -1529,6 +1549,7 @@ static int ufs_mtk_cpu_online_notify(unsigned int cpu, struct hlist_node *node)
 	host = hlist_entry_safe(node, struct ufs_mtk_host, cpuhp_node);
 	hba = host->hba;
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (hba->mcq_enabled && cpu != 0) {
 		ufs_mtk_mcq_set_irq_affinity(hba, cpu);
 
@@ -1536,6 +1557,7 @@ static int ufs_mtk_cpu_online_notify(unsigned int cpu, struct hlist_node *node)
 		if (cpu == 3)
 			ufs_mtk_mcq_set_irq_affinity(hba, 0);
 	}
+#endif
 
 	if (cpu == 3) {
 		ret = irq_set_affinity_hint(hba->irq, cpumask_of(cpu));
@@ -1551,7 +1573,9 @@ static int ufs_mtk_cpu_offline_notify(unsigned int cpu, struct hlist_node *node)
 	struct ufs_mtk_host *host;
 	struct ufs_hba *hba;
 	struct cpumask mask;
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	unsigned int irq;
+#endif
 	int ret = 0;
 
 	if (!node)
@@ -1570,6 +1594,7 @@ static int ufs_mtk_cpu_offline_notify(unsigned int cpu, struct hlist_node *node)
 		dev_info(hba->dev, "set irq %d affinity to CPU %*pbl %s\n",
 				hba->irq, cpumask_pr_args(&mask), ret ? "failed" : "");
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 		/* Migrate irq of CPU0 to other CPUs */
 		irq = ufs_mtk_mcq_get_irq(hba, 0);
 		if (irq != MTK_MCQ_INVALID_IRQ) {
@@ -1577,6 +1602,7 @@ static int ufs_mtk_cpu_offline_notify(unsigned int cpu, struct hlist_node *node)
 			dev_info(hba->dev, "set irq %d affinity to CPU %*pbl %s\n",
 					irq, cpumask_pr_args(&mask), ret ? "failed" : "");
 		}
+#endif
 	}
 
 	return 0;
@@ -1631,7 +1657,9 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 	/* Initialize host capability */
 	ufs_mtk_init_host_caps(hba);
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	ufs_mtk_init_mcq_irq(hba);
+#endif
 
 	err = ufs_mtk_bind_mphy(hba);
 	if (err)
@@ -1666,9 +1694,11 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 
 	hba->quirks |= UFSHCI_QUIRK_SKIP_MANUAL_WB_FLUSH_CTRL;
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	hba->quirks |= UFSHCD_QUIRK_MCQ_BROKEN_INTR;
 	if (host->caps & UFS_MTK_CAP_MCQ_BROKEN_RTC)
 		hba->quirks |= UFSHCD_QUIRK_MCQ_BROKEN_RTC;
+#endif
 
 	hba->vps->wb_flush_threshold = UFS_WB_BUF_REMAIN_PERCENT(80);
 
@@ -1721,8 +1751,12 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 		      CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* rodin: 6.18 hrtimer_setup */
 #endif
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (host->caps & UFS_MTK_CAP_DISABLE_MCQ || !ufs_host_mcq_support(hba))
 		ufs_mtk_btag_init(hba);
+#else
+	ufs_mtk_btag_init(hba);
+#endif
 	
 	ufs_mtk_dbg_register(hba);
 
@@ -2331,6 +2365,7 @@ void ufs_mtk_dynamic_clock_scaling(struct ufs_hba *hba, int mode)
 	ufshcd_rpm_put(hba);
 }
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static void _ufshcd_enable_intr(struct ufs_hba *hba, u32 intrs)
 {
 	u32 set = ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
@@ -2340,6 +2375,7 @@ static void _ufshcd_enable_intr(struct ufs_hba *hba, u32 intrs)
 
 	ufshcd_writel(hba, set, REG_INTERRUPT_ENABLE);
 }
+#endif
 
 static int ufs_mtk_link_set_hpm(struct ufs_hba *hba)
 {
@@ -2386,6 +2422,7 @@ static int ufs_mtk_link_set_hpm(struct ufs_hba *hba)
 	if (err)
 		return err;
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (hba->mcq_enabled) {
 		ufs_mtk_config_mcq(hba, false);
 		/* Enable required interrupts */
@@ -2395,6 +2432,7 @@ static int ufs_mtk_link_set_hpm(struct ufs_hba *hba)
 		ufshcd_writel(hba, ufshcd_readl(hba, REG_UFS_MEM_CFG) | 0x1,
 			      REG_UFS_MEM_CFG);
 	}
+#endif
 
 	return 0;
 }
@@ -2634,6 +2672,7 @@ static void ufs_mtk_dbg_register_dump(struct ufs_hba *hba)
 				"Debug Probe (0x22C8): ");
 	}
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (hba->mcq_enabled) {
 		/* Dump ufshci register 0x380 */
 		ufshcd_dump_regs(hba, REG_UFS_MCQ_CFG, 4,
@@ -2647,6 +2686,7 @@ static void ufs_mtk_dbg_register_dump(struct ufs_hba *hba)
 				REF_UFS_MTK_CQ7_IACR - REG_UFS_MTK_SQD + 4,
 				"UFSHCI (0x2800): ");
 	}
+#endif
 
 
 	ufs_mtk_dbg_dump(100);
@@ -2667,8 +2707,11 @@ static int ufs_mtk_apply_dev_quirks(struct ufs_hba *hba)
 {
 	struct ufs_dev_info *dev_info = &hba->dev_info;
 	u16 mid = dev_info->wmanufacturerid;
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	unsigned int cpu;
+#endif
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	if (hba->mcq_enabled) {
 		/* Use none scheduler for mcq */
 		if (hba->host->nr_hw_queues > 1) {
@@ -2680,6 +2723,7 @@ static int ufs_mtk_apply_dev_quirks(struct ufs_hba *hba)
 		for (cpu = 0; cpu < nr_cpu_ids; cpu++)
 			ufs_mtk_mcq_set_irq_affinity(hba, cpu);
 	}
+#endif
 
 	if (mid == UFS_VENDOR_SAMSUNG) {
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TACTIVATE), 6);
@@ -3032,6 +3076,7 @@ static int ufs_mtk_clk_scale_notify(struct ufs_hba *hba, bool scale_up,
 	return 0;
 }
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static int ufs_mtk_get_hba_mac(struct ufs_hba *hba)
 {
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
@@ -3042,7 +3087,15 @@ static int ufs_mtk_get_hba_mac(struct ufs_hba *hba)
 
 	return MAX_SUPP_MAC;
 }
+#else
+static int ufs_mtk_get_hba_mac(struct ufs_hba *hba)
+{
+	/* MCQ support not built: reject MAC query to keep legacy SDB mode */
+	return -EPERM;
+}
+#endif
 
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 static int ufs_mtk_op_runtime_config(struct ufs_hba *hba)
 {
 	struct ufshcd_mcq_opr_info_t *opr;
@@ -3171,6 +3224,7 @@ static int ufs_mtk_config_esi(struct ufs_hba *hba)
 
 	return ufs_mtk_config_mcq(hba, true);
 }
+#endif
 
 static void ufs_mtk_config_scsi_dev(struct scsi_device *sdev)
 {
@@ -3227,10 +3281,14 @@ static const struct ufs_hba_variant_ops ufs_hba_mtk_vops = {
 	.config_scaling_param = ufs_mtk_config_scaling_param,
 	.clk_scale_notify    = ufs_mtk_clk_scale_notify,
 	/* mcq vops */
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
 	.get_hba_mac         = ufs_mtk_get_hba_mac,
 	.op_runtime_config   = ufs_mtk_op_runtime_config,
 	.mcq_config_resource = ufs_mtk_mcq_config_resource,
 	.config_esi          = ufs_mtk_config_esi,
+#else
+	.get_hba_mac         = ufs_mtk_get_hba_mac,
+#endif
 	.config_scsi_dev     = ufs_mtk_config_scsi_dev,
 #if IS_ENABLED(CONFIG_MTK_UFS_DEBUG_BUILD)
 	.check_bus_status    = ufs_mtk_check_bus_status,
