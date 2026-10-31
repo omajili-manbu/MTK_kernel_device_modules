@@ -688,8 +688,12 @@ unsigned int ovl_comp_frame_done_event_MT6899(struct mtk_ddp_comp *comp)
 #ifndef CMDQ_EVENT_OVL0_DISP_OVL3_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL3_2L_FRAME_DONE 215
 #endif /* CMDQ_EVENT_OVL0_DISP_OVL3_2L_FRAME_DONE */
+/* rodin 6.18（2026-10-31）：取值按 dt-bindings/gce/mt6899-gce.h；上方 MT6989 同名宏异值，先 undef 消 -Wmacro-redefined */
+#undef CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL2_2L_FRAME_DONE 216
+#undef CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL1_2L_FRAME_DONE 217
+#undef CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE
 #define CMDQ_EVENT_OVL0_DISP_OVL0_2L_FRAME_DONE 218
 
 	switch (comp->id) {

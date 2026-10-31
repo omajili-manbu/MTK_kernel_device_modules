@@ -628,7 +628,6 @@ void mtk_disp_update_channel_hrt_MT6991(struct mtk_drm_crtc *mtk_crtc,
 {
 	int i = 0, j;
 	unsigned int subcomm_bw_sum[4] = {0};
-	struct drm_crtc *crtc = &mtk_crtc->base;
 	unsigned int compr_ratio = 90;
 	int oddmr_hrt = 0;
 	struct mtk_ddp_comp *comp;
