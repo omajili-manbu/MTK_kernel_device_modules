@@ -42,6 +42,7 @@ ${MTK_LPM_DBG_COMMON_NAME}-objs += lpm_dbg_pm.o
 ${MTK_LPM_DBG_COMMON_NAME}-objs += lpm_dbg_spm_fs.o
 ${MTK_LPM_DBG_COMMON_NAME}-objs += lpm_dbg_trace_event.o
 ${MTK_LPM_DBG_COMMON_NAME}-objs += lpm_dbg_hwreq.o
+${MTK_LPM_DBG_COMMON_NAME}-objs += lpm_dbg_mcupm_dep.o
 ${MTK_LPM_DBG_COMMON_NAME}-objs += $(LPM_MODULE_DEBUG_COMMON)
 
 
