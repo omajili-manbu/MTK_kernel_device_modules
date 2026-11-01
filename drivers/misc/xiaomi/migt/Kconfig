@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0
+config XIAOMI_MIGT
+	tristate "Xiaomi MiGameTurbo (6.18 aligned)"
+	depends on ARM64 && ANDROID_VENDOR_HOOKS && ANDROID_VENDOR_OEM_DATA
+	select XIAOMI_METIS
+	default n
+	help
+	  Xiaomi MIGT game scheduling/frequency policy, aligned to the CCC
+	  dash reconstruction (OS3.0.305 stock). Providers that stock
+	  resolved in the closed scheduler are rebuilt: the game_migt slot
+	  family and oem_freq live in metis (with 6.18 vendor-hook
+	  bridges), sched_load_update in mi_schedule. Stock parameter
+	  defaults keep every policy gate off until userspace opts in.
