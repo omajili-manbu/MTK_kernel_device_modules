@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: GPL-2.0-only
 config XIAOMI_METIS
-	tristate "Xiaomi METIS policy layer (6.18 aligned)"
+	tristate "Xiaomi METIS stock reconstruction (6.18 aligned)"
 	depends on ARM64 && ANDROID_VENDOR_HOOKS && ANDROID_VENDOR_OEM_DATA
 	default n
 	help
-	  Xiaomi METIS task policy for rodin: VIP/lock-inheritance marking,
-	  cold-start protection, cluster affinity and frequency boost, all
-	  attached to native GKI vendor hooks. The stock pick-side scheduler
-	  (private rbtree/pick/preempt ladder/deadline tree), WALT remnants,
-	  private load balancer and EAS replication are dropped: 6.18 owns
-	  the scheduling core, load tracking, uclamp and energy-aware
-	  placement; this layer keeps only SoC/task policy on live hooks.
-	  Carrier state lives in the mi_schedule task slots. All exported
-	  symbols have in-tree consumers; no closed-scheduler ABI stubs.
+	  Xiaomi METIS fully aligned to the CCC dash reconstruction
+	  (OS3.0.305 stock): VIP/lock-inheritance marking, cold-start
+	  protection, cluster affinity/frequency boost, pick-side policy
+	  libraries, WALT/deadline/schlat/io/lowlt faces and the registry
+	  provider slots, all attached to the live 6.18 GKI vendor-hook
+	  surface. Closed-scheduler-only entry bridges (stock-context
+	  assembly) are kept compiled but dormant, matching upstream dash.
+	  Carrier state lives in the mi_schedule task slots. Stock defects
+	  are retained except where the 6.18 environment forbids them
+	  (mutex oem payload co-tenancy with xr_qi, record_*_starttime
+	  hook absence, set_next_entity signature drift).

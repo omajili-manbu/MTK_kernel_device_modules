@@ -2,14 +2,13 @@
 #ifndef _XIAOMI_METIS_FINAL_CONTROL_H
 #define _XIAOMI_METIS_FINAL_CONTROL_H
 #include <linux/fs.h>
-#include <linux/cgroup.h>
 #include <linux/moduleparam.h>
 #include <linux/notifier.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/workqueue.h>
 #include "metis_monitor.h"
-
+#include "metis-final-scheduler.h"
 #include "metis_binder_request.h"
 #include "metis_cluster_boost.h"
 
@@ -22,17 +21,18 @@ extern unsigned long cluster_affinity_uid_mlist[3125];
 extern unsigned long cluster_affinity_uid_llist[3125];
 extern u32 mi_rebind_task[4][5], mi_viptask[3];
 extern s32 thermal_break_enable, last_traced_uid;
-extern unsigned int ui_last_cpu;
+extern unsigned int ui_last_cpu, ren_last_cpu, sf_last_cpu, hwc_last_cpu;
+extern s32 show_traced_uid; /* Stock METIS .bss+0x159b0, size4. */
 extern s64 vtask_monitor_beg_us, vtask_monitor_end_us, frame_boost_start;
 extern unsigned long max_limit_freq[3], thermal_limit_freq[3];
 extern s32 comm_monitor_debug, set_static_vip;
 extern struct workqueue_struct *my_wq;
 extern s32 persist_vip_pids[8];
 extern spinlock_t persist_vip_lock;
-
-
-
-
+extern u32 top_task_monitor_window;
+extern struct proc_dir_entry *runtime_info_entry;
+extern struct notifier_block runtime_info_notifier;
+extern const struct proc_ops runtime_info_debug_proc_ops;
 
 /* Stock 0x50 allocation; native work_struct replaces the stock work prefix. */
 struct metis_comm_work {
@@ -72,28 +72,31 @@ int metis_mmap(struct file *file, struct vm_area_struct *vma);
 int metis_open(struct inode *inode, struct file *file);
 int metis_release(struct inode *inode, struct file *file);
 void metis_set_vip_thread(struct task_struct *task, u32 kind, u32 seconds);
-
-
+void metis_update_top_task_info(struct task_struct *task, struct rq *rq,
+			       int running, u64 wallclock, u64 previous);
 
 bool str2_in_str1(const char *haystack, const char *needle);
-
+bool is_main_thread_depend(struct mi_task_struct *state);
 int kernel_set_static_vip(struct task_struct *task);
 int func_set_static_vip(const char *value, const struct kernel_param *param);
 void compare_task_comm_work_func(struct work_struct *work);
 void setup_task_wk_func(struct work_struct *work);
 void probe_task_rename(void *unused, struct task_struct *task, bool exec);
+/* rodin 6.18：钩子签名 = (void*, ret, cgrp, task, threadgroup)。 */
 void probe_android_vh_cgroup_set_task(void *unused, int result,
-				    struct cgroup *cgrp, struct task_struct *task,
+				    struct cgroup *cgroup,
+				    struct task_struct *task,
 				    bool threadgroup);
 int metis_comm_monitor_init(void);
 void metis_comm_monitor_exit(void);
 int __set_common_persist_vip(s32 pid, struct task_struct *task);
-
+void metis_set_common_persist_vip(struct task_struct *task);
 int set_common_persist_vip_task(const char *value,
 			      const struct kernel_param *param);
 int get_common_persist_vip_task(char *buffer, const struct kernel_param *param);
 int set_clear_persist_vip_task(const char *value,
 			     const struct kernel_param *param);
+int metis_common_api_init(void);
 void metis_common_api_exit(void);
 void history_task_info_init(void);
 int metis_doublecyc_init(void);

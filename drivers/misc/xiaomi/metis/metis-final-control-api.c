@@ -135,9 +135,7 @@ int set_mi_efboost(u32 pid, unsigned long mask, bool clear)
 			if (mask & 0x100000) atomic_dec(&mi_dynamic_vip_num);
 			if (mask & 0x400000) atomic_dec(&mi_sdk_eboost_vip_num);
 			if (mask & 0x200000) MI_FIELD(state, u32, 0x298) = UINT_MAX;
-			/* rodin 6.18：stock 优先级为 (~mask)|0x2000000，会把从未持有的
-			 * bit25 清掉且污染其它未清位；本意为 ~(mask|0x2000000)。 */
-			state->flags_0xc0 &= ~((u32)mask | 0x2000000U);
+			state->flags_0xc0 &= ~(u32)mask | 0x2000000;
 			if (metis_debug && mask == 0x400000)
 				printk("\0016metis-fas: clean mi eboost vip task: cnt = %d, pid = %d, name = %s",
 					atomic_read(&mi_sdk_eboost_vip_num), task->pid, task->comm);
@@ -283,8 +281,10 @@ void metis_set_vip_thread(struct task_struct *task, u32 kind, u32 seconds)
 static void ioctl_foreground(u32 uid)
 {
 	if (metis_debug) printk("\0016metis-fas: Change foreground uid from %d to %d\n", foreground_uid, uid);
-	if (uid != last_traced_uid)
+	if (uid != last_traced_uid) {
+		show_traced_uid = uid;
 		last_traced_uid = uid;
+	}
 	foreground_uid = uid;
 }
 
@@ -309,6 +309,7 @@ long metis_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			if (metis_debug) printk("\0016metis-fas: UI_GET_VTASK_TOKEN, in_frame_boost");
 			del_cluster();
 		}
+		vtask_monitor = 1;
 		vtask_monitor_beg_us = ktime_to_us(ktime_get());
 		ui_last_cpu = raw_smp_processor_id();
 		ioctl_foreground(uid);
@@ -332,6 +333,7 @@ long metis_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			if (metis_debug) printk("\0016metis-fas: UI_RELEASE_VTASK_TOKEN, in_frame_boost");
 			del_cluster();
 		}
+		vtask_monitor = 0;
 		vtask_monitor_end_us = ktime_to_us(ktime_get());
 		if (metis_debug)
 			printk("\0016metis-fas: vtask_monitor_us is %lu\n", (unsigned long)(vtask_monitor_end_us - vtask_monitor_beg_us));
@@ -392,10 +394,9 @@ long metis_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			mi_dynamic_vtask_prio_sched_start(task, request[1]);
 		} else if ((cmd & 0xff) == 9) {
 			clean_mi_dynamic_vip_task(task);
-			/* rodin 6.18：stock 在 put 后仍读 task->pid/comm（UAF），
-			 * 打点挪到 put 之前。 */
-			if (metis_debug) printk("\0016metis-fas: metis ioctl: clear dynamic vip, pid = %d, name = %s\n", task->pid, task->comm);
 			put_task_struct(task);
+			/* Preserve original debug-after-put lifetime defect. */
+			if (metis_debug) printk("\0016metis-fas: metis ioctl: clear dynamic vip, pid = %d, name = %s\n", task->pid, task->comm);
 			break;
 		} else {
 			if (metis_debug)

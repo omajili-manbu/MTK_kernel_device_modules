@@ -589,6 +589,11 @@ void do_rwsem_list_insert(struct metis618_rwsem_waiter *waiter,
 				other_priority = task_prio_for_rwsem_insert(task);
 			}
 		}
+		/* Raw .text+0x3968..0x3998 __trace_bprintk tail, skipped
+		 * by Ghidra. Preserve the genuine native debug producer. */
+		trace_printk("tsched: insert tsk %d %s %d after %d %s %d\n",
+			current->pid, current->comm, priority,
+			other->task->pid, other->task->comm, other_priority);
 		if (priority >= other_priority) {
 			rwsem_link_after(&waiter->list, cursor);
 			*already_on_list = true;
@@ -667,6 +672,8 @@ void mi_rwsem_list_add_hook(void *unused, struct rwsem_waiter *waiter_opaque,
 			rtg_rwsem_handoff_jif = waiter->timeout;
 		}
 	}
+	if (coldstart_app_tasks(task) && !coldstart_set_mmlock_holder_vip)
+		mark_task_low_lt(get_mi_task_struct(task));
 insert:
 	do_rwsem_list_insert(waiter, sem, already_on_list, priority);
 }
@@ -802,6 +809,41 @@ ready:
 	coldstart_tsk_ready_to_run(task);
 }
 
+/* .text+0x1374, virtual 00109d9c. Bounds failure really is BRK #0x5512. */
+void register_rvh_mi_try_to_wake_up(unsigned int module, metis_link_wake_fn hook)
+{
+	if (module >= 3) {
+		asm volatile("brk #0x5512");
+		__builtin_unreachable();
+	}
+	mi_try_to_wake_up_func[module] = hook;
+	pr_info("metis-link: %s[%d] now\n", __func__, module);
+}
+
+/* .text+0x13c0, virtual 00109de8. No RCU or hook synchronization in stock. */
+void unregister_rvh_mi_try_to_wake_up(unsigned int module)
+{
+	if (module >= 3) {
+		asm volatile("brk #0x5512");
+		__builtin_unreachable();
+	}
+	mi_try_to_wake_up_func[module] = NULL;
+	pr_info("metis-link: %s[%d] now\n", __func__, module);
+}
+
+/* .text+0x4298, virtual 0010ccc0; real MIGT consumers witness task/flags. */
+void register_game_wake_f(metis_game_wake_fn hook)
+{
+	pr_info("metis-fas: %s now\n", __func__);
+	game_wake_hooks = hook;
+}
+
+/* .text+0x42dc, virtual 0010cd04. */
+void unregister_game_wake_f(void)
+{
+	game_wake_hooks = NULL;
+}
+
 /* .text+0x140c, virtual 00109e34. All returns are ignored, including failed
  * hook/misc/proc registration. No compensation or success inference. */
 int metis_link_init(void)
@@ -825,6 +867,8 @@ int metis_link_init(void)
 	register_trace_android_vh_mutex_wait_finish(mi_mutex_wait_finish_hook, NULL);
 	register_trace_android_vh_rwsem_read_trylock_failed(mi_rwsem_read_trylock_failed, NULL);
 	register_trace_android_vh_rwsem_wake_finish(mi_lock_rwsem_wake_finish_hook, NULL);
+	/* rodin 6.18：closed-scheduler 分发表保留导出契约；活体走原生 hook 双挂。 */
+	mi_try_to_wake_up_func[1] = metis_link_try_to_wake_up_hook;
 	register_trace_android_rvh_try_to_wake_up(metis_link_try_to_wake_up_hook, NULL);
 	register_trace_android_vh_alter_futex_plist_add(mi_alter_futex_plist_add, NULL);
 	register_trace_android_vh_do_futex(mi_do_futex, NULL);
@@ -842,6 +886,7 @@ int metis_link_init(void)
  * left installed by this original exit body. */
 void metis_link_exit(void)
 {
+	mi_try_to_wake_up_func[1] = NULL;
 	tracepoint_synchronize_unregister();
 	misc_deregister(&metis_link_misc);
 	if (mi_art_mutex_entry)

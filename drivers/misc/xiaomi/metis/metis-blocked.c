@@ -18,6 +18,7 @@
 #define CREATE_TRACE_POINTS
 #include "metis-blocked-trace.h"
 #undef CREATE_TRACE_POINTS
+#undef CREATE_TRACE_POINTS
 
 #define METIS_RWSEM_TAG_UNKNOWN 0xab9f19ab00000000ULL
 
