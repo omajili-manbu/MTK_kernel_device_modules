@@ -212,7 +212,13 @@ phys_addr_t mcupm_reserve_mem_get_size(unsigned int id)
 }
 EXPORT_SYMBOL_GPL(mcupm_reserve_mem_get_size);
 
-#if defined(MODULE)
+/*
+ * rodin 6.18（2026-11-01）：MODULE 段与 built-in 段并存 ——
+ * mcupm_map_memory_region 在两种形态都可用（6.6 stock 的 .ko 走它，
+ * 且其"找不到 reserved-memory 节点即降级继续"语义正是 6.18 需要的容错）；
+ * built-in 专用的 reserve_mem_of_init / reserve_memory_init 同时保留，
+ * 供 RESERVEDMEM_OF_DECLARE 使用。
+ */
 static int mcupm_assign_memory_block(void)
 {
 	int ret = 0;
@@ -310,7 +316,6 @@ static int mcupm_map_memory_region(void)
 
 	return 0;
 }
-#else
 static int __init mcupm_reserve_mem_of_init(struct reserved_mem *rmem)
 {
 	unsigned int id;
@@ -408,7 +413,6 @@ static int mcupm_reserve_memory_init(void)
 	return 0;
 }
 
-#endif
 #endif
 
 /* MCUPM HELPER. User is apmcu_sspm_mailbox_read/write*/
@@ -587,13 +591,20 @@ static int mcupm_device_probe(struct platform_device *pdev)
 		skip_logger = false;
 
 #if IS_ENABLED(CONFIG_OF_RESERVED_MEM)
-#if defined(MODULE)
+	/*
+	 * rodin 6.18（2026-11-01）：与 6.6 stock 同路径 —— 走 map_memory_region
+	 * 的容错分支（找不到 reserved-memory 节点时降级继续：has_reserved_memory
+	 * =false / skip_logger=true），而非 built-in 专用的 reserve_memory_init
+	 * （认领失败即 return 0 中止 probe）。
+	 * 本树 mt6899 DT 无 "mediatek,reserve-memory-mcupm_share" 节点（活体为
+	 * bootloader 注入的 "mediatek,MCUPM-reserved"，compatible 与属性集均不同），
+	 * built-in 分支认领失败 → "Reserved Memory Failed" → probe 退出 →
+	 * MCUPM 固件握手从未发生 → BL31 DEPD readiness 闸永不就绪 → PSCI
+	 * CPU_SUSPEND 全被 -2 拒 → 深档 0 进入。
+	 * 6.6 stock mcupm.ko 是 .ko（MODULE 宏）→ 本就走 map_memory_region 容错
+	 * 路径并继续跑到 "MCUPM: Alive RES_MEM(0) SKIP_LOG(1) ret(0)"。
+	 */
 	if (mcupm_map_memory_region()) {
-		pr_info("[MCUPM] Reserved Memory Failed\n");
-		return 0;
-	}
-#else
-	if (mcupm_reserve_memory_init()) {
 		pr_info("[MCUPM] Reserved Memory Failed\n");
 		return 0;
 	}
@@ -603,7 +614,6 @@ static int mcupm_device_probe(struct platform_device *pdev)
 		mcupm_lock_emi_mpu();
 		post_mcupm_set_emi_mpu();
 	}
-#endif
 #endif
 
 	ret = mtk_ipi_init(pdev);
