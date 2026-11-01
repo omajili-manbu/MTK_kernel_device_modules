@@ -10,3 +10,5 @@ obj-$(CONFIG_XIAOMI_METIS) += metis/
 obj-$(CONFIG_XIAOMI_MI_SCHEDULE) += mi_schedule/
 obj-$(CONFIG_XIAOMI_XR_QI) += xr_qi/
 obj-$(CONFIG_XIAOMI_PERF_ACTUATOR) += perf_actuator/
+obj-$(CONFIG_XIAOMI_MILLET_CORE) += millet/
+obj-$(CONFIG_XIAOMI_MILLET_OEM_CGROUP) += millet_oem_cgroup/
