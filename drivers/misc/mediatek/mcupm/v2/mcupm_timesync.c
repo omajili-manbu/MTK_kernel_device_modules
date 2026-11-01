@@ -4,6 +4,7 @@
  */
 
 #include <linux/clocksource.h>
+#include <linux/hrtimer.h>
 #include <linux/sched/clock.h>
 #include <linux/suspend.h>
 #include <linux/timex.h>
@@ -85,7 +86,7 @@ static void mcupm_ts_update(int suspended, u64 tick, u64 ts)
 	mb();
 }
 
-static u64 timesync_tick_read(const struct cyclecounter *cc)
+static u64 timesync_tick_read(struct cyclecounter *cc)
 {
 	return arch_timer_read_counter();
 }
@@ -187,9 +188,12 @@ unsigned int mcupm_timesync_init(void)
 	 */
 	timecounter_init(&timesync_counter, &timesync_cc, sched_clock());
 
-	hrtimer_init(&timesync_refresh_timer,
+	/*
+	 * rodin 6.18（2026-11-01）：hrtimer_init 在本树已被 hrtimer_setup 取代
+	 * （含 clockid 与 mode 参数、并直接绑定回调）。
+	 */
+	hrtimer_setup(&timesync_refresh_timer, timesync_refresh,
 				CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	timesync_refresh_timer.function = timesync_refresh;
 	hrtimer_start(&timesync_refresh_timer, wrap, HRTIMER_MODE_REL);
 
 	pr_info("%s ts: cycle_last %lld, time_base:%lld, wrap:%lld\n",

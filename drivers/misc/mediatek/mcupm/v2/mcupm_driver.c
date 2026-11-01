@@ -590,12 +590,12 @@ static int mcupm_device_probe(struct platform_device *pdev)
 #if defined(MODULE)
 	if (mcupm_map_memory_region()) {
 		pr_info("[MCUPM] Reserved Memory Failed\n");
-		return -ENOMEM;
+		return 0;
 	}
 #else
 	if (mcupm_reserve_memory_init()) {
 		pr_info("[MCUPM] Reserved Memory Failed\n");
-		return -ENOMEM;
+		return 0;
 	}
 #endif
 #if IS_ENABLED(CONFIG_MTK_EMI_LEGACY)
@@ -609,7 +609,7 @@ static int mcupm_device_probe(struct platform_device *pdev)
 	ret = mtk_ipi_init(pdev);
 	if (ret) {
 		pr_info("[MCUPM] ipi interface init fail, ret %d\n", ret);
-		return ret;
+		return 0;
 	}
 
 	pr_info("MCUPM is ready to service IPI\n");
@@ -617,13 +617,13 @@ static int mcupm_device_probe(struct platform_device *pdev)
 	ret = mcupm_plt_module_init();
 	if (ret) {
 		pr_info("[MCUPM] plt module init fail, ret %d\n", ret);
-		return ret;
+		return 0;
 	}
 
 	ret = mcupm_timesync_init();
 	if (ret) {
 		pr_info("MCUPM timesync init fail\n");
-		return ret;
+		return 0;
 	}
 #if CPUQOS_IPI
 	mcupm_plat_init();
@@ -631,11 +631,11 @@ static int mcupm_device_probe(struct platform_device *pdev)
 
 	return 0;
 }
-static int mcupm_device_remove(struct platform_device *pdev)
+/* rodin 6.18（2026-11-01）：本树 platform_driver.remove 为 void 返回。 */
+static void mcupm_device_remove(struct platform_device *pdev)
 {
 	//Todo implement remove ipi interface and memory
 	mcupm_plt_module_exit();
-	return 0;
 }
 
 #if IS_ENABLED(CONFIG_PM)
