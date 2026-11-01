@@ -5,6 +5,7 @@
 
 #include <asm/errno.h>
 #include <linux/vseq.h>
+#include <linux/workqueue.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/cpuidle.h>
@@ -62,15 +63,30 @@ static int __init lpm_device_initcall(void)
 	return 0;
 }
 
+/*
+ * rodin 6.18（2026-11-01）：VALIDATE SET 延迟 40s。
+ * 6.6 路径 = vendor 模块 ~40s 加载后才发本 SMC（MCUPM fw 已 ready，
+ * BL31 DEPD 握手顺利 → 首次 mcusysoff 39.4s）。6.18 内建后
+ * late_initcall ~6s 就打（MCUPM TASK_STA 仍 0），BL31 validate 状态
+ * 被提前写坏 → CPU_SUSPEND 全拒（-2 风暴）。延迟到 40s 与 6.6 时序
+ * 对齐；40s 后 MCUPM fw 稳定运行，SET 到达即通。
+ */
+static void lpm_validate_delay_fn(struct work_struct *work)
+{
+	cpuidle_pause_and_lock();
+	lpm_smc_cpu_pm(VALIDATE_PWR_STATE_CTRL, MT_LPM_SMC_ACT_SET,
+			PSCI_E_SUCCESS, 0);
+	cpuidle_resume_and_unlock();
+	pr_info("[name:mtk_lpm][P] - validate SET sent (delayed 40s)\n");
+}
+static DECLARE_DELAYED_WORK(lpm_validate_delay, lpm_validate_delay_fn);
+
 static int __init lpm_late_initcall(void)
 {
 	lpm_plat_apmcu_init();
 	lpm_model_suspend_init();
 
-	cpuidle_pause_and_lock();
-	lpm_smc_cpu_pm(VALIDATE_PWR_STATE_CTRL, MT_LPM_SMC_ACT_SET,
-				PSCI_E_SUCCESS, 0);
-	cpuidle_resume_and_unlock();
+	schedule_delayed_work(&lpm_validate_delay, 40 * HZ);
 
 	return 0;
 }

@@ -4,7 +4,7 @@
  * 背景：PSCI CPU_SUSPEND power-down 全被 BL31 以 PSCI_E_INVALID_PARAMS 拒绝
  * （readiness 闸：DEV_INIT 要求 MCUPM mbox slot8 TASK_STA==1，40s 兜底在
  * DEV_INIT 未过时不可达，与公开 cpcv5_4 的 cpupm_pwr_state_valid 同构）。
- * 本节点只读三个候选 slot 窗口，不写任何 MCUPM 状态。
+ * 本节点只读三个候选 slot 窗口 + TCM 全域稀疏扫描，不写任何 MCUPM 状态。
  */
 #include <linux/io.h>
 #include <linux/init.h>
@@ -15,16 +15,18 @@
 #include <lpm_dbg_fs_common.h>
 
 #define MCUPM_TCM_PA		0x0C070000UL
+#define TCM_SZ			0x50000UL
 /* 内核侧 APMCU_MCUPM mbox 窗（DT mbox0_base = TCM+0x6F600），slot8=TASK_STA */
 #define WIN_SLOTS_PA		(MCUPM_TCM_PA + 0x6F600)
 /* 公开 TF-A mcupm_cfg.h 的 CPU_EB_MBOX3_OFFSET 两种代际 */
 #define WIN_MBOX3_V23_PA	(MCUPM_TCM_PA + 0x7E0)
 #define WIN_MBOX3_V1_PA		(MCUPM_TCM_PA + 0xCE0)
 
-#define WIN_SLOTS_N		12	/* 覆盖 slot0/4/7/8 足够 */
+#define WIN_SLOTS_N		40	/* 覆盖 slot0/4/7/8 足够 */
 #define WIN_MBOX3_N		8
 
 static void __iomem *win_slots, *win_v23, *win_v1;
+static void __iomem *tcm_base;
 
 static size_t win_dump(char *p, size_t sz, const char *tag,
 		       void __iomem *base, unsigned int pa, int n)
@@ -52,14 +54,15 @@ static ssize_t mcupm_dep_read(char *ToUserBuf, size_t sz, void *priv)
 		return -EINVAL;
 
 	if (!win_slots) {
-		win_slots = ioremap(WIN_SLOTS_PA, WIN_SLOTS_N * 4);
+		win_slots = ioremap(WIN_SLOTS_PA, 40 * 4);
 		win_v23 = ioremap(WIN_MBOX3_V23_PA, WIN_MBOX3_N * 4);
 		win_v1 = ioremap(WIN_MBOX3_V1_PA, WIN_MBOX3_N * 4);
-		if (!win_slots || !win_v23 || !win_v1)
+		tcm_base = ioremap(MCUPM_TCM_PA, TCM_SZ);
+		if (!win_slots || !win_v23 || !win_v1 || !tcm_base)
 			return -ENOMEM;
 	}
 
-	used += scnprintf(p, sz,
+	used += scnprintf(p + used, sz - used,
 		"==== MCUPM DEPD handshake windows (read-only) ====\n");
 	used += win_dump(p + used, sz - used, "kernel-slot window",
 			 win_slots, WIN_SLOTS_PA, WIN_SLOTS_N);
@@ -70,6 +73,31 @@ static ssize_t mcupm_dep_read(char *ToUserBuf, size_t sz, void *priv)
 			 win_v23, WIN_MBOX3_V23_PA, WIN_MBOX3_N);
 	used += win_dump(p + used, sz - used, "tf-a mbox3 v1",
 			 win_v1, WIN_MBOX3_V1_PA, WIN_MBOX3_N);
+
+	/* TCM 全域稀疏扫描：只列非零字（全零 = 固件未运行），上限 60 行 */
+	{
+		unsigned int off, nz = 0, shown = 0;
+		u32 prev = 0;
+
+		used += scnprintf(p + used, sz - used,
+			"==== TCM full sweep (non-zero words, cap 60) ====\n");
+		for (off = 0; off < TCM_SZ; off += 4) {
+			u32 val = readl(tcm_base + off);
+
+			if (!val)
+				continue;
+			nz++;
+			if (shown >= 60 || val == prev)
+				continue;
+			used += scnprintf(p + used, sz - used,
+				"off=0x%05X val=0x%08x\n", off, val);
+			shown++;
+			prev = val;
+		}
+		used += scnprintf(p + used, sz - used,
+			"==== nonzero words total: %u / %u ====\n",
+			nz, (unsigned int)(TCM_SZ / 4));
+	}
 
 	return used;
 }
