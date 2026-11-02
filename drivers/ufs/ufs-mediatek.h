@@ -27,7 +27,9 @@
 /*
  * MCQ define and struct
  */
-#define UFSHCD_MAX_Q_NR 8
+/* rodin 6.18（2026-11-03）：容量上限抬到 16；实际申请的 IRQ 数在
+ * ufs_mtk_init_mcq_irq() 里按控制器 MCQCAP 报告值夹紧 */
+#define UFSHCD_MAX_Q_NR 16
 #define MTK_MCQ_INVALID_IRQ	0xFFFF
 
 #define UFSHCD_ENABLE_MTK_MCQ_INTRS	\

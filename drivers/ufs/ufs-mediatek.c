@@ -1482,8 +1482,19 @@ static void ufs_mtk_init_mcq_irq(struct ufs_hba *hba)
 	struct platform_device *pdev;
 	int i;
 	int irq;
+	u32 mcqcap;
 
-	host->mcq_nr_intr = UFSHCD_MAX_Q_NR;
+	/*
+	 * rodin 6.18（2026-11-03，MCQ 队列数按控制器能力夹紧）：
+	 * UFSHCD_MAX_Q_NR=16 只是数组容量上限，实际申请的 IRQ 数取
+	 * min(16, MCQCAP[7:0] + 1)，与 core ufshcd_mcq_config_nr_queues()
+	 * 的 hba_maxq 口径一致（MCQCAP 为 0-based 队列数）。此前按编译期
+	 * 常量申请，控制器报告队列数更少时会多请求一堆用不到的 IRQ，
+	 * DT 条目不足时 platform_get_irq() 失败还会整体禁用 MCQ。
+	 */
+	mcqcap = ufshcd_readl(hba, REG_MCQCAP);
+	host->mcq_nr_intr = min_t(u32, UFSHCD_MAX_Q_NR,
+				  (u32)FIELD_GET(GENMASK(7, 0), mcqcap) + 1);
 	pdev = container_of(hba->dev, struct platform_device, dev);
 
 	/* invalidate irq info */
@@ -1553,9 +1564,12 @@ static int ufs_mtk_cpu_online_notify(unsigned int cpu, struct hlist_node *node)
 	if (hba->mcq_enabled && cpu != 0) {
 		ufs_mtk_mcq_set_irq_affinity(hba, cpu);
 
-		/* Migrate irq of cpu0 to cpu3 */
-		if (cpu == 3)
-			ufs_mtk_mcq_set_irq_affinity(hba, 0);
+		/*
+		 * rodin 6.18（2026-11-03）：删去 cpu==3 时把 qid0 中断再改绑一次
+		 * 的特殊分支。它与逐 CPU 绑定叠加，把 CPU3 上线瞬间的两个队列
+		 * 中断压到同一颗核上，亲和性反复覆盖，表现为 UFS 完成中断延迟
+		 * 抖动；各在线 CPU 只绑自己的队列，均衡交给 IRQ 子系统。
+		 */
 	}
 #endif
 
@@ -1657,10 +1671,6 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 	/* Initialize host capability */
 	ufs_mtk_init_host_caps(hba);
 
-#ifdef CONFIG_UFS_MEDIATEK_MCQ
-	ufs_mtk_init_mcq_irq(hba);
-#endif
-
 	err = ufs_mtk_bind_mphy(hba);
 	if (err)
 		goto out_variant_clear;
@@ -1732,6 +1742,15 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 	ufs_mtk_setup_clocks(hba, true, POST_CHANGE);
 
 	ufs_mtk_get_hw_ip_version(hba);
+
+#ifdef CONFIG_UFS_MEDIATEK_MCQ
+	/*
+	 * rodin 6.18（2026-11-03）：MCQ IRQ 初始化移到 clocks/PHY 就绪之后，
+	 * 使 ufs_mtk_init_mcq_irq() 内的 MCQCAP 读取有效（此前紧跟
+	 * init_host_caps，控制器寄存器尚不可读，无法按能力夹紧队列数）。
+	 */
+	ufs_mtk_init_mcq_irq(hba);
+#endif
 
 #if IS_ENABLED(CONFIG_MTK_UFS_DEBUG_BUILD)
 	ufs_mtk_check_bus_init(host->ip_ver);
@@ -3162,6 +3181,15 @@ static int ufs_mtk_config_mcq_irq(struct ufs_hba *hba)
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
 	u32 irq, i;
 	int ret;
+
+	/*
+	 * rodin 6.18（2026-11-03）：init 按 MCQCAP 取到的上限可能大于 core
+	 * 实际启用的硬件队列数（hba->uhq[] 只分配 nr_hw_queues 项）。这里
+	 * 只注册真正启用队列的 IRQ 并同步收缩 mcq_nr_intr，enable/disable
+	 * 循环才不会碰到未 request 的中断，qid 也不会越出 uhq 数组。
+	 */
+	if (host->mcq_nr_intr > hba->nr_hw_queues)
+		host->mcq_nr_intr = hba->nr_hw_queues;
 
 	for (i = 0; i < host->mcq_nr_intr; i++) {
 		irq = host->mcq_intr_info[i].irq;
