@@ -1629,11 +1629,42 @@ static int mminfra_pm_suspend_noirq(struct device *dev)
 	return 0;
 }
 
+static int mminfra_pm_resume_noirq(struct device *dev)
+{
+	pr_notice("mminfra resume noirq\n");
+	if (mm_pwr_ver <= mm_pwr_v2) {
+		if (vcp_gipc) {
+			writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
+			pr_notice("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
+		}
+	}
+	return 0;
+}
+
+/*
+ * rodin 6.18 (2026-11-03): raw GIPC resume request without the hwvoter clock
+ * vote. The voter polls VCP ready before enabling the clock and the ready bit
+ * is only set by VCP fw after it receives this resume write, so routing the
+ * wake through the voter deadlocks while VCP fw is asleep after a suspend
+ * abort (prepare already sent MM_SYS_SUSPEND, complete runs too late).
+ */
+void mtk_mminfra_vcp_wake_request(void)
+{
+	if (mm_pwr_ver <= mm_pwr_v2) {
+		if (vcp_gipc) {
+			writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
+			pr_notice("mminfra vcp wake request\n");
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(mtk_mminfra_vcp_wake_request);
+
 static const struct dev_pm_ops mminfra_debug_pm_ops = {
 	.prepare = mminfra_pm_prepare,
 	.complete = mminfra_pm_complete,
 	.suspend = mminfra_pm_suspend,
 	.suspend_noirq = mminfra_pm_suspend_noirq,
+	.resume_noirq = mminfra_pm_resume_noirq,
 };
 
 static const struct of_device_id of_mminfra_debug_match_tbl[] = {
