@@ -24,6 +24,7 @@
 #include "scpsys.h"
 #include "mtk-scpsys.h"
 #include "clkchk.h"
+#include "../../misc/mediatek/mminfra/mtk-mminfra-debug.h"
 
 #include <dt-bindings/power/mt2701-power.h>
 #include <dt-bindings/power/mt2712-power.h>
@@ -45,6 +46,7 @@
 #define MTK_POLL_DELAY_US		10
 #define MTK_POLL_300MS_TIMEOUT		(300 * USEC_PER_MSEC)
 #define MTK_POLL_1S_TIMEOUT		USEC_PER_SEC
+#define MTK_POLL_VCP_WAKE_TIMEOUT	(50 * USEC_PER_MSEC)
 #define MTK_POLL_IRQ_DELAY_US		3
 #define MTK_POLL_IRQ_TIMEOUT		USEC_PER_SEC
 #define MTK_POLL_HWV_PREPARE_CNT	2500
@@ -146,7 +148,37 @@ static const struct scpsys_plat_ops *scpsys_ops;
 static void turn_onoff_infra(enum infra_onoff_enum on);
 static bool mtk_check_vcp_is_ready(struct scp_domain *scpd);
 
-void mtk_mminfra_vcp_wake_request(void);
+/*
+ * rodin 6.18（2026-11-03）：WAIT_VCP 的统一等待点（原 5 处复制）。
+ * suspend 展开期 VCP 被 prepare 的 MM_SYS_SUSPEND 有意送睡，唤醒要等
+ * resume_noirq/complete：该窗口内超时属预期，单条告警后按上电成功继续。
+ * 运行期真超时：请求唤醒后只做 50ms 短轮询（替代原来的 1s 全量重轮，
+ * 显式唤醒后再耗 1s 无意义且拉长 noirq 停滞），
+ * 仍失败则返回错误，由调用方走原 unwind 并只打一条诊断。
+ */
+static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
+{
+	int ret, tmp;
+
+	ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
+					tmp > 0, MTK_POLL_DELAY_US,
+					MTK_POLL_1S_TIMEOUT);
+	if (!ret)
+		return 0;
+
+	if (mtk_mminfra_vcp_sleep_prepared()) {
+		pr_warn_ratelimited("[scpsys] %s: vcp asleep in suspend window, skip wait\n",
+				    name);
+		return 0;
+	}
+
+	mtk_mminfra_vcp_wake_request();
+
+	return readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
+					  tmp > 0, MTK_POLL_DELAY_US,
+					  MTK_POLL_VCP_WAKE_TIMEOUT);
+}
+
 static DEFINE_SPINLOCK(hwv_infra_lock);
 #define hwccf_lock(flags)   spin_lock_irqsave(&hwv_infra_lock, flags)
 #define hwccf_unlock(flags) spin_unlock_irqrestore(&hwv_infra_lock, flags)
@@ -631,21 +663,9 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 
 	/* wait until vcp is ready, for HFRP base MTCMOS */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_WAIT_VCP)) {
-		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-				MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-		if (ret < 0) {
-			/*
-			 * rodin 6.18 (2026-11-03): on suspend-abort resume VCP fw may be
-			 * asleep (prepare sent GIPC suspend, the wake only arrives at
-			 * complete, which runs after this power_on). Request the wake here
-			 * and re-poll once before failing.
-			 */
-			mtk_mminfra_vcp_wake_request();
-			ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-					MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-			if (ret < 0)
-				goto err_vcp_ready;
-		}
+		ret = scpsys_wait_vcp_ready(scpd, genpd->name);
+		if (ret < 0)
+			goto err_vcp_ready;
 	}
 
 	dev_dbg(scp->dev, "[scpsys] %s: vcp-ok\n", genpd->name);
@@ -834,21 +854,9 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 
 	/* wait until vcp is ready, for HFRP base MTCMOS */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_WAIT_VCP)) {
-		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-				MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-		if (ret < 0) {
-			/*
-			 * rodin 6.18 (2026-11-03): on suspend-abort resume VCP fw may be
-			 * asleep (prepare sent GIPC suspend, the wake only arrives at
-			 * complete, which runs after this power_on). Request the wake here
-			 * and re-poll once before failing.
-			 */
-			mtk_mminfra_vcp_wake_request();
-			ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-					MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-			if (ret < 0)
-				goto err_vcp_ready;
-		}
+		ret = scpsys_wait_vcp_ready(scpd, genpd->name);
+		if (ret < 0)
+			goto err_vcp_ready;
 	}
 
 	ret = scpsys_clk_enable(scpd->lp_clk, MAX_CLKS);
@@ -1253,21 +1261,9 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_WAIT_VCP)) {
 		/* wait until vcp is ready, check 0x1c00091c[1] = 1 */
-		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd,
-				tmp, tmp > 0, MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-		if (ret < 0) {
-			/*
-			 * rodin 6.18 (2026-11-03): on suspend-abort resume VCP fw may be
-			 * asleep (prepare sent GIPC suspend, the wake only arrives at
-			 * complete, which runs after this power_on). Request the wake here
-			 * and re-poll once before failing.
-			 */
-			mtk_mminfra_vcp_wake_request();
-			ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-					MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-			if (ret < 0)
-				goto err_vcp_ready;
-		}
+		ret = scpsys_wait_vcp_ready(scpd, genpd->name);
+		if (ret < 0)
+			goto err_vcp_ready;
 	}
 
 	dev_dbg(scp->dev, "[scpsys] %s: hwv vcp-ok\n", genpd->name);
@@ -1373,21 +1369,9 @@ static int scpsys_hwv_power_off(struct generic_pm_domain *genpd)
 
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_WAIT_VCP)) {
 		/* wait until vcp is ready, check 0x1c00091c[1] = 1 */
-		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd,
-				tmp, tmp > 0, MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-		if (ret < 0) {
-			/*
-			 * rodin 6.18 (2026-11-03): on suspend-abort resume VCP fw may be
-			 * asleep (prepare sent GIPC suspend, the wake only arrives at
-			 * complete, which runs after this power_on). Request the wake here
-			 * and re-poll once before failing.
-			 */
-			mtk_mminfra_vcp_wake_request();
-			ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-					MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-			if (ret < 0)
-				goto err_vcp_ready;
-		}
+		ret = scpsys_wait_vcp_ready(scpd, genpd->name);
+		if (ret < 0)
+			goto err_vcp_ready;
 	}
 
 	ret = scpsys_clk_enable(scpd->lp_clk, MAX_CLKS);
@@ -1595,21 +1579,9 @@ int __mminfra_hwv_power_ctrl(struct scp_domain *scpd, struct regmap *regmap,
 
 	/* wait until vcp is ready, check 0x1c00091c[1] = 1 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_WAIT_VCP)) {
-		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-				MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-		if (ret < 0) {
-			/*
-			 * rodin 6.18 (2026-11-03): on suspend-abort resume VCP fw may be
-			 * asleep (prepare sent GIPC suspend, the wake only arrives at
-			 * complete, which runs after this power_on). Request the wake here
-			 * and re-poll once before failing.
-			 */
-			mtk_mminfra_vcp_wake_request();
-			ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp, tmp > 0,
-					MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-			if (ret < 0)
-				goto err_vcp_ready;
-		}
+		ret = scpsys_wait_vcp_ready(scpd, name);
+		if (ret < 0)
+			goto err_vcp_ready;
 	}
 
 	val = BIT(scpd->data->hwv_shift);

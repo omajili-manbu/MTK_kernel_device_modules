@@ -70,6 +70,14 @@ int mtk_mminfra_dbg_hang_detect(const char *user, bool skip_pm_runtime);
 
 void mtk_mminfra_off_gipc(void);
 
+#if IS_ENABLED(CONFIG_MTK_MMINFRA_DEBUG_STACK)
+void mtk_mminfra_vcp_wake_request(void);
+bool mtk_mminfra_vcp_sleep_prepared(void);
+#else
+static inline void mtk_mminfra_vcp_wake_request(void) { }
+static inline bool mtk_mminfra_vcp_sleep_prepared(void) { return false; }
+#endif
+
 #else
 
 static inline int mtk_mminfra_dbg_hang_detect(const char *user, bool skip_pm_runtime)
@@ -78,6 +86,8 @@ static inline int mtk_mminfra_dbg_hang_detect(const char *user, bool skip_pm_run
 }
 
 static inline void mtk_mminfra_off_gipc(void) { }
+static inline void mtk_mminfra_vcp_wake_request(void) { }
+static inline bool mtk_mminfra_vcp_sleep_prepared(void) { return false; }
 
 #endif /* CONFIG_MTK_MMINFRA */
 

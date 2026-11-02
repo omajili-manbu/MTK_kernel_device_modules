@@ -92,6 +92,8 @@ static u32 bkrs_reg_pa;
 static u32 mm_pwr_ver;
 static bool mminfra_ao_base;
 static bool vcp_gipc;
+/* rodin 6.18（2026-11-03）：prepare 已送睡 VCP、尚未唤醒的窗口。 */
+static bool vcp_sleep_prepared;
 static bool no_sleep_pd_cb;
 static bool skip_apsrc;
 static bool has_infra_hfrp;
@@ -1591,6 +1593,8 @@ static int mminfra_pm_prepare(struct device *dev)
 	if (mm_pwr_ver <= mm_pwr_v2) {
 		if (vcp_gipc) {
 			mtk_clk_mminfra_hwv_power_ctrl_optional(true, CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
+			/* rodin 6.18（2026-11-03）：置位睡眠标志供 scpsys 判分支。 */
+			WRITE_ONCE(vcp_sleep_prepared, true);
 			writel(MM_SYS_SUSPEND, dbg->vcp_gipc_in_set);
 			pr_notice("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
 			mtk_clk_mminfra_hwv_power_ctrl_optional(false, CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
@@ -1610,6 +1614,7 @@ static void mminfra_pm_complete(struct device *dev)
 				readl(dbg->vlp_base+0x91c));
 			pr_notice("mminfra dummy2 = 0x%x\n", readl(dbg->mminfra_base+0x408));
 			writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
+			WRITE_ONCE(vcp_sleep_prepared, false);
 			pr_notice("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
 			mtk_clk_mminfra_hwv_power_ctrl_optional(false,
 				CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
@@ -1629,13 +1634,18 @@ static int mminfra_pm_suspend_noirq(struct device *dev)
 	return 0;
 }
 
+/*
+ * rodin 6.18（2026-11-03）：只有 prepare 真的把 VCP 送睡（标志置位）才补
+ * RESUME；正常成功 resume 不再打两条 notice。
+ */
 static int mminfra_pm_resume_noirq(struct device *dev)
 {
-	pr_notice("mminfra resume noirq\n");
+	pr_debug("mminfra resume noirq\n");
 	if (mm_pwr_ver <= mm_pwr_v2) {
-		if (vcp_gipc) {
+		if (vcp_gipc && READ_ONCE(vcp_sleep_prepared)) {
 			writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
-			pr_notice("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
+			WRITE_ONCE(vcp_sleep_prepared, false);
+			pr_debug("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
 		}
 	}
 	return 0;
@@ -1658,6 +1668,16 @@ void mtk_mminfra_vcp_wake_request(void)
 	}
 }
 EXPORT_SYMBOL_GPL(mtk_mminfra_vcp_wake_request);
+
+/*
+ * rodin 6.18（2026-11-03）：供 scpsys 判断 WAIT_VCP 超时是否落在
+ * suspend 展开期（VCP 有意睡着）。
+ */
+bool mtk_mminfra_vcp_sleep_prepared(void)
+{
+	return READ_ONCE(vcp_sleep_prepared);
+}
+EXPORT_SYMBOL_GPL(mtk_mminfra_vcp_sleep_prepared);
 
 static const struct dev_pm_ops mminfra_debug_pm_ops = {
 	.prepare = mminfra_pm_prepare,
