@@ -1001,6 +1001,18 @@ static void probe_android_rvh_rtmutex_prepare_setprio(void *ignore, struct task_
 	struct rq_flags rf;
 	struct rq *rq;
 
+	/*
+	 * rodin 6.18（2026-11-03）：本回调处于 rtmutex wait_lock+pi_lock 持有
+	 * 段（rt_mutex_adjust_prio），下方 __task_rq_lock 与上游
+	 * rt_mutex_setprio 自身在同一 wait_lock 临界区内的取锁同向同集，非新
+	 * 增锁对；PROXY_EXEC 的 find_proxy_task 只取 mutex/rwsem 的 wait_lock
+	 * （blocked_on 类型仅 BO_T_MUTEX/BO_T_RWSEM，futex PI 不写
+	 * blocked_on），非 PREEMPT_RT 下 mutex/rwsem 阻塞不经 rtmutex ⇒ 两侧
+	 * wait_lock 种群不相交，无反序环。重审触发 = 切 PREEMPT_RT /
+	 * blocked_on 扩枚举接入 rtmutex / 调度侧新增其他持 rq 锁取 wait_lock
+	 * 的点。
+	 */
+
 	/* if rt boost, recover prio with backup */
 	if (unlikely(is_turbo_task(p))) {
 		if (!dl_prio(p->prio) && !rt_prio(p->prio)) {
