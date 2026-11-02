@@ -369,7 +369,7 @@ static int __init mcupm_reserve_mem_of_init(struct reserved_mem *rmem)
 RESERVEDMEM_OF_DECLARE(mcupm_reservedmem, MCUPM_MEM_RESERVED_KEY,
 	mcupm_reserve_mem_of_init);
 
-static int mcupm_reserve_memory_init(void)
+static int __maybe_unused mcupm_reserve_memory_init(void)
 {
 	unsigned int id;
 	phys_addr_t accumlate_memory_size;
