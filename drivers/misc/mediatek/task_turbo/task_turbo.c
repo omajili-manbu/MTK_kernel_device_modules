@@ -127,6 +127,10 @@ static DEFINE_MUTEX(enforced_qualified_lock);
 static pid_t turbo_pid[TURBO_PID_COUNT] = {0};
 static unsigned int task_turbo_feats;
 static struct task_struct *inherited_rwsem_owners[INHERITED_RWSEM_COUNT] = {NULL};
+/* rodin 6.18（2026-11-03）：wait_lock 域内只记账不调锁，rwsem 继承的 apply/unset
+ * 旗标挂在本数组，由 tt_rwsem_tuning_worker 进程上下文消费（同守 RWSEM_SPIN_LOCK）。 */
+static bool rwsem_tuning_apply_pending[INHERITED_RWSEM_COUNT];
+static bool rwsem_tuning_unset_pending[INHERITED_RWSEM_COUNT];
 
 static bool is_turbo_task(struct task_struct *p);
 /* rodin 6.9：tt_idle_cpu() 是 6.6 idle_cpu() 的本地副本，改名后内核头不再提供声明，
@@ -188,6 +192,8 @@ static void tt_vip_event_handler(struct work_struct *work);
 static DECLARE_WORK(tt_vip_worker, tt_vip_event_handler);
 static void tt_vip_periodic_handler(struct work_struct *work);
 static DECLARE_WORK(tt_vip_periodic_worker, tt_vip_periodic_handler);
+static void tt_rwsem_tuning_worker(struct work_struct *work);
+static DECLARE_WORK(tt_rwsem_tuning_wk, tt_rwsem_tuning_worker);
 static int ssid_tgid;
 static int sui_tgid;
 static int f_tgid;
@@ -1481,32 +1487,35 @@ static void rwsem_stop_turbo_inherit(struct rw_semaphore *sem)
 	int i;
 	bool found = false;
 
-	/* rodin 6.18（2026-10-30）：write wait_finish 钩子在成功取锁路径的
-	 * sem->wait_lock 持中触发，stop_turbo_inherit→unset_scheduler_tuning
-	 * 的 set_user_nice(owner) 取 task_rq_lock，与 PROXY_EXEC
-	 * find_proxy_task（rq→wait_lock）互为反序可成环——与 start 成对门
-	 * （start 被门则无记录，本函数经 get_inherit_task() 亦自然走空）。 */
-	if (sched_proxy_exec())
-		return;
-
+	/* rodin 6.18（2026-11-03）：write wait_finish 钩子在成功取锁路径的
+	 * sem->wait_lock 持中触发，set_user_nice 取 task_rq_lock，与 PROXY_EXEC
+	 * find_proxy_task（rq→wait_lock）互为反序可成环 ⇒ unset 不在本域内联：
+	 * 继承态归零（最后一个继承源离场）时置 unset_pending 交
+	 * tt_rwsem_tuning_worker 进程上下文收尾；仍有多源继承时仅回收本槽位，
+	 * 与 stock 内联形态相同，worker 只被真实终态跃迁唤醒。 */
 	spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
 	inherited_owner = get_inherit_task(sem);
 	if (!inherited_owner)
 		goto out_unlock;
 
 	for (i = 0; i < INHERITED_RWSEM_COUNT; i++)
-		if (inherited_rwsem_owners[i] == inherited_owner) {
+		if (inherited_rwsem_owners[i] == inherited_owner &&
+		    !rwsem_tuning_unset_pending[i]) {
 			found = true;
-			inherited_rwsem_owners[i] = NULL;
 			break;
 		}
 	if (!found)
 		goto out_unlock;
 
-	stop_turbo_inherit(inherited_owner, RWSEM_INHERIT);
+	if (stop_turbo_inherit(inherited_owner, RWSEM_INHERIT)) {
+		rwsem_tuning_unset_pending[i] = true;
+		queue_work(system_highpri_wq, &tt_rwsem_tuning_wk);
+	} else {
+		inherited_rwsem_owners[i] = NULL;
+		put_task_struct(inherited_owner);
+	}
 	sem->android_vendor_data1 = 0;
 	trace_turbo_inherit_end(inherited_owner);
-	put_task_struct(inherited_owner);
 
 out_unlock:
 	spin_unlock_irqrestore(&RWSEM_SPIN_LOCK, flags);
@@ -1515,7 +1524,7 @@ out_unlock:
 static void rwsem_start_turbo_inherit(struct rw_semaphore *sem)
 {
 	unsigned long flags;
-	bool should_inherit;
+	bool should_inherit, need_boost;
 	struct task_struct *owner, *inherited_owner;
 	struct task_turbo_t *turbo_data;
 	int i;
@@ -1524,14 +1533,13 @@ static void rwsem_start_turbo_inherit(struct rw_semaphore *sem)
 	if (!sub_feat_enable(SUB_FEAT_LOCK))
 		return;
 
-	/* rodin 6.18（2026-10-30）：wait_start 钩子在 sem->wait_lock 持中触发，
-	 * start_turbo_inherit→set_scheduler_tuning 的 set_user_nice(owner) 取
-	 * task_rq_lock，与 PROXY_EXEC find_proxy_task（rq→wait_lock）互为反序
-	 * 可成环；等待者重要性经 donor 继承原生传递，PROXY_EXEC 下整条 rwsem
-	 * 继承让位——与 stop 成对门，无残留态。 */
-	if (sched_proxy_exec())
-		return;
-
+	/* rodin 6.18（2026-11-03）：wait_start 钩子在 sem->wait_lock 持中触发，
+	 * set_user_nice 取 task_rq_lock，与 PROXY_EXEC find_proxy_task
+	 * （rq→wait_lock）互为反序可成环 ⇒ 优先级/VVIP 调整不再内联：本函数
+	 * 只在 RWSEM_SPIN_LOCK 内记账并置 apply_pending，由
+	 * tt_rwsem_tuning_worker 进程上下文重推演 inherit_types 后落
+	 * set_scheduler_tuning；PROXY_EXEC 下 donor 继承原生传递重要性，
+	 * 本链恢复为叠加增强。 */
 	spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
 	owner = tt_rwsem_owner(sem);
 	should_inherit = should_set_inherit_turbo(current);
@@ -1544,17 +1552,26 @@ static void rwsem_start_turbo_inherit(struct rw_semaphore *sem)
 			for (i = 0; i < INHERITED_RWSEM_COUNT; i++)
 				if (!inherited_rwsem_owners[i]) {
 					found = true;
-					inherited_rwsem_owners[i] = owner;
 					break;
 				}
 			if (!found)
 				goto out_unlock;
+			/* 仅当本次记账把继承态从无到有时才唤 worker：owner 已在
+			 * boost（binder/他槽）时 apply 只是 no-op，免一趟派发。 */
+			need_boost = atomic_read(
+				&get_task_turbo_t(owner)->inherit_types) == 0;
+			inherited_rwsem_owners[i] = owner;
 			get_task_struct(owner);
 			start_turbo_inherit(owner,
 					    RWSEM_INHERIT,
 					    turbo_data->inherit_cnt);
 			sem->android_vendor_data1 = (u64)owner;
 			trace_turbo_inherit_start(current, owner);
+			if (need_boost) {
+				rwsem_tuning_apply_pending[i] = true;
+				queue_work(system_highpri_wq,
+					   &tt_rwsem_tuning_wk);
+			}
 		}
 	}
 out_unlock:
@@ -1575,8 +1592,8 @@ static bool start_turbo_inherit(struct task_struct *task,
 	if (turbo_data->inherit_cnt < cnt + 1)
 		turbo_data->inherit_cnt = cnt + 1;
 
-	/* scheduler tuning start */
-	set_scheduler_tuning(task);
+	/* scheduler tuning 改由调用方落：binder 上下文内联（无 wait_lock），
+	 * rwsem 链经 tt_rwsem_tuning_worker（wait_lock 域内禁调锁）。 */
 	return true;
 }
 
@@ -1601,8 +1618,8 @@ static bool stop_turbo_inherit(struct task_struct *task,
 	if (inherit_types > 0)
 		goto done;
 
-	/* scheduler tuning stop */
-	unset_scheduler_tuning(task);
+	/* scheduler tuning stop 由调用方落：binder 上下文内联（无 wait_lock），
+	 * rwsem 链经 tt_rwsem_tuning_worker（wait_lock 域内禁调锁）。 */
 	turbo_data->inherit_cnt = 0;
 	ret = true;
 done:
@@ -1641,6 +1658,63 @@ static inline void unset_scheduler_tuning(struct task_struct *task)
 
 	trace_turbo_vvip_unset(task_pid_nr(task));
 	trace_sched_turbo_nice_set(task, cur_prio, task->prio);
+}
+
+/*
+ * rodin 6.18（2026-11-03）：rwsem 继承的调度侧收口件。wait_start/wait_finish
+ * 钩子均在 sem->wait_lock 持中触发，set_user_nice 的 task_rq_lock 与
+ * PROXY_EXEC find_proxy_task（rq→wait_lock）互为反序，不得在钩子上下文
+ * 内联；槽位侧只记账（apply/unset 旗标 + 引用），本 worker 进程上下文按
+ * inherit_types 现值重推演后落 set/unset_scheduler_tuning，并回收 unset
+ * 侧槽位引用。apply 与 unset 可能对同一槽位先后挂起（如 boost 后紧接
+ * 归还），重推演使乱序/缺步事件仍收敛到与内联序一致的终态。
+ */
+static void tt_rwsem_tuning_worker(struct work_struct *work)
+{
+	int i;
+
+	for (i = 0; i < INHERITED_RWSEM_COUNT; i++) {
+		unsigned long flags;
+		struct task_struct *task;
+		struct task_turbo_t *turbo_data;
+		bool apply, unset;
+
+		spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
+		task = inherited_rwsem_owners[i];
+		apply = task && rwsem_tuning_apply_pending[i];
+		unset = task && rwsem_tuning_unset_pending[i];
+		/* 自持引用：处理窗内槽位可能被他端内联回收（多源继承的中间
+		 * 站），worker 的存活性不依赖槽位引用；flagless 槽位不取。 */
+		if (apply || unset)
+			get_task_struct(task);
+		spin_unlock_irqrestore(&RWSEM_SPIN_LOCK, flags);
+
+		if (!apply && !unset)
+			continue;
+
+		if (apply) {
+			turbo_data = get_task_turbo_t(task);
+			if (atomic_read(&turbo_data->inherit_types) > 0)
+				set_scheduler_tuning(task);
+		}
+		if (unset) {
+			turbo_data = get_task_turbo_t(task);
+			if (atomic_read(&turbo_data->inherit_types) == 0)
+				unset_scheduler_tuning(task);
+		}
+
+		spin_lock_irqsave(&RWSEM_SPIN_LOCK, flags);
+		if (inherited_rwsem_owners[i] == task) {
+			rwsem_tuning_apply_pending[i] = false;
+			if (unset) {
+				rwsem_tuning_unset_pending[i] = false;
+				inherited_rwsem_owners[i] = NULL;
+				put_task_struct(task);
+			}
+		}
+		spin_unlock_irqrestore(&RWSEM_SPIN_LOCK, flags);
+		put_task_struct(task);
+	}
 }
 
 static inline void add_inherit_types(struct task_struct *task, int type)
@@ -1684,6 +1758,10 @@ static bool binder_start_turbo_inherit(struct task_struct *from,
 		from_turbo_data = get_task_turbo_t(from);
 		ret = start_turbo_inherit(to, BINDER_INHERIT,
 					from_turbo_data->inherit_cnt);
+		/* rodin 6.18（2026-11-03）：tuning 自 start_turbo_inherit 拆出；
+		 * binder 钩子上下文无 wait_lock，renice 内联与 stock 同。 */
+		if (ret)
+			set_scheduler_tuning(to);
 		trace_turbo_inherit_start(from, to);
 	}
 done:
@@ -1693,7 +1771,8 @@ done:
 static void binder_stop_turbo_inherit(struct task_struct *p)
 {
 	if (is_inherit_turbo(p, BINDER_INHERIT)) {
-		stop_turbo_inherit(p, BINDER_INHERIT);
+		if (stop_turbo_inherit(p, BINDER_INHERIT))
+			unset_scheduler_tuning(p);
 		trace_turbo_inherit_end(p);
 	}
 }
