@@ -113,6 +113,16 @@ struct system_heap_buffer {
 
 /* numeric truth lives in mtk_page_pool.h next to the shared externs */
 
+/*
+ * rodin 6.18（2026-11-03）：lowmark 的单位口径待 blob IDA 定性 ——
+ * 池侧直接按 chunk 数比较（need_free_to_reserve_pool / refill 线程），
+ * 而释放侧溢出判据用 RESERVE_POOL_CAP_CHUNKS >> orders[j]（把 0x6400
+ * 按页数折成当前 order 的 chunk 数），两套换算对 order>0 并不一致，
+ * 此处照 blob 直译保留、不动逻辑。
+ */
+/* D2b: order-0 reserve 池每批补页上限（lowmark 150/300，32/批 兼顾
+ * pcp 批量收益与批间水位复查粒度） */
+#define RESERVE_REFILL_BULK	32
 static int g_reserve_config[2][5] = {
 	/* { lowmark[order8], lowmark[order4], lowmark[order0], timeout_sec, slow_alloc_us } */
 	{ 15, 3200, 150, 100, 1000 },	/* totalram <= 8G */
@@ -330,7 +340,7 @@ static struct page *mtk_extend_sys_heap_alloc_largest_available(
 		unsigned int order = orders[i];
 		bool rsv_empty;
 		int slo, shi, rlo, rhi;
-		u64 t1;
+		u64 t1 = 0;
 
 		if (order > max_order)
 			continue;
@@ -421,13 +431,27 @@ static struct page *mtk_extend_sys_heap_alloc_largest_available(
 
 		/* 3rd: plain alloc with slow-path instrumentation (blob 0xF034) */
 		if (!page) {
-			t1 = ktime_get();
+			u64 now = 0;
+
+			/*
+			 * rodin 6.18（2026-11-03，慢路径计时外提）：慢分配判据
+			 * 只服务 whitelisted（hit）分配，其 last_use_ms 决定
+			 * order-0 reserve 的取用，属池逻辑，保留；普通 chunk
+			 * 不再为每 chunk 付一次 ktime_get()。纯统计计数只在
+			 * debug_mask 非 0 时累计（debug 关闭时为 0，sysfs 文件
+			 * 与格式不变）。
+			 */
+			if (hit)
+				t1 = ktime_get();
 			page = alloc_pages(pool->gfp_mask, pool->order);
-			if (hit && div_u64(ktime_get() - t1, NSEC_PER_USEC) >
+			if (hit)
+				now = ktime_get();
+			if (hit && div_u64(now - t1, NSEC_PER_USEC) >
 				   (u64)reserve_extend_info.slow_alloc_us) {
 				reserve_extend_info.last_use_ms =
-					div_u64(ktime_get(), NSEC_PER_MSEC);
-				reserve_extend_info.stat_slow_alloc++;
+					div_u64(now, NSEC_PER_MSEC);
+				if (reserve_extend_info.debug_mask)
+					reserve_extend_info.stat_slow_alloc++;
 				if (reserve_extend_info.debug_mask & BIT(2)) {
 					reserve_pool_counts(pool, &slo, &shi);
 					reserve_pool_counts(rsv_pool, &rlo, &rhi);
@@ -447,7 +471,7 @@ static struct page *mtk_extend_sys_heap_alloc_largest_available(
 				       leader->comm, current->comm, current->pid,
 				       order, slo, shi, rlo, rhi, hit);
 			}
-			if (order == 0) {
+			if (order == 0 && reserve_extend_info.debug_mask) {
 				if (hit)
 					reserve_extend_info.stat_hit_alloc++;
 				else
@@ -474,6 +498,64 @@ static struct page *mtk_extend_sys_heap_alloc_largest_available(
 	return NULL;
 }
 
+/*
+ * rodin 6.18（2026-11-03，reserve 池批量补页）：单池补页，把 chunk 数
+ * 补到 lowmark。refill kthread 与 init 同步预充共用本函数，lowmark 判据
+ * 与 order-0 限定保持 blob 原样。alloc_pages_bulk() 一批最多
+ * RESERVE_REFILL_BULK 个 order-0 页，批间重读池计数并复查水位；
+ * 每批数量按 (lowmark - total) 限量，不会越过 lowmark。
+ */
+static void reserve_pool_refill_pool(struct mtk_dmabuf_page_pool *pool)
+{
+	int lowmark = reserve_extend_info.lowmark[reserve_slot_of_order(pool->order)];
+	gfp_t gfp = (pool->gfp_mask & ~__GFP_NORETRY) | __GFP_RECLAIM;
+	bool session_start = true;
+	int total;
+
+	/* blob 只补 order-0 池 */
+	if (pool->order != 0 || !reserve_extend_info.enabled)
+		return;
+
+	total = reserve_pool_total_chunks(pool);
+	if (total >= lowmark)
+		return;
+
+	do {
+		struct page *pages[RESERVE_REFILL_BULK];
+		int slot = reserve_slot_of_order(pool->order);
+		int need, nr;
+		unsigned long got, k;
+
+		total = reserve_pool_total_chunks(pool);
+		if (total >= lowmark)
+			break;
+		if (ktime_get() - pool->refill_time <
+		    RESERVE_REFILL_INTERVAL_NS)
+			break;
+		if (session_start) {
+			reserve_extend_info.refill_count[slot]++;
+			reserve_extend_info.refill_last[slot] = 0;
+			session_start = false;
+		}
+		if (!reserve_pool_watermark_ok(pool, pool->gfp_mask)) {
+			pool->refill_time = ktime_get();
+			break;
+		}
+
+		need = lowmark - total;
+		nr = min(need, RESERVE_REFILL_BULK);
+		memset(pages, 0, sizeof(pages));
+		got = alloc_pages_bulk(gfp, nr, pages);
+		if (!got)
+			break;
+		for (k = 0; k < got; k++) {
+			reserve_extend_info.refill_last[slot]++;
+			reserve_extend_info.refill_ok[slot]++;
+			mtk_dmabuf_page_pool_add(pool, pages[k]);
+		}
+	} while (reserve_extend_info.enabled);
+}
+
 /* blob 0xE570; wakes only when a reserve pool drops below its lowmark */
 static int reserve_pool_refill_kthread(void *data)
 {
@@ -482,7 +564,6 @@ static int reserve_pool_refill_kthread(void *data)
 
 	while (i < NUM_ORDERS) {
 		struct mtk_dmabuf_page_pool *pool = pools[i];
-		int lowmark, total;
 
 		/* tripwire：init 已是全有全无（fail 路径整体回滚且不起线程），
 		 * NULL 槽不应存在；blob 同名线程无判空（NULL 即 panic），此处
@@ -490,40 +571,7 @@ static int reserve_pool_refill_kthread(void *data)
 		if (WARN_ON_ONCE(!pool))
 			goto next_pool;
 
-		lowmark = reserve_extend_info.lowmark[reserve_slot_of_order(pool->order)];
-		total = reserve_pool_total_chunks(pool);
-
-		if (total < lowmark && pool->order == 0 && reserve_extend_info.enabled) {
-			gfp_t gfp = (pool->gfp_mask & ~__GFP_NORETRY) | __GFP_RECLAIM;
-			bool session_start = true;
-
-			do {
-				struct page *page;
-				int slot = reserve_slot_of_order(pool->order);
-
-				total = reserve_pool_total_chunks(pool);
-				if (total >= lowmark)
-					break;
-				if (ktime_get() - pool->refill_time <
-				    RESERVE_REFILL_INTERVAL_NS)
-					break;
-				if (session_start) {
-					reserve_extend_info.refill_count[slot]++;
-					reserve_extend_info.refill_last[slot] = 0;
-					session_start = false;
-				}
-				if (!reserve_pool_watermark_ok(pool, pool->gfp_mask)) {
-					pool->refill_time = ktime_get();
-					break;
-				}
-				page = alloc_pages(gfp, pool->order);
-				if (!page)
-					break;
-				reserve_extend_info.refill_last[slot]++;
-				reserve_extend_info.refill_ok[slot]++;
-				mtk_dmabuf_page_pool_add(pool, page);
-			} while (reserve_extend_info.enabled);
-		}
+		reserve_pool_refill_pool(pool);
 
 		if (reserve_extend_info.debug_mask & BIT(1)) {
 			int lo, hi;
@@ -924,6 +972,16 @@ static void mtk_sys_heap_reserve_pool_init(struct mtk_dmabuf_page_pool **page_po
 
 	reserve_extend_info.enabled = 1;
 	reserve_pool_enable = 1;
+
+	/*
+	 * rodin 6.18（2026-11-03，建池预充）：建池后同步按 lowmark 补一轮
+	 * order-0 reserve 池，消除首个相机请求到达时池仍为空、整条路径
+	 * 落到慢速 alloc_pages 的窗口。与 refill 线程共用同一补页函数，
+	 * 判据（order0 限定 / 水位 / 10s 节流）一致。
+	 */
+	for (i = 0; i < NUM_ORDERS; i++)
+		if (system_reserve_pools[i])
+			reserve_pool_refill_pool(system_reserve_pools[i]);
 
 	/* refill 线程先于 sysfs face 就绪；全有全无下只有三池齐了才走到这里 */
 	reserve_refill_task = kthread_create_on_node(reserve_pool_refill_kthread,
