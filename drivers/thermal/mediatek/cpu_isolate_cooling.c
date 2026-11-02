@@ -91,8 +91,10 @@ static int cpu_isolate_probe(struct platform_device *pdev)
 		cpu_isolate_devs[i].cur_state = 0;
 
 		ret = snprintf(cpu_isolate_devs[i].cooler_name, THERMAL_NAME_LENGTH, "%s-%d", name, i);
-		if (ret < 0)
-			pr_notice("%s:%d snprintf error\n", __func__, __LINE__);
+		/* rodin 6.18（2026-11-03）：snprintf 截断返回写入长度而非负值，
+		 * ret >= size 同样是坏名（截断名可能与他簇撞名）。 */
+		if (ret < 0 || ret >= THERMAL_NAME_LENGTH)
+			pr_notice("%s:%d snprintf error or truncated\n", __func__, __LINE__);
 
 		cpu_isolate_devs[i].cdev = thermal_of_cooling_device_register(np, 
 			cpu_isolate_devs[i].cooler_name, &cpu_isolate_devs[i],  &cpu_isolate_cooling_ops);
