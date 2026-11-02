@@ -159,10 +159,10 @@ static void metis_bridge_should_honor_rt_sync(void *unused, struct rq *rq,
 }
 
 /* Stock: MTK affinity layer skipped re-binding VIP-affinity tasks. The
- * 6.18 tree has no MTK affinity re-binder; the decision point survives as
- * an observation bridge over the user-set-affinity gate, recording the
- * stock answer without vetoing user intent. Re-bind point when an MTK
- * affinity layer returns. */
+ * 6.18 MTK re-binder lives in mtk_set_cpus_allowed_ptr (fpsgo-fed
+ * kernel_allowed_mask); since rodin 6.18 (2026-11-03) the migt skip
+ * verdict is honored there, and this bridge remains a syscalls-entry
+ * observation point only. */
 static void metis_bridge_setaffinity_early(void *unused, struct task_struct *p,
 		const struct cpumask *new_mask, bool *retval)
 {

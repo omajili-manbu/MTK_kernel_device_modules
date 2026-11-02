@@ -432,6 +432,10 @@ static void mtk_post_init_entity_util_avg(void *data, struct sched_entity *se)
 	}
 }
 
+/* rodin 6.18（2026-11-03）：migt 游戏模式 skip 槽，本体与注册在
+ * drivers/misc/xiaomi/metis/metis-game-registry.c 与 migt/subsystem-lifecycle.c。 */
+extern bool (*game_migt_should_skip_affinity_task_hook)(void);
+
 static void mtk_set_cpus_allowed_ptr(void *data, struct task_struct *p,
 	struct affinity_context *ctx, bool *skip_user_ptr)
 {
@@ -462,6 +466,18 @@ static void mtk_set_cpus_allowed_ptr(void *data, struct task_struct *p,
 	if (p->user_cpus_ptr &&
 		!(ctx->flags & (SCA_USER | SCA_MIGRATE_ENABLE | SCA_MIGRATE_DISABLE)) &&
 		cpumask_intersects(ctx->new_mask, p->user_cpus_ptr)) {
+		/*
+		 * rodin 6.18（2026-11-03）：migt 游戏模式 mtk_vip 预留非零时，
+		 * stock 的 MTK affinity 重绑对 migt VIP 任务让位。本钩子即 6.18
+		 * 的 MTK 重绑主体（fpsgo 经 set_cpus_allowed_ptr_by_kernel 写
+		 * kernel_allowed_mask），在此接 skip 判定；migt 未配置时恒 false，
+		 * 行为与无门一致。
+		 */
+		bool (*migt_skip_affinity)(void) =
+			READ_ONCE(game_migt_should_skip_affinity_task_hook);
+
+		if (migt_skip_affinity && migt_skip_affinity())
+			return;
 		*skip_user_ptr = true;
 		ctx->new_mask = kernel_allowed_mask;
 		}
