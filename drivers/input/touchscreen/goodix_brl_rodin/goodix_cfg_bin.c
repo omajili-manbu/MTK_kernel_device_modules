@@ -15,6 +15,7 @@
   *
   */
 #include "goodix_ts_core.h"
+#include <linux/rodin_vendor_fw.h>
 
 #define TS_BIN_VERSION_START_INDEX		5
 #define TS_BIN_VERSION_LEN				4
@@ -103,28 +104,37 @@ struct goodix_cfg_bin {
 static int goodix_read_cfg_bin(struct device *dev, const char *cfg_name,
 			struct goodix_cfg_bin *cfg_bin)
 {
-/* =y 内建 fw 加载时序适配（§177 同族，blob 无此改动）：probe 落 vseq 重放波
- * 早于 ueventd 就绪，request_firmware 首轮必败；60s 窗跨过用户态固件助手就绪
- * 点（原 3x200ms 为 blob .ko 时代 init insmod、用户态已就绪的保险窗）。
- * 不动全局宏 GOODIX_RETRY_3（全树 7+ 处消费）。 */
-#define GOODIX_FW_REQ_RETRY     30
-#define GOODIX_FW_REQ_RETRY_MS  2000
+/* rodin 6.18（2026-11-03，goodix cfg-bin 固件门闩）：=y 内建 probe 落
+ * vseq 重放波，早于 first-stage init 挂 /vendor，原 30×2000ms 同步 msleep
+ * 循环等固件（注释自证首轮必败）。改走共享门闩：先 rodin_vendor_fw_wait()，
+ * 门开时先发单次 request_firmware，失败再走 blob 原形态
+ * 3×200ms 兜底（文件真缺的有界重试），门 GAVE_UP 只试一次即返回，不再
+ * 空等。不动全局宏 GOODIX_RETRY_3（全树 7+ 处消费）；同文件族的
+ * goodix_brl_fwupdate.c 另有一条 30×2s 请求循环，不在本条范围。 */
+#define GOODIX_FW_FALLBACK_RETRY	3
+#define GOODIX_FW_FALLBACK_RETRY_MS	200
 
 	const struct firmware *firmware = NULL;
 	int ret;
-	int retry = GOODIX_FW_REQ_RETRY;
+	int try_cnt;
+	bool gate_open;
 
 	ts_info("cfg_bin_name:%s", cfg_name);
 
-	while (retry--) {
+	gate_open = (rodin_vendor_fw_wait() == 0);
+	try_cnt = gate_open ? GOODIX_FW_FALLBACK_RETRY : 1;
+
+	while (try_cnt--) {
 		ret = request_firmware(&firmware, cfg_name, dev);
 		if (!ret)
 			break;
-		ts_info("get cfg bin retry:[%d]", GOODIX_FW_REQ_RETRY - retry);
-		msleep(GOODIX_FW_REQ_RETRY_MS);
+		ts_info("get cfg bin retry:[%d]",
+			GOODIX_FW_FALLBACK_RETRY - try_cnt);
+		msleep(GOODIX_FW_FALLBACK_RETRY_MS);
 	}
-	if (retry < 0) {
-		ts_err("failed get cfg bin[%s] error:%d", cfg_name, ret);
+	if (ret) {
+		ts_err("failed get cfg bin[%s] error:%d (fw gate %s)",
+		       cfg_name, ret, gate_open ? "open" : "gave up");
 		return ret;
 	}
 

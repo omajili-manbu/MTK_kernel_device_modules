@@ -2122,35 +2122,33 @@ static void fts_fwupg_work(struct work_struct *work)
     /* get fw */
     ret = fts_fwupg_get_fw_file(upg);
     if (ret < 0) {
-        if (!rodin_vendor_fw_ready() &&
-            fwupg_retry_cnt < FTS_FWUPG_RETRY_MAX) {
-            /*
-             * -ENOENT almost surely means /vendor/firmware is not
-             * mounted yet: retry on the shared 2s backoff and let the
-             * retry workfn block on the vendor firmware gate.  The
-             * counter bounds this branch -- once the gate gave up
-             * (dir never showed up) it falls through to the terminal
-             * error path instead of ping-ponging at 0 delay.  The
-             * common exit below re-enables the touch IRQ between
-             * rounds so the panel stays alive while waiting.
-             */
-            fwupg_retry_cnt++;
-            FTS_INFO("get file fail, vendor fw dir not ready, wait gate round %d/%d",
-                     fwupg_retry_cnt, FTS_FWUPG_RETRY_MAX);
-            schedule_delayed_work(&fwupg_retry_work, FTS_FWUPG_RETRY_DELAY);
-            goto out;
-        }
         fwupg_retry_cnt++;
         if (fwupg_retry_cnt <= FTS_FWUPG_RETRY_MAX) {
-            FTS_ERROR("get file fail, can't upgrade, retry %d after %ds",
-                      fwupg_retry_cnt, FTS_FWUPG_RETRY_DELAY / HZ);
-            schedule_delayed_work(&fwupg_retry_work, FTS_FWUPG_RETRY_DELAY);
-        } else {
-            FTS_ERROR("get file fail, can't upgrade");   /* _b582-INTB：blob LINE 2101（无 [DIS-TF-TOUCH]） */
-            /* blob 0x2f34c-0x2f368：mi event（TOUCH_EVENT_FWLOAD_ERR,"TpFirmwareLoadFail","focal"） */
-            xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
-                                                   "TpFirmwareLoadFail", "focal");
+            /*
+             * rodin 6.18（2026-11-03，首试零延迟）：
+             * gate already open => /vendor/firmware is mounted and the
+             * file should be reachable, so hand the next attempt back
+             * with no 2s backoff.  Gate still closed => pre-mount
+             * window, keep the 2s fallback and let retry_workfn block
+             * on the shared gate.  The bounded FTS_FWUPG_RETRY_MAX
+             * budget is unchanged.
+             */
+            if (!rodin_vendor_fw_ready()) {
+                FTS_INFO("get file fail, vendor fw dir not ready, wait gate round %d/%d",
+                         fwupg_retry_cnt, FTS_FWUPG_RETRY_MAX);
+                schedule_delayed_work(&fwupg_retry_work,
+                                      FTS_FWUPG_RETRY_DELAY);
+            } else {
+                FTS_INFO("get file fail, vendor fw ready, retry round %d/%d without delay",
+                         fwupg_retry_cnt, FTS_FWUPG_RETRY_MAX);
+                schedule_delayed_work(&fwupg_retry_work, 0);
+            }
+            goto out;
         }
+        FTS_ERROR("get file fail, can't upgrade");   /* _b582-INTB：blob LINE 2101（无 [DIS-TF-TOUCH]） */
+        /* blob 0x2f34c-0x2f368：mi event（TOUCH_EVENT_FWLOAD_ERR,"TpFirmwareLoadFail","focal"） */
+        xiaomi_touch_mievent_report_str_common(TOUCH_EVENT_FWLOAD_ERR, 0,
+                                               "TpFirmwareLoadFail", "focal");
     } else {
         fwupg_retry_cnt = 0;
         /* ic init if have */
