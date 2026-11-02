@@ -241,30 +241,6 @@ TRACE_EVENT(select_turbo_cpu,
 		__entry->max_spare_cpu)
 );
 
-TRACE_EVENT(turbo_futex_plist_add,
-	TP_PROTO(int prev_pid, bool prev_turbo, int next_pid, bool next_turbo),
-	TP_ARGS(prev_pid, prev_turbo, next_pid, next_turbo),
-	TP_STRUCT__entry(
-		__field(int, prev_pid)
-		__field(bool, prev_turbo)
-		__field(int, next_pid)
-		__field(bool, next_turbo)
-	),
-
-	TP_fast_assign(
-		__entry->prev_pid = prev_pid;
-		__entry->prev_turbo = prev_turbo;
-		__entry->next_pid = next_pid;
-		__entry->next_turbo = next_turbo;
-	),
-
-	TP_printk("prev_pid=%d prev_turbo=%d next_pid=%d next_turbo=%d",
-		__entry->prev_pid,
-		__entry->prev_turbo,
-		__entry->next_pid,
-		__entry->next_turbo)
-);
-
 TRACE_EVENT(turbo_prepare_prio_fork,
 	TP_PROTO(struct task_turbo_t *turbo_data, struct task_struct *p),
 	TP_ARGS(turbo_data, p),

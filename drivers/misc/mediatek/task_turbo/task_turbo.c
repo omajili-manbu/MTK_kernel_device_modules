@@ -139,8 +139,6 @@ int tt_idle_cpu(int cpu);
  * ⇒ 原样编译必错。本文件两处调用都是 set_load_weight(p, false)，6.18 版在该分支
  * 执行 `p->se.load = lw`，与旧副本逐位等价。 */
 static void rwsem_stop_turbo_inherit(struct rw_semaphore *sem);
-static void rwsem_list_add(struct task_struct *task, struct list_head *entry,
-				struct list_head *head);
 static bool binder_start_turbo_inherit(struct task_struct *from,
 					struct task_struct *to);
 static void binder_stop_turbo_inherit(struct task_struct *p);
@@ -1082,14 +1080,6 @@ static void probe_android_vh_rwsem_init(void *ignore, struct rw_semaphore *sem)
 	sem->android_vendor_data1 = 0;
 }
 
-static void probe_android_vh_alter_rwsem_list_add(void *ignore, struct rwsem_waiter *waiter,
-							struct rw_semaphore *sem,
-							bool *already_on_list)
-{
-	rwsem_list_add(waiter->task, &waiter->list, &sem->wait_list);
-	*already_on_list = true;
-}
-
 static void probe_android_vh_rwsem_wait_start(void *ignore, struct rw_semaphore *sem)
 {
 	rwsem_start_turbo_inherit(sem);
@@ -1205,40 +1195,6 @@ static void probe_android_vh_binder_restore_priority(void *ignore,
 		binder_stop_turbo_inherit(cur);
 	if (cur && binder_stop_vip_inherit_hook)
 		binder_stop_vip_inherit(cur);
-}
-
-static void probe_android_vh_alter_futex_plist_add(void *ignore, struct plist_node *q_list,
-						struct plist_head *hb_chain, bool *already_on_hb)
-{
-	struct futex_q *this, *next;
-	struct plist_node *current_node = q_list;
-	struct plist_node *this_node;
-	int prev_pid = 0;
-	bool prev_turbo = 1;
-	bool this_turbo;
-
-	if (!sub_feat_enable(SUB_FEAT_LOCK) ||
-	    !is_turbo_task(current)) {
-		*already_on_hb = false;
-		return;
-	}
-
-	plist_for_each_entry_safe(this, next, hb_chain, list) {
-		this_turbo = is_turbo_task(this->task);
-		if ((!this->pi_state || !this->rt_waiter) && !this_turbo) {
-			this_node = &this->list;
-			trace_turbo_futex_plist_add(prev_pid, prev_turbo,
-					this->task->pid, this_turbo);
-			list_add(&current_node->node_list,
-				 this_node->node_list.prev);
-			*already_on_hb = true;
-			return;
-		}
-		prev_pid = this->task->pid;
-		prev_turbo = this_turbo;
-	}
-
-	*already_on_hb = false;
 }
 
 static void probe_android_rvh_select_task_rq_fair(void *ignore, struct task_struct *p,
@@ -1543,41 +1499,6 @@ static void rwsem_stop_turbo_inherit(struct rw_semaphore *sem)
 
 out_unlock:
 	spin_unlock_irqrestore(&RWSEM_SPIN_LOCK, flags);
-}
-
-static void rwsem_list_add(struct task_struct *task,
-			   struct list_head *entry,
-			   struct list_head *head)
-{
-	if (!sub_feat_enable(SUB_FEAT_LOCK)) {
-		list_add_tail(entry, head);
-		return;
-	}
-
-	if (is_turbo_task(task)) {
-		struct list_head *pos = NULL;
-		struct list_head *n = NULL;
-		struct rwsem_waiter *waiter = NULL;
-		struct rwsem_waiter *entry_waiter;
-
-		/*
-		 * Insert turbo task prior to first non-turbo task.
-		 * Make sure only the first waiter can have its handoff_set
-		 * set here.
-		 */
-		entry_waiter = list_entry(entry, struct rwsem_waiter, list);
-		list_for_each_safe(pos, n, head) {
-			waiter = list_entry(pos,
-					struct rwsem_waiter, list);
-			if (!is_turbo_task(waiter->task)) {
-				entry_waiter->handoff_set = waiter->handoff_set;
-				waiter->handoff_set = false;
-				list_add(entry, waiter->list.prev);
-				return;
-			}
-		}
-	}
-	list_add_tail(entry, head);
 }
 
 static void rwsem_start_turbo_inherit(struct rw_semaphore *sem)
@@ -2502,20 +2423,11 @@ static int __init init_task_turbo(void)
 		goto failed;
 	}
 
-	ret = register_trace_android_vh_alter_rwsem_list_add(
-			probe_android_vh_alter_rwsem_list_add, NULL);
-	if (ret) {
-		ret_erri_line = __LINE__;
-		goto failed;
-	}
-
-	ret = register_trace_android_vh_alter_futex_plist_add(
-			probe_android_vh_alter_futex_plist_add, NULL);
-	if (ret) {
-		ret_erri_line = __LINE__;
-		goto failed;
-	}
-
+	/* rodin 6.18（2026-11-03）：alter_rwsem_list_add / alter_futex_plist_add
+	 * 退注册，锁链插入收敛 metis-final-link 单一属主——stock 6.6 两 probe
+	 * 入口有 *already_on_* 守卫（task_turbo.ko blob 反汇编 LDRB [X3] 实证），
+	 * 6.18 重建缺失守卫且 metis 先注册，同节点二次入队撕裂 plist/futex
+	 * 链（首启 12.85s RenderEngine futex_wake Oops）。 */
 	ret = register_trace_android_rvh_select_task_rq_fair(
 			probe_android_rvh_select_task_rq_fair, NULL);
 	if (ret) {
