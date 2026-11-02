@@ -60,12 +60,18 @@ static u64 mi_gt_scale_exec_time(u64 delta, struct rq *rq)
 void migt_hook(struct task_struct *task, int cpu, int event, u64 wallclock, u64 delta_exec)
 {
 	struct migt_task_state *gt;
-	u64 now = fas_sched_clock(), elapsed, runtime, smoothed, div, cap, bucket;
+	u64 now, elapsed, runtime, smoothed, div, cap, bucket;
 	u32 uid, threshold, generation, i;
+
 	BUG_ON((unsigned int)cpu >= 32);
-	gt = get_gt_task(task);
-	if (!gt || boost_policy < 2)
+	/* rodin 6.18（2026-11-03，非游戏态快判）：boost_policy<2 时本条
+	 * accounting 钩子无消费者，先返省掉 fas_sched_clock() 与后续判定。 */
+	if (boost_policy < 2)
 		return;
+	gt = get_gt_task(task);
+	if (!gt)
+		return;
+	now = fas_sched_clock();
 	if (boost_policy == 3)
 		game_load_update(task, mi_gt_scale_exec_time(delta_exec, per_cpu_ptr(&runqueues, cpu)), cpu);
 	uid = MI_FIELD((u8 *)gt - 0x1a0, u32, 0xbc);

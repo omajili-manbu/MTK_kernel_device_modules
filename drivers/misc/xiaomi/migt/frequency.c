@@ -27,8 +27,14 @@ u64 last_freq_change_time[3], sum_freq_rt[3];
 /* .text+0x5f90..0x6034; current native restricted hook takes a policy. */
 void android_rvh_cpufreq_transition(void *unused, struct cpufreq_policy *policy)
 {
-	u32 cluster = cpu_to_cluster(policy->cpu);
+	u32 cluster;
 	u64 last;
+
+	/* rodin 6.18（2026-11-03，glk 未启用即返）：boost_policy==0 时
+	 * game_load 频点记录无消费者，省掉每次 cpufreq 迁移的钩子开销。 */
+	if (!boost_policy)
+		return;
+	cluster = cpu_to_cluster(policy->cpu);
 	BUG_ON(cluster >= 3);
 	last = last_freq_change_time[cluster];
 	sum_freq_rt[cluster] -= last * cur_record_freq[cluster];
