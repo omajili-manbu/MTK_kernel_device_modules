@@ -4,6 +4,7 @@
 #include <linux/cpumask.h>
 #include <linux/ktime.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/string.h>
 #include <trace/hooks/binder.h>
 #include <trace/hooks/sched.h>
@@ -146,6 +147,6 @@ static void __exit metis_module_exit(void)
 	metis_io_exit();
 	misc_deregister(&metis_misc);
 }
-module_init(metis_module_init);
+vseq_module_init(metis_module_init);
 module_exit(metis_module_exit);
 MODULE_LICENSE("GPL");

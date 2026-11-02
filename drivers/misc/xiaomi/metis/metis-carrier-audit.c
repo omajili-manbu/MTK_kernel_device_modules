@@ -23,6 +23,7 @@
 #include <linux/bpf.h>
 #include <linux/btf.h>
 #include <linux/init.h>
+#include <linux/vseq.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/plist.h>
@@ -212,4 +213,4 @@ static int __init metis_carrier_audit_init(void)
 	WARN_ON(!(btf && reset && reentry && futex));
 	return 0;
 }
-late_initcall(metis_carrier_audit_init);
+vseq_late_initcall(metis_carrier_audit_init);
