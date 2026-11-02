@@ -67,6 +67,38 @@ void prio_sched_check(struct rq *rq)
 	MI_FIELD(state, u8, 0x268) = 1;
 }
 
+/* rodin 6.18（2026-11-03，普通 CFS 实体快判）：入队/出队热路径仅在 VIP、
+ * game、link 判据与 lowlt 加链全部可证为空时一次廉价判定即返；任一判据
+ * 在场一律落回原路径，VIP/game 判定分支不改。 */
+#define METIS_VIP_FLAG_MASK	(0x21c00020U | 0x0c0ae000U | \
+				 0x800U | 0x40000U)
+
+static __always_inline bool metis_plain_cfs_task(struct task_struct *task,
+						 struct mi_task_struct *state)
+{
+	/* 冷启窗判定同时保留 in_coldstart_period() 的到期清理副作用；
+	 * 窗口在场时一律走原路径。 */
+	if (metis_wakeup_enable && in_coldstart_period())
+		return false;
+	if (task->pid == cold_start_app_tgid ||
+	    task->tgid == cold_start_app_tgid)
+		return false;
+	/* game 槽（vip_task_detect[0]）仅在 GT_FLAGS 非零时才可能命中。 */
+	if (MI_FIELD(state, u32, 0x1a4))
+		return false;
+	if (READ_ONCE(state->flags_0xc0) & METIS_VIP_FLAG_MASK)
+		return false;
+	if (MI_FIELD(state, u32, 0xc8) & 0x1e0)
+		return false;
+	if (state->rb_magic_270)
+		return false;
+	/* is_preempted_cs_task() 仅 0x2b4 的 0x18 位可能落真。 */
+	if (protect_cs && task->prio >= 100 &&
+	    (MI_FIELD(state, u32, 0x2b4) & 0x18))
+		return false;
+	return true;
+}
+
 void __enqueue_vip_task(unsigned int cpu, struct task_struct *task)
 {
 	struct mi_task_struct *state, *other;
@@ -85,6 +117,8 @@ void __enqueue_vip_task(unsigned int cpu, struct task_struct *task)
 	if (more_vip_flag_print)
 		trace_metis_vip_task_flag(state, jiffies);
 	MI_FIELD(state, u64, 0x280) = fas_sched_clock();
+	if (metis_plain_cfs_task(task, state))
+		return;
 	if (!cold_start_ui_task(task) && !mi_vip_task(task) &&
 	    !mi_link_vip_task(task)) {
 		lowlt_list_add_task(task, cpu);
@@ -142,6 +176,11 @@ void __dequeue_vip_task(unsigned int cpu, struct task_struct *task)
 	struct list_head *node;
 
 	vip_stock_cpu_bound(cpu);
+	state = get_mi_task_struct(task);
+	if (state && state->rb_magic_270 != 0xbadc &&
+	    list_empty(&state->node_2c0) &&
+	    !(READ_ONCE(state->flags_0xc0) & 0x40000))
+		return;
 	lowlt_list_del_task(task, cpu);
 	state = get_mi_task_struct(task);
 	if (task && !state) {
