@@ -5,7 +5,6 @@
 
 #include <asm/errno.h>
 #include <linux/vseq.h>
-#include <linux/workqueue.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/cpuidle.h>

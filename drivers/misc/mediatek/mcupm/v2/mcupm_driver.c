@@ -616,10 +616,16 @@ static int mcupm_device_probe(struct platform_device *pdev)
 	}
 #endif
 
+	/*
+	 * rodin 6.18（2026-11-03）：ipi/plt/timesync 失败不再吞成 probe 成功。
+	 * 消费者（cpufreq_hybrid / eem）只取静态 mcupm_ipidev 指针并各自处理
+	 * IPI 返回，没有 device_link/defer 依赖，故直接传播真实错误；
+	 * 不用 -EPROBE_DEFER，避免半初始化的 ipidev 被重复注册。
+	 */
 	ret = mtk_ipi_init(pdev);
 	if (ret) {
 		pr_info("[MCUPM] ipi interface init fail, ret %d\n", ret);
-		return 0;
+		return ret;
 	}
 
 	pr_info("MCUPM is ready to service IPI\n");
@@ -627,13 +633,13 @@ static int mcupm_device_probe(struct platform_device *pdev)
 	ret = mcupm_plt_module_init();
 	if (ret) {
 		pr_info("[MCUPM] plt module init fail, ret %d\n", ret);
-		return 0;
+		return ret;
 	}
 
 	ret = mcupm_timesync_init();
 	if (ret) {
 		pr_info("MCUPM timesync init fail\n");
-		return 0;
+		return ret;
 	}
 #if CPUQOS_IPI
 	mcupm_plat_init();
