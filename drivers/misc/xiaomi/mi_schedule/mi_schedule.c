@@ -388,6 +388,8 @@ void mi_sched_tick(void *unused, struct rq *rq)
 	struct mi_task_work *w;
 	u64 now = get_jiffies_64();
 	u32 uid;
+	bool ref_held;
+
 	if (!runtime_enable || pause_mode)
 		return;
 	p = rq->curr;
@@ -397,7 +399,12 @@ void mi_sched_tick(void *unused, struct rq *rq)
 	if (!u)
 		goto roll;
 	uid = __kuid_val(u->uid);
-	get_task_struct(p);
+	/* rodin 6.18（2026-11-03，tick 实体即 current）：本钩挂
+	 * android_vh_scheduler_tick，在本地 CPU 的 this_rq() 上调用，
+	 * rq->curr 恒为 current；省掉一次 get/put 引用。 */
+	ref_held = p != current;
+	if (ref_held)
+		get_task_struct(p);
 	t = get_mi_task_struct(p);
 	if (!t || !refcount_read(&p->usage))
 		goto put;
@@ -418,7 +425,8 @@ void mi_sched_tick(void *unused, struct rq *rq)
 		}
 	}
 put:
-	put_task_struct(p);
+	if (ref_held)
+		put_task_struct(p);
 	free_uid(u);
 roll:
 	/* Keep stock's signed 32-bit multiplication followed by u64 comparison. */
