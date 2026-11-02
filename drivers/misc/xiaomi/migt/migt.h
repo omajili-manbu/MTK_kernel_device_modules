@@ -205,7 +205,9 @@ void set_next_freq(void *data, unsigned long util, unsigned long mapped_freq,
 		bool *need_update);
 
 /* Imported slot ABI: module-lifecycle.c assigns/clears the actual provider. */
-/* rodin 6.18：stock 的 closed-kernel 侧函数指针槽；读者缺位，
- * 槽位降为模块内静态存储，写路径（migt_enable 注册）保持。 */
+/* rodin 6.18（2026-11-03）：stock 的 closed-kernel 侧函数指针槽。槽变量在
+ * 6.18 无读者（stock 闭核 ABI 无等价读者，保留作对照锚），enable 语义并非
+ * 空转——register_mi_sched_enable(0, migt_enable) 已接入 metis_sched_enable()，
+ * 由 fair pick 与 after_enqueue 两个门控点消费。 */
 extern int (*mi_gt_sched_enable_slot)(void);
 #endif
