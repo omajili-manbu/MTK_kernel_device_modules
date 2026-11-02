@@ -130,7 +130,6 @@ EXPORT_SYMBOL_GPL(mi_after_dequeue_task_hook);
 EXPORT_SYMBOL_GPL(metis_runqueues);
 EXPORT_SYMBOL_GPL(metis_update_top_task_info);
 EXPORT_SYMBOL_GPL(rq_deadloop_detect);
-EXPORT_SYMBOL_GPL(mi_scheduler_tick_hook);
 EXPORT_SYMBOL_GPL(mi_schedule_hook);
 EXPORT_SYMBOL_GPL(metis_doublecyc_init);
 EXPORT_SYMBOL_GPL(metis_doublecyc_exit);

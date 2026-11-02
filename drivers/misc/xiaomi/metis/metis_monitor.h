@@ -19,5 +19,4 @@ extern u32 suspend_vip_enable;
 extern unsigned int doublecyc_debug;
 
 void monitor_task_enqueue(struct mi_task_struct *state);
-void mi_scheduler_tick_hook(struct rq *rq);
 #endif
