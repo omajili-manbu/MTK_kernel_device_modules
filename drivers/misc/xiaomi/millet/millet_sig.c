@@ -7,6 +7,7 @@
 #include <linux/freezer.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
@@ -112,7 +113,7 @@ static void __exit millet_sig_exit(void)
 	unregister_millet_hook(MILLET_ID_SIG);
 }
 
-module_init(millet_sig_init);
+vseq_module_init(millet_sig_init);
 module_exit(millet_sig_exit);
 
 MODULE_LICENSE("GPL");

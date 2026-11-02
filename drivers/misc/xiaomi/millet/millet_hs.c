@@ -4,6 +4,7 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/sched.h>
 
 #include "millet.h"
@@ -56,7 +57,7 @@ static void __exit millet_hs_exit(void)
 	unregister_millet_hook(MILLET_ID_HANDSHAKE);
 }
 
-module_init(millet_hs_init);
+vseq_module_init(millet_hs_init);
 module_exit(millet_hs_exit);
 
 MODULE_LICENSE("GPL");

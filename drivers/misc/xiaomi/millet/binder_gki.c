@@ -5,6 +5,7 @@
 #include <linux/freezer.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/mutex.h>
 #include <linux/overflow.h>
 #include <linux/rbtree.h>
@@ -392,7 +393,7 @@ static void __exit binder_gki_exit(void)
 	WRITE_ONCE(millet_binder_procs_lock, NULL);
 }
 
-module_init(binder_gki_init);
+vseq_module_init(binder_gki_init);
 module_exit(binder_gki_exit);
 
 MODULE_LICENSE("GPL");

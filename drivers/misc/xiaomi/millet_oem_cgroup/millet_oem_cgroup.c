@@ -6,6 +6,7 @@
 #include <linux/cred.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/sched.h>
 #include <linux/uidgid.h>
 
@@ -67,7 +68,7 @@ static int __init millet_oem_cgroup_init(void)
 
 	return 0;
 }
-module_init(millet_oem_cgroup_init);
+vseq_module_init(millet_oem_cgroup_init);
 
 /*
  * Stock has no exit and leaves callbacks pointing into module text. Keep the

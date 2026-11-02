@@ -6,6 +6,7 @@
 #include <linux/init.h>
 #include <linux/ip.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6.h>
@@ -218,7 +219,7 @@ static void __exit millet_pkg_exit(void)
 				ARRAY_SIZE(millet_pkg_hooks));
 }
 
-module_init(millet_pkg_init);
+vseq_module_init(millet_pkg_init);
 module_exit(millet_pkg_exit);
 
 MODULE_LICENSE("GPL");

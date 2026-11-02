@@ -4,6 +4,7 @@
 #include <linux/errno.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/printk.h>
 #include "module_lifecycle.h"
 #include "owners.h"
@@ -162,5 +163,5 @@ void migt_exit(void)
 	printk("%s success\n", "migt_exit");
 }
 
-module_init(migt_init);
+vseq_module_init(migt_init);
 module_exit(migt_exit);

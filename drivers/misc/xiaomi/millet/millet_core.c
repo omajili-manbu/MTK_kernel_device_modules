@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/ktime.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/mutex.h>
 #include <linux/netlink.h>
 #include <linux/proc_fs.h>
@@ -478,7 +479,7 @@ static void __exit millet_core_exit(void)
 	millet_sock_state.netlink = NULL;
 }
 
-module_init(millet_core_init);
+vseq_module_init(millet_core_init);
 module_exit(millet_core_exit);
 
 MODULE_LICENSE("GPL");

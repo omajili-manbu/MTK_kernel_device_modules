@@ -6,6 +6,7 @@
 #include <linux/freezer.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/vseq.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/user_namespace.h>
@@ -256,7 +257,7 @@ static void __exit millet_binder_exit(void)
 	unregister_millet_hook(MILLET_ID_BINDER);
 }
 
-module_init(millet_binder_init);
+vseq_module_init(millet_binder_init);
 module_exit(millet_binder_exit);
 
 MODULE_LICENSE("GPL");
