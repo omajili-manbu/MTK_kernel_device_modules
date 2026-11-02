@@ -5,6 +5,7 @@
 #include <linux/vseq.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
+#include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/pm_runtime.h>
@@ -880,7 +881,35 @@ static struct i2c_driver main4_vcm_i2c_driver = {
 	.id_table = main4_vcm_id_table,
 };
 
-vseq_module_i2c_driver(main4_vcm_i2c_driver);
+/* rodin 6.18（2026-11-03，probe 后置扩展）：=y 后本单元 probe
+ * 落在 vseq 重放线上串行执行（regulator/pinctrl + v4l2 subdev），原厂 .ko
+ * 语境由 vendor_dlkm 波装载。消费者仅 imgsensor async notifier（核心支持
+ * 后注册匹配）与用户态 ioctl，无同步 probe 依赖。i2c_add_driver 投
+ * system_wq，vseq 行立即返回。 */
+static void main4_vcm_async_register_workfn(struct work_struct *work)
+{
+	int ret = i2c_add_driver(&main4_vcm_i2c_driver);
+
+	if (ret)
+		pr_err("%s: async i2c_add_driver failed, ret=%d\n",
+		       __func__, ret);
+}
+static DECLARE_WORK(main4_vcm_async_register_work, main4_vcm_async_register_workfn);
+
+static int __init main4_vcm_async_init(void)
+{
+	schedule_work(&main4_vcm_async_register_work);
+	return 0;
+}
+
+vseq_module_init(main4_vcm_async_init);
+
+static void __exit main4_vcm_i2c_exit(void)
+{
+	i2c_del_driver(&main4_vcm_i2c_driver);
+}
+
+module_exit(main4_vcm_i2c_exit);
 
 MODULE_AUTHOR("Po-Hao Huang <Po-Hao.Huang@mediatek.com>");
 MODULE_DESCRIPTION("MAIN4_VCM VCM driver");

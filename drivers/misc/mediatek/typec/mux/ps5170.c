@@ -9,6 +9,7 @@
 #include <linux/i2c.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/workqueue.h>
 #include <linux/mutex.h>
 #include <linux/of_platform.h>
 #include <linux/pinctrl/consumer.h>
@@ -686,7 +687,36 @@ static struct i2c_driver ps5170_driver = {
 	.remove	= ps5170_remove,
 	.id_table = ps5170_table,
 };
-vseq_module_i2c_driver(ps5170_driver);
+/* rodin 6.18（2026-11-03，probe 后置扩展）：=y 后本单元 probe
+ * 落在 vseq 重放线上串行执行（i2c 器件探测 + switch_set 往返 + mux/switch
+ * 注册），原厂 .ko 语境由 vendor_dlkm 波装载。消费者：mux_switch 全局 list
+ * 在每次 set 时遍历（晚注册自然纳入）、tcpc 经 typec core 对晚注册 mux 返回
+ * -EPROBE_DEFER 由 deferred probe 重试；probe 末尾自带 switch_set(NONE)
+ * 兜底，无同步 probe 依赖。i2c_add_driver 投 system_wq，vseq 行立即返回。 */
+static void ps5170_async_register_workfn(struct work_struct *work)
+{
+	int ret = i2c_add_driver(&ps5170_driver);
+
+	if (ret)
+		pr_err("%s: async i2c_add_driver failed, ret=%d\n",
+		       __func__, ret);
+}
+static DECLARE_WORK(ps5170_async_register_work, ps5170_async_register_workfn);
+
+static int __init ps5170_async_init(void)
+{
+	schedule_work(&ps5170_async_register_work);
+	return 0;
+}
+
+vseq_module_init(ps5170_async_init);
+
+static void __exit ps5170_i2c_exit(void)
+{
+	i2c_del_driver(&ps5170_driver);
+}
+
+module_exit(ps5170_i2c_exit);
 
 MODULE_DESCRIPTION("ps5170 Type-C Redriver");
 MODULE_LICENSE("GPL v2");

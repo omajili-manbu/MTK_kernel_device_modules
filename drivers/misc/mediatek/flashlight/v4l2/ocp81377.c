@@ -4,6 +4,7 @@
 #include <linux/delay.h>
 #include <linux/vseq.h>
 #include <linux/module.h>
+#include <linux/workqueue.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
@@ -1180,7 +1181,36 @@ static struct i2c_driver ocp81377_i2c_driver = {
 	.id_table = ocp81377_id_table,
 };
 
-vseq_module_i2c_driver(ocp81377_i2c_driver);
+/* rodin 6.18（2026-11-03，probe 后置扩展）：=y 后本单元 probe
+ * 落在 vseq 重放线上串行执行（pinctrl + 5ms udelay + DEVICEID 读 + 双 subdev
+ * 注册），原厂 .ko 语境由 vendor_dlkm 波装载。消费者仅 v4l2 async subdev
+ * （核心支持后注册匹配）与 thermal cooling device（rodin DT 无 cooling-map
+ * 引用该 cdev，晚注册无害），无同步 probe 依赖。i2c_add_driver 投
+ * system_wq，vseq 行立即返回。 */
+static void ocp81377_async_register_workfn(struct work_struct *work)
+{
+	int ret = i2c_add_driver(&ocp81377_i2c_driver);
+
+	if (ret)
+		pr_err("%s: async i2c_add_driver failed, ret=%d\n",
+		       __func__, ret);
+}
+static DECLARE_WORK(ocp81377_async_register_work, ocp81377_async_register_workfn);
+
+static int __init ocp81377_async_init(void)
+{
+	schedule_work(&ocp81377_async_register_work);
+	return 0;
+}
+
+vseq_module_init(ocp81377_async_init);
+
+static void __exit ocp81377_i2c_exit(void)
+{
+	i2c_del_driver(&ocp81377_i2c_driver);
+}
+
+module_exit(ocp81377_i2c_exit);
 
 MODULE_AUTHOR("Roger-HY Wang <roger-hy.wang@mediatek.com>");
 MODULE_DESCRIPTION("Texas Instruments OCP81377 LED flash driver");
