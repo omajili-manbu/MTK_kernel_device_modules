@@ -1190,7 +1190,13 @@ void vip_cfs_tick(struct rq *rq)
 	struct vip_task_struct *vts;
 	struct rq_flags rf;
 
-	vts = &(mtk_task_of(rq->curr))->vip_task;
+	/*
+	 * rodin 6.18（2026-11-03）：PROXY_EXEC 下 rq->curr 可能是代跑阻塞链
+	 * 的 proxy，VIP 限流记账对象是调度上下文（阻塞链头），与
+	 * vip_check_preempt_wakeup 的 donor 判据同理由；PROXY_EXEC=n 时 core
+	 * 每次 pick 都 rq_set_donor(rq, next)，donor ≡ curr，行为无差。
+	 */
+	vts = &(mtk_task_of(rq->donor))->vip_task;
 
 	if (unlikely(!vip_enable))
 		return;
@@ -1210,7 +1216,7 @@ void vip_cfs_tick(struct rq *rq)
 
 	if (vts->vip_list.next && !link_with_others(&vts->vip_list))
 		goto out;
-	account_vip_runtime(rq, rq->curr);
+	account_vip_runtime(rq, rq->donor);
 	/*
 	 * If the current is not VIP means, we have to re-schedule to
 	 * see if we can run any other task including VIP tasks.
