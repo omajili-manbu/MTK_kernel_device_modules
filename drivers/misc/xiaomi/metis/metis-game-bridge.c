@@ -27,7 +27,7 @@
 
 /* Stock: fair pick asks for the game task's exclusive CPU after EAS.
  * Bridge: a non-negative answer inside the task's mask wins. */
-static void metis_bridge_select_task_rq_fair(void *unused, struct task_struct *p,
+void metis_bridge_select_task_rq_fair(struct task_struct *p,
 		int prev_cpu, int sd_flag, int wake_flags, int *new_cpu)
 {
 	migt_select_cpu_fn hook = READ_ONCE(game_migt_select_cpu_hook);
@@ -62,7 +62,7 @@ static void metis_bridge_select_task_rq_fair(void *unused, struct task_struct *p
 
 /* Stock: RT pick honors reserve exclusions and VIP-cpu skips.
  * Bridge: same fallback shape as the fair path. */
-static void metis_bridge_select_task_rq_rt(void *unused, struct task_struct *p,
+void metis_bridge_select_task_rq_rt(struct task_struct *p,
 		int prev_cpu, int sd_flag, int wake_flags, int *new_cpu)
 {
 	migt_task_cpu_fn skip_rt = READ_ONCE(game_migt_should_skip_this_cpu_rt_hook);
@@ -90,7 +90,7 @@ static void metis_bridge_select_task_rq_rt(void *unused, struct task_struct *p,
 
 /* Stock: load balance consults skip-migrate before pulling a game task.
  * Bridge: either handler (pull path or tick path) vetoes the migration. */
-static void metis_bridge_can_migrate_task(void *unused, struct task_struct *p,
+void metis_bridge_can_migrate_task(struct task_struct *p,
 		int dst_cpu, int *can_migrate)
 {
 	migt_task_cpu_fn skip = READ_ONCE(game_migt_should_skip_migrate_hook);
@@ -211,9 +211,8 @@ static void metis_bridge_account_task_time(void *unused, struct task_struct *p,
 
 int metis_game_bridge_init(void)
 {
-	register_trace_android_rvh_select_task_rq_fair(metis_bridge_select_task_rq_fair, NULL);
-	register_trace_android_rvh_select_task_rq_rt(metis_bridge_select_task_rq_rt, NULL);
-	register_trace_android_rvh_can_migrate_task(metis_bridge_can_migrate_task, NULL);
+	/* rodin 6.18（2026-11-03）：select_task_rq_fair/rt、can_migrate 三槽
+	 * 单属主化，本三实现改由 mtk scheduler 合并钩子直调（sched_main.c）。 */
 	register_trace_android_rvh_sched_newidle_balance(metis_bridge_newidle_balance, NULL);
 	register_trace_android_rvh_find_lowest_rq(metis_bridge_find_lowest_rq, NULL);
 	register_trace_android_rvh_should_honor_rt_sync(metis_bridge_should_honor_rt_sync, NULL);

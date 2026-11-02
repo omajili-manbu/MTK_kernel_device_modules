@@ -781,7 +781,8 @@ void sched_pause_init(void)
 				hook_rvh_rto_next_cpu, NULL);
 	register_trace_android_rvh_get_nohz_timer_target(
 				hook_rvh_get_nohz_timer_target,	NULL);
-	register_trace_android_rvh_can_migrate_task(hook_rvh_can_migrate_task, NULL);
+	/* rodin 6.18（2026-11-03）：can_migrate 槽位单属主化，本否决实现改由
+	 * scheduler 合并钩子直调（sched_main.c，同模块直调）。 */
 	register_trace_android_rvh_find_busiest_queue(hook_rvh_find_busiest_queue, NULL);
 	register_trace_android_rvh_find_new_ilb(hook_rvh_find_new_ilb, NULL);
 }

@@ -74,7 +74,7 @@ static void qi_free_task(void *unused, struct task_struct *p)
 	if (p)
 		qi_free_task_extension(p);
 }
-static void qi_select_task_rq_rt(void *unused, struct task_struct *p, int prev_cpu,
+void qi_select_task_rq_rt(struct task_struct *p, int prev_cpu,
 		       int sd_flag, int wake_flags, int *new_cpu)
 {
 	struct task_qi *src, *dst;
@@ -655,10 +655,9 @@ static void qi_percpu_rwsem_wq_add(void *unused, struct percpu_rw_semaphore *sem
 
 int qi_vh_comm_register(void)
 {
-	int ret = register_trace_android_vh_free_task(qi_free_task, NULL);
-	if (ret < 0)
-		return ret;
-	return register_trace_android_rvh_select_task_rq_rt(qi_select_task_rq_rt, NULL);
+	/* rodin 6.18（2026-11-03）：rvh select_task_rq_rt 槽位单属主化，本实现
+	 * 改由 mtk scheduler 合并钩子直调；原先册即首启 -16（EBUSY）根因。 */
+	return register_trace_android_vh_free_task(qi_free_task, NULL);
 }
 void qi_vh_comm_unregister(void)
 {

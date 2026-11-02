@@ -183,6 +183,52 @@ static void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
 	*target_cpu = new_cpu;
 }
 
+/* rodin 6.18（2026-11-03）：android_rvh_* 限制钩子单属主化。ANDROID_RVH_NR_PROBES_MAX=2，
+ * 超员注册 -EBUSY 静默败（xr_qi init -16、本件 fair 选核 failed! 实证）；select_task_rq_fair/rt、
+ * can_migrate_task 三槽原为 mtk/task_turbo/xr_qi/metis-game-bridge 多方注册，收敛为下列
+ * 单一注册者按定序直调（全内建跨编译单元直调，无需导出）：
+ *   fair/rt = 基底(mtk EAS) → scoped 覆写/传播 → game 否决终写（game reserved CPU
+ *             回落必须终写，顺带修复 metis 先行注册被基底覆写的序病）；
+ *   can_migrate = 三方均否决式，与序无关，按 pause→mtk→metis 排。
+ * 定序对齐 stock 形态：stock 装载序 metis(3.3898s) < task_turbo(3.4732s)，game 任务
+ * 经 VIP 门使 turbo 早退，metis 拣核不被夺。 */
+extern void tt_hook_select_task_rq_fair(struct task_struct *p, int prev_cpu,
+		int sd_flag, int wake_flags, int *target_cpu);
+extern void metis_bridge_select_task_rq_fair(struct task_struct *p, int prev_cpu,
+		int sd_flag, int wake_flags, int *new_cpu);
+extern void metis_bridge_select_task_rq_rt(struct task_struct *p, int prev_cpu,
+		int sd_flag, int wake_flags, int *new_cpu);
+extern void metis_bridge_can_migrate_task(struct task_struct *p, int dst_cpu,
+		int *can_migrate);
+extern void qi_select_task_rq_rt(struct task_struct *p, int prev_cpu, int sd_flag,
+		int wake_flags, int *new_cpu);
+extern void hook_rvh_can_migrate_task(void *data, struct task_struct *p,
+		int dst_cpu, int *can_migrate);
+
+static void mtk_eas_select_task_rq_fair(void *ignore, struct task_struct *p,
+		int prev_cpu, int sd_flag, int wake_flags, int *target_cpu)
+{
+	sched_select_task_rq_fair_hook(ignore, p, prev_cpu, sd_flag, wake_flags, target_cpu);
+	metis_bridge_select_task_rq_fair(p, prev_cpu, sd_flag, wake_flags, target_cpu);
+	tt_hook_select_task_rq_fair(p, prev_cpu, sd_flag, wake_flags, target_cpu);
+}
+
+static void mtk_eas_select_task_rq_rt(void *ignore, struct task_struct *p,
+		int prev_cpu, int sd_flag, int wake_flags, int *new_cpu)
+{
+	mtk_select_task_rq_rt(ignore, p, prev_cpu, sd_flag, wake_flags, new_cpu);
+	qi_select_task_rq_rt(p, prev_cpu, sd_flag, wake_flags, new_cpu);
+	metis_bridge_select_task_rq_rt(p, prev_cpu, sd_flag, wake_flags, new_cpu);
+}
+
+static void mtk_eas_can_migrate_task(void *ignore, struct task_struct *p,
+		int dst_cpu, int *can_migrate)
+{
+	hook_rvh_can_migrate_task(ignore, p, dst_cpu, can_migrate);
+	mtk_can_migrate_task(ignore, p, dst_cpu, can_migrate);
+	metis_bridge_can_migrate_task(p, dst_cpu, can_migrate);
+}
+
 static void sched_rq_load_hook(void *data, struct cfs_rq *rq)
 {
 	if (trace_sched_rq_load_enabled())
@@ -451,7 +497,7 @@ static void mtk_sched_trace_init(void)
 		pr_info("register sched_rq_load_hook failed!\n");
 
 	ret = register_trace_android_rvh_select_task_rq_fair(
-			sched_select_task_rq_fair_hook, NULL);
+			mtk_eas_select_task_rq_fair, NULL);
 	if (ret)
 		pr_info("register sched_select_task_rq_fair_hook failed!\n");
 }
@@ -1240,7 +1286,7 @@ static int __init mtk_scheduler_init(void)
 	 * EAS 组选择实现留待钩子可用时复用。
 	 */
 	ret = register_trace_android_rvh_can_migrate_task(
-			mtk_can_migrate_task, NULL);
+			mtk_eas_can_migrate_task, NULL);
 	if (ret)
 		pr_info("register android_rvh_can_migrate_task failed\n");
 
@@ -1305,7 +1351,7 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		pr_info("register android_rvh_after_enqueue_task failed, returned %d\n", ret);
 
-	ret = register_trace_android_rvh_select_task_rq_rt(mtk_select_task_rq_rt, NULL);
+	ret = register_trace_android_rvh_select_task_rq_rt(mtk_eas_select_task_rq_rt, NULL);
 	if (ret)
 		pr_info("register mtk_select_task_rq_rt hooks failed, returned %d\n", ret);
 

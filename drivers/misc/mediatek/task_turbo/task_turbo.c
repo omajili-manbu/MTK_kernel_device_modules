@@ -1197,7 +1197,9 @@ static void probe_android_vh_binder_restore_priority(void *ignore,
 		binder_stop_vip_inherit(cur);
 }
 
-static void probe_android_rvh_select_task_rq_fair(void *ignore, struct task_struct *p,
+/* rodin 6.18（2026-11-03）：rvh 槽位单属主化，由 mtk scheduler 合并钩子直调；
+ * VIP 早退门保留（stock 同序：game/VIP 任务不参与 turbo 覆写）。 */
+void tt_hook_select_task_rq_fair(struct task_struct *p,
 							int prev_cpu, int sd_flag,
 							int wake_flags, int *target_cpu)
 {
@@ -2428,13 +2430,8 @@ static int __init init_task_turbo(void)
 	 * 入口有 *already_on_* 守卫（task_turbo.ko blob 反汇编 LDRB [X3] 实证），
 	 * 6.18 重建缺失守卫且 metis 先注册，同节点二次入队撕裂 plist/futex
 	 * 链（首启 12.85s RenderEngine futex_wake Oops）。 */
-	ret = register_trace_android_rvh_select_task_rq_fair(
-			probe_android_rvh_select_task_rq_fair, NULL);
-	if (ret) {
-		ret_erri_line = __LINE__;
-		goto failed;
-	}
-
+	/* rodin 6.18（2026-11-03）：rvh select_task_rq_fair 槽位单属主化，
+	 * 本实现改由 mtk scheduler 合并钩子直调（见 sched_main.c）。 */
 	ret = register_trace_android_vh_cgroup_set_task(
 			probe_android_vh_cgroup_set_task, NULL);
 	if (ret) {
