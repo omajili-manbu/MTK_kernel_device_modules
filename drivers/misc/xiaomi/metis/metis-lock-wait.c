@@ -32,6 +32,7 @@ void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
 	struct mutex_waiter *other;
 	struct task_struct *task;
 	bool vip, link_vip;
+	bool inserted = false;
 
 	/* Original dereferences this result pointer before all other guards. */
 	if (READ_ONCE(*already_on_list))
@@ -46,6 +47,20 @@ void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
 	if (!mi_vip_task(current) && !mi_link_vip_task(current))
 		return;
 	new = &waiter->list;
+	/* rodin 6.18（2026-11-03）：重入守卫——alter 钩子对同一 waiter 可能
+	 * 二次触发，无守卫重走插入路径会邻位自撞落硬化报告分支、中位重链
+	 * 撕裂链表；扫链命中本 waiter 即置 already 返回（链上实达型）。 */
+	{
+		struct list_head *cur = READ_ONCE(list->prev);
+
+		while (cur && cur != list) {
+			if (cur == new) {
+				WRITE_ONCE(*already_on_list, true);
+				return;
+			}
+			cur = READ_ONCE(cur->prev);
+		}
+	}
 	cursor = READ_ONCE(list->next);
 	for (;;) {
 		if (cursor == list) {
@@ -57,6 +72,7 @@ void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
 				WRITE_ONCE(new->next, list);
 				WRITE_ONCE(new->prev, prev);
 				WRITE_ONCE(prev->next, new);
+				inserted = true;
 			}
 			break;
 		}
@@ -81,13 +97,18 @@ void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
 				WRITE_ONCE(new->next, next);
 				WRITE_ONCE(new->prev, prev);
 				WRITE_ONCE(prev->next, new);
+				inserted = true;
 			}
 			break;
 		}
 		cursor = next;
 	}
-	/* This is set even when corruption reporting prevented the insertion. */
-	WRITE_ONCE(*already_on_list, true);
+	/* rodin 6.18（2026-11-03）：仅实际落链后置 already；硬化报告分支
+	 * 未落链不置，放行核心 list_add_tail——静默丢 waiter 会令核心在
+	 * 空链取假 waiter（container_of(&lock->wait_list)，字段落在
+	 * android_vendor/oem_data 上），与 rwsem 侧 NULL->blocked_lock 同形。 */
+	if (inserted)
+		WRITE_ONCE(*already_on_list, true);
 }
 
 void mi_mutex_wait_start_hook(void *unused, struct mutex *lock)
