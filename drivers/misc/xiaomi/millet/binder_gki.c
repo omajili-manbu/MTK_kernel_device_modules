@@ -283,6 +283,10 @@ static void binder_wait_hook(void *unused, bool do_proc_work,
 
 	(void)unused;
 	(void)do_proc_work;
+	/* rodin 6.18（2026-11-03，无 owner 时先返）：跟踪点常驻，
+	 * 没有注册者时不必再取 transaction 锁与 caller 引用。 */
+	if (!rcu_access_pointer(millet_binder_hooks))
+		return;
 	transaction = thread->transaction_stack;
 	if (!transaction)
 		return;
