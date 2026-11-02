@@ -65,12 +65,14 @@ static inline bool mtk_task_on_rq_active(const struct task_struct *p)
  * 绕过 proxy 链维护 → find_proxy_task/activate_blocked_waiters 走链不终止
  * → 持 rq 锁永挂 → 其余核 rq convoy 逐核饿死（两份死亡帧多核 rq 队列级联
  * + expdb CPU0 slowpath ×102 实证）。补上核心同款门：blocked_on 非空一律
- * 不可裸迁移；拒绝时打点留证（现场窗口本就瞬时，ratelimited 足够）。
+ * 不可裸迁移；拒绝时打点留证 —— pr_debug 默认静态 nop（DYNAMIC_DEBUG_CORE
+ * 在案），dyndbg 按需开；pr_info_ratelimited 每次拒绝付一发 irqsave 自旋
+ * 记账，在迁移风暴（本路径本就在锁内）下是纯白付。rodin 6.18（2026-11-03）。
  */
 static inline bool mtk_task_migratable(const struct task_struct *p)
 {
 	if (READ_ONCE(p->blocked_on.lock)) {
-		pr_info_ratelimited("mtkmig: refuse blocked-on %s[%d]\n",
+		pr_debug_ratelimited("mtkmig: refuse blocked-on %s[%d]\n",
 				    p->comm, p->pid);
 		return false;
 	}
