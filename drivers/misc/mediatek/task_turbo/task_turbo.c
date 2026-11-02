@@ -1203,11 +1203,20 @@ void tt_hook_select_task_rq_fair(struct task_struct *p,
 							int prev_cpu, int sd_flag,
 							int wake_flags, int *target_cpu)
 {
+	int cpu;
+
 	/* skip if p is vip */
 	if (get_vip_task_prio(p) != NOT_VIP)
 		return;
 
-	*target_cpu = select_turbo_cpu(p);
+	/*
+	 * rodin 6.18（2026-11-03）：合并钩子链里本函数收尾，无 turbo 判定
+	 * （非 turbo 任务 / 无 BIGCORE 档）时不得回写 —— 裸写 -1 会把链上
+	 * 前序（met/migt 桥）已定的 target_cpu 清成"无判定"回落原生选核。
+	 */
+	cpu = select_turbo_cpu(p);
+	if (cpu >= 0)
+		*target_cpu = cpu;
 }
 
 static inline struct task_struct *tt_rwsem_owner(struct rw_semaphore *sem)
