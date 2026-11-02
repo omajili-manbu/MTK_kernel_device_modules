@@ -54,6 +54,13 @@
 #include <linux/thermal.h>
 #include <linux/workqueue.h>
 
+/*
+ * rodin 6.18（2026-11-03）：bootmonitor 在 boot_completed 落账时
+ * 置位的一次性标志（drivers/misc/xiaomi/bootmonitor/bootmonitor.c，
+ * EXPORT_SYMBOL_GPL）。两件同镜像内建；写入方只置 true，读取方轮询。
+ */
+extern bool bm_boot_completed;
+
 #define RBB_NR_CLUSTER	3
 #define RBB_TICK_MS	150
 #define RBB_WINDOW_MS	30000
@@ -73,6 +80,9 @@ struct rbb_cluster {
 	unsigned int hw_min;
 	unsigned int floor[RBB_RELEASED];	/* kHz per level */
 	bool attached;
+	/* rodin 6.18（2026-11-03）：该簇被 max cap 压破后单独让位 */
+	bool capped_out;		/* parked at hw_min, no longer follows levels */
+	unsigned int cap_cnt;		/* consecutive ticks max < our floor */
 };
 
 static struct rbb_cluster rbb_clusters[RBB_NR_CLUSTER] = {
@@ -97,7 +107,7 @@ static int rbb_state = RBB_WAIT;
 static int rbb_level = RBB_RELEASED;
 static unsigned int rbb_window_ms = RBB_WINDOW_MS;
 static unsigned long rbb_deadline;
-static unsigned int rbb_heat_cnt, rbb_cool_cnt, rbb_cap_cnt, rbb_blind_cnt;
+static unsigned int rbb_heat_cnt, rbb_cool_cnt, rbb_blind_cnt;
 static long rbb_last_temp = -1;
 static bool rbb_temp_ever_read;
 static bool rbb_zone_diag_done;
@@ -125,6 +135,15 @@ static bool rbb_attached_all(void)
 	return n == RBB_NR_CLUSTER;
 }
 
+/* rodin 6.18（2026-11-03）：档位切换后地板已变，旧计数失效。 */
+static void rbb_cap_cnt_reset(void)
+{
+	int i;
+
+	for (i = 0; i < RBB_NR_CLUSTER; i++)
+		rbb_clusters[i].cap_cnt = 0;
+}
+
 static void rbb_apply_level(int level)
 {
 	struct rbb_cluster *c;
@@ -132,7 +151,9 @@ static void rbb_apply_level(int level)
 
 	for (i = 0; i < RBB_NR_CLUSTER; i++) {
 		c = &rbb_clusters[i];
-		if (c->attached)
+		/* rodin 6.18（2026-11-03）：让位簇的请求已停在
+		 * hw_min，不再随温度档位回挂。 */
+		if (c->attached && !c->capped_out)
 			freq_qos_update_request(&rbb_req[i],
 				level == RBB_RELEASED ? c->hw_min :
 							c->floor[level]);
@@ -152,13 +173,26 @@ static void rbb_goto_level(int level, const char *why)
 
 static void rbb_arm(void)
 {
+	int i;
+
+	/* rodin 6.18（2026-11-03）：新窗口从全簇满档重新开始。 */
+	for (i = 0; i < RBB_NR_CLUSTER; i++) {
+		rbb_clusters[i].cap_cnt = 0;
+		rbb_clusters[i].capped_out = false;
+	}
+
 	rbb_deadline = jiffies + msecs_to_jiffies(rbb_window_ms);
 	rbb_heat_cnt = 0;
 	rbb_cool_cnt = 0;
-	rbb_cap_cnt = 0;
 	rbb_blind_cnt = 0;
 	rbb_temp_ever_read = false;
 	rbb_state = RBB_ACTIVE;
+	/* rodin 6.18（2026-11-03）：level 已是 L0 时 rbb_goto_level()
+	 * 早退不重挂请求，而上面刚清掉 capped_out；fresh window 必须把
+	 * 此前停在 hw_min 的簇显式拉回 L0。
+	 */
+	if (rbb_level == RBB_L0)
+		rbb_apply_level(RBB_L0);
 	rbb_goto_level(RBB_L0, "arm");
 	schedule_delayed_work(&rbb_work, 0);
 }
@@ -208,6 +242,10 @@ static void rbb_detach_one(int idx)
 	if (freq_qos_request_active(&rbb_req[idx]))
 		freq_qos_remove_request(&rbb_req[idx]);
 	c->attached = false;
+
+	/* rodin 6.18（2026-11-03）：簇离场即清让位态，重建后重判。 */
+	c->capped_out = false;
+	c->cap_cnt = 0;
 
 	/* policy went away; the next CREATE_POLICY re-arms a fresh window */
 	if (rbb_state == RBB_ACTIVE) {
@@ -262,7 +300,6 @@ static void rbb_tick(struct work_struct *work)
 {
 	struct cpufreq_policy *policy;
 	struct rbb_cluster *c;
-	int capped = 0;
 	long temp;
 	int target;
 	int i;
@@ -274,6 +311,17 @@ static void rbb_tick(struct work_struct *work)
 
 	if (time_after_eq(jiffies, rbb_deadline)) {
 		rbb_goto_level(RBB_RELEASED, "window");
+		rbb_state = RBB_DONE;
+		goto out;
+	}
+
+	/*
+	 * rodin 6.18（2026-11-03）：bootmonitor 的 boot_completed 已落账
+	 * ⇒ userspace 启动窗语义结束。复用 handover 出口即时释放全部地板并
+	 * 终态退出；30s 窗口仍作 bootmonitor 未发布标志时的兜底。
+	 */
+	if (READ_ONCE(bm_boot_completed)) {
+		rbb_goto_level(RBB_RELEASED, "boot done");
 		rbb_state = RBB_DONE;
 		goto out;
 	}
@@ -302,7 +350,7 @@ static void rbb_tick(struct work_struct *work)
 				rbb_goto_level(target, "heat");
 				rbb_heat_cnt = 0;
 				rbb_cool_cnt = 0;
-				rbb_cap_cnt = 0;
+				rbb_cap_cnt_reset();
 			}
 		} else if (target < rbb_level) {
 			if (++rbb_cool_cnt >= RBB_UP_TICKS) {
@@ -317,36 +365,49 @@ static void rbb_tick(struct work_struct *work)
 	}
 
 	/*
-	 * a real cap (thermal, or MIUI's own max clamp after boot
-	 * completes) lands on policy->max; cur lagging a freshly armed
-	 * floor is a ramp in progress, never a cap.  A max sustained below
-	 * our floor means the userspace thermal manager has taken over
-	 * frequency management (mi_thermald clamps max within seconds of
-	 * boot): hand over outright instead of sawtoothing against its
-	 * clamps -- the window only backstops a boot where the handover
-	 * never arrives.
+	 * rodin 6.18（2026-11-03）：max 压破某簇当前地板 = userspace 热
+	 * 管理已对该簇接管。只撤该簇的 MIN 地板（请求常驻、置 hw_min，停止
+	 * 跟随档位），其余簇维持原地板继续吃启动窗余量；同一簇连续
+	 * RBB_DOWN_TICKS 拍成立才退出，防单拍抖动。全部 attached 簇都退出后
+	 * 整体 handover（原语义：热管理全面接管，让位并终态退出）。cur 爬坡
+	 * 仍不参与判定。
 	 */
 	if (rbb_level != RBB_RELEASED) {
+		int attached = 0, pending = 0;
+
 		for (i = 0; i < RBB_NR_CLUSTER; i++) {
 			c = &rbb_clusters[i];
 			if (!c->attached)
 				continue;
-			policy = cpufreq_cpu_get(c->first_cpu);
-			if (!policy)
+			attached++;
+			if (c->capped_out)
 				continue;
+
+			policy = cpufreq_cpu_get(c->first_cpu);
+			if (!policy) {
+				pending++;
+				continue;
+			}
 			if (policy->max && policy->max < c->floor[rbb_level])
-				capped++;
+				c->cap_cnt++;
+			else
+				c->cap_cnt = 0;
 			cpufreq_cpu_put(policy);
+
+			if (c->cap_cnt >= RBB_DOWN_TICKS) {
+				freq_qos_update_request(&rbb_req[i], c->hw_min);
+				c->capped_out = true;
+				pr_info("rodin_boot_boost: cpu%u floor withdrawn by max cap\n",
+					c->first_cpu);
+			} else {
+				pending++;
+			}
 		}
 
-		if (capped) {
-			if (++rbb_cap_cnt >= RBB_DOWN_TICKS) {
-				rbb_goto_level(RBB_RELEASED, "handover");
-				rbb_state = RBB_DONE;
-				goto out;
-			}
-		} else {
-			rbb_cap_cnt = 0;
+		if (attached && !pending) {
+			rbb_goto_level(RBB_RELEASED, "handover");
+			rbb_state = RBB_DONE;
+			goto out;
 		}
 	}
 
@@ -460,8 +521,8 @@ static ssize_t status_show(struct kobject *kobj, struct kobj_attribute *attr,
 		off += sysfs_emit_at(buf, off,
 			"cpu%u floor=%u cur=%u attached=%d\n",
 			c->first_cpu,
-			rbb_level == RBB_RELEASED ? c->hw_min :
-						    c->floor[rbb_level],
+			(rbb_level == RBB_RELEASED || c->capped_out) ?
+					c->hw_min : c->floor[rbb_level],
 			policy ? policy->cur : 0, c->attached);
 		if (policy)
 			cpufreq_cpu_put(policy);

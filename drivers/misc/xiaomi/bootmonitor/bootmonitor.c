@@ -182,6 +182,13 @@ static unsigned long log_count_2;
 static struct log_t **bootprof_2;
 static u8 version_change;
 static int bootindex;
+/* rodin 6.18（2026-11-03）：boot_completed 落账即置位的一次性
+ * 标志，供 rodin_boot_boost 的 150ms 轮询点即时让位（EXPORT_SYMBOL_GPL，
+ * 消费方 extern 声明，形态同本文件消费 bootprof_lock）。失败路径提前
+ * break，标志保持 false，消费方按 30s 窗口兜底。
+ */
+bool bm_boot_completed;
+EXPORT_SYMBOL_GPL(bm_boot_completed);
 
 module_param_string(bootmode, bm_boot_mode, sizeof(bm_boot_mode), 0644);
 module_param_string(fingerprint, build_fingerprint, sizeof(build_fingerprint),
@@ -857,6 +864,11 @@ judge_noprint:
 			break;
 
 		bm_event_counts = stage + 1;
+		/* rodin 6.18（2026-11-03）：十级账本走到末级
+		 * boot_completed 才发布；失败在上一级 break，标志不置位。
+		 */
+		if (stage + 1 == BM_EVENT_NR)
+			WRITE_ONCE(bm_boot_completed, true);
 	}
 
 	if (!failed) {
