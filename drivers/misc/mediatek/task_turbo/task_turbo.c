@@ -321,7 +321,8 @@ EXPORT_SYMBOL(disable_tt_vip_hook);
  */
 static int enable_tt_vip(const char *buf, const struct kernel_param *kp)
 {
-	int retval = 0, val = 0;
+	int retval = 0, val = 0, i;
+	pid_t turbo_pid_snap[TURBO_PID_COUNT] = {0};
 
 	retval = kstrtouint(buf, 0, &val);
 
@@ -333,8 +334,28 @@ static int enable_tt_vip(const char *buf, const struct kernel_param *kp)
 
 	tt_vip_enable = !!val;
 
-	if (!tt_vip_enable && disable_tt_vip_hook)
-		disable_tt_vip_hook(enforced_qualified_mask);
+	if (!tt_vip_enable) {
+		/*
+		 * rodin 6.18（2026-11-03）：disable_tt_vip_hook 只撤算法层状态，
+		 * set_scheduler_tuning 挂到 turbo 任务身上的 vvip/throttle 旗标
+		 * 不在其清单，残留会让开关关闭后 VIP 待遇照旧。锁内快照、锁外
+		 * unset_task_vvip 落账（内含跨 CPU rq 锁，理由同 feats 清零路径）；
+		 * tt_vip_enable=0 后新 boost 在 set_scheduler_tuning 处被门死，
+		 * 无再挂窗口。enforced_qualified_mask 是外部 caller 的 enforce
+		 * 状态记忆，不随开关清零。
+		 */
+		spin_lock(&TURBO_SPIN_LOCK);
+		for (i = 0; i < TURBO_PID_COUNT; i++)
+			turbo_pid_snap[i] = turbo_pid[i];
+		spin_unlock(&TURBO_SPIN_LOCK);
+		for (i = 0; i < TURBO_PID_COUNT; i++) {
+			if (turbo_pid_snap[i])
+				unset_task_vvip(turbo_pid_snap[i]);
+		}
+
+		if (disable_tt_vip_hook)
+			disable_tt_vip_hook(enforced_qualified_mask);
+	}
 
 	return retval;
 }
@@ -1897,6 +1918,7 @@ static int set_task_turbo_feats(const char *buf,
 {
 	int ret, i;
 	unsigned int val;
+	pid_t stale_pid[TURBO_PID_COUNT] = {0};
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret)
@@ -1910,16 +1932,25 @@ static int set_task_turbo_feats(const char *buf,
 		ret = -EINVAL;
 
 	/* if disable turbo, remove all turbo tasks */
-	/* spin_lock(&TURBO_SPIN_LOCK); */
 	if (val == 0) {
 		for (i = 0; i < TURBO_PID_COUNT; i++) {
-			if (turbo_pid[i]) {
-				unset_turbo_task(turbo_pid[i]);
-				turbo_pid[i] = 0;
-			}
+			stale_pid[i] = turbo_pid[i];
+			turbo_pid[i] = 0;
 		}
 	}
 	spin_unlock(&TURBO_SPIN_LOCK);
+
+	/*
+	 * rodin 6.18（2026-11-03）：unset_turbo_task → unset_scheduler_tuning
+	 * → set_user_nice 内含跨 CPU task_rq_lock，挪到锁外落账以免持模块锁
+	 * 连发跨核锁拉长临界区。TURBO_SPIN_LOCK 为模块私锁、与调度器锁链无
+	 * 交叉，锁外化不引入反序面；feats 已清零后 add_turbo_list_by_pid、
+	 * cgroup attach、exec 三个入口均被 task_turbo_feats 门死，无并发添桩。
+	 */
+	for (i = 0; i < TURBO_PID_COUNT; i++) {
+		if (stale_pid[i])
+			unset_turbo_task(stale_pid[i]);
+	}
 
 	if (!ret) {
 		pr_info("%s: task_turbo_feats is change to %d successfully",
