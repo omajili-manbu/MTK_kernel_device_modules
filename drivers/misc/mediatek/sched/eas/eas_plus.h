@@ -129,6 +129,9 @@ extern void mtk_find_busiest_group(void *data, struct sched_group *busiest,
 		struct rq *dst_rq, int *out_balance);
 extern void mtk_find_energy_efficient_cpu(void *data, struct task_struct *p,
 		int prev_cpu, int sync, int *new_cpu);
+/* rodin 6.18（2026-11-03）：死门注册守卫读它；真身 = sugov/nonlinear_opp_cap.c */
+extern int get_eas_hook(void);
+
 extern void mtk_cpu_overutilized(void *data, int cpu, int *overutilized);
 
 extern unsigned long pd_get_util_cpufreq(struct energy_env *eenv,

@@ -1290,16 +1290,27 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		pr_info("register android_rvh_can_migrate_task failed\n");
 
-	ret = register_trace_android_rvh_cpu_overutilized(
-			mtk_cpu_overutilized, NULL);
-	if (ret)
-		pr_info("register trace_android_rvh_cpu_overutilized failed\n");
+	/*
+	 * rodin 6.18（2026-11-03）：下列 handler 入口 get_eas_hook() 门恒死
+	 * （6.18 由 native EAS 接管，门复活前置件见 get_eas_hook 处注释）。
+	 * 死门期不注册：注册形态下每 tick/唤醒/切换仍付一次静态派发；
+	 * 门复活时须连同注册一并恢复。cpu_util_cfs_boost 钩是活体包络
+	 * 出口，不在本守卫之列。
+	 */
+	if (get_eas_hook()) {
+		ret = register_trace_android_rvh_cpu_overutilized(
+				mtk_cpu_overutilized, NULL);
+		if (ret)
+			pr_info("register trace_android_rvh_cpu_overutilized failed\n");
+	}
 
 
-	ret = register_trace_android_rvh_tick_entry(
-			mtk_tick_entry, NULL);
-	if (ret)
-		pr_info("register android_rvh_tick_entry failed\n");
+	if (get_eas_hook()) {
+		ret = register_trace_android_rvh_tick_entry(
+				mtk_tick_entry, NULL);
+		if (ret)
+			pr_info("register android_rvh_tick_entry failed\n");
+	}
 
 
 	ret = register_trace_android_vh_set_wake_flags(
@@ -1311,9 +1322,11 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		pr_info("register mtk_pelt_rt_tp hooks failed, returned %d\n", ret);
 
-	ret = register_trace_android_rvh_schedule(mtk_sched_switch, NULL);
-	if (ret)
-		pr_info("register mtk_sched_switch hooks failed, returned %d\n", ret);
+	if (get_eas_hook()) {
+		ret = register_trace_android_rvh_schedule(mtk_sched_switch, NULL);
+		if (ret)
+			pr_info("register mtk_sched_switch hooks failed, returned %d\n", ret);
+	}
 
 	ret = register_trace_android_rvh_update_misfit_status(mtk_update_misfit_status, NULL);
 	if (ret)
@@ -1343,13 +1356,17 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		pr_info("register mtk_cpu_util_cfs_boost_hook hooks failed, returned %d\n", ret);
 
-	ret = register_trace_android_vh_scheduler_tick(hook_scheduler_tick, NULL);
-	if (ret)
-		pr_info("scheduler: register scheduler_tick hooks failed, returned %d\n", ret);
+	if (get_eas_hook()) {
+		ret = register_trace_android_vh_scheduler_tick(hook_scheduler_tick, NULL);
+		if (ret)
+			pr_info("scheduler: register scheduler_tick hooks failed, returned %d\n", ret);
+	}
 
-	ret = register_trace_android_rvh_after_enqueue_task(mtk_hook_after_enqueue_task, NULL);
-	if (ret)
-		pr_info("register android_rvh_after_enqueue_task failed, returned %d\n", ret);
+	if (get_eas_hook()) {
+		ret = register_trace_android_rvh_after_enqueue_task(mtk_hook_after_enqueue_task, NULL);
+		if (ret)
+			pr_info("register android_rvh_after_enqueue_task failed, returned %d\n", ret);
+	}
 
 	ret = register_trace_android_rvh_select_task_rq_rt(mtk_eas_select_task_rq_rt, NULL);
 	if (ret)

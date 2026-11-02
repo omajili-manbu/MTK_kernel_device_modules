@@ -1553,17 +1553,25 @@ void register_vip_hooks(void)
 	 * （本树内行为等效：钩子调用点缺失时回调同样是死码）。vip_check_preempt_wakeup 本体保留。
 	 */
 
-	ret = register_trace_android_vh_scheduler_tick(vip_scheduler_tick, NULL);
-	if (ret)
-		pr_info("register scheduler_tick failed\n");
+	/*
+	 * rodin 6.18（2026-11-03）：rq VIP 链唯一入队路径在 eas_plus 死门后
+	 * （enqueue_vip_task 单点，见 :434 唯一 list_add），门死期三钩只剩
+	 * 每 tick/schedule/dequeue 的静态派发开销，不注册；门复活时一并恢复。
+	 * vip_rvh_cpu_cgroup_online 与门无关，保持常驻。
+	 */
+	if (get_eas_hook()) {
+		ret = register_trace_android_vh_scheduler_tick(vip_scheduler_tick, NULL);
+		if (ret)
+			pr_info("register scheduler_tick failed\n");
 
-	ret = register_trace_android_rvh_replace_next_task_fair(vip_replace_next_task_fair, NULL);
-	if (ret)
-		pr_info("register replace_next_task_fair hooks failed, returned %d\n", ret);
+		ret = register_trace_android_rvh_replace_next_task_fair(vip_replace_next_task_fair, NULL);
+		if (ret)
+			pr_info("register replace_next_task_fair hooks failed, returned %d\n", ret);
 
-	ret = register_trace_android_rvh_after_dequeue_task(vip_dequeue_task, NULL);
-	if (ret)
-		pr_info("register after_dequeue_task hooks failed, returned %d\n", ret);
+		ret = register_trace_android_rvh_after_dequeue_task(vip_dequeue_task, NULL);
+		if (ret)
+			pr_info("register after_dequeue_task hooks failed, returned %d\n", ret);
+	}
 }
 
 void vip_init(void)
