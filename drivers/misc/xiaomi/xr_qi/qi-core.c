@@ -28,6 +28,7 @@ extern int qi_vh_mutex_register(void);
 extern int qi_vh_rwsem_register(void);
 extern int qi_vh_percpu_rwsem_register(void);
 extern int qi_vh_futex_register(void);
+extern int qi_vh_fork_register(void);
 extern void qi_vh_comm_unregister(void);
 extern void qi_vh_binder_unregister(void);
 extern void qi_vh_mutex_unregister(void);
@@ -338,7 +339,7 @@ static void qi_sysctl_unregister(void)
 }
 static int __init qi_init(void)
 {
-	int (* const regs[])(void) = { qi_vh_comm_register, qi_vh_binder_register,
+	int (* const regs[])(void) = { qi_vh_fork_register, qi_vh_comm_register, qi_vh_binder_register,
 		qi_vh_mutex_register, qi_vh_rwsem_register, qi_vh_percpu_rwsem_register,
 		qi_vh_futex_register, qi_sysctl_register };
 	void (* const unregs[])(void) = { qi_vh_futex_unregister, qi_vh_percpu_rwsem_unregister,

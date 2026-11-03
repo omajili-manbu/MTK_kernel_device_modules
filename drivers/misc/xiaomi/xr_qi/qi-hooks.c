@@ -664,6 +664,18 @@ void qi_vh_comm_unregister(void)
 	/* The restricted RT probe is intentionally left registered by stock. */
 	unregister_trace_android_vh_free_task(qi_free_task, NULL);
 }
+/* rodin 6.18（2026-11-03）：__sched_fork 不清 android_oem_data1（mqos_task
+ * 指针槽），fork 整结构 memcpy 使子任务继承父指针，先退者 kfree 后余者
+ * get_task_qi 悬垂——无条件清槽，不设使能门（先 fork 后开 qi 窗口同样要闭）。 */
+static void qi_task_fork(void *unused, struct task_struct *p)
+{
+	if (p)
+		p->android_oem_data1[2] = 0;
+}
+int qi_vh_fork_register(void)
+{
+	return register_trace_android_rvh_sched_fork(qi_task_fork, NULL);
+}
 int qi_vh_binder_register(void)
 {
 	int first = 0, ret;
