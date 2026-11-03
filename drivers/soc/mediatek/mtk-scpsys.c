@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
+#include <linux/jiffies.h>
 #include <linux/module.h>
 #include <linux/mfd/syscon.h>
 #include <linux/of_device.h>
@@ -159,10 +160,21 @@ static bool mtk_check_vcp_is_ready(struct scp_domain *scpd);
  * 可睡眠 readx_poll_timeout；唯一带 MTK_SCPD_IRQ_SAVE 的 mminfra-hwv 域
  * 可能自原子上下文进入，保持忙轮形态（按 genpd.flags 分派）。
  */
+/*
+ * rodin 6.18（2026-11-04）：ready 轮询冷却闸（与 clk-mtk 同款）——满预算
+ * 失败后 1s 冷却窗内直接快败。风暴期每个域的上/下电都要过本等待（仅
+ * mminfra-hwv 域原子形态），N 域串行即 N×2s 关中断滞（实测 12.6s 连续
+ * 无 tick 触发 hard lockup）；任一次轮询成功即清闸自愈。
+ */
+static unsigned long scpsys_vcp_cooldown;
+
 static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 {
 	bool atomic_ctx = scpd->genpd.flags & GENPD_FLAG_IRQ_SAFE;
 	int ret, tmp;
+
+	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
+		return -ETIMEDOUT;
 
 	if (atomic_ctx)
 		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
@@ -172,8 +184,10 @@ static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 		ret = readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
 					 tmp > 0, MTK_POLL_DELAY_US,
 					 MTK_POLL_1S_TIMEOUT);
-	if (!ret)
+	if (!ret) {
+		WRITE_ONCE(scpsys_vcp_cooldown, 0);
 		return 0;
+	}
 
 	if (mtk_mminfra_vcp_sleep_prepared()) {
 		pr_warn_ratelimited("[scpsys] %s: vcp asleep in suspend window, skip wait\n",
@@ -184,12 +198,16 @@ static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 	mtk_mminfra_vcp_wake_request();
 
 	if (atomic_ctx)
-		return readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
-						 tmp > 0, MTK_POLL_DELAY_US,
-						 MTK_POLL_VCP_WAKE_TIMEOUT);
-	return readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
-				  tmp > 0, MTK_POLL_DELAY_US,
-				  MTK_POLL_VCP_WAKE_TIMEOUT);
+		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
+						tmp > 0, MTK_POLL_DELAY_US,
+						MTK_POLL_VCP_WAKE_TIMEOUT);
+	else
+		ret = readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
+					 tmp > 0, MTK_POLL_DELAY_US,
+					 MTK_POLL_VCP_WAKE_TIMEOUT);
+	if (ret < 0)
+		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + HZ);
+	return ret;
 }
 
 static DEFINE_SPINLOCK(hwv_infra_lock);
