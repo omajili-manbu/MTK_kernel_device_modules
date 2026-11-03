@@ -1589,17 +1589,16 @@ static void mminfra_debug_shutdown(struct platform_device *pdev)
 
 static int mminfra_pm_prepare(struct device *dev)
 {
-	pr_notice("mminfra prepare\n");
-	if (mm_pwr_ver <= mm_pwr_v2) {
-		if (vcp_gipc) {
-			mtk_clk_mminfra_hwv_power_ctrl_optional(true, CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
-			/* rodin 6.18（2026-11-03）：置位睡眠标志供 scpsys 判分支。 */
-			WRITE_ONCE(vcp_sleep_prepared, true);
-			writel(MM_SYS_SUSPEND, dbg->vcp_gipc_in_set);
-			pr_notice("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
-			mtk_clk_mminfra_hwv_power_ctrl_optional(false, CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
-		}
-	}
+	/*
+	 * rodin 6.18（2026-11-04）：挂起期 VCP 不睡。死亡链第一块多米诺 =
+	 * 本站发 MM_SYS_SUSPEND 让 VCP 睡 → enter 级中止后 ~50ms 又发
+	 * RESUME 叫醒 → FW 半睡态被自身 WDT 咬死 → mm-infra 投票全败 →
+	 * 整链崩塌。不睡后 WDT 不响、投票全成、VLP 区不死，中止退化为
+	 * 无害的失败挂起。代价 = VCP 电源票可能使 SPM 深睡变浅（先保命
+	 * 后省电，源头 C 解决后回收）。vcp_sleep_prepared 恒 false，
+	 * complete/resume_noirq 的 RESUME 补发与各消费点睡眠分支自然失效。
+	 */
+	pr_notice("mminfra prepare (vcp kept awake)\n");
 	return 0;
 }
 
@@ -1613,9 +1612,9 @@ static void mminfra_pm_complete(struct device *dev)
 				readl(dbg->spm_base+0xea8), readl(dbg->spm_base+0xeac),
 				readl(dbg->vlp_base+0x91c));
 			pr_notice("mminfra dummy2 = 0x%x\n", readl(dbg->mminfra_base+0x408));
-			writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
+			if (READ_ONCE(vcp_sleep_prepared))
+				writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
 			WRITE_ONCE(vcp_sleep_prepared, false);
-			pr_notice("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
 			mtk_clk_mminfra_hwv_power_ctrl_optional(false,
 				CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
 		}
