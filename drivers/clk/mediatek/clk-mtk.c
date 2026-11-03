@@ -34,7 +34,13 @@
 #endif
 #define MTK_POLL_DELAY_US		10
 #define MTK_POLL_300MS_TIMEOUT		(300 * USEC_PER_MSEC)
-#define MTK_POLL_1S_TIMEOUT		(5000 * USEC_PER_MSEC)
+/* rodin 6.18（2026-11-03）：常量名 1S 与旧值 5s 名实不符——挂起中止后
+ * mminfra voter 的 VCP-ready 忙轮以此预算关中断空转（VCP 已醒但其
+ * ready 投票须经仍在半上电的 mminfra hwv voter 落地，只会白烧满档），
+ * 实测 4.7s 停滞触发多核 hard lockup 检查并连锁 panic。对齐真值 1s
+ * （mtk-scpsys.c 同名常量与 stock scpsys/hwv 计数环均为 1s 档），
+ * 超时后既有显式唤醒+短轮询兜底接力，最坏关中断停滞收敛到 ~1s。 */
+#define MTK_POLL_1S_TIMEOUT		USEC_PER_SEC
 /* rodin 6.18 (2026-11-03): short re-poll budget after an explicit VCP wake
  * request, mirroring the scpsys WAIT_VCP handling. */
 #define MTK_POLL_VCP_WAKE_TIMEOUT	(50 * USEC_PER_MSEC)
