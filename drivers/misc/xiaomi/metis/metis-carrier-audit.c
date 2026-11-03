@@ -12,8 +12,9 @@
  *     SKIP（不误报）。
  *  2. rwsem 16B 原生槽不变量：mi_rwsem_init 复位语义（magic 模 +
  *     deadline 清零）+ 幂等二次应用。活体接力载体，stock 布局保真。
- *  3. 同类微回归：do_rwsem_list_insert 在链守卫（重入置 already
- *     不再插）、priority==5 门（already 不动）、空链首插。
+ *  3. 同类微回归：do_rwsem_list_insert 插入层无在链自检（在链守卫
+ *     已删，重入由钩子体扫链闭包；在链 waiter 照常落链置
+ *     already）、priority==5 门（already 不动）、空链首插。
  *  4. futex alter 钩子 already 出参契约（直通不触链）+ 空链 smoke。
  *     NULL-task 遍历在 boot 期不可确定性驱动（钩子前置
  *     VIP/qos 门对 init 任务恒关），留作 LTS 重验项。
@@ -126,20 +127,21 @@ static bool metis_audit_rwsem_reentry(void)
 	memset(&sem, 0, sizeof(sem));
 	INIT_LIST_HEAD(&sem.wait_list);
 
-	/* 在链守卫：waiter.list 非空才视为在链（list_empty 语义：自指 = 空 =
-	 * 不在链）。挂上宿主链制造非空 → 守卫置 already 且不插。旧版误用
-	 * INIT_LIST_HEAD 造出空链，守卫不触发反而真插，并把脏链状态带进
-	 * 后续用例——2026-10-31 修正。 */
+	/* 插入层在链自检已删除（rodin 6.18（2026-11-03）：list_empty 自链
+	 * 检测吃栈页残留自链字节，空链首 waiter 被误判在链即成假 waiter；
+	 * 重入改由钩子体扫链守卫闭包）。用例钉住新契约：在链 waiter
+	 * 照常落链 + already=true，与空链首插同形——守卫若被无意加回，
+	 * 此处即红。 */
 	memset(&w_onsrc, 0, sizeof(w_onsrc));
 	list_add(&w_onsrc.list, &onsrc);
 	already = false;
 	do_rwsem_list_insert((struct metis618_rwsem_waiter *)&w_onsrc, &sem,
 			     &already, 0);
-	if (!already || sem.wait_list.next != &sem.wait_list)
+	if (!already || sem.wait_list.next != &w_onsrc.list)
 		ok = false;
-	pr_info("metis-audit: rwsem reentry guard: %s (already=%d)\n",
-		(already && sem.wait_list.next == &sem.wait_list) ? "ok" :
-							  "MISMATCH",
+	pr_info("metis-audit: rwsem insert no-selfcheck: %s (already=%d)\n",
+		(already && sem.wait_list.next == &w_onsrc.list) ? "ok" :
+							 "MISMATCH",
 		already);
 	list_del(&w_onsrc.list);
 
