@@ -2331,8 +2331,12 @@ void clkchk_debug_dump_mt6899(enum chk_sys_id id[],
 			mdelay(10);
 		}
 
+		/* rodin 6.18（2026-11-03）：调试即死雷降级。stock blob 时代此
+		 * dump 面从未被踩（VCP 握手未输过）；6.18 suspend resume 期
+		 * vcp_ready_timeout 可达（wlan0 早醒打断 VCP 握手），BUG_ON
+		 * 把可恢复的 failed_suspend 变硬重启。降 WARN 留现场栈。 */
 		if (trigger_bugon)
-			BUG_ON(1);
+			WARN_ON(1);
 	}
 }
 EXPORT_SYMBOL_GPL(clkchk_debug_dump_mt6899);

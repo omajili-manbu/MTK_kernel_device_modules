@@ -785,7 +785,9 @@ static void debug_dump(unsigned int id, unsigned int pwr_sta)
 				mt_get_fmeter_freq(fclks->id, fclks->type));
 	}
 
-	BUG_ON(1);
+	/* rodin 6.18（2026-11-03）：同 clkchk 调试即死雷降级——dump 面可达
+	 * （MTCMOS 检查/vcp_ready 超时路径），BUG_ON 把可恢复中止变硬重启。 */
+	WARN_ON(1);
 }
 
 static enum chk_sys_id log_dump_id[] = {
