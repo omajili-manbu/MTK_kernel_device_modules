@@ -528,14 +528,22 @@ static void mi_user_roll_wk(struct work_struct *work)
 		if (!mu) {
 			mu = kmem_cache_alloc(mi_user_struct_cachep, GFP_KERNEL);
 			if (mu) {
-				void *old = xa_store(&mi_user_xa, uid, mu, GFP_KERNEL);
+				/* rodin 6.18（2026-11-03）：先初始化后发布——xa_store 起即对
+				 * 全核 tick/proc 读者可见，后补字段存在未初始化窗口；
+				 * init_mi_user 的 get_uid 属 mu 私有，发布失败或竞败时随 mu 一并释放。 */
+				void *old;
 
-				if (old) {
+				init_mi_user(mu, u);
+				old = xa_store(&mi_user_xa, uid, mu, GFP_KERNEL);
+				if (xa_is_err(old)) {
+					free_uid(mu->user);
+					kmem_cache_free(mi_user_struct_cachep, mu);
+					mu = NULL;
+				} else if (old) {
 					/* 并发建项：保留先到者，释放后到者。 */
+					free_uid(mu->user);
 					kmem_cache_free(mi_user_struct_cachep, mu);
 					mu = old;
-				} else {
-					init_mi_user(mu, u);
 				}
 			}
 		}
@@ -991,7 +999,12 @@ static int __init mi_sched_init(void)
 	}
 	mi_task_struct_cachep = kmem_cache_create("mi_task_struct", MI_TASK_STATE_SIZE, 0,
 		SLAB_ACCOUNT | SLAB_PANIC | SLAB_HWCACHE_ALIGN, NULL);
-	mi_user_struct_cachep = kmem_cache_create("mi_user_struct", 0xc0, 0,
+	/* rodin 6.18（2026-11-03）：尺寸随 sizeof 走（本内核 rwlock_t=8B，
+	 * sizeof=0xc8）；stock 口径 0xc0 把尾字段 user 悬到对象外，slab
+	 * 相邻对象头 8B 互踩，tick 读 mu->user 实读下一格对象
+	 * initialized|unknown_04（已初始化即恒为 1）。 */
+	mi_user_struct_cachep = kmem_cache_create("mi_user_struct",
+		sizeof(struct mi_user_struct), 0,
 		SLAB_ACCOUNT | SLAB_PANIC | SLAB_HWCACHE_ALIGN, NULL);
 	sched_wq = alloc_workqueue("mi_sched", WQ_UNBOUND, 0);
 	if (!sched_wq) {

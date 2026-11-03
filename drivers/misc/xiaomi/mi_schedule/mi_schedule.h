@@ -69,17 +69,19 @@ struct mi_task_struct {
 	};
 };
 
+/* rodin 6.18（2026-11-03）：本内核 rwlock_t=8B（stock 6.6 为 4B），本结构体整体后移 8B、sizeof=0xc8；偏移以本构建 BTF 实测为准。
+ * 缓存尺寸必须走 sizeof()——按 stock 口径 0xc0 建缓存会把尾字段 user 悬到对象外，slab 相邻对象头 8B 互踩。 */
 struct mi_user_struct {
 	u32 initialized;                       /* 0x00 */
 	u32 unknown_04;
 	u64 magic;                             /* 0x08 */
-	rwlock_t lock;                         /* 0x10 */
+	rwlock_t lock;                         /* 0x10, rwlock_t 8B on this build */
 	u32 unknown_14;
-	struct list_head tasks;                /* 0x18 */
-	u64 sup_runtime[6];                    /* 0x28 */
-	u64 big_runtime[6];                    /* 0x58 */
-	u64 little_runtime[6];                 /* 0x88 */
-	struct user_struct *user;              /* 0xb8 */
+	struct list_head tasks;                /* 0x20 */
+	u64 sup_runtime[6];                    /* 0x30 */
+	u64 big_runtime[6];                    /* 0x60 */
+	u64 little_runtime[6];                 /* 0x90 */
+	struct user_struct *user;              /* 0xc0 */
 };
 
 /* All 0x1f0 bytes are exported as stock per-CPU data. Stock free-task uses
