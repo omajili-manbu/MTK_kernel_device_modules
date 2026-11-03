@@ -5,7 +5,6 @@
  */
 
 #include <linux/clk.h>
-#include <linux/hardirq.h>
 #include <linux/vseq.h>
 #include <linux/clk-provider.h>
 #include <linux/io.h>
@@ -2307,39 +2306,7 @@ EXPORT_SYMBOL_GPL(print_subsys_reg_mt6899);
 void clkchk_debug_dump_mt6899(enum chk_sys_id id[],
 		char *exception_name, bool trigger_vcp_dump, bool trigger_bugon)
 {
-	static bool hwv_dump_once_latch;
 	const struct fmeter_clk *fclks;
-
-	/*
-	 * rodin 6.18（2026-11-03）：本 dump 面含 fmeter 遍历、子系统寄存器
-	 * 读与 VCP dump 协同，经 atomic notifier 到达时处于 CCF gate/mux
-	 * disable 的关中断自旋锁窗内，不可安全执行（stock 时代该路径不可
-	 * 达，风暴期单次 ~3s+ 关中断即触发 hard lockup）。原子上下文直接
-	 * 抑制；诊断价值由可睡眠调用者（adb clkchk_external_dump）保留，
-	 * 尝试时间线由 dw_clkchkd 探针独立留痕。
-	 */
-	if (in_atomic() || irqs_disabled()) {
-		pr_warn_ratelimited("[clkchk] %s: suppressed in atomic context\n",
-				    exception_name);
-		return;
-	}
-
-	/*
-	 * rodin 6.18（2026-11-03）：挂起中止后 mm-infra 投票失败可反复到达
-	 * 本 dump（hwv_cg_timeout / vcp_ready_timeout 两站），单次 ~1.2s
-	 * 的 fmeter 遍历 + 子系统寄存器读 + vcp_cmd_ex(mdelay) 在反复失败
-	 * 窗内持续放血整机（探针实测 30s 内 5 次 dump 连锁 hard lockup
-	 * 至 panic）。一次性闩：每 boot 首次全量 dump 留诊断，后续仅 WARN
-	 * 抑制；devapc/serror 直调（trigger_vcp_dump=false）不受闩约束；
-	 * 尝试时间线由 dw_clkchkd 探针独立留痕。
-	 */
-	if (trigger_vcp_dump && hwv_dump_once_latch) {
-		pr_warn_ratelimited("[clkchk] %s: dump suppressed (already dumped this boot)\n",
-				    exception_name);
-		return;
-	}
-	if (trigger_vcp_dump)
-		hwv_dump_once_latch = true;
 
 	fclks = mt_get_fmeter_clks();
 

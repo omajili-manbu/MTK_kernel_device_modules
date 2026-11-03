@@ -8,7 +8,6 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
-#include <linux/jiffies.h>
 #include <linux/module.h>
 #include <linux/mfd/syscon.h>
 #include <linux/of_device.h>
@@ -160,42 +159,10 @@ static bool mtk_check_vcp_is_ready(struct scp_domain *scpd);
  * 可睡眠 readx_poll_timeout；唯一带 MTK_SCPD_IRQ_SAVE 的 mminfra-hwv 域
  * 可能自原子上下文进入，保持忙轮形态（按 genpd.flags 分派）。
  */
-/*
- * rodin 6.18（2026-11-04）：ready 轮询冷却闸（与 clk-mtk 同款）——满预算
- * 失败后 1s 冷却窗内直接快败。风暴期每个域的上/下电都要过本等待（仅
- * mminfra-hwv 域原子形态），N 域串行即 N×2s 关中断滞（实测 12.6s 连续
- * 无 tick 触发 hard lockup）；任一次轮询成功即清闸自愈。
- */
-static unsigned long scpsys_vcp_cooldown;
-
-/*
- * rodin 6.18（2026-11-04）：hwv done 族轮询同吃冷却闸——VCP 死态下
- * done 位永不落地，每站满预算 1s 原子轮询与 ready 等待同窗叠加成
- * 多秒关中断滞；成功即清闸自愈。
- */
-static int scpsys_poll_hwv_done(struct scp_domain *scpd,
-				int (*op)(struct scp_domain *))
-{
-	int tmp, ret2;
-
-	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
-		return -ETIMEDOUT;
-	ret2 = readx_poll_timeout_atomic(op, scpd, tmp, tmp > 0,
-					 MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
-	if (ret2 < 0)
-		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + 10 * HZ);
-	else
-		WRITE_ONCE(scpsys_vcp_cooldown, 0);
-	return ret2;
-}
-
 static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 {
 	bool atomic_ctx = scpd->genpd.flags & GENPD_FLAG_IRQ_SAFE;
 	int ret, tmp;
-
-	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
-		return -ETIMEDOUT;
 
 	if (atomic_ctx)
 		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
@@ -205,10 +172,8 @@ static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 		ret = readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
 					 tmp > 0, MTK_POLL_DELAY_US,
 					 MTK_POLL_1S_TIMEOUT);
-	if (!ret) {
-		WRITE_ONCE(scpsys_vcp_cooldown, 0);
+	if (!ret)
 		return 0;
-	}
 
 	if (mtk_mminfra_vcp_sleep_prepared()) {
 		pr_warn_ratelimited("[scpsys] %s: vcp asleep in suspend window, skip wait\n",
@@ -219,16 +184,12 @@ static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 	mtk_mminfra_vcp_wake_request();
 
 	if (atomic_ctx)
-		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
-						tmp > 0, MTK_POLL_DELAY_US,
-						MTK_POLL_VCP_WAKE_TIMEOUT);
-	else
-		ret = readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
-					 tmp > 0, MTK_POLL_DELAY_US,
-					 MTK_POLL_VCP_WAKE_TIMEOUT);
-	if (ret < 0)
-		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + 10 * HZ);
-	return ret;
+		return readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
+						 tmp > 0, MTK_POLL_DELAY_US,
+						 MTK_POLL_VCP_WAKE_TIMEOUT);
+	return readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
+				  tmp > 0, MTK_POLL_DELAY_US,
+				  MTK_POLL_VCP_WAKE_TIMEOUT);
 }
 
 static DEFINE_SPINLOCK(hwv_infra_lock);
@@ -700,18 +661,6 @@ static void scpsys_extb_iso_up(struct scp_domain *scpd)
 	writel(val, ctl_addr);
 }
 
-/*
- * rodin 6.18（2026-11-03）：MTCMOS ack/sta 轮询按 genpd 锁形态分派，与
- * scpsys_wait_vcp_ready 同款论据——非 irq-safe 域 genpd 锁为 mutex、回调
- * 恒进程上下文，可睡眠轮询消除域下电/上电路径最长 1s×多站的关中断停滞
- * （挂起中止后 ack 停滞是整机 hard lockup 的直接执行体）；唯一 irq-safe
- * 的 mminfra-hwv 域保忙轮。HWV done 轮询位保持原形态。
- */
-#define scpsys_poll_ack(scpd, op, val, cond, delay_us, timeout) \
-	(((scpd)->genpd.flags & GENPD_FLAG_IRQ_SAFE) \
-	 ? readx_poll_timeout_atomic(op, (scpd), val, cond, delay_us, timeout) \
-	 : readx_poll_timeout(op, (scpd), val, cond, delay_us, timeout))
-
 static int scpsys_power_on(struct generic_pm_domain *genpd)
 {
 	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
@@ -752,10 +701,10 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 	writel(val, ctl_addr);
 	/* wait until PWR_ACK = 1 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_IS_PWR_CON_ON))
-		ret = scpsys_poll_ack(scpd, scpsys_pwr_ack_is_on, tmp, tmp > 0,
+		ret = readx_poll_timeout_atomic(scpsys_pwr_ack_is_on, scpd, tmp, tmp > 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	else
-		ret = scpsys_poll_ack(scpd, scpsys_sta_is_on, tmp, tmp > 0,
+		ret = readx_poll_timeout_atomic(scpsys_sta_is_on, scpd, tmp, tmp > 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto err_pwr_ack;
@@ -767,10 +716,10 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 	writel(val, ctl_addr);
 	/* wait until PWR_ACK = 1 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_IS_PWR_CON_ON))
-		ret = scpsys_poll_ack(scpd, scpsys_pwr_ack_2nd_is_on, tmp, tmp > 0,
+		ret = readx_poll_timeout_atomic(scpsys_pwr_ack_2nd_is_on, scpd, tmp, tmp > 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	else
-		ret = scpsys_poll_ack(scpd, scpsys_sta_2nd_is_on, tmp, tmp > 0,
+		ret = readx_poll_timeout_atomic(scpsys_sta_2nd_is_on, scpd, tmp, tmp > 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto err_pwr_ack;
@@ -1002,10 +951,10 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 	writel(val, ctl_addr);
 	/* wait until PWR_ACK = 1 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_IS_PWR_CON_ON))
-		ret = scpsys_poll_ack(scpd, scpsys_pwr_ack_is_on, tmp, tmp == 0,
+		ret = readx_poll_timeout_atomic(scpsys_pwr_ack_is_on, scpd, tmp, tmp == 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	else
-		ret = scpsys_poll_ack(scpd, scpsys_sta_is_on, tmp, tmp == 0,
+		ret = readx_poll_timeout_atomic(scpsys_sta_is_on, scpd, tmp, tmp == 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto out;
@@ -1016,10 +965,10 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 
 	/* wait until PWR_ACK = 0 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_IS_PWR_CON_ON))
-		ret = scpsys_poll_ack(scpd, scpsys_pwr_ack_2nd_is_on, tmp, tmp == 0,
+		ret = readx_poll_timeout_atomic(scpsys_pwr_ack_2nd_is_on, scpd, tmp, tmp == 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	else
-		ret = scpsys_poll_ack(scpd, scpsys_sta_2nd_is_on, tmp, tmp == 0,
+		ret = readx_poll_timeout_atomic(scpsys_sta_2nd_is_on, scpd, tmp, tmp == 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto out;
@@ -1089,10 +1038,10 @@ static int scpsys_md_power_on(struct generic_pm_domain *genpd)
 
 	/* wait until PWR_ACK = 1 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_IS_PWR_CON_ON))
-		ret = scpsys_poll_ack(scpd, scpsys_pwr_ack_is_on, tmp, tmp > 0,
+		ret = readx_poll_timeout_atomic(scpsys_pwr_ack_is_on, scpd, tmp, tmp > 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	else
-		ret = scpsys_poll_ack(scpd, scpsys_sta_is_on, tmp, tmp > 0,
+		ret = readx_poll_timeout_atomic(scpsys_sta_is_on, scpd, tmp, tmp > 0,
 				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto err_pwr_ack;
@@ -1151,10 +1100,10 @@ static int scpsys_md_power_off(struct generic_pm_domain *genpd)
 
 	/* wait until PWR_ACK = 0 */
 	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_IS_PWR_CON_ON))
-		ret = scpsys_poll_ack(scpd, scpsys_pwr_ack_is_on, tmp, tmp == 0,
+		ret = readx_poll_timeout_atomic(scpsys_pwr_ack_is_on, scpd, tmp, tmp == 0,
 				MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	else
-		ret = scpsys_poll_ack(scpd, scpsys_sta_is_on, tmp, tmp == 0,
+		ret = readx_poll_timeout_atomic(scpsys_sta_is_on, scpd, tmp, tmp == 0,
 				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 	if (ret < 0)
 		goto out;
@@ -1218,14 +1167,6 @@ static int scpsys_apu_power_off(struct generic_pm_domain *genpd)
 
 static int mtk_hwv_is_done(struct scp_domain *scpd)
 {
-	/*
-	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
-	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
-	 * 冷却期直接回安全值，零寄存器触碰。
-	 */
-	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
-		return 0;;
-
 	struct scp *scp = scpd->scp;
 	struct regmap *hwv_regmap;
 	u32 val = 0, mask = 0;
@@ -1248,14 +1189,6 @@ static int mtk_hwv_is_done(struct scp_domain *scpd)
 
 static int mtk_hwv_is_enable_done(struct scp_domain *scpd)
 {
-	/*
-	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
-	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
-	 * 冷却期直接回安全值，零寄存器触碰。
-	 */
-	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
-		return 0;;
-
 	struct scp *scp = scpd->scp;
 	struct regmap *hwv_regmap;
 	u32 val = 0, val2 = 0, val3 = 0;
@@ -1280,14 +1213,6 @@ static int mtk_hwv_is_enable_done(struct scp_domain *scpd)
 
 static int mtk_hwv_is_disable_done(struct scp_domain *scpd)
 {
-	/*
-	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
-	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
-	 * 冷却期直接回安全值，零寄存器触碰。
-	 */
-	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
-		return 0;;
-
 	struct scp *scp = scpd->scp;
 	struct regmap *hwv_regmap;
 	u32 val = 0, val2 = 0;
@@ -1310,14 +1235,6 @@ static int mtk_hwv_is_disable_done(struct scp_domain *scpd)
 
 static bool mtk_check_vcp_is_ready(struct scp_domain *scpd)
 {
-	/*
-	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
-	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
-	 * 冷却期直接回安全值，零寄存器触碰。
-	 */
-	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
-		return false;;
-
 	if (scpsys_ops == NULL || scpsys_ops->is_vcp_ready == NULL)
 		return true;
 
@@ -1377,7 +1294,8 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 
 	dev_dbg(scp->dev, "[scpsys] %s: hwv pre-done-poll\n", genpd->name);
 	/* wait for irq status idle */
-	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_done);
+	ret = readx_poll_timeout_atomic(mtk_hwv_is_done, scpd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
 	if (ret < 0)
 		goto err_hwv_prepare;
 
@@ -1404,7 +1322,8 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 	}
 
 	/* wait until VOTER_ACK = 1 */
-	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_enable_done);
+	ret = readx_poll_timeout_atomic(mtk_hwv_is_enable_done, scpd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
 	if (ret < 0)
 		goto err_hwv_done;
 
@@ -1484,7 +1403,8 @@ static int scpsys_hwv_power_off(struct generic_pm_domain *genpd)
 	}
 
 	/* wait for irq status idle */
-	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_done);
+	ret = readx_poll_timeout_atomic(mtk_hwv_is_done, scpd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
 	if (ret < 0)
 		goto err_hwv_prepare;
 
@@ -1512,7 +1432,8 @@ static int scpsys_hwv_power_off(struct generic_pm_domain *genpd)
 	}
 
 	/* wait until VOTER_ACK = 0 */
-	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_disable_done);
+	ret = readx_poll_timeout_atomic(mtk_hwv_is_disable_done, scpd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
 	if (ret < 0)
 		goto err_hwv_done;
 
@@ -1571,7 +1492,7 @@ static int scpsys_pbus_power_on(struct generic_pm_domain *genpd)
 	writel(val, ctl_addr);
 
 	/* wait until PWR_ACK == 1 */
-	ret = scpsys_poll_ack(scpd, scpsys_pbus_pwr_ack_is_on, tmp, tmp > 0,
+	ret = readx_poll_timeout_atomic(scpsys_pbus_pwr_ack_is_on, scpd, tmp, tmp > 0,
 			MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 
 	if (ret < 0)
@@ -1625,7 +1546,7 @@ static int scpsys_pbus_power_off(struct generic_pm_domain *genpd)
 	writel(val, ctl_addr);
 
 	/* wait until PWR_ACK == 0 */
-	ret = scpsys_poll_ack(scpd, scpsys_pbus_pwr_ack_is_on, tmp, tmp == 0,
+	ret = readx_poll_timeout_atomic(scpsys_pbus_pwr_ack_is_on, scpd, tmp, tmp == 0,
 			MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
 
 	if (ret < 0)
@@ -1708,7 +1629,8 @@ int __mminfra_hwv_power_ctrl(struct scp_domain *scpd, struct regmap *regmap,
 	if (onoff) {
 		tmp = 0;
 		/* wait until VOTER_ACK = 1 */
-		ret = scpsys_poll_hwv_done(scpd, mtk_mminfra_hwv_is_enable_done);
+		ret = readx_poll_timeout_atomic(mtk_mminfra_hwv_is_enable_done, scpd, tmp, tmp > 0,
+				MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
 		if (ret < 0)
 			goto err_hwv_done;
 		scpd->is_on = true;

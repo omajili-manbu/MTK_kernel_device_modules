@@ -22,29 +22,12 @@
 
 #include "clk-mtk.h"
 #include "clk-gate.h"
-#include <linux/iopoll.h>
-#include <linux/jiffies.h>
-#include "../../misc/mediatek/mminfra/mtk-mminfra-debug.h"
 
-/* mtk-mminfra-debug.h defines the same pair; guard to avoid redefinition. */
-#ifndef MTK_POLL_HWV_VOTE_CNT
 #define MTK_POLL_HWV_VOTE_CNT		(2500)
-#endif
-#ifndef MTK_POLL_HWV_VOTE_US
 #define MTK_POLL_HWV_VOTE_US		2
-#endif
 #define MTK_POLL_DELAY_US		10
 #define MTK_POLL_300MS_TIMEOUT		(300 * USEC_PER_MSEC)
-/* rodin 6.18（2026-11-03）：常量名 1S 与旧值 5s 名实不符——挂起中止后
- * mminfra voter 的 VCP-ready 忙轮以此预算关中断空转（VCP 已醒但其
- * ready 投票须经仍在半上电的 mminfra hwv voter 落地，只会白烧满档），
- * 实测 4.7s 停滞触发多核 hard lockup 检查并连锁 panic。对齐真值 1s
- * （mtk-scpsys.c 同名常量与 stock scpsys/hwv 计数环均为 1s 档），
- * 超时后既有显式唤醒+短轮询兜底接力，最坏关中断停滞收敛到 ~1s。 */
-#define MTK_POLL_1S_TIMEOUT		USEC_PER_SEC
-/* rodin 6.18 (2026-11-03): short re-poll budget after an explicit VCP wake
- * request, mirroring the scpsys WAIT_VCP handling. */
-#define MTK_POLL_VCP_WAKE_TIMEOUT	(50 * USEC_PER_MSEC)
+#define MTK_POLL_1S_TIMEOUT		(5000 * USEC_PER_MSEC)
 
 #define MMINFRA_DONE_STA		BIT(0)
 #define VCP_READY_STA			BIT(1)
@@ -118,19 +101,8 @@ struct ipi_callbacks *mtk_clk_get_ipi_cb(void)
 }
 EXPORT_SYMBOL_GPL(mtk_clk_get_ipi_cb);
 
-/* rodin 6.18（2026-11-04）：冷却闸前向声明（条件函数定义先于闸本体） */
-static unsigned long mtk_vcp_ready_cooldown;
-static bool mtk_vcp_ready_in_cooldown(void);
-
 static int mtk_vcp_is_ready(struct mtk_hwv_domain *hwvd)
 {
-	/*
-	 * rodin 6.18（2026-11-04）：冷却期 VLP 区未上电，读之挂死总线
-	 * 等互连超时（实测 ~8s）——冷却期直接回 not-ready，零触碰。
-	 */
-	if (time_before(jiffies, READ_ONCE(mtk_vcp_ready_cooldown)))
-		return 0;;
-
 	u32 val = 0, mask = 0;
 
 	if (mmproc_sspm_vote_sync_bits_support)
@@ -148,13 +120,6 @@ static int mtk_vcp_is_ready(struct mtk_hwv_domain *hwvd)
 
 static int mtk_mminfra_hwv_is_enable_done(struct mtk_hwv_domain *hwvd)
 {
-	/*
-	 * rodin 6.18（2026-11-04）：冷却期 VLP 区未上电，读之挂死总线
-	 * 等互连超时（实测 ~8s）——冷却期直接回 not-ready，零触碰。
-	 */
-	if (time_before(jiffies, READ_ONCE(mtk_vcp_ready_cooldown)))
-		return 0;;
-
 	u32 val = 0, mask = 0;
 
 	if (mmproc_sspm_vote_sync_bits_support)
@@ -169,58 +134,6 @@ static int mtk_mminfra_hwv_is_enable_done(struct mtk_hwv_domain *hwvd)
 	return 0;
 }
 
-/*
- * rodin 6.18（2026-11-04）：ready 轮询冷却闸——满预算失败后 10s 冷却窗
- * 内直接快败。窗长必须大于单次全量轮询时长（1s）：1s 窗时下一次调用
- * 恰逢冷却刚到期，闸形同虚设（实测仍 9s 级关中断滞）。10s 窗把风暴期
- * 全量轮询压到每 10s 一次，任一次成功即清闸自愈。
- */
-static unsigned long mtk_vcp_ready_cooldown;
-
-static bool mtk_vcp_ready_in_cooldown(void)
-{
-	return time_before(jiffies, READ_ONCE(mtk_vcp_ready_cooldown));
-}
-
-static void mtk_vcp_ready_arm_cooldown(void)
-{
-	WRITE_ONCE(mtk_vcp_ready_cooldown, jiffies + 10 * HZ);
-}
-
-/*
- * rodin 6.18 (2026-11-03): gate/mux CCF callbacks reach the voter from
- * atomic context, so the VCP-ready wait keeps the busy-poll flavor, but
- * it must not hold the vote spinlock while polling (up to 5s with local
- * IRQs masked collides with CPU idle entry and the watchdog). Skip the
- * wait while the suspend window has VCP intentionally asleep, and
- * request an explicit wake once before giving up.
- */
-static int mtk_clk_wait_vcp_ready(struct mtk_hwv_domain *hwvd)
-{
-	int ret, tmp;
-
-	if (mtk_mminfra_vcp_sleep_prepared())
-		return 0;
-
-	if (mtk_vcp_ready_in_cooldown())
-		return -ETIMEDOUT;
-
-	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, hwvd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-	if (!ret) {
-		WRITE_ONCE(mtk_vcp_ready_cooldown, 0);
-		return 0;
-	}
-
-	mtk_mminfra_vcp_wake_request();
-
-	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, hwvd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_VCP_WAKE_TIMEOUT);
-	if (ret < 0)
-		mtk_vcp_ready_arm_cooldown();
-	return ret;
-}
-
 static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 			unsigned int vote_msk, bool onoff)
 {
@@ -232,18 +145,14 @@ static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 	int ret = 0;
 	int tmp = 0;
 	int i = 0;
-	bool locked = false;
-
-	/* rodin 6.18 (2026-11-03): the VCP-ready wait only reads hwv status;
-	 * keep it outside the vote spinlock so a slow VCP no longer holds
-	 * local IRQs off for seconds (lock now covers just the vote write and
-	 * its ack, bounded by MTK_POLL_HWV_VOTE_CNT). */
-	ret = mtk_clk_wait_vcp_ready(hwvd);
-	if (ret < 0)
-		goto err_hwv_prepare;
 
 	spin_lock_irqsave(&mminfra_vote_lock, flags);
-	locked = true;
+
+	/* wait until VCP_READY_ACK = 1 */
+	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, hwvd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
+	if (ret < 0)
+		goto err_hwv_prepare;
 
 	en_ofs = hwvd->data->en_ofs;
 	if (onoff) {
@@ -270,21 +179,13 @@ static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 
 	if (onoff) {
 		/* wait until VOTER_ACK = 1 */
-		/* rodin 6.18（2026-11-04）：done 位须 VCP 落章，VCP 死态下永不
-		 * 落地——本站又在 vote 自旋锁窗内，每 hwv clk 一次 300ms 乘上
-		 * N 个 clk 即 12s 级关中断滞。冷却窗内跳过确认（storm 窗内
-		 * 正确性本已由中止兜底，干净窗冷却已过不受影响）。
-		 */
-		if (!mtk_vcp_ready_in_cooldown()) {
-			ret = readx_poll_timeout_atomic(mtk_mminfra_hwv_is_enable_done, hwvd, tmp, tmp > 0,
-					MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
-			if (ret < 0)
-				goto err_hwv_done;
-		}
+		ret = readx_poll_timeout_atomic(mtk_mminfra_hwv_is_enable_done, hwvd, tmp, tmp > 0,
+				MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
+		if (ret < 0)
+			goto err_hwv_done;
 	}
 
 	spin_unlock_irqrestore(&mminfra_vote_lock, flags);
-	locked = false;
 
 	return 0;
 
@@ -296,14 +197,10 @@ err_hwv_vote:
 	dev_err(hwvd->dev, "Failed to hwv vote %s timeout %s(%d %x %x)\n", onoff ? "on" : "off",
 			hwvd->data->name, ret, vote_msk, val);
 err_hwv_prepare:
-	if (!mtk_vcp_ready_in_cooldown())
-		regmap_read(hwvd->regmap, hwvd->data->done_ofs, &val);
-	else
-		val = 0;
+	regmap_read(hwvd->regmap, hwvd->data->done_ofs, &val);
 	dev_err(hwvd->dev, "Failed to vcp boot-up timeout %s(%x)\n", hwvd->data->name, val);
 
-	if (locked)
-		spin_unlock_irqrestore(&mminfra_vote_lock, flags);
+	spin_unlock_irqrestore(&mminfra_vote_lock, flags);
 
 	mtk_clk_notify(NULL, hwvd->regmap, hwvd->data->name,
 			hwvd->data->en_ofs, 0,
@@ -318,28 +215,11 @@ void mtk_clk_polling_vcp_ready(void)
 	int ret = 0;
 	int tmp = 0;
 
-	if (mtk_mminfra_vcp_sleep_prepared())
-		return;
-
-	if (mtk_vcp_ready_in_cooldown())
-		return;
-
 	/* wait until VCP_READY_ACK = 1 */
 	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, &mminfra_hwv_domain, tmp, tmp > 0,
 			MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
-	if (!ret) {
-		WRITE_ONCE(mtk_vcp_ready_cooldown, 0);
-		return;
-	}
-
-	/* rodin 6.18 (2026-11-03): request an explicit wake and re-poll once
-	 * before reporting the timeout (mirrors the scpsys WAIT_VCP handling). */
-	mtk_mminfra_vcp_wake_request();
-	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, &mminfra_hwv_domain, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_VCP_WAKE_TIMEOUT);
 	if (ret < 0) {
-		mtk_vcp_ready_arm_cooldown();
-		val = 0;
+		regmap_read(mminfra_hwv_domain.regmap, mminfra_hwv_domain.data->done_ofs, &val);
 		dev_err(mminfra_hwv_domain.dev, "Failed to vcp boot-up timeout %s(%x)\n",
 				mminfra_hwv_domain.data->name, val);
 
