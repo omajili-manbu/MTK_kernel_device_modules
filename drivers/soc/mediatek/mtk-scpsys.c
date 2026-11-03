@@ -168,6 +168,27 @@ static bool mtk_check_vcp_is_ready(struct scp_domain *scpd);
  */
 static unsigned long scpsys_vcp_cooldown;
 
+/*
+ * rodin 6.18（2026-11-04）：hwv done 族轮询同吃冷却闸——VCP 死态下
+ * done 位永不落地，每站满预算 1s 原子轮询与 ready 等待同窗叠加成
+ * 多秒关中断滞；成功即清闸自愈。
+ */
+static int scpsys_poll_hwv_done(struct scp_domain *scpd,
+				int (*op)(struct scp_domain *))
+{
+	int tmp, ret2;
+
+	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
+		return -ETIMEDOUT;
+	ret2 = readx_poll_timeout_atomic(op, scpd, tmp, tmp > 0,
+					 MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
+	if (ret2 < 0)
+		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + HZ);
+	else
+		WRITE_ONCE(scpsys_vcp_cooldown, 0);
+	return ret2;
+}
+
 static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 {
 	bool atomic_ctx = scpd->genpd.flags & GENPD_FLAG_IRQ_SAFE;
@@ -1324,8 +1345,7 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 
 	dev_dbg(scp->dev, "[scpsys] %s: hwv pre-done-poll\n", genpd->name);
 	/* wait for irq status idle */
-	ret = readx_poll_timeout_atomic(mtk_hwv_is_done, scpd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
+	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_done);
 	if (ret < 0)
 		goto err_hwv_prepare;
 
@@ -1352,8 +1372,7 @@ static int scpsys_hwv_power_on(struct generic_pm_domain *genpd)
 	}
 
 	/* wait until VOTER_ACK = 1 */
-	ret = readx_poll_timeout_atomic(mtk_hwv_is_enable_done, scpd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
+	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_enable_done);
 	if (ret < 0)
 		goto err_hwv_done;
 
@@ -1433,8 +1452,7 @@ static int scpsys_hwv_power_off(struct generic_pm_domain *genpd)
 	}
 
 	/* wait for irq status idle */
-	ret = readx_poll_timeout_atomic(mtk_hwv_is_done, scpd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
+	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_done);
 	if (ret < 0)
 		goto err_hwv_prepare;
 
@@ -1462,8 +1480,7 @@ static int scpsys_hwv_power_off(struct generic_pm_domain *genpd)
 	}
 
 	/* wait until VOTER_ACK = 0 */
-	ret = readx_poll_timeout_atomic(mtk_hwv_is_disable_done, scpd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
+	ret = scpsys_poll_hwv_done(scpd, mtk_hwv_is_disable_done);
 	if (ret < 0)
 		goto err_hwv_done;
 
@@ -1659,8 +1676,7 @@ int __mminfra_hwv_power_ctrl(struct scp_domain *scpd, struct regmap *regmap,
 	if (onoff) {
 		tmp = 0;
 		/* wait until VOTER_ACK = 1 */
-		ret = readx_poll_timeout_atomic(mtk_mminfra_hwv_is_enable_done, scpd, tmp, tmp > 0,
-				MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
+		ret = scpsys_poll_hwv_done(scpd, mtk_mminfra_hwv_is_enable_done);
 		if (ret < 0)
 			goto err_hwv_done;
 		scpd->is_on = true;
