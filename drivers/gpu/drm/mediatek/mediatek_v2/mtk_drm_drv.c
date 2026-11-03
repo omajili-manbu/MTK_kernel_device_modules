@@ -81,11 +81,10 @@
 #include <linux/interconnect.h>
 #include "dvfsrc-exp.h"
 #endif
-/* rodin 6.18（2026-11-03）：vendor 头按 CONFIG_DEVICE_MODULES_MTK_SMI 双形态
- * 自适配（=y 真声明 / =n 空壳）。本树 smi 已内建（=y），旧本地空壳让
- * mtk_smi_init_power_off 变 no-op，smi probe 保电引用（init-power-on）永不
- * 归还，显示族 MTCMOS 收不掉 → suspend 撞死窗；接回真实现释放保电。 */
-#include <soc/mediatek/mtk_smi_internal.h>
+/* rodin: upstream smi.h omits the vendor power hook and the smi driver is a
+ * blob in this build (CONFIG_MTK_SMI unset); mirror the vendor header's
+ * no-op fallback. */
+static inline void mtk_smi_init_power_off(void) { }
 
 #include "mtk_dsi.h"
 
