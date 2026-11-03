@@ -1366,6 +1366,19 @@ static int vcp_pm_event(struct notifier_block *notifier
 		pr_notice("[VCP] PM_POST_SUSPEND entered %d %d\n", pwclkcnt, is_suspending);
 		if (is_suspending && pwclkcnt) {
 			if (!vcp_ao) {
+				/*
+				 * rodin 6.18（2026-11-04）：stock POST 开局 mminfra 先行
+				 * （vcp.ko pm_event 线性流程：turn_mminfra_on →
+				 * wait_ready_sync → …治疗… → mminfra_off）——VLP 区复活
+				 * 后 FW 才有应答 ready/受控复位的运行环境；死区里空转
+				 * 治疗无效。对称收尾在 wait_ready_sync 之后。
+				 */
+				{
+					int mm_ret = vcp_turn_mminfra_on();
+					if (mm_ret < 0)
+						pr_notice("[VCP] %s: post mminfra on %d\n",
+							__func__, mm_ret);
+				}
 				if (!IS_ERR(vcp26m)) {
 					retval = clk_prepare_enable(vcp26m);
 					if (retval)
@@ -1395,6 +1408,7 @@ static int vcp_pm_event(struct notifier_block *notifier
 				is_suspending = false;
 				waitCnt = vcp_wait_ready_sync(RTOS_FEATURE_ID);
 #endif
+				vcp_turn_mminfra_off();
 			} else {
 				ret = vcp_turn_mminfra_on();
 				if (ret < 0) {
