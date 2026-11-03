@@ -118,8 +118,19 @@ struct ipi_callbacks *mtk_clk_get_ipi_cb(void)
 }
 EXPORT_SYMBOL_GPL(mtk_clk_get_ipi_cb);
 
+/* rodin 6.18（2026-11-04）：冷却闸前向声明（条件函数定义先于闸本体） */
+static unsigned long mtk_vcp_ready_cooldown;
+static bool mtk_vcp_ready_in_cooldown(void);
+
 static int mtk_vcp_is_ready(struct mtk_hwv_domain *hwvd)
 {
+	/*
+	 * rodin 6.18（2026-11-04）：冷却期 VLP 区未上电，读之挂死总线
+	 * 等互连超时（实测 ~8s）——冷却期直接回 not-ready，零触碰。
+	 */
+	if (time_before(jiffies, READ_ONCE(mtk_vcp_ready_cooldown)))
+		return 0;;
+
 	u32 val = 0, mask = 0;
 
 	if (mmproc_sspm_vote_sync_bits_support)
@@ -137,6 +148,13 @@ static int mtk_vcp_is_ready(struct mtk_hwv_domain *hwvd)
 
 static int mtk_mminfra_hwv_is_enable_done(struct mtk_hwv_domain *hwvd)
 {
+	/*
+	 * rodin 6.18（2026-11-04）：冷却期 VLP 区未上电，读之挂死总线
+	 * 等互连超时（实测 ~8s）——冷却期直接回 not-ready，零触碰。
+	 */
+	if (time_before(jiffies, READ_ONCE(mtk_vcp_ready_cooldown)))
+		return 0;;
+
 	u32 val = 0, mask = 0;
 
 	if (mmproc_sspm_vote_sync_bits_support)
@@ -278,7 +296,10 @@ err_hwv_vote:
 	dev_err(hwvd->dev, "Failed to hwv vote %s timeout %s(%d %x %x)\n", onoff ? "on" : "off",
 			hwvd->data->name, ret, vote_msk, val);
 err_hwv_prepare:
-	regmap_read(hwvd->regmap, hwvd->data->done_ofs, &val);
+	if (!mtk_vcp_ready_in_cooldown())
+		regmap_read(hwvd->regmap, hwvd->data->done_ofs, &val);
+	else
+		val = 0;
 	dev_err(hwvd->dev, "Failed to vcp boot-up timeout %s(%x)\n", hwvd->data->name, val);
 
 	if (locked)
@@ -318,7 +339,7 @@ void mtk_clk_polling_vcp_ready(void)
 			MTK_POLL_DELAY_US, MTK_POLL_VCP_WAKE_TIMEOUT);
 	if (ret < 0) {
 		mtk_vcp_ready_arm_cooldown();
-		regmap_read(mminfra_hwv_domain.regmap, mminfra_hwv_domain.data->done_ofs, &val);
+		val = 0;
 		dev_err(mminfra_hwv_domain.dev, "Failed to vcp boot-up timeout %s(%x)\n",
 				mminfra_hwv_domain.data->name, val);
 

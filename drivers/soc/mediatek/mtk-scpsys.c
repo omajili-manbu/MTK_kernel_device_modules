@@ -1218,6 +1218,14 @@ static int scpsys_apu_power_off(struct generic_pm_domain *genpd)
 
 static int mtk_hwv_is_done(struct scp_domain *scpd)
 {
+	/*
+	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
+	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
+	 * 冷却期直接回安全值，零寄存器触碰。
+	 */
+	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
+		return 0;;
+
 	struct scp *scp = scpd->scp;
 	struct regmap *hwv_regmap;
 	u32 val = 0, mask = 0;
@@ -1240,6 +1248,14 @@ static int mtk_hwv_is_done(struct scp_domain *scpd)
 
 static int mtk_hwv_is_enable_done(struct scp_domain *scpd)
 {
+	/*
+	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
+	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
+	 * 冷却期直接回安全值，零寄存器触碰。
+	 */
+	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
+		return 0;;
+
 	struct scp *scp = scpd->scp;
 	struct regmap *hwv_regmap;
 	u32 val = 0, val2 = 0, val3 = 0;
@@ -1264,6 +1280,14 @@ static int mtk_hwv_is_enable_done(struct scp_domain *scpd)
 
 static int mtk_hwv_is_disable_done(struct scp_domain *scpd)
 {
+	/*
+	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
+	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
+	 * 冷却期直接回安全值，零寄存器触碰。
+	 */
+	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
+		return 0;;
+
 	struct scp *scp = scpd->scp;
 	struct regmap *hwv_regmap;
 	u32 val = 0, val2 = 0;
@@ -1286,6 +1310,14 @@ static int mtk_hwv_is_disable_done(struct scp_domain *scpd)
 
 static bool mtk_check_vcp_is_ready(struct scp_domain *scpd)
 {
+	/*
+	 * rodin 6.18（2026-11-04）：冷却期 VCP 已知死态，本读落在
+	 * mm-infra 未上电的 VLP 区即挂死总线等互连超时（实测 ~8s）。
+	 * 冷却期直接回安全值，零寄存器触碰。
+	 */
+	if (time_before(jiffies, READ_ONCE(scpsys_vcp_cooldown)))
+		return false;;
+
 	if (scpsys_ops == NULL || scpsys_ops->is_vcp_ready == NULL)
 		return true;
 
