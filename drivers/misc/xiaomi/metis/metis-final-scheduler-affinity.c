@@ -283,7 +283,7 @@ int clu_aff_init(void)
 			cpumask_set_cpu(cpu, &viptask_use_cpumask);
 	}
 	clu_aff_header = register_sysctl_sz("clu-aff/viptask_maxcpu_nr",
-			clu_aff_table, 2);
+			clu_aff_table, 1);
 	pr_info("metis-clu-aff: come into %s\n", "cluster_core_init");
 	for (cpu = 0; cpu < 32 && cluster <= 2; cpu++) {
 		if (!(remaining & BIT(cpu)))

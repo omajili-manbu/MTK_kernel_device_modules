@@ -66,8 +66,11 @@ struct syscore_ops fas_syscore_ops = {
 	.resume = fas_resume,
 };
 
-/* Original table .data+0x60: one real item and a zero terminator. */
-struct ctl_table clu_aff_table[2] = {
+/* Original table .data+0x60: one real item and a zero terminator.
+ * rodin 6.18（2026-11-03）：register_sysctl_sz 按传入计数逐项校验，尾哨兵
+ * 零节点会被 table check 拒绝（procname is null）导致整表不注册，改为
+ * 单条目无哨兵、计数与数组同长。 */
+struct ctl_table clu_aff_table[1] = {
 	{
 		.procname = "viptask_maxcpu_nr",
 		.data = &vip_task_max_cpu_nr,
@@ -75,7 +78,6 @@ struct ctl_table clu_aff_table[2] = {
 		.mode = 0644,
 		.proc_handler = proc_viptask_cpus_set,
 	},
-	{ },
 };
 
 static const struct kernel_param_ops param_ops_vip_link = {

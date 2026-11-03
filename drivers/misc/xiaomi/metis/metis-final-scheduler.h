@@ -32,7 +32,7 @@ extern unsigned long cluster_affinity_uid_mlist[3125];
 extern unsigned long cluster_affinity_uid_llist[3125];
 extern unsigned long cluster_affinity_uid_blist[3125];
 extern struct ctl_table_header *clu_aff_header;
-extern struct ctl_table clu_aff_table[2];
+extern struct ctl_table clu_aff_table[1];
 
 /* Current fair.c declares cpu_array as cpumask_t ***; its real stock
  * build_cpu_array publishes that same table to metis_lb_cpu_array. */
