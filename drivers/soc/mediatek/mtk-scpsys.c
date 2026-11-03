@@ -183,7 +183,7 @@ static int scpsys_poll_hwv_done(struct scp_domain *scpd,
 	ret2 = readx_poll_timeout_atomic(op, scpd, tmp, tmp > 0,
 					 MTK_POLL_DELAY_US, MTK_POLL_IRQ_TIMEOUT);
 	if (ret2 < 0)
-		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + HZ);
+		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + 10 * HZ);
 	else
 		WRITE_ONCE(scpsys_vcp_cooldown, 0);
 	return ret2;
@@ -227,7 +227,7 @@ static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 					 tmp > 0, MTK_POLL_DELAY_US,
 					 MTK_POLL_VCP_WAKE_TIMEOUT);
 	if (ret < 0)
-		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + HZ);
+		WRITE_ONCE(scpsys_vcp_cooldown, jiffies + 10 * HZ);
 	return ret;
 }
 

@@ -152,10 +152,10 @@ static int mtk_mminfra_hwv_is_enable_done(struct mtk_hwv_domain *hwvd)
 }
 
 /*
- * rodin 6.18（2026-11-03）：ready 轮询冷却闸——满预算失败后 1s 冷却窗内
- * 直接快败。风暴期 N 个 hwv clk 串行 disable 的 N×1.05s 关中断轮询
- * （CCF enable_lock 窗内）塌缩为每秒至多一次全量轮询；任一次轮询成功
- * 即清闸自愈。
+ * rodin 6.18（2026-11-04）：ready 轮询冷却闸——满预算失败后 10s 冷却窗
+ * 内直接快败。窗长必须大于单次全量轮询时长（1s）：1s 窗时下一次调用
+ * 恰逢冷却刚到期，闸形同虚设（实测仍 9s 级关中断滞）。10s 窗把风暴期
+ * 全量轮询压到每 10s 一次，任一次成功即清闸自愈。
  */
 static unsigned long mtk_vcp_ready_cooldown;
 
@@ -166,7 +166,7 @@ static bool mtk_vcp_ready_in_cooldown(void)
 
 static void mtk_vcp_ready_arm_cooldown(void)
 {
-	WRITE_ONCE(mtk_vcp_ready_cooldown, jiffies + HZ);
+	WRITE_ONCE(mtk_vcp_ready_cooldown, jiffies + 10 * HZ);
 }
 
 /*
