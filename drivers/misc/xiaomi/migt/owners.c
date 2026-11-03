@@ -85,22 +85,25 @@ struct miscdevice migt_misc = {
 	.fops = &migt_fops,
 };
 
-/* .data+0x118, 7 x 0x40. Keep proc_dointvec on uint storage, as in stock;
- * do not add bounds, unsigned handlers, or substitute the first migt_debug. */
+/* .data+0x118, stock 7 x 0x40 (6 entries + zero terminator).
+ * rodin 6.18（2026-11-03）：register_sysctl_sz 按精确计数逐项校验，尾哨兵
+ * 会被 table check 拒绝导致整表不注册，改为 6 条目无哨兵；其余语义保持
+ * proc_dointvec on uint storage, as in stock; do not add bounds, unsigned
+ * handlers, or substitute the first migt_debug. */
 #define MIGT_SYSCTL(_name, _data, _length, _handler) \
 	{ .procname = (_name), .data = (_data), .maxlen = (_length), \
 	  .mode = 0644, .proc_handler = (_handler) }
-struct ctl_table migt_table[7] = {
+struct ctl_table migt_table[6] = {
 	MIGT_SYSCTL("enable_pkg_monitor", &enable_pkg_monitor, 4, proc_dointvec),
 	MIGT_SYSCTL("migt_sched_debug", &migt_render_debug, 4, proc_dointvec),
 	MIGT_SYSCTL("render_stask", &set_render_as_stask, 4, proc_dointvec),
 	MIGT_SYSCTL("stask_candidate_num", &stask_candidate_num, 4, proc_dointvec),
 	MIGT_SYSCTL("vip_task_max_num", &vip_task_max_num, 4, proc_dointvec),
 	MIGT_SYSCTL("ip_task_max_num", &ip_task_max_num, 4, proc_dointvec),
-	{ },
 };
-/* .data+0x330, 11 x 0x40. The distinct load perf_mod remains its own owner. */
-struct ctl_table game_load_table[11] = {
+/* .data+0x330, stock 11 x 0x40 (10 entries + zero terminator), same
+ * exact-count adaptation. The distinct load perf_mod remains its own owner. */
+struct ctl_table game_load_table[10] = {
 	MIGT_SYSCTL("game_load_choose_policy", &sysctl_game_load_choose_policy,
 		4, proc_dointvec),
 	MIGT_SYSCTL("glk_disable", &glk_disable, 4, proc_dointvec),
@@ -112,7 +115,6 @@ struct ctl_table game_load_table[11] = {
 	MIGT_SYSCTL("game_maxfreq_limit", glk_maxfreq, 12, proc_glk_dofreq),
 	MIGT_SYSCTL("perf_mod", &game_load_perf_mod, 4, proc_dointvec),
 	MIGT_SYSCTL("load_debug", &game_load_debug, 4, proc_dointvec),
-	{ },
 };
 #undef MIGT_SYSCTL
 

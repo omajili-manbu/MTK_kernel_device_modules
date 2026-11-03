@@ -8,7 +8,7 @@
 
 /* Actual stock local state/table owners; no fabricated definitions. */
 extern struct ctl_table_header *migt_sched_header, *game_load_header;
-extern struct ctl_table migt_table[7], game_load_table[11];
+extern struct ctl_table migt_table[6], game_load_table[10];
 extern struct proc_dir_entry *frame_load_dir;
 /* Distinct from game-load's same-named original static proc entries. */
 extern struct proc_dir_entry *migt_frame_history_entry, *migt_frame_cpu_entry;

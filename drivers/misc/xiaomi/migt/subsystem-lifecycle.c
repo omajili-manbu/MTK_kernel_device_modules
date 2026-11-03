@@ -101,7 +101,7 @@ int migt_sched_init(void)
 	printk("\0016migt-gtc: migt_sched %s: inited!\n", __func__);
 	migt_init_sucess = 1;
 	BUG_ON(migt_sched_header != NULL);
-	migt_sched_header = register_sysctl_sz("migt", migt_table, 7);
+	migt_sched_header = register_sysctl_sz("migt", migt_table, 6);
 	return 0;
 }
 
@@ -174,7 +174,7 @@ int game_load_init(void)
 {
 	subsystem_init_clusters(true);
 	BUG_ON(game_load_header != NULL);
-	game_load_header = register_sysctl_sz("migt/glk", game_load_table, 11);
+	game_load_header = register_sysctl_sz("migt/glk", game_load_table, 10);
 	register_oem_freq_hook(set_next_freq);
 	game_load_has_init = 1;
 	printk("\0013glk: game load init success\n");
