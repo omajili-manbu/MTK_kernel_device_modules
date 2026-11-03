@@ -106,6 +106,25 @@ static void vcp_A_wdt_handler(struct tasklet_struct *t)
 		}
 	}
 
+	/*
+	 * rodin 6.18（2026-11-03）：挂起窗内 WDT 不强制复位。
+	 * 6.18 PM 环境下 enter 级中止把 MM_SYS_SUSPEND(0x20000) 与
+	 * MM_SYS_RESUME(0x10000) 挤入同一窗口，FW 睡眠中无法回写
+	 * CORE_RDY_TO_REBOOT，此处长轮询超时后的强制复位会打断其自然
+	 * 唤醒，复位恢复期 mm-infra 投票全败即整机死亡。窗内只清 WDT
+	 * 中断、重开 IRQ，FW 由在途 RESUME 命令自然唤醒；真死态由
+	 * vcp_enable_pm_clk 的按需 reset_vcp() 兜底。
+	 */
+	if (is_suspending) {
+		pr_notice("[VCP] wdt during suspend window, skip force reset\n");
+		if (reg0)
+			vcp_wdt_clear(0);
+		if (reg1)
+			vcp_wdt_clear(1);
+		enable_irq(t->data);
+		return;
+	}
+
 	wait_vcp_ready_to_reboot();
 	/* Wakeup mobile_log_d after vcp flush the log */
 	vcp_logger_wakeup_handler(0, NULL, NULL, 0);
