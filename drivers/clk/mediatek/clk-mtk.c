@@ -252,10 +252,17 @@ static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 
 	if (onoff) {
 		/* wait until VOTER_ACK = 1 */
-		ret = readx_poll_timeout_atomic(mtk_mminfra_hwv_is_enable_done, hwvd, tmp, tmp > 0,
-				MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
-		if (ret < 0)
-			goto err_hwv_done;
+		/* rodin 6.18（2026-11-04）：done 位须 VCP 落章，VCP 死态下永不
+		 * 落地——本站又在 vote 自旋锁窗内，每 hwv clk 一次 300ms 乘上
+		 * N 个 clk 即 12s 级关中断滞。冷却窗内跳过确认（storm 窗内
+		 * 正确性本已由中止兜底，干净窗冷却已过不受影响）。
+		 */
+		if (!mtk_vcp_ready_in_cooldown()) {
+			ret = readx_poll_timeout_atomic(mtk_mminfra_hwv_is_enable_done, hwvd, tmp, tmp > 0,
+					MTK_POLL_DELAY_US, MTK_POLL_300MS_TIMEOUT);
+			if (ret < 0)
+				goto err_hwv_done;
+		}
 	}
 
 	spin_unlock_irqrestore(&mminfra_vote_lock, flags);
