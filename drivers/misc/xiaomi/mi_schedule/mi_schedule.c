@@ -150,6 +150,10 @@ static void init_mi_task(struct mi_task_struct *t, struct task_struct *p)
 	t->task = p;
 	t->user = NULL;
 	t->initial_exec_runtime = p->se.sum_exec_runtime;
+	/* rodin 6.18（2026-11-03）：0x4e0 差分基线为本树新增（tick 生产桥
+	 * 消费），stock 从不写该字节——对齐 initial_exec_runtime，world-init
+	 * 存量任务首 tick 不灌全量 delta。 */
+	t->last_exec_runtime = t->initial_exec_runtime;
 	memset(t->raw + 0x110, 0, 0x90);
 	MI_FIELD(t, u32, 0x1a0) = 0;
 	MI_FIELD(t, u32, 0x1c8) = 0;
