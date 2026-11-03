@@ -154,10 +154,13 @@ const struct kparam_array migt_param_array_glk_minfreq = {
 };
 
 /* Genuine __param: 70 x 0x28, preserved order and name/ops/arg edges.
- * All permissions are 0644, level=-1, flags=0. The section is metadata;
- * module.c supplies entry/exports; no parent/config/package activation. */
+ * All permissions are 0644, level=-1, flags=0. rodin 6.18（2026-11-03）：=y 后本段由 kernel/params.c param_sysfs_builtin()
+ * 按 KBUILD_MODNAME 点分前缀分派——补 "migt." 前缀使 70 项落
+ * /sys/module/migt/parameters/（stock 为 .ko 时经 module kobject 到达同一路径；
+ * 无前缀会按 core_param 语义并入 /sys/module/kernel/parameters，
+ * init.project.rc 对本路径 17 项 chmod/restorecon 方能生效）。 */
 #define MIGT_PARAM(_name, _ops, _arg) \
-	{ .name = (_name), .mod = THIS_MODULE, .ops = (_ops), \
+	{ .name = ("migt." _name), .mod = THIS_MODULE, .ops = (_ops), \
 	  .perm = 0644, .level = -1, .flags = 0, .arg = (_arg) }
 const struct kernel_param migt_parameters[70] __used __section("__param")
 	__aligned(__alignof__(struct kernel_param)) = {
