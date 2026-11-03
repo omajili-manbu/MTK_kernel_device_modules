@@ -22,12 +22,22 @@
 
 #include "clk-mtk.h"
 #include "clk-gate.h"
+#include <linux/iopoll.h>
+#include "../../misc/mediatek/mminfra/mtk-mminfra-debug.h"
 
+/* mtk-mminfra-debug.h defines the same pair; guard to avoid redefinition. */
+#ifndef MTK_POLL_HWV_VOTE_CNT
 #define MTK_POLL_HWV_VOTE_CNT		(2500)
+#endif
+#ifndef MTK_POLL_HWV_VOTE_US
 #define MTK_POLL_HWV_VOTE_US		2
+#endif
 #define MTK_POLL_DELAY_US		10
 #define MTK_POLL_300MS_TIMEOUT		(300 * USEC_PER_MSEC)
 #define MTK_POLL_1S_TIMEOUT		(5000 * USEC_PER_MSEC)
+/* rodin 6.18 (2026-11-03): short re-poll budget after an explicit VCP wake
+ * request, mirroring the scpsys WAIT_VCP handling. */
+#define MTK_POLL_VCP_WAKE_TIMEOUT	(50 * USEC_PER_MSEC)
 
 #define MMINFRA_DONE_STA		BIT(0)
 #define VCP_READY_STA			BIT(1)
@@ -134,6 +144,32 @@ static int mtk_mminfra_hwv_is_enable_done(struct mtk_hwv_domain *hwvd)
 	return 0;
 }
 
+/*
+ * rodin 6.18 (2026-11-03): gate/mux CCF callbacks reach the voter from
+ * atomic context, so the VCP-ready wait keeps the busy-poll flavor, but
+ * it must not hold the vote spinlock while polling (up to 5s with local
+ * IRQs masked collides with CPU idle entry and the watchdog). Skip the
+ * wait while the suspend window has VCP intentionally asleep, and
+ * request an explicit wake once before giving up.
+ */
+static int mtk_clk_wait_vcp_ready(struct mtk_hwv_domain *hwvd)
+{
+	int ret, tmp;
+
+	if (mtk_mminfra_vcp_sleep_prepared())
+		return 0;
+
+	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, hwvd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
+	if (!ret)
+		return 0;
+
+	mtk_mminfra_vcp_wake_request();
+
+	return readx_poll_timeout_atomic(mtk_vcp_is_ready, hwvd, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_VCP_WAKE_TIMEOUT);
+}
+
 static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 			unsigned int vote_msk, bool onoff)
 {
@@ -145,14 +181,18 @@ static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 	int ret = 0;
 	int tmp = 0;
 	int i = 0;
+	bool locked = false;
 
-	spin_lock_irqsave(&mminfra_vote_lock, flags);
-
-	/* wait until VCP_READY_ACK = 1 */
-	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, hwvd, tmp, tmp > 0,
-			MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
+	/* rodin 6.18 (2026-11-03): the VCP-ready wait only reads hwv status;
+	 * keep it outside the vote spinlock so a slow VCP no longer holds
+	 * local IRQs off for seconds (lock now covers just the vote write and
+	 * its ack, bounded by MTK_POLL_HWV_VOTE_CNT). */
+	ret = mtk_clk_wait_vcp_ready(hwvd);
 	if (ret < 0)
 		goto err_hwv_prepare;
+
+	spin_lock_irqsave(&mminfra_vote_lock, flags);
+	locked = true;
 
 	en_ofs = hwvd->data->en_ofs;
 	if (onoff) {
@@ -186,6 +226,7 @@ static int __mminfra_hwvoter_power_ctrl(struct mtk_hwv_domain *hwvd,
 	}
 
 	spin_unlock_irqrestore(&mminfra_vote_lock, flags);
+	locked = false;
 
 	return 0;
 
@@ -200,7 +241,8 @@ err_hwv_prepare:
 	regmap_read(hwvd->regmap, hwvd->data->done_ofs, &val);
 	dev_err(hwvd->dev, "Failed to vcp boot-up timeout %s(%x)\n", hwvd->data->name, val);
 
-	spin_unlock_irqrestore(&mminfra_vote_lock, flags);
+	if (locked)
+		spin_unlock_irqrestore(&mminfra_vote_lock, flags);
 
 	mtk_clk_notify(NULL, hwvd->regmap, hwvd->data->name,
 			hwvd->data->en_ofs, 0,
@@ -215,9 +257,20 @@ void mtk_clk_polling_vcp_ready(void)
 	int ret = 0;
 	int tmp = 0;
 
+	if (mtk_mminfra_vcp_sleep_prepared())
+		return;
+
 	/* wait until VCP_READY_ACK = 1 */
 	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, &mminfra_hwv_domain, tmp, tmp > 0,
 			MTK_POLL_DELAY_US, MTK_POLL_1S_TIMEOUT);
+	if (!ret)
+		return;
+
+	/* rodin 6.18 (2026-11-03): request an explicit wake and re-poll once
+	 * before reporting the timeout (mirrors the scpsys WAIT_VCP handling). */
+	mtk_mminfra_vcp_wake_request();
+	ret = readx_poll_timeout_atomic(mtk_vcp_is_ready, &mminfra_hwv_domain, tmp, tmp > 0,
+			MTK_POLL_DELAY_US, MTK_POLL_VCP_WAKE_TIMEOUT);
 	if (ret < 0) {
 		regmap_read(mminfra_hwv_domain.regmap, mminfra_hwv_domain.data->done_ofs, &val);
 		dev_err(mminfra_hwv_domain.dev, "Failed to vcp boot-up timeout %s(%x)\n",
