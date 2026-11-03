@@ -155,14 +155,23 @@ static bool mtk_check_vcp_is_ready(struct scp_domain *scpd);
  * 运行期真超时：请求唤醒后只做 50ms 短轮询（替代原来的 1s 全量重轮，
  * 显式唤醒后再耗 1s 无意义且拉长 noirq 停滞），
  * 仍失败则返回错误，由调用方走原 unwind 并只打一条诊断。
+ * 非 irq-safe 域的 genpd 锁为 mutex 形态，回调恒进程上下文，两段等待用
+ * 可睡眠 readx_poll_timeout；唯一带 MTK_SCPD_IRQ_SAVE 的 mminfra-hwv 域
+ * 可能自原子上下文进入，保持忙轮形态（按 genpd.flags 分派）。
  */
 static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 {
+	bool atomic_ctx = scpd->genpd.flags & GENPD_FLAG_IRQ_SAFE;
 	int ret, tmp;
 
-	ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
-					tmp > 0, MTK_POLL_DELAY_US,
-					MTK_POLL_1S_TIMEOUT);
+	if (atomic_ctx)
+		ret = readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
+						tmp > 0, MTK_POLL_DELAY_US,
+						MTK_POLL_1S_TIMEOUT);
+	else
+		ret = readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
+					 tmp > 0, MTK_POLL_DELAY_US,
+					 MTK_POLL_1S_TIMEOUT);
 	if (!ret)
 		return 0;
 
@@ -174,9 +183,13 @@ static int scpsys_wait_vcp_ready(struct scp_domain *scpd, const char *name)
 
 	mtk_mminfra_vcp_wake_request();
 
-	return readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
-					  tmp > 0, MTK_POLL_DELAY_US,
-					  MTK_POLL_VCP_WAKE_TIMEOUT);
+	if (atomic_ctx)
+		return readx_poll_timeout_atomic(mtk_check_vcp_is_ready, scpd, tmp,
+						 tmp > 0, MTK_POLL_DELAY_US,
+						 MTK_POLL_VCP_WAKE_TIMEOUT);
+	return readx_poll_timeout(mtk_check_vcp_is_ready, scpd, tmp,
+				  tmp > 0, MTK_POLL_DELAY_US,
+				  MTK_POLL_VCP_WAKE_TIMEOUT);
 }
 
 static DEFINE_SPINLOCK(hwv_infra_lock);
