@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Stock OS3.0.305 GPL export table: 147 original symbols.
- * rodin 6.18 (2026-11-05): the pick_next_task_fair route is carried by the
- * android_rvh_replace_next_task_fair adapter in metis-vip-queue.c, so
- * mi_pick_next_task_fair_hook and its export are withdrawn. The three
- * machine-ABI assembly bridges (metis_choose_cpu_fastpath,
- * mi_check_preempt_wakeup_hook, metis_coldstart_rt_find_lowest_rq) and
- * their metis-stock-entries.S carrier are retired with it: no 6.18 stock
- * provider exists and the wakeup policy attaches natively. Their exports
- * were always deliberately absent; no guessed declaration or CRC is
- * supplied. Native KMI/CFI/linking are UNTESTED. */
+/* Stock OS3.0.305 GPL export table: 148 original symbols.
+ * Three original entries have observed machine-ABI assembly bridges, but
+ * their canonical C types/MODVERSIONS remain unresolved. Their exports are
+ * deliberately absent; no guessed declaration or CRC is supplied:
+ * metis_choose_cpu_fastpath, mi_check_preempt_wakeup_hook,
+ * metis_coldstart_rt_find_lowest_rq. Native KMI/CFI/linking are UNTESTED. */
 #include <linux/export.h>
 #include "metis_common.h"
 #include "metis_state.h"
@@ -94,6 +90,7 @@ EXPORT_SYMBOL_GPL(speed_touch_store_freq);
 EXPORT_SYMBOL_GPL(speed_touch_restore_freq);
 EXPORT_SYMBOL_GPL(mi_enqueue_task_fair_hook);
 EXPORT_SYMBOL_GPL(mi_dequeue_task_fair_hook);
+EXPORT_SYMBOL_GPL(mi_pick_next_task_fair_hook);
 EXPORT_SYMBOL_GPL(get_foreground_uid);
 EXPORT_SYMBOL_GPL(set_foreground_app);
 EXPORT_SYMBOL_GPL(register_mi_enqueue_task_fair_hook);

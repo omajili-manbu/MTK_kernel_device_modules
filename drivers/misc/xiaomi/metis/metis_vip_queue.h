@@ -41,10 +41,10 @@ void mi_dequeue_task_fair_hook(struct rq *rq, struct task_struct *task, int flag
 void register_mi_enqueue_entity_hook(metis_enqueue_entity_fn hook);
 void unregister_mi_enqueue_entity_hook(void);
 void prio_sched_check(struct rq *rq);
-/* rodin 6.18：android_rvh_replace_next_task_fair 适配入口（原 stock
- * pick_next_task_fair 钩 handler 已随 6.18 载体退役）。 */
-void metis_vip_replace_next_task_fair(void *unused, struct rq *rq,
-		struct task_struct **p, struct task_struct *prev);
+struct task_struct *mi_pick_task_fair(unsigned int cpu);
+void mi_pick_next_task_fair_hook(void *unused, struct rq *rq,
+		struct task_struct **task, struct sched_entity **entity,
+		bool *repick, bool simple, struct task_struct *prev);
 bool mi_preempt_wakeup(struct task_struct *current_task,
 		struct task_struct *waking_task, bool *ignore, bool *nopreempt);
 bool mi_check_preempt_tick(unsigned int cpu);

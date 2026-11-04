@@ -88,13 +88,6 @@ static int __init metis_module_init(void)
 	register_mi_find_energy_efficient_cpu(1, find_energy_hook);
 	register_mi_walt_get_indicies(1, walt_get_indicies_hook);
 	register_trace_android_rvh_after_enqueue_task(mi_after_enqueue_task_hook, NULL);
-	/* rodin 6.18（2026-11-05）：pick 选侧优先与唤醒策略两路接活。replace 面
-	 * 原属 mtk vip.c 死门注册（该面已让位退役，metis 单属主）；wakeup 面
-	 * 原经 metis-stock-entries.S 机器 ABI 蹦床，现原生直调。 */
-	register_trace_android_rvh_replace_next_task_fair(
-		metis_vip_replace_next_task_fair, NULL);
-	register_trace_android_rvh_check_preempt_wakeup_fair(
-		metis_final_check_preempt_wakeup_hook, NULL);
 	register_vip_task_detect(1, metis_vvip_task);
 	register_mi_sched_enable(1, get_mi_fboost_enable);
 	register_ui_task_detect(1, metis_ui_task_quick, metis_ui_pipeline);

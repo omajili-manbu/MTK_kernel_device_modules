@@ -98,10 +98,6 @@ void metis_tp_exit(void);
  * C formal is unknown. These local prototypes describe consumed policy inputs. */
 void metis_final_preempt_wakeup_policy(struct rq *rq, struct task_struct *task,
 		bool *preempt, bool *nopreempt, bool *skip_mtk_vip);
-/* rodin 6.18：android_rvh_check_preempt_wakeup_fair 适配入口，直调上 policy。 */
-void metis_final_check_preempt_wakeup_hook(void *unused, struct rq *rq,
-		struct task_struct *p, bool *preempt, bool *nopreempt, int wake_flags,
-		struct sched_entity *se, struct sched_entity *pse);
 void metis_final_coldstart_lowest_policy(struct cpumask *mask, int found,
 		int *lowest);
 
