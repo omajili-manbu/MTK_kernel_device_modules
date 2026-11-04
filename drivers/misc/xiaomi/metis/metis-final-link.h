@@ -43,6 +43,9 @@ void mi_binder_set_vip_hook(void *data, struct binder_transaction *transaction,
 void mi_alter_futex_plist_add(void *data, struct plist_node *node,
 		struct plist_head *head, bool *already_on_hb);
 void mi_do_futex(void *data, u32 __user *uaddr, int command, unsigned int *flags, u32 __user *uaddr2);
+/* rodin 6.18：android_vh_do_futex 双 handler 合并后的单注册入口。 */
+void mi_do_futex_hook(void *data, u32 __user *uaddr, int command,
+		unsigned int *flags, u32 __user *uaddr2);
 void mi_futex_sleep_start(void *data, struct task_struct *task);
 void mi_futex_wake_this(void *data, int ret, int nr_wake, int target_nr,
 		struct task_struct *task);

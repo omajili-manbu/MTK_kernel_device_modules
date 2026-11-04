@@ -364,7 +364,8 @@ int metis_wakeup_init(void)
 	register_trace_android_vh_syscall_prctl_finished(
 		metis_wakeup_syscall_prctl_finished_hook, NULL);
 	register_trace_android_rvh_wake_up_new_task(wake_up_new_task_hook, NULL);
-	register_trace_android_vh_do_futex(metis_wakeup_futex_wait_hook, NULL);
+	/* rodin 6.18（2026-11-05）：do_futex 注册已并入 metis-final-link.c 的
+	 * mi_do_futex_hook（双 handler 合并单注册），此处不再单独挂。 */
 	return 0;
 }
 

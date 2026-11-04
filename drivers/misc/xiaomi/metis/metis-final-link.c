@@ -407,6 +407,16 @@ void mi_do_futex(void *data, u32 __user *uaddr, int command, unsigned int *flags
 	}
 }
 
+/* rodin 6.18（2026-11-05）：android_vh_do_futex 双 handler 合并本入口单注册，
+ * 序即原注册序（metis_link_init 先注册 mi_do_futex、metis_wakeup_init 后注册
+ * metis_wakeup_futex_wait_hook），每事件省一次 tracepoint 分派。 */
+void mi_do_futex_hook(void *data, u32 __user *uaddr, int command,
+		unsigned int *flags, u32 __user *uaddr2)
+{
+	mi_do_futex(data, uaddr, command, flags, uaddr2);
+	metis_wakeup_futex_wait_hook(data, uaddr, command, flags, uaddr2);
+}
+
 /* .text+0x2e5c, virtual 0010b884. */
 void mi_futex_sleep_start(void *data, struct task_struct *task)
 {
@@ -844,14 +854,13 @@ void unregister_game_wake_f(void)
  * hook/misc/proc registration. No compensation or success inference. */
 int metis_link_init(void)
 {
-	register_trace_android_vh_mutex_wait_start(mi_mutex_wait_start_hook, NULL);
+	register_trace_android_vh_mutex_wait_start(mi_mutex_wait_start, NULL);
 	register_trace_android_vh_alter_rwsem_list_add(mi_rwsem_list_add_hook, NULL);
-	register_trace_android_vh_rwsem_write_wait_start(mi_rwsem_write_wait_start_hook, NULL);
+	register_trace_android_vh_alter_mutex_list_add(mi_mutex_list_add_hook, NULL);
+	register_trace_android_vh_rwsem_write_wait_start(mi_rwsem_write_wait_start, NULL);
 	register_trace_android_vh_rwsem_read_wait_start(mi_rwsem_read_wait_start_hook, NULL);
 	register_trace_android_vh_binder_restore_priority(mi_binder_restore_vip_hook, NULL);
 	register_trace_android_vh_binder_set_priority(mi_binder_set_vip_hook, NULL);
-	register_trace_android_vh_rwsem_write_wait_start(mi_rwsem_lock_starttime, NULL);
-	register_trace_android_vh_mutex_wait_start(mi_mutex_lock_starttime, NULL);
 	/* rodin 6.18：rtmutex_wait_start 传 rt_mutex_base*；qi/metis 语义点已由
  * rwsem/mutex 替代钩子覆盖，rtmutex 链不再注册 */
 	register_trace_android_vh_pcpu_rwsem_lock_acquired(mi_pcpu_rwsem_lock_starttime, NULL);
@@ -867,7 +876,7 @@ int metis_link_init(void)
 	mi_try_to_wake_up_func[1] = metis_link_try_to_wake_up_hook;
 	register_trace_android_rvh_try_to_wake_up(metis_link_try_to_wake_up_hook, NULL);
 	register_trace_android_vh_alter_futex_plist_add(mi_alter_futex_plist_add, NULL);
-	register_trace_android_vh_do_futex(mi_do_futex, NULL);
+	register_trace_android_vh_do_futex(mi_do_futex_hook, NULL);
 	register_trace_android_vh_futex_sleep_start(mi_futex_sleep_start, NULL);
 	register_trace_android_vh_futex_wake_this(mi_futex_wake_this, NULL);
 	register_trace_android_vh_futex_wait_end(mi_futex_wait_end, NULL);

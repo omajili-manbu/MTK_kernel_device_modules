@@ -172,6 +172,19 @@ static void metis_bridge_setaffinity_early(void *unused, struct task_struct *p,
 		trace_printk("metis-game: skip affinity task %d observed\n", p->pid);
 }
 
+/* rodin 6.18（2026-11-05）：android_vh_sched_setaffinity_early 双 handler 合并
+ * 本入口单注册，序即原注册序（clu_aff_init 先注册 mi_sched_setaffinity、
+ * 本 init 后注册 migt 观察）；注册/注销收拢本文件。 */
+void mi_sched_setaffinity(void *unused, struct task_struct *task,
+		const struct cpumask *mask, bool *skip);
+
+void mi_setaffinity_early(void *unused, struct task_struct *p,
+		const struct cpumask *new_mask, bool *retval)
+{
+	mi_sched_setaffinity(unused, p, new_mask, retval);
+	metis_bridge_setaffinity_early(unused, p, new_mask, retval);
+}
+
 /* Stock: sugov mapping consulted the game-load OEM freq hook. The 6.18
  * android_vh_map_util_freq carries the exact stock signature, so this is
  * a pure forward: migt registers set_next_freq and the bridge relays. */
@@ -216,7 +229,7 @@ int metis_game_bridge_init(void)
 	register_trace_android_rvh_sched_newidle_balance(metis_bridge_newidle_balance, NULL);
 	register_trace_android_rvh_find_lowest_rq(metis_bridge_find_lowest_rq, NULL);
 	register_trace_android_rvh_should_honor_rt_sync(metis_bridge_should_honor_rt_sync, NULL);
-	register_trace_android_vh_sched_setaffinity_early(metis_bridge_setaffinity_early, NULL);
+	register_trace_android_vh_sched_setaffinity_early(mi_setaffinity_early, NULL);
 	register_trace_android_vh_map_util_freq(metis_bridge_map_util_freq, NULL);
 	register_trace_android_vh_account_task_time(metis_bridge_account_task_time, NULL);
 	pr_info("metis-game: vendor hook bridge inited\n");
@@ -228,7 +241,7 @@ int metis_game_bridge_init(void)
  * 非受限 DECLARE_HOOK 两件。 */
 void metis_game_bridge_exit(void)
 {
-	unregister_trace_android_vh_sched_setaffinity_early(metis_bridge_setaffinity_early, NULL);
+	unregister_trace_android_vh_sched_setaffinity_early(mi_setaffinity_early, NULL);
 	unregister_trace_android_vh_map_util_freq(metis_bridge_map_util_freq, NULL);
 	unregister_trace_android_vh_account_task_time(metis_bridge_account_task_time, NULL);
 	tracepoint_synchronize_unregister();

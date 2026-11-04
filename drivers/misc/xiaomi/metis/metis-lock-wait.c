@@ -21,11 +21,13 @@
 
 #include "metis-final-trace.h"
 
-/* rodin 6.18：stock 由 mi_locking 注册本钩；6.18 无该模块，metis 自挂
- * android_vh_alter_mutex_list_add（活体）。stock 首步的
- * mutex_reset_data_no_waiter 写 android_oem_data1，与 xr_qi waiter 计数
- * 共租冲突（2026-10-27 定案），不重放；VIP 插队主体为纯链表手术，保留。 */
-void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
+/* rodin 6.18（2026-11-05）：stock 由 mi_locking 注册本钩，6.18 无该模块，
+ * 改由 metis 自挂——metis_link_init 注册 android_vh_alter_mutex_list_add
+ * 使本插队体实际接活。stock 首步的 mutex_reset_data_no_waiter 写
+ * android_oem_data1，与 xr_qi waiter 计数共租冲突（2026-10-27 定案），
+ * 不重放；VIP 插队主体为纯链表手术，保留。 */
+void mi_mutex_list_add_hook(void *unused, struct mutex *lock,
+			    struct mutex_waiter *waiter,
 			    struct list_head *list, bool *already_on_list)
 {
 	struct list_head *cursor, *next, *prev, *new;
@@ -221,6 +223,15 @@ void mi_rwsem_lock_starttime(void *unused, struct rw_semaphore *sem)
 	mi_record_lock_starttime(current, start, "rwsem");
 }
 
+/* rodin 6.18（2026-11-05）：android_vh_rwsem_write_wait_start 双 handler 合并本
+ * 入口单注册，序即原注册序（先 mi_rwsem_write_wait_start_hook 后
+ * mi_rwsem_lock_starttime），每事件省一次 tracepoint 分派。 */
+void mi_rwsem_write_wait_start(void *unused, struct rw_semaphore *sem)
+{
+	mi_rwsem_write_wait_start_hook(unused, sem);
+	mi_rwsem_lock_starttime(unused, sem);
+}
+
 void mi_mutex_lock_starttime(void *unused, struct mutex *lock)
 {
 	const unsigned long start = 1;
@@ -240,6 +251,15 @@ void mi_mutex_lock_starttime(void *unused, struct mutex *lock)
 	mi_record_lock_starttime(task, start, "mutex");
 	/* rodin 6.18（2026-10-27）：vip_blocked_on_mutex 读者死门控（payload 无消费
 	 * 者），其后 0x2000/50-tick 接力块整体退役 —— stock 本就从未活体。 */
+}
+
+/* rodin 6.18（2026-11-05）：android_vh_mutex_wait_start 双 handler 合并本
+ * 入口单注册，序即原注册序（先 mi_mutex_wait_start_hook 后
+ * mi_mutex_lock_starttime），每事件省一次 tracepoint 分派。 */
+void mi_mutex_wait_start(void *unused, struct mutex *lock)
+{
+	mi_mutex_wait_start_hook(unused, lock);
+	mi_mutex_lock_starttime(unused, lock);
 }
 
 void mi_rtmutex_lock_starttime(void *unused, struct rt_mutex *lock)

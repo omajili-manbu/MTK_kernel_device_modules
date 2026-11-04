@@ -20,8 +20,9 @@ void mi_record_lock_starttime(struct task_struct *task, unsigned long start,
 			      const char *type);
 void mi_lock_vip_finish_common(struct task_struct *task);
 
-/* Four-argument exported helper, not a native five-argument trace callback. */
-void mi_mutex_list_add_hook(struct mutex *lock, struct mutex_waiter *waiter,
+/* Trace callback: leading void *unused per vendor hook convention. */
+void mi_mutex_list_add_hook(void *unused, struct mutex *lock,
+			    struct mutex_waiter *waiter,
 			    struct list_head *list, bool *already_on_list);
 void mi_mutex_wait_start_hook(void *unused, struct mutex *lock);
 void mi_rwsem_write_wait_start_hook(void *unused, struct rw_semaphore *sem);
@@ -35,6 +36,11 @@ void mi_pcpu_rwsem_wq_add(void *unused, struct percpu_rw_semaphore *sem,
 			bool reader);
 void mi_rwsem_write_wait_finish_hook(void *unused, struct rw_semaphore *sem);
 void mi_lock_rwsem_wake_finish_hook(void *unused, struct rw_semaphore *sem);
+
+/* rodin 6.18：android_vh_mutex_wait_start / android_vh_rwsem_write_wait_start
+ * 双 handler 合并后的单注册入口，序保持原注册序。 */
+void mi_mutex_wait_start(void *unused, struct mutex *lock);
+void mi_rwsem_write_wait_start(void *unused, struct rw_semaphore *sem);
 
 /* Remaining native waiter consumers are declared in metis-final-link.h;
  * kernel/locking/rwsem.h now shares rwsem.c's canonical waiter definition. */

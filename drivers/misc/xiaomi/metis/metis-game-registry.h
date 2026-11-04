@@ -60,4 +60,9 @@ void unregister_oem_freq_hook(void);
 int metis_game_bridge_init(void);
 void metis_game_bridge_exit(void);
 
+/* Combined android_vh_sched_setaffinity_early entry; per-hook single
+ * registration owned by metis-game-bridge.c. */
+void mi_setaffinity_early(void *unused, struct task_struct *p,
+		const struct cpumask *new_mask, bool *retval);
+
 #endif

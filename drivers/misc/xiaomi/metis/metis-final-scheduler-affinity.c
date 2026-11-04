@@ -320,7 +320,9 @@ int clu_aff_init(void)
 		~(u32)affinity_word(&cluster_affinity_cpumask[1]);
 	cluster_core_init_suc = 1;
 	register_trace_android_rvh_cpuset_fork(mi_cpuset_fork, NULL);
-	register_trace_android_vh_sched_setaffinity_early(mi_sched_setaffinity, NULL);
+	/* rodin 6.18（2026-11-05）：mi_sched_setaffinity 的注册已并入
+	 * metis-game-bridge.c 的 mi_setaffinity_early（双 handler 合并单注册），
+	 * 本处不再单独挂。 */
 	register_trace_android_rvh_set_cpus_allowed_comm(mi_set_cpus_allowed_comm, NULL);
 	pr_err("metis-clu-aff: clu_aff %s: inited!\n", "clu_aff_init");
 	return 0;
