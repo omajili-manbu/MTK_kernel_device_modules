@@ -1305,6 +1305,23 @@ static void vcp_pm_clocks_restore_all(void)
 		pr_debug("[VCP] %s: pm_runtime_get_sync %d\n", __func__, retval);
 }
 
+/* complete 已预授 26M 与电源域时的 POST 余段：核心/总线钟补齐 */
+static void vcp_pm_clocks_resume_core(void)
+{
+	int retval;
+
+	if (!IS_ERR(vcpclk)) {
+		retval = clk_prepare_enable(vcpclk);
+		if (retval)
+			pr_debug("[VCP] %s: vcpclk %d\n", __func__, retval);
+	}
+	if (!IS_ERR(vcpsel)) {
+		retval = clk_prepare_enable(vcpsel);
+		if (retval)
+			pr_debug("[VCP] %s: vcpsel %d\n", __func__, retval);
+	}
+}
+
 /*
  * rodin 6.18（2026-11-04）：complete 预恢复时钟标记——mminfra complete
  * 预上钟时置位，POST 恢复段据此跳过防重复计数。
@@ -1318,9 +1335,23 @@ static bool vcp_clocks_early_granted;
  * mm-infra 投票死 → VLP 死区连锁。在 complete 的 mm-infra 握手前
  * 上钟，固件见到在途 RESUME 即自行复活；POST 恢复段据此跳过防重复计数。
  */
+/*
+ * rodin 6.18（2026-11-05）：complete 握手前仅预授 26M 与电源域——
+ * RESUME 可达的最小充要资源；核心/总线钟由 POST 按标记补齐，
+ * 挂起期拆除与恢复两面对账恒平。
+ */
 void vcp_resume_grant_clocks(void)
 {
-	vcp_pm_clocks_restore_all();
+	int retval;
+
+	if (!IS_ERR(vcp26m)) {
+		retval = clk_prepare_enable(vcp26m);
+		if (retval)
+			pr_debug("[VCP] %s: vcp26m %d\n", __func__, retval);
+	}
+	retval = pm_runtime_get_sync(vcp_power_devs);
+	if (retval)
+		pr_debug("[VCP] %s: pm_runtime_get_sync %d\n", __func__, retval);
 	WRITE_ONCE(vcp_clocks_early_granted, true);
 }
 EXPORT_SYMBOL_GPL(vcp_resume_grant_clocks);
@@ -1430,6 +1461,8 @@ static int vcp_pm_event(struct notifier_block *notifier
 				}
 				if (!READ_ONCE(vcp_clocks_early_granted))
 					vcp_pm_clocks_restore_all();
+				else
+					vcp_pm_clocks_resume_core();
 				WRITE_ONCE(vcp_clocks_early_granted, false);
 
 				vcp_enable_dapc();

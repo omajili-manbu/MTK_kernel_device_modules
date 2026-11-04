@@ -1609,11 +1609,12 @@ static void mminfra_pm_complete(struct device *dev)
 	if (mm_pwr_ver <= mm_pwr_v2) {
 		if (vcp_gipc) {
 			/*
-			 * rodin 6.18（2026-11-04）：mm-infra 握手前先恢复 VCP 时钟。
-			 * prepare 已发 MM_SYS_SUSPEND 并拆除 26M（POST 才恢复），
-			 * 固件停车时可能仍持有 CLK_SYS/BUS REQ——无钟则 RESUME
-			 * 无人应答，ready 轮询死等 → mm-infra 投票死 → VLP 死区
-			 * 连锁。先上钟，固件见在途 RESUME 即自醒，轮询由此可成。
+			 * rodin 6.18（2026-11-05）：mm-infra 握手前先预授 VCP 的
+			 * 26M 与电源域。prepare 已发 MM_SYS_SUSPEND 并拆钟（POST
+			 * 才恢复），固件停车时可能仍持有 CLK_SYS/BUS REQ——无钟
+			 * 则 RESUME 无人应答，ready 轮询死等 → mm-infra 投票死 →
+			 * VLP 死区连锁。26M 为 RESUME 可达的最小充要钟，核心/
+			 * 总线钟由 POST 补齐，固件见在途 RESUME 即自醒。
 			 */
 			vcp_resume_grant_clocks();
 			mtk_clk_mminfra_hwv_power_ctrl_optional(true, CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
