@@ -1608,6 +1608,14 @@ static void mminfra_pm_complete(struct device *dev)
 	pr_notice("mminfra complete\n");
 	if (mm_pwr_ver <= mm_pwr_v2) {
 		if (vcp_gipc) {
+			/*
+			 * rodin 6.18（2026-11-04）：mm-infra 握手前先恢复 VCP 时钟。
+			 * prepare 已发 MM_SYS_SUSPEND 并拆除 26M（POST 才恢复），
+			 * 固件停车时可能仍持有 CLK_SYS/BUS REQ——无钟则 RESUME
+			 * 无人应答，ready 轮询死等 → mm-infra 投票死 → VLP 死区
+			 * 连锁。先上钟，固件见在途 RESUME 即自醒，轮询由此可成。
+			 */
+			vcp_resume_grant_clocks();
 			mtk_clk_mminfra_hwv_power_ctrl_optional(true, CLK_MMINFRA_PWR_VOTE_BIT_MMINFRA);
 			pr_notice("mminfra mtcmos = 0x%x, hfrp mtcmos = 0x%x, done bits=0x%x\n",
 				readl(dbg->spm_base+0xea8), readl(dbg->spm_base+0xeac),
@@ -1631,23 +1639,6 @@ static int mminfra_pm_suspend(struct device *dev)
 static int mminfra_pm_suspend_noirq(struct device *dev)
 {
 	pr_notice("mminfra suspend noirq\n");
-	return 0;
-}
-
-/*
- * rodin 6.18（2026-11-03）：只有 prepare 真的把 VCP 送睡（标志置位）才补
- * RESUME；正常成功 resume 不再打两条 notice。
- */
-static int mminfra_pm_resume_noirq(struct device *dev)
-{
-	pr_debug("mminfra resume noirq\n");
-	if (mm_pwr_ver <= mm_pwr_v2) {
-		if (vcp_gipc && READ_ONCE(vcp_sleep_prepared)) {
-			writel(MM_SYS_RESUME, dbg->vcp_gipc_in_set);
-			WRITE_ONCE(vcp_sleep_prepared, false);
-			pr_debug("VCP_GIPC_IN_SET = 0x%x\n", readl(dbg->vcp_gipc_in_set));
-		}
-	}
 	return 0;
 }
 
@@ -1684,7 +1675,6 @@ static const struct dev_pm_ops mminfra_debug_pm_ops = {
 	.complete = mminfra_pm_complete,
 	.suspend = mminfra_pm_suspend,
 	.suspend_noirq = mminfra_pm_suspend_noirq,
-	.resume_noirq = mminfra_pm_resume_noirq,
 };
 
 static const struct of_device_id of_mminfra_debug_match_tbl[] = {

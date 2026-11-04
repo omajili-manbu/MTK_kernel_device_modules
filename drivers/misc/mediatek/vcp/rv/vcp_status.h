@@ -70,4 +70,7 @@ int vcp_register_mminfra_cb_ex(mminfra_pwr_ptr fpt_on, mminfra_pwr_ptr fpt_off,
 	mminfra_dump_ptr mminfra_dump_func);
 struct device *vcp_get_io_device_ex(enum VCP_IOMMU_DEV io_num);
 
+/* rodin 6.18：mm-infra complete 握手前的 VCP 时钟预恢复（rv/vcp_helper.c） */
+void vcp_resume_grant_clocks(void);
+
 #endif
