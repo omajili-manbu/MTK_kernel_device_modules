@@ -1277,10 +1277,53 @@ int vcp_disable_pm_clk(enum feature_id id)
 }
 
 /*
+ * rodin 6.18（2026-11-05）：VCP PM 时钟/电源域恢复单点——PREPARE 侧
+ * 拆除（put_sync + sel/clk/26m）的对偶，complete 预授与 POST 恢复
+ * 共用一份，杜绝双路径重复计数。
+ */
+static void vcp_pm_clocks_restore_all(void)
+{
+	int retval;
+
+	if (!IS_ERR(vcp26m)) {
+		retval = clk_prepare_enable(vcp26m);
+		if (retval)
+			pr_debug("[VCP] %s: vcp26m %d\n", __func__, retval);
+	}
+	if (!IS_ERR(vcpclk)) {
+		retval = clk_prepare_enable(vcpclk);
+		if (retval)
+			pr_debug("[VCP] %s: vcpclk %d\n", __func__, retval);
+	}
+	if (!IS_ERR(vcpsel)) {
+		retval = clk_prepare_enable(vcpsel);
+		if (retval)
+			pr_debug("[VCP] %s: vcpsel %d\n", __func__, retval);
+	}
+	retval = pm_runtime_get_sync(vcp_power_devs);
+	if (retval)
+		pr_debug("[VCP] %s: pm_runtime_get_sync %d\n", __func__, retval);
+}
+
+/*
  * rodin 6.18（2026-11-04）：complete 预恢复时钟标记——mminfra complete
  * 预上钟时置位，POST 恢复段据此跳过防重复计数。
  */
 static bool vcp_clocks_early_granted;
+
+/*
+ * rodin 6.18（2026-11-04）：mminfra complete 握手前的时钟预恢复。
+ * prepare 已发 MM_SYS_SUSPEND 并拆除 26M（POST 才恢复），固件停车
+ * 时可能仍持有 CLK_SYS/BUS REQ——无钟则写入的 RESUME 无人应答 →
+ * mm-infra 投票死 → VLP 死区连锁。在 complete 的 mm-infra 握手前
+ * 上钟，固件见到在途 RESUME 即自行复活；POST 恢复段据此跳过防重复计数。
+ */
+void vcp_resume_grant_clocks(void)
+{
+	vcp_pm_clocks_restore_all();
+	WRITE_ONCE(vcp_clocks_early_granted, true);
+}
+EXPORT_SYMBOL_GPL(vcp_resume_grant_clocks);
 
 static int vcp_pm_event(struct notifier_block *notifier
 			, unsigned long pm_event, void *unused)
@@ -1385,29 +1428,8 @@ static int vcp_pm_event(struct notifier_block *notifier
 						pr_notice("[VCP] %s: post mminfra on %d\n",
 							__func__, mm_ret);
 				}
-				if (!READ_ONCE(vcp_clocks_early_granted)) {
-					if (!IS_ERR(vcp26m)) {
-						retval = clk_prepare_enable(vcp26m);
-						if (retval)
-							pr_debug("[VCP] %s: clk_prepare_enable vcp26m\n",
-								__func__);
-					}
-				if (!IS_ERR(vcpclk)) {
-					retval = clk_prepare_enable(vcpclk);
-					if (retval)
-						pr_debug("[VCP] %s: clk_prepare_enable vcpclk\n",
-							__func__);
-				}
-				if (!IS_ERR(vcpsel)) {
-					retval = clk_prepare_enable(vcpsel);
-					if (retval)
-						pr_debug("[VCP] %s: clk_prepare_enable vcpsel\n",
-							__func__);
-				}
-				retval = pm_runtime_get_sync(vcp_power_devs);
-				if (retval)
-					pr_debug("[VCP] %s: pm_runtime_get_sync\n", __func__);
-				}
+				if (!READ_ONCE(vcp_clocks_early_granted))
+					vcp_pm_clocks_restore_all();
 				WRITE_ONCE(vcp_clocks_early_granted, false);
 
 				vcp_enable_dapc();
@@ -2777,39 +2799,6 @@ void vcp_region_info_init(void)
 #else
 void vcp_region_info_init(void) {}
 #endif
-
-/*
- * rodin 6.18（2026-11-04）：mminfra complete 握手前的时钟预恢复。
- * prepare 已发 MM_SYS_SUSPEND 并拆除 26M（POST 才恢复），固件停车
- * 时可能仍持有 CLK_SYS/BUS REQ——无钟则写入的 RESUME 无人应答 →
- * mm-infra 投票死 → VLP 死区连锁。在 complete 的 mm-infra 握手前
- * 上钟，固件见到在途 RESUME 即自行复活；POST 恢复段据此跳过防重复计数。
- */
-void vcp_resume_grant_clocks(void)
-{
-	int retval;
-
-	if (!IS_ERR(vcp26m)) {
-		retval = clk_prepare_enable(vcp26m);
-		if (retval)
-			pr_debug("[VCP] %s: vcp26m %d\n", __func__, retval);
-	}
-	if (!IS_ERR(vcpclk)) {
-		retval = clk_prepare_enable(vcpclk);
-		if (retval)
-			pr_debug("[VCP] %s: vcpclk %d\n", __func__, retval);
-	}
-	if (!IS_ERR(vcpsel)) {
-		retval = clk_prepare_enable(vcpsel);
-		if (retval)
-			pr_debug("[VCP] %s: vcpsel %d\n", __func__, retval);
-	}
-	retval = pm_runtime_get_sync(vcp_power_devs);
-	if (retval)
-		pr_debug("[VCP] %s: pm_runtime_get_sync %d\n", __func__, retval);
-	WRITE_ONCE(vcp_clocks_early_granted, true);
-}
-EXPORT_SYMBOL_GPL(vcp_resume_grant_clocks);
 
 void vcp_recovery_init(void)
 {
