@@ -394,7 +394,7 @@ static void group_init_existing_task_load(struct task_struct *p)
 	group_init_new_task_load(p);
 }
 
-static void group_android_rvh_wake_up_new_task(void *unused, struct task_struct *new)
+void group_android_rvh_wake_up_new_task(void *unused, struct task_struct *new)
 {
 	/* init new task grp & list */
 	group_init_new_task_load(new);
@@ -539,10 +539,9 @@ static void group_register_hooks(void)
 {
 	int ret = 0;
 
-	ret = register_trace_android_rvh_wake_up_new_task(
-		group_android_rvh_wake_up_new_task, NULL);
-	if (ret)
-		pr_info("register wake_up_new_task hooks failed, returned %d\n", ret);
+	/* rodin 6.18（2026-11-05）：android_rvh_wake_up_new_task 限制槽收敛至
+	 * sched_main.c mtk_eas_wake_up_new_task 单一注册者直调（组记账居首），
+	 * 本处不再独立注册。 */
 
 	register_trace_android_rvh_flush_task(
 		group_android_rvh_flush_task, NULL);

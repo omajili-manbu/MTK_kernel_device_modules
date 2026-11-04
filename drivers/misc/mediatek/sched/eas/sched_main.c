@@ -182,6 +182,27 @@ static void mtk_eas_can_migrate_task(void *ignore, struct task_struct *p,
 	metis_bridge_can_migrate_task(p, dst_cpu, can_migrate);
 }
 
+/* rodin 6.18（2026-11-05）：android_rvh_wake_up_new_task 同为 ANDROID_RVH_NR_PROBES_MAX=2
+ * 限制槽，原为 group 记账（group_init）/vip 新任务初始化（vip_init）/metis 冷启动唤醒
+ * 标记（metis_wakeup_init）三方独立注册，前两席先占，metis 在 vseq 重放波最晚注册被
+ * -EBUSY 静默挤掉且不查返回值。收敛为本单一注册者按定序直调（全内建跨编译单元直调，
+ * 无需导出）：group 记账 → vip 新任务初始化 → metis 唤醒标记（意图序居末）；三方写
+ * 不相交的 per-task 字段，序无耦合。group/vip 随各自 Kconfig 直调。 */
+extern void group_android_rvh_wake_up_new_task(void *unused, struct task_struct *new);
+extern void vip_new_tasks(void *unused, struct task_struct *new);
+extern void wake_up_new_task_hook(void *unused, struct task_struct *task);
+
+static void mtk_eas_wake_up_new_task(void *unused, struct task_struct *new)
+{
+#if IS_ENABLED(CONFIG_MTK_SCHED_GROUP_AWARE)
+	group_android_rvh_wake_up_new_task(unused, new);
+#endif
+#if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
+	vip_new_tasks(unused, new);
+#endif
+	wake_up_new_task_hook(unused, new);
+}
+
 static void sched_rq_load_hook(void *data, struct cfs_rq *rq)
 {
 	if (trace_sched_rq_load_enabled())
@@ -1166,6 +1187,18 @@ static int __init mtk_scheduler_init(void)
 		mtk_task_data_guard_fail("mtk_sched");
 		return -ENODEV;
 	}
+
+	/*
+	 * rodin 6.18（2026-11-05）：android_rvh_wake_up_new_task 单一注册点
+	 * （handler 见 mtk_eas_wake_up_new_task）。置于 vip_init/group_init 之前：
+	 * vip/group handler 仅做 per-task 字段初始化，先注册与 stock vip_init
+	 * "先注册后走查存量任务"同形，initcall 窗口内新建任务不漏初始化；
+	 * metis handler 由 metis_wakeup_enable（BSS 默认 0）首门自守，未初始化态安全。
+	 */
+	ret = register_trace_android_rvh_wake_up_new_task(
+			mtk_eas_wake_up_new_task, NULL);
+	if (ret)
+		pr_info("register android_rvh_wake_up_new_task failed, returned %d\n", ret);
 
 	/* build cpu_array for hints-based gear search*/
 	init_cpu_array();

@@ -1222,7 +1222,7 @@ void init_task_gear_hints(struct task_struct *p)
 	ghts->reverse    = 0;
 }
 
-static void vip_new_tasks(void *unused, struct task_struct *new)
+void vip_new_tasks(void *unused, struct task_struct *new)
 {
 	init_vip_task_struct(new);
 	init_task_gear_hints(new);
@@ -1282,7 +1282,7 @@ void register_vip_hooks(void)
 void vip_init(void)
 {
 	struct task_struct *g, *p;
-	int cpu, slot_id, ret = 0;
+	int cpu, slot_id;
 
 	balance_vvip_overutilied = false;
 	balance_vip_overutilized = false;
@@ -1290,9 +1290,9 @@ void vip_init(void)
 	/* init vip related value to group*/
 	init_vip_group();
 
-	ret = register_trace_android_rvh_wake_up_new_task(vip_new_tasks, NULL);
-	if (ret)
-		pr_info("register wake_up_new_task hooks failed, returned %d\n", ret);
+	/* rodin 6.18（2026-11-05）：android_rvh_wake_up_new_task 限制槽收敛至
+	 * sched_main.c mtk_eas_wake_up_new_task 单一注册者直调（vip 新任务
+	 * 初始化居中），本处不再独立注册。 */
 
 	/* init vip related value to exist tasks */
 	read_lock(&tasklist_lock);

@@ -360,10 +360,13 @@ int set_metis_wakeup_task(const char *value, const struct kernel_param *param)
 
 int metis_wakeup_init(void)
 {
-	/* The three stock registration returns are intentionally ignored. */
+	/* The stock registration return is intentionally ignored. */
 	register_trace_android_vh_syscall_prctl_finished(
 		metis_wakeup_syscall_prctl_finished_hook, NULL);
-	register_trace_android_rvh_wake_up_new_task(wake_up_new_task_hook, NULL);
+	/* rodin 6.18（2026-11-05）：android_rvh_wake_up_new_task 注册收敛至
+	 * sched_main.c mtk_eas_wake_up_new_task 单一注册者直调（冷启动标记居末），
+	 * 本处不再独立注册——原注册处 vseq 重放波末位、返回值未检查，被
+	 * ANDROID_RVH_NR_PROBES_MAX=2 槽位挤占时 -EBUSY 静默败。 */
 	/* rodin 6.18（2026-11-05）：do_futex 注册已并入 metis-final-link.c 的
 	 * mi_do_futex_hook（双 handler 合并单注册），此处不再单独挂。 */
 	return 0;
