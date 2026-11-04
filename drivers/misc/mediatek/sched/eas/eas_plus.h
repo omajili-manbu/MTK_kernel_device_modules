@@ -129,8 +129,6 @@ extern void mtk_find_busiest_group(void *data, struct sched_group *busiest,
 		struct rq *dst_rq, int *out_balance);
 extern void mtk_find_energy_efficient_cpu(void *data, struct task_struct *p,
 		int prev_cpu, int sync, int *new_cpu);
-/* rodin 6.18（2026-11-03）：死门注册守卫读它；真身 = sugov/nonlinear_opp_cap.c */
-extern int get_eas_hook(void);
 
 extern void mtk_cpu_overutilized(void *data, int cpu, int *overutilized);
 
@@ -170,9 +168,6 @@ extern int init_share_buck(void);
 extern void mtk_tick_entry(void *data, struct rq *rq);
 extern void mtk_set_wake_flags(void *data, int *wake_flags, unsigned int *mode);
 extern unsigned long cpu_cap_ceiling(int cpu);
-extern void mtk_pelt_rt_tp(void *data, struct rq *rq);
-extern void mtk_sched_switch(void *data, struct task_struct *prev,
-		struct task_struct *next, struct rq *rq);
 extern void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, bool *need_update);
 extern inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	unsigned long uclamp_max, unsigned long capacity, int cpu);

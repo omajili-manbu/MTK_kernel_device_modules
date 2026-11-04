@@ -77,54 +77,12 @@ static inline void sched_asym_cpucapacity_init(void)
 		mtk_sched_asym_cpucapacity = 0;
 }
 
-static void sched_task_util_hook(void *data, struct sched_entity *se)
-{
-	if (!get_eas_hook())
-		return;
-
-	if (trace_sched_task_util_enabled()) {
-		struct task_struct *p;
-		struct sched_avg *sa;
-
-		if (!entity_is_task(se))
-			return;
-
-		p = container_of(se, struct task_struct, se);
-		sa = &se->avg;
-
-		trace_sched_task_util(p->pid,
-				sa->util_avg, sa->util_est);
-	}
-}
-
-static void sched_task_uclamp_hook(void *data, struct sched_entity *se)
-{
-	if (!get_eas_hook())
-		return;
-
-	if (trace_sched_task_uclamp_enabled()) {
-		struct task_struct *p;
-		struct uclamp_se *uc_min_req, *uc_max_req;
-		unsigned long util;
-
-		if (!entity_is_task(se))
-			return;
-
-		p = container_of(se, struct task_struct, se);
-		util = READ_ONCE(se->avg.util_est);
-		util = max(util, READ_ONCE(se->avg.util_avg));
-		uc_min_req = &p->uclamp_req[UCLAMP_MIN];
-		uc_max_req = &p->uclamp_req[UCLAMP_MAX];
-
-		trace_sched_task_uclamp(p->pid, util,
-				p->uclamp[UCLAMP_MIN].active,
-				p->uclamp[UCLAMP_MIN].value, p->uclamp[UCLAMP_MAX].value,
-				uc_min_req->user_defined, uc_min_req->value,
-				uc_max_req->user_defined, uc_max_req->value);
-	}
-}
-
-static void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
+/*
+ * rodin 6.18（2026-11-05）：get_eas_hook() 总闸随死门机制摘除。EAS 能量选核
+ * 休眠期（rd->pd 不建）合并链 mtk_eas_select_task_rq_fair 不再直调本函数，
+ * 本体保留为全局符号作 EAS 复活门。
+ */
+void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
 							int prev_cpu, int sd_flag,
 							int wake_flags, int *target_cpu)
 {
@@ -142,9 +100,6 @@ static void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
 	 */
 	if (!(wake_flags & WF_TTWU) || (wake_flags & WF_CURRENT_CPU) ||
 	    (sd_flag & (SD_BALANCE_FORK | SD_BALANCE_EXEC)))
-		return;
-
-	if (!get_eas_hook())	/* 现成的运行期总开关 = kill switch */
 		return;
 
 	rd = cpu_rq(smp_processor_id())->rd;
@@ -187,9 +142,10 @@ static void sched_select_task_rq_fair_hook(void *ignore, struct task_struct *p,
  * 超员注册 -EBUSY 静默败（xr_qi init -16、本件 fair 选核 failed! 实证）；select_task_rq_fair/rt、
  * can_migrate_task 三槽原为 mtk/task_turbo/xr_qi/metis-game-bridge 多方注册，收敛为下列
  * 单一注册者按定序直调（全内建跨编译单元直调，无需导出）：
- *   fair/rt = 基底(mtk EAS) → scoped 覆写/传播 → game 否决终写（game reserved CPU
- *             回落必须终写，顺带修复 metis 先行注册被基底覆写的序病）；
- *   can_migrate = 三方均否决式，与序无关，按 pause→mtk→metis 排。
+ *   fair/rt = scoped 覆写/传播 → game 否决终写（game reserved CPU 回落必须终写）；
+ *   can_migrate = pause → metis 否决式；
+ * rodin 6.18（2026-11-05）：get_eas_hook() 总闸摘除后 EAS 库本体（能量选核/RT 选核/
+ * can_migrate 基底）退出直调链，本体保留待 EAS 复活。
  * 定序对齐 stock 形态：stock 装载序 metis(3.3898s) < task_turbo(3.4732s)，game 任务
  * 经 VIP 门使 turbo 早退，metis 拣核不被夺。 */
 extern void tt_hook_select_task_rq_fair(struct task_struct *p, int prev_cpu,
@@ -208,7 +164,6 @@ extern void hook_rvh_can_migrate_task(void *data, struct task_struct *p,
 static void mtk_eas_select_task_rq_fair(void *ignore, struct task_struct *p,
 		int prev_cpu, int sd_flag, int wake_flags, int *target_cpu)
 {
-	sched_select_task_rq_fair_hook(ignore, p, prev_cpu, sd_flag, wake_flags, target_cpu);
 	metis_bridge_select_task_rq_fair(p, prev_cpu, sd_flag, wake_flags, target_cpu);
 	tt_hook_select_task_rq_fair(p, prev_cpu, sd_flag, wake_flags, target_cpu);
 }
@@ -216,7 +171,6 @@ static void mtk_eas_select_task_rq_fair(void *ignore, struct task_struct *p,
 static void mtk_eas_select_task_rq_rt(void *ignore, struct task_struct *p,
 		int prev_cpu, int sd_flag, int wake_flags, int *new_cpu)
 {
-	mtk_select_task_rq_rt(ignore, p, prev_cpu, sd_flag, wake_flags, new_cpu);
 	qi_select_task_rq_rt(p, prev_cpu, sd_flag, wake_flags, new_cpu);
 	metis_bridge_select_task_rq_rt(p, prev_cpu, sd_flag, wake_flags, new_cpu);
 }
@@ -225,7 +179,6 @@ static void mtk_eas_can_migrate_task(void *ignore, struct task_struct *p,
 		int dst_cpu, int *can_migrate)
 {
 	hook_rvh_can_migrate_task(ignore, p, dst_cpu, can_migrate);
-	mtk_can_migrate_task(ignore, p, dst_cpu, can_migrate);
 	metis_bridge_can_migrate_task(p, dst_cpu, can_migrate);
 }
 
@@ -235,9 +188,8 @@ static void sched_rq_load_hook(void *data, struct cfs_rq *rq)
 		trace_sched_rq_load(rq);
 }
 
-/* rodin 6.18（2026-10-31）：sched_queue_task_hook 撤场。handler 整体在
- * get_eas_hook() 门后恒死（mtk_eas_hook 空 + legacy_api_support=0），
- * 且 flt 直挂先行翻开 static key 后，带 data 的再注册被
+/* rodin 6.18（2026-10-31）：sched_queue_task_hook 撤场。该挂点属 vendor
+ * 门控注册面，且 flt 直挂先行翻开 static key 后，带 data 的再注册被
  * WARN_ON(key_enabled && data) 拒绝——每次开机 2 组 WARN 即源于此。
  * flt 记账已在 flt_register_kernel_hooks() 直挂，本处无对应消费者。 */
 
@@ -338,9 +290,6 @@ void mtk_check_d_tasks(void *data, struct task_struct *p,
 void mtk_setscheduler_uclamp(void *data, struct task_struct *tsk,
 	int clamp_id, unsigned int value)
 {
-	if (!get_eas_hook())
-		return;
-
 	if (trace_sched_set_uclamp_enabled())
 		trace_sched_set_uclamp(tsk->pid,
 		task_cpu(tsk), task_on_rq_queued(tsk), clamp_id, value);
@@ -391,7 +340,7 @@ static void mtk_post_init_entity_util_avg(void *data, struct sched_entity *se)
 	bool post_init_util_ctl = sched_post_init_util_enable_get();
 	int freq;
 
-	if (!post_init_util_ctl || !get_eas_hook())
+	if (!post_init_util_ctl)
 		return;
 
 	if (likely(entity_is_task(se)))
@@ -500,14 +449,6 @@ static void mtk_sched_trace_init(void)
 {
 	int ret = 0;
 
-	ret = register_trace_pelt_se_tp(sched_task_util_hook, NULL);
-	if (ret)
-		pr_info("register sched_task_util_hook failed!\n");
-
-	ret = register_trace_pelt_se_tp(sched_task_uclamp_hook, NULL);
-	if (ret)
-		pr_info("register sched_task_uclamp_hook failed!\n");
-
 	ret = register_trace_sched_util_est_cfs_tp(sched_rq_load_hook, NULL);
 	if (ret)
 		pr_info("register sched_rq_load_hook failed!\n");
@@ -520,8 +461,6 @@ static void mtk_sched_trace_init(void)
 
 static void mtk_sched_trace_exit(void)
 {
-	unregister_trace_pelt_se_tp(sched_task_util_hook, NULL);
-	unregister_trace_pelt_se_tp(sched_task_uclamp_hook, NULL);
 	unregister_trace_sched_util_est_cfs_tp(sched_rq_load_hook, NULL);
 }
 
@@ -1307,53 +1246,20 @@ static int __init mtk_scheduler_init(void)
 		pr_info("register android_rvh_can_migrate_task failed\n");
 
 	/*
-	 * rodin 6.18（2026-11-03）：下列 handler 入口 get_eas_hook() 门恒死
-	 * （6.18 由 native EAS 接管，门复活前置件见 get_eas_hook 处注释）。
-	 * 死门期不注册：注册形态下每 tick/唤醒/切换仍付一次静态派发；
-	 * 门复活时须连同注册一并恢复。cpu_util_cfs_boost 钩是活体包络
-	 * 出口，不在本守卫之列。
+	 * rodin 6.18（2026-11-05）：get_eas_hook() 总闸摘除。原恒死注册块
+	 * （cpu_overutilized/tick_entry/scheduler_tick/after_enqueue，门后
+	 * 从未生效）整体摘除，handler 本体保留待 EAS 复活时恢复注册；
+	 * sched_switch 链（vip push 主体）与 pelt trace 面连函数摘除。
+	 * cpu_util_cfs_boost 钩是活体包络出口，不在本摘除之列。
 	 */
-	if (get_eas_hook()) {
-		ret = register_trace_android_rvh_cpu_overutilized(
-				mtk_cpu_overutilized, NULL);
-		if (ret)
-			pr_info("register trace_android_rvh_cpu_overutilized failed\n");
-	}
-
-
-	if (get_eas_hook()) {
-		ret = register_trace_android_rvh_tick_entry(
-				mtk_tick_entry, NULL);
-		if (ret)
-			pr_info("register android_rvh_tick_entry failed\n");
-	}
-
-
 	ret = register_trace_android_vh_set_wake_flags(
 			mtk_set_wake_flags, NULL);
 	if (ret)
 		pr_info("register android_vh_set_wake_flags failed\n");
 
-	ret = register_trace_pelt_rt_tp(mtk_pelt_rt_tp, NULL);
-	if (ret)
-		pr_info("register mtk_pelt_rt_tp hooks failed, returned %d\n", ret);
-
-	if (get_eas_hook()) {
-		ret = register_trace_android_rvh_schedule(mtk_sched_switch, NULL);
-		if (ret)
-			pr_info("register mtk_sched_switch hooks failed, returned %d\n", ret);
-	}
-
 	ret = register_trace_android_rvh_update_misfit_status(mtk_update_misfit_status, NULL);
 	if (ret)
 		pr_info("register mtk_update_misfit_status hooks failed, returned %d\n", ret);
-
-#if IS_ENABLED(CONFIG_MTK_NEWIDLE_BALANCE)
-	ret = register_trace_android_rvh_sched_newidle_balance(
-			mtk_sched_newidle_balance, NULL);
-	if (ret)
-		pr_info("register android_rvh_sched_newidle_balance failed\n");
-#endif
 
 	pr_debug(TAG"Start to init eas_ioctl driver\n");
 	parent = proc_mkdir("easmgr", NULL);
@@ -1372,26 +1278,10 @@ static int __init mtk_scheduler_init(void)
 	if (ret)
 		pr_info("register mtk_cpu_util_cfs_boost_hook hooks failed, returned %d\n", ret);
 
-	if (get_eas_hook()) {
-		ret = register_trace_android_vh_scheduler_tick(hook_scheduler_tick, NULL);
-		if (ret)
-			pr_info("scheduler: register scheduler_tick hooks failed, returned %d\n", ret);
-	}
-
-	if (get_eas_hook()) {
-		ret = register_trace_android_rvh_after_enqueue_task(mtk_hook_after_enqueue_task, NULL);
-		if (ret)
-			pr_info("register android_rvh_after_enqueue_task failed, returned %d\n", ret);
-	}
-
 	ret = register_trace_android_rvh_select_task_rq_rt(mtk_eas_select_task_rq_rt, NULL);
 	if (ret)
 		pr_info("register mtk_select_task_rq_rt hooks failed, returned %d\n", ret);
 
-
-	ret = register_trace_android_rvh_find_lowest_rq(mtk_find_lowest_rq, NULL);
-	if (ret)
-		pr_info("register find_lowest_rq hooks failed, returned %d\n", ret);
 
 	ret = register_trace_android_vh_sched_pelt_multiplier(mtk_sched_pelt_multiplier, NULL);
 	if (ret)
@@ -1434,7 +1324,6 @@ out_wq:
 static void __exit mtk_scheduler_exit(void)
 {
 	mtk_sched_trace_exit();
-	unregister_trace_android_vh_scheduler_tick(hook_scheduler_tick, NULL);
 	cleanup_sched_common_sysfs();
 #if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 	exit_flt_platform();

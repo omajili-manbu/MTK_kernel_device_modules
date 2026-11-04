@@ -11,7 +11,6 @@ enum {
 };
 
 int init_sched_ctrl(void);
-extern bool legacy_api_support_get(void);
 extern bool sched_vip_enable_get(void);
 extern bool sched_gear_hints_enable_get(void);
 extern bool sched_updown_migration_enable_get(void);

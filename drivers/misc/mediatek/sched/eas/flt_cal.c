@@ -73,9 +73,6 @@ DEFINE_PER_CPU(struct flt_rq, flt_rq);
 /* Debug */
 //#define FLT_DEBUG 1
 
-/* update for flt tul */
-static bool update_flt_tul = true;
-
 #ifdef FLT_DEBUG
 #define FLT_LOGI(...)	pr_info("FLT:" __VA_ARGS__)
 #else
@@ -1268,17 +1265,11 @@ static void flt_android_rvh_try_to_wake_up(void *unused, struct task_struct *p)
 static void flt_android_rvh_tick_entry(void *unused, struct rq *rq)
 {
 	u64 wallclock;
-	int res = -1;
 
 	lockdep_assert_rq_held(rq);
 	if (unlikely(flt_get_mode() == FLT_MODE_0))
 		return;
 
-	if (unlikely(update_flt_tul && get_eas_hook())) {
-		res = flt_tul();
-		if (res == 0)
-			update_flt_tul = false;
-	}
 	set_window_start(rq);
 	wallclock = get_current_time();
 
@@ -1331,12 +1322,12 @@ static void flt_register_kernel_hooks(void)
 		pr_info("register android_rvh_tick_entry failed\n");
 
 	/*
-	 * rodin 6.18：enqueue/dequeue 记账钩子从 sched_queue_task_hook() 摘出
-	 * 直挂——原挂点整体在 get_eas_hook() 门后（6.18 上恒死），记账被连坐，
-	 * group_nr_running 只剩 group.c 挂组/摘组在维护，sugov_ext 的
-	 * grp_tar_util 消费到的是挂组数而非运行态。直挂后与门解耦，运行态
-	 * 口径（只认 sched_delayed，见 flt_rvh_enqueue_task 内注释）恢复为
-	 * 记账真口径（与 group.c 挂组点的 mtk_task_on_rq_active 同口径）。
+	 * rodin 6.18：enqueue/dequeue 记账钩子直挂（vendor 时代经
+	 * sched_queue_task_hook 门挂，6.18 该门机制已随总闸摘除），记账与
+	 * 门解耦后 group_nr_running 的运行态口径（只认 sched_delayed，见
+	 * flt_rvh_enqueue_task 内注释）恢复为记账真口径（与 group.c 挂组点的
+	 * mtk_task_on_rq_active 同口径）；sugov_ext 的 grp_tar_util 消费到
+	 * 运行态而非挂组数。
 	 */
 	ret = register_trace_android_rvh_enqueue_task(
 		flt_rvh_enqueue_task, NULL);

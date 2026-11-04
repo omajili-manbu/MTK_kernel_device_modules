@@ -31,7 +31,6 @@
 #include "dsu_interface.h"
 #include <mt-plat/mtk_irq_mon.h>
 #include "eas/group.h"
-#include "sched_version_ctrl.h"
 #if IS_ENABLED(CONFIG_MTK_THERMAL_INTERFACE)
 #include <thermal_interface.h>
 #endif
@@ -913,13 +912,6 @@ inline int get_eas_wl(int wl)
 	return wl;
 }
 
-inline int get_eas_wl_dsu(int wl)
-{
-	if (wl < 0 || wl >= nr_wl)
-		wl = wl_dsu_curr;
-	return wl;
-}
-
 static void free_capacity_table(void)
 {
 	int i;
@@ -1283,52 +1275,13 @@ int em_util2opp(int cpu, int util)
 
 /* hook API */
 /*
- * rodin 6.18（2026-10-30 审计警示）：本指针全树（devmod/kmod/内核树）无人
- * 赋值，get_eas_hook() 恒 0 —— 它是约十个 6.6 vendor 调度子系统的总闸死门：
- * vendor fair.c 均衡全簇（mtk_can_migrate_task/mtk_sched_newidle_balance/
- * migrate_running_task/try_to_pull_VVIP/active-LB stopper）、vip push 整链
- * （vip_sched_switch → vip_push_runnable）、mtk_hook_after_enqueue_task
- * （vip_enqueue_task + sugov_data enq 面）、sched_queue_task_hook（flt
- * 记账曾被本门连坐死、现已直挂解耦）、rt.c 面、hook_scheduler_tick。
- * 赋值即一次性复活全部面，其中 vip push 是 PROXY_EXEC 下对已排队任务
- * 裸搬移的高危原语（rq convoy 死锁帧主角，mtk_task_migratable 门只盖
- * blocked_on 一类），vendor fair.c 簇从未在 6.18+proxy 下验证。接闸前
- * 必过：锁序反序全量审计报告（2026-10-30）§三/§四逐面重审 + proxy
- * 不变量复审 + 冻率对照；VIP 跨核放置的正确梯子 = uclamp/唤醒
- * placement → 单 rq pick 侧优先 → 最后才谈搬家（详见 vip.c
- * vip_push_runnable 处警告）。
+ * rodin 6.18（2026-11-05）：get_eas_hook 总闸与无主 vendor hook 指针表
+ * 全量摘除；pd_* 转换面直呼内建 em_*，legacy 容量表机制保留待用。
  */
-int (*mtk_eas_hook)(void);
-EXPORT_SYMBOL(mtk_eas_hook);
-int get_eas_hook(void)
-{
-	if (mtk_eas_hook)
-		return mtk_eas_hook();
-	return legacy_api_support_get();
-}
-EXPORT_SYMBOL_GPL(get_eas_hook);
 
-int (*mtk_data_hook)(int *data);
-EXPORT_SYMBOL(mtk_data_hook);
-int mtk_data_get(int *data)
-{
-	if (mtk_data_hook)
-		return mtk_data_hook(data);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtk_data_get);
-
-void (*mtk_sched_test_hook)(int *data);
-EXPORT_SYMBOL(mtk_sched_test_hook);
-
-int (*mtk_opp2freq_hook)(int cpu, int opp, int quant, int wl);
-EXPORT_SYMBOL(mtk_opp2freq_hook);
 int pd_opp2freq(int cpu, int opp, int quant, int wl)
 {
-	if (mtk_opp2freq_hook)
-		return mtk_opp2freq_hook(cpu, opp, quant, get_eas_wl(wl));
-	else
-		return em_opp2freq(cpu, opp);
+	return em_opp2freq(cpu, opp);
 }
 EXPORT_SYMBOL_GPL(pd_opp2freq);
 
@@ -1344,22 +1297,9 @@ void record_sched_pd_opp2cap(int cpu, int opp, int quant, int wl,
 }
 EXPORT_SYMBOL_GPL(record_sched_pd_opp2cap);
 
-int (*mtk_opp2cap_hook)(int cpu, int opp, int quant, int wl,
-	int *val_1, int *val_2, int *val_r, int *val_s, int val_m, int r_o);
-EXPORT_SYMBOL(mtk_opp2cap_hook);
 int pd_opp2cap(int cpu, int opp, int quant, int wl, int *val_s, int r_o, int caller)
 {
-	if (mtk_opp2cap_hook) {
-		int result, val_1, val_2, val_r;
-
-		result = mtk_opp2cap_hook(cpu, opp, quant, get_eas_wl(wl),
-			&val_1, &val_2, &val_r, val_s, val_m, r_o);
-
-		record_sched_pd_opp2cap(cpu, opp, quant, wl, val_1, val_2, val_r, val_s, r_o, caller);
-
-		return result;
-	} else
-		return em_opp2cap(cpu, opp);
+	return em_opp2cap(cpu, opp);
 }
 EXPORT_SYMBOL_GPL(pd_opp2cap);
 
@@ -1376,187 +1316,29 @@ void record_sched_pd_opp2pwr_eff(int cpu, int opp, int quant, int wl,
 }
 EXPORT_SYMBOL_GPL(record_sched_pd_opp2pwr_eff);
 
-int (*mtk_opp2pwr_eff_hook)(int cpu, int opp, int quant, int wl,
-	int *val_1, int *val_2, int *val_3, int *val_r1, int *val_r2, int *val_s, int val_m, int r_o);
-EXPORT_SYMBOL(mtk_opp2pwr_eff_hook);
 int pd_opp2pwr_eff(int cpu, int opp, int quant, int wl, int *val_s, int r_o, int caller)
 {
-	if (mtk_opp2pwr_eff_hook) {
-		int result, val_1, val_2, val_3, val_r1, val_r2;
-
-		result = mtk_opp2pwr_eff_hook(cpu, opp, quant, get_eas_wl(wl),
-			&val_1, &val_2, &val_3, &val_r1, &val_r2, val_s, val_m, r_o);
-
-		record_sched_pd_opp2pwr_eff(cpu, opp, quant, wl, val_1, val_2, val_3,
-				val_r1, val_r2, val_s, r_o, caller);
-
-		return result;
-	} else
-		return em_opp2pwr_eff(cpu, opp);
+	return em_opp2pwr_eff(cpu, opp);
 }
 EXPORT_SYMBOL_GPL(pd_opp2pwr_eff);
 
-int (*mtk_opp2dyn_pwr_hook)(int cpu, int opp, int quant, int wl,
-	int *val_1, int *val_r, int *val_s, int val_m, int r_o);
-EXPORT_SYMBOL(mtk_opp2dyn_pwr_hook);
-int pd_opp2dyn_pwr(int cpu, int opp, int quant, int wl, int *val_s, int r_o, int caller)
-{
-	if (mtk_opp2dyn_pwr_hook) {
-		int result, val_1, val_r;
-
-		result = mtk_opp2dyn_pwr_hook(cpu, opp, quant, get_eas_wl(wl),
-			&val_1, &val_r, val_s, val_m, r_o);
-		if (trace_sched_pd_opp2dyn_pwr_enabled()) {
-			int val_s_0 = val_s == NULL ? (curr_collab_state == NULL ? -1 :
-							curr_collab_state[0].state) : val_s[0];
-			trace_sched_pd_opp2dyn_pwr(cpu, opp, quant, wl,
-				val_1, val_r, val_s_0, val_m, r_o, caller);
-		}
-		return result;
-	} else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_opp2dyn_pwr);
-
-int (*mtk_opp2volt_hook)(int cpu, int opp, int quant, int wl);
-EXPORT_SYMBOL(mtk_opp2volt_hook);
-int pd_opp2volt(int cpu, int opp, int quant, int wl)
-{
-	if (mtk_opp2volt_hook)
-		return mtk_opp2volt_hook(cpu, opp, quant, get_eas_wl(wl));
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_opp2volt);
-
-int (*mtk_cpu_opp2dsu_freq_hook)(int cpu, int opp, int quant, int wl);
-EXPORT_SYMBOL(mtk_cpu_opp2dsu_freq_hook);
-int pd_cpu_opp2dsu_freq(int cpu, int opp, int quant, int wl)
-{
-	if (mtk_cpu_opp2dsu_freq_hook)
-		return mtk_cpu_opp2dsu_freq_hook(cpu, opp, quant, get_eas_wl_dsu(wl));
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_cpu_opp2dsu_freq);
-
-int (*mtk_util2opp_hook)(int cpu, int util, int quant, int wl,
-	int *val_1, int *val_2, int *val_3, int *val_4, int *val_r, int *val_s, int val_m, int r_o);
-EXPORT_SYMBOL(mtk_util2opp_hook);
 int pd_util2opp(int cpu, int util, int quant, int wl, int *val_s, int r_o, int caller)
 {
-	if (mtk_util2opp_hook) {
-		int result, val_1, val_2, val_3, val_4, val_r;
-
-		result = mtk_util2opp_hook(cpu, util, quant, get_eas_wl(wl),
-			&val_1, &val_2, &val_3, &val_4, &val_r, val_s, val_m, r_o);
-		if(trace_sched_pd_util2opp_enabled()) {
-			int val_s_0 = val_s == NULL ? (curr_collab_state == NULL ? -1 :
-							curr_collab_state[0].state) : val_s[0];
-			trace_sched_pd_util2opp(cpu, quant, wl,
-				val_1, val_2, val_3, val_4, val_r, val_s_0, val_m, r_o, caller);
-		}
-		return result;
-	} else
-		return em_util2opp(cpu, util);
+	return em_util2opp(cpu, util);
 }
 EXPORT_SYMBOL_GPL(pd_util2opp);
 
-int (*mtk_freq2opp_hook)(int cpu, int freq, int quant, int wl);
-EXPORT_SYMBOL(mtk_freq2opp_hook);
 int pd_freq2opp(int cpu, int freq, int quant, int wl)
 {
-	if (mtk_freq2opp_hook)
-		return mtk_freq2opp_hook(cpu, freq, quant, get_eas_wl(wl));
-	else
-		return em_freq2opp(cpu, freq);
+	return em_freq2opp(cpu, freq);
 }
 EXPORT_SYMBOL_GPL(pd_freq2opp);
 
-int (*mtk_cpu_volt2opp_hook)(int cpu, int volt, int quant, int wl);
-EXPORT_SYMBOL(mtk_cpu_volt2opp_hook);
-int pd_cpu_volt2opp(int cpu, int volt, int quant, int wl)
-{
-	if (mtk_cpu_volt2opp_hook)
-		return mtk_cpu_volt2opp_hook(cpu, volt, quant, get_eas_wl(wl));
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_cpu_volt2opp);
-
-int (*mtk_dsu_weighting_hook)(int wl, int cpu);
-EXPORT_SYMBOL(mtk_dsu_weighting_hook);
-unsigned int pd_get_dsu_weighting(int wl, unsigned int cpu)
-{
-	if (mtk_dsu_weighting_hook)
-		return mtk_dsu_weighting_hook(get_eas_wl_dsu(wl), cpu);
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_get_dsu_weighting);
-
-int (*mtk_emi_weighting_hook)(int wl, int cpu);
-EXPORT_SYMBOL(mtk_emi_weighting_hook);
-unsigned int pd_get_emi_weighting(int wl, unsigned int cpu)
-{
-	if (mtk_emi_weighting_hook)
-		return mtk_emi_weighting_hook(get_eas_wl(wl), cpu);
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_get_emi_weighting);
-
-int (*mtk_dsu_freq2opp_hook)(int freq);
-EXPORT_SYMBOL(mtk_dsu_freq2opp_hook);
-unsigned int dsu_get_freq_opp(unsigned int freq)
-{
-	if (mtk_dsu_freq2opp_hook)
-		return mtk_dsu_freq2opp_hook(freq);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(dsu_get_freq_opp);
-
-int (*mtk_dsu_volt2opp_hook)(int volt);
-EXPORT_SYMBOL(mtk_dsu_volt2opp_hook);
-int pd_dsu_volt2opp(int volt)
-{
-	if (mtk_dsu_volt2opp_hook)
-		return mtk_dsu_volt2opp_hook(volt);
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(pd_dsu_volt2opp);
-
-static struct dsu_state dsu_state_tmp;
-struct dsu_state *(*mtk_dsu_opp_ps_hook)(int wl, int opp);
-EXPORT_SYMBOL(mtk_dsu_opp_ps_hook);
-struct dsu_state *dsu_get_opp_ps(int wl, int opp)
-{
-	if (mtk_dsu_opp_ps_hook)
-		return mtk_dsu_opp_ps_hook(wl, opp);
-	return &dsu_state_tmp;
-}
-EXPORT_SYMBOL_GPL(dsu_get_opp_ps);
-
-int (*mtk_leakage_hook)(int cpu, int opp, int temperature);
-EXPORT_SYMBOL(mtk_leakage_hook);
 unsigned int pd_get_opp_leakage(unsigned int cpu, unsigned int opp, unsigned int temperature)
 {
-	if (mtk_leakage_hook)
-		return mtk_leakage_hook(cpu, opp, temperature);
 	return 1;
 }
 EXPORT_SYMBOL_GPL(pd_get_opp_leakage);
-
-int (*mtk_dsu_freq_hook)(void);
-EXPORT_SYMBOL(mtk_dsu_freq_hook);
-int pd_get_dsu_freq(void)
-{
-	if (mtk_dsu_freq_hook)
-		return mtk_dsu_freq_hook();
-	return 1;
-}
-EXPORT_SYMBOL_GPL(pd_get_dsu_freq);
 /* hook API */
 
 int pd_freq2util(unsigned int cpu, int freq, bool quant, int wl, int *val_s, int r_o)
@@ -2132,11 +1914,6 @@ int init_opp_cap_info(struct proc_dir_entry *dir)
 	if (ret)
 		return ret;
 
-	if (legacy_api_support_get()) {
-		rebuild_sched_domains();
-		init_legacy_capacity_table();
-	}
-
 #if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)
 	nr_wl = mtk_mapping.total_type;
 #endif
@@ -2145,14 +1922,6 @@ int init_opp_cap_info(struct proc_dir_entry *dir)
 	ret = init_dpt_io();
 	if (ret)
 		pr_info("init_dpt_io fail, return=%d\n", ret);
-
-	if (legacy_api_support_get()) {
-		for (int i = 0; i < MAX_NR_CPUS; i++) {
-			set_target_margin(i, 20);
-			set_target_margin_low(i, 20);
-			set_turn_point_freq(i, 1);
-		}
-	}
 
 #if IS_ENABLED(CONFIG_MTK_GEARLESS_SUPPORT)
 	for (int i = 0; i < MAX_NR_CPUS; i++) {

@@ -99,10 +99,6 @@ void mtk_find_busiest_group(void *data, struct sched_group *busiest,
 	int src_cpu = -1;
 	int dst_cpu = dst_rq->cpu;
 
-
-	if (!get_eas_hook())
-		return;
-
 	if (cpu_paused(dst_cpu)) {
 		*out_balance = 1;
 		if (trace_sched_find_busiest_group_enabled())
@@ -150,9 +146,6 @@ void mtk_cpu_overutilized(void *data, int cpu, int *overutilized)
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long sum_util = 0, sum_cap = 0;
 	int i = 0;
-
-	if (!get_eas_hook())
-		return;
 
 	rcu_read_lock();
 	pd = rcu_dereference(rq->rd->pd);
@@ -583,8 +576,6 @@ void mtk_tick_entry(void *data, struct rq *rq)
 	bool sbb_trigger, is_cpu_to_update_thermal = false, update_all __maybe_unused = true;
 	u64 idle_time, wall_time, cpu_utilize;
 	struct sbb_cpu_data *sbb_data = per_cpu(sbb, rq->cpu);
-	if (!get_eas_hook())
-		return;
 
 	irq_log_store();
 
@@ -679,9 +670,6 @@ EXPORT_SYMBOL_GPL(get_wake_sync);
 
 void mtk_set_wake_flags(void *data, int *wake_flags, unsigned int *mode)
 {
-	if (!get_eas_hook())
-		return;
-
 	if (!sched_sync_hint_enable)
 		*wake_flags &= ~WF_SYNC;
 }
@@ -880,14 +868,11 @@ void check_for_migration(struct task_struct *p)
 
 void hook_scheduler_tick(void *data, struct rq *rq)
 {
-	if (!get_eas_hook())
-		return;
-
 	/*
 	 * rodin 6.18（2026-10-26）：rotate 层删除后 rd->android_vendor_data1
 	 * 的唯一写者（system_has_many_heavy_task，rotate.c）不复存在；读侧
-	 * （fair.c 迁移挑任务）读到恒 0 —— 与删除前完全一致（写者本就在
-	 * get_eas_hook()=0 的早退之后，从未实际执行）。
+	 * （fair.c 迁移挑任务）读到恒 0 —— 与删除前完全一致（本 handler
+	 * 恒死期写者从未实际执行，注册块已随总闸摘除）。
 	 */
 	if (rq->curr->policy == SCHED_NORMAL)
 		check_for_migration(rq->curr);
@@ -900,20 +885,16 @@ void mtk_hook_after_enqueue_task(void *data, struct rq *rq,
 	struct sugov_rq_data *sugov_data_ptr;
 	struct sugov_rq_data *sugov_data_ptr2;
 
-
-	if (!get_eas_hook())
-		return;
-
 	irq_log_store();
 
 	irq_log_store();
 
 #if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
 	/*
-	 * rodin 6.18（2026-10-30 审计警示）：本函数入口 get_eas_hook() 门恒死，
-	 * vip_enqueue_task 实际从未执行 ⇒ vrq->vip_tasks 运行期恒空，pick 侧
-	 * replace_next/tick 记账/requeue 全部空转（vip.c 已加空链快路径）。
-	 * 复活 = mtk_eas_hook 总闸（nonlinear_opp_cap.c 注释），勿单独在此接线。
+	 * rodin 6.18（2026-11-05）：get_eas_hook() 总闸摘除，本 handler 的
+	 * 注册块随死门一并撤除——EAS 休眠期本函数不被调用，vip_enqueue_task
+	 * 仍不执行（vrq->vip_tasks 运行期恒空，vip.c 已加空链快路径）。
+	 * 复活 = 恢复 android_rvh_after_enqueue_task 注册，勿单独在此接线。
 	 */
 	if (vip_fair_task(p))
 		vip_enqueue_task(rq, p);
@@ -1067,14 +1048,6 @@ unsigned long shared_buck_calc_pwr_eff(struct energy_env *eenv, int dst_cpu,
 #endif
 
 #if IS_ENABLED(CONFIG_MTK_EAS)
-void mtk_pelt_rt_tp(void *data, struct rq *rq)
-{
-	if (!get_eas_hook())
-		return;
-
-	cpufreq_update_util(rq, 0);
-}
-
 static inline unsigned long task_util(struct task_struct *p)
 {
 	return READ_ONCE(p->se.avg.util_avg);
@@ -1090,71 +1063,6 @@ static inline unsigned long task_util_est(struct task_struct *p)
 	if (sched_feat(UTIL_EST) && is_util_est_enable())
 		return max(task_util(p), _task_util_est(p));
 	return task_util(p);
-}
-
-static inline s64 entity_key(struct cfs_rq *cfs_rq, struct sched_entity *se)
-{
-	/* rodin 6.9：6.18 把 cfs_rq::min_vruntime 换成了 zero_vruntime
-	 * （同一语义：zero-lag 点，见 kernel/sched/fair.c:642 的 entity_key()）。
-	 * 6.18 的写法是 vruntime_op(se->vruntime, "-", cfs_rq->zero_vruntime)，
-	 * vruntime_op 是 fair.c 的 static helper；这里保留原减法形式，算术等价。 */
-	return (s64)(se->vruntime - cfs_rq->zero_vruntime);
-}
-
-int _entity_eligible(struct cfs_rq *cfs_rq, struct sched_entity *se)
-{
-	/*
-	 * rodin 6.9：6.18 删掉了 cfs_rq::avg_vruntime / avg_load 这两个增量缓存字段，
-	 * 改用 zero_vruntime + sum_w_vruntime + sum_weight 的新模型（fair.c:730-760）。
-	 * 判据本身没变（"se 的 vruntime 不晚于零滞后点"），6.18 已把它做成非 static 的
-	 * entity_eligible(cfs_rq, se)（kernel/sched/sched.h:3984 有 extern 声明，
-	 * 本文件已 include <sched/sched.h>）⇒ 直接复用 mainline 实现，语义精确等价。 */
-	return entity_eligible(cfs_rq, se);
-}
-
-#if 0   /* rodin 6.9：原 6.6 实现（依赖已删字段），保留作对照 */
-int _entity_eligible_66(struct cfs_rq *cfs_rq, struct sched_entity *se)
-{
-	struct sched_entity *curr = cfs_rq->curr;
-	s64 avg = cfs_rq->avg_vruntime;
-	long load = cfs_rq->avg_load;
-
-	if (curr && curr->on_rq) {
-		unsigned long weight = scale_load_down(curr->load.weight);
-
-		avg += entity_key(cfs_rq, curr) * weight;
-		load += weight;
-	}
-
-	return avg >= entity_key(cfs_rq, se) * load;
-}
-#endif  /* rodin 6.9 对照块结束 */
-
-void mtk_sched_switch(void *data, struct task_struct *prev,
-		struct task_struct *next, struct rq *rq)
-{
-	if (!get_eas_hook())
-		return;
-
-	if (next->pid == 0)
-		per_cpu(sbb, rq->cpu)->active = 0;
-
-	if (trace_sched_stat_vdeadline_enabled()) {
-		if (prev->pid != 0 && next->pid != 0) {
-			if (prev->prio > 99 && next->prio > 99) {
-				if (_entity_eligible(&(rq->cfs), &(prev->se)))
-					trace_sched_stat_vdeadline(prev, next);
-			}
-		}
-	}
-
-#if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
-	vip_sched_switch(prev, next, rq);
-#endif /* CONFIG_MTK_SCHED_VIP_TASK */
-
-#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
-	flt_android_rvh_schedule(data, prev, next, rq);
-#endif
 }
 
 /*

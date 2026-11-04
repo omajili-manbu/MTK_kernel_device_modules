@@ -103,8 +103,6 @@ struct cpu_dsu_freq_state {
 	unsigned int *dsu_freq_vote;
 };
 
-extern struct dsu_state *dsu_get_opp_ps(int wl, int opp);
-extern unsigned int dsu_get_freq_opp(unsigned int freq);
 extern void update_wl_tbl(unsigned int cpu, bool *is_cpu_to_update_thermal);
 extern int get_curr_wl(void);
 extern int get_curr_wl_dsu(void);
@@ -130,20 +128,13 @@ extern void record_sched_pd_opp2pwr_eff(int cpu, int opp, int quant, int wl,
 		int val_1, int val_2, int val_3, int val_r1, int val_r2, int *val_s,
 		int r_o, int caller);
 
-extern int get_eas_hook(void);
 extern int pd_opp2freq(int cpu, int opp, int quant, int wl);
 extern int pd_opp2cap(int cpu, int opp, int quant, int wl, int *val_s, int r_o, int caller);
 extern int pd_opp2pwr_eff(int cpu, int opp, int quant, int wl, int *val_s, int r_o, int caller);
-extern int pd_opp2dyn_pwr(int cpu, int opp, int quant, int wl, int *val_s, int r_o, int caller);
-extern int pd_opp2volt(int cpu, int opp, int quant, int wl);
 extern int pd_util2opp(int cpu, int util, int quant, int wl, int *val_s, int r_o, int caller);
 extern int pd_freq2opp(int cpu, int freq, int quant, int wl);
-extern int pd_cpu_volt2opp(int cpu, int volt, int quant, int wl);
 extern int pd_freq2util(unsigned int cpu, int freq, bool quant, int wl, int *val_s, int r_o);
 extern int pd_util2freq(unsigned int cpu, int util, bool quant, int wl);
-extern int pd_cpu_opp2dsu_freq(int cpu, int opp, int quant, int wl);
-extern int pd_dsu_volt2opp(int volt);
-extern int pd_get_dsu_freq(void);
 extern unsigned long pd_X2Y(int cpu, unsigned long input, enum sugov_type in_type,
 		enum sugov_type out_type, bool quant, int caller);
 
@@ -166,8 +157,6 @@ extern unsigned long pd_get_util_opp_legacy(unsigned int cpu, unsigned long util
 extern unsigned int pd_get_cpu_opp(unsigned int cpu);
 extern unsigned int pd_get_opp_leakage(unsigned int cpu, unsigned int opp,
 	unsigned int temperature);
-extern unsigned int pd_get_dsu_weighting(int wl, unsigned int cpu);
-extern unsigned int pd_get_emi_weighting(int wl, unsigned int cpu);
 extern unsigned int get_curr_cap(unsigned int cpu);
 extern int get_fpsgo_bypass_flag(void);
 extern void (*fpsgo_notify_fbt_is_boost_fp)(int fpsgo_is_boost);

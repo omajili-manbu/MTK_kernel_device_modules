@@ -589,8 +589,6 @@ void mtk_select_task_rq_rt(void *data, struct task_struct *p, int source_cpu,
 	int ret, target = -1, this_cpu, select_reason = -1;
 	struct cpumask *lowest_mask = this_cpu_cpumask_var_ptr(mtk_select_rq_rt_mask);
 	struct rt_energy_aware_output rt_ea_output;
-	if (!get_eas_hook())
-		return;
 
 	rt_energy_aware_output_init(&rt_ea_output, p);
 	rt_ea_output.rt_aggre_preempt_enable = rt_aggre_preempt_enable;
@@ -680,9 +678,6 @@ void mtk_find_lowest_rq(void *data, struct task_struct *p, struct task_struct *e
 	cpumask_t avail_lowest_mask;
 	int target = -1, select_reason = -1;
 	struct rt_energy_aware_output rt_ea_output;
-
-	if (!get_eas_hook())
-		return;
 
 	rt_energy_aware_output_init(&rt_ea_output, p);
 	rt_ea_output.rt_aggre_preempt_enable = rt_aggre_preempt_enable;
