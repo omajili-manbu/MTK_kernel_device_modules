@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config XIAOMI_LB
+	tristate "Xiaomi launch boost page recorder"
+	depends on ARM64 && ARM64_4K_PAGES && MMU && SWAP && PROC_FS && ANDROID_VENDOR_HOOKS
+	help
+	  Stock launch boost interface, file-page collection and cold-start
+	  package recording behind /dev/iorap_dev (rodin blob 6.6.77-android15,
+	  cold face only - no PTE snapshot/preread engine). Stock defects are
+	  deliberately retained; changing behavior breaks the iorapd contract.
