@@ -22,6 +22,7 @@
 #include "../apu_debug.h"
 #include "../apu_config.h"
 #include "../apu_hw.h"
+#include "../apu_ipi.h"
 #include "../apu_excep.h"
 #include "apummu_tbl.h"
 
@@ -33,10 +34,13 @@ static struct mtk_apu *g_apu;
 static struct workqueue_struct *apu_workq;
 static struct delayed_work timeout_work;
 
+/* serialize firmware PDN path and host idle-timer power off */
+static DEFINE_MUTEX(pwr_off_seq_mtx);
+
 /*
  * COLD BOOT power off timeout
  *
- * exception will trigger
+ * power off will trigger
  * if power on and not power off
  * without ipi send
  */
@@ -45,10 +49,13 @@ static struct delayed_work timeout_work;
 /*
  * WARM BOOT power off timeout
  *
- * excpetion will trigger
- * if power off not done after ipi send
+ * power off will trigger
+ * if no host ipi send after the last one
  */
 #define IPI_PWROFF_TIMEOUT_MS (60 * 1000)
+
+/* re-check interval while IPI traffic is still draining */
+#define APU_PWROFF_RETRY_MS (5 * 1000)
 
 #define CHECK_BIT(var, pos) ((var) & (1<<(pos)))
 
@@ -56,14 +63,38 @@ static void apu_timeout_work(struct work_struct *work)
 {
 	struct mtk_apu *apu = g_apu;
 	struct device *dev = apu->dev;
+	struct mtk_apu_hw_ops *hw_ops = &apu->platdata->ops;
+	int ret;
 
 	if (apu->bypass_pwr_off_chk) {
 		dev_info(dev, "%s: skip aee\n", __func__);
 		return;
 	}
 
-	apu->bypass_pwr_off_chk = true;
-	apusys_rv_aee_warn("APUSYS_RV", "APUSYS_RV_POWER_OFF_TIMEOUT");
+	/* rodin 2026-11-05: 恢复宿主侧空闲断电。定时器由每次
+	 * IPI 发送重排, 落点 = 宿主静默 60s; 经 ipi_lock 把关(IPI 使用计数已归零)
+	 * 后在宿主侧完整释放电源域, 下一次 IPI 发送经 warm boot 重新拉起。否则
+	 * 域要等固件自身 ~300s 空闲策略发 PDN_UNLOCK 才断电, APU 域占空比钉在
+	 * ~92%, apupwr wakeup source 常驻压制挂起流。 */
+	if (pm_runtime_suspended(apu->dev))
+		return;
+
+	/* ipi_lock 拒绝 = 尚有 IPI 在途(含发送持锁), 稍后重查 */
+	ret = apu_ipi_lock(apu);
+	if (ret) {
+		queue_delayed_work(apu_workq, &timeout_work,
+				   msecs_to_jiffies(APU_PWROFF_RETRY_MS));
+		return;
+	}
+
+	ret = hw_ops->power_off(apu);
+	apu_ipi_unlock(apu);
+
+	/* 断电失败才保留原看门狗告警语义 */
+	if (ret) {
+		apu->bypass_pwr_off_chk = true;
+		apusys_rv_aee_warn("APUSYS_RV", "APUSYS_RV_POWER_OFF_TIMEOUT");
+	}
 }
 
 static uint32_t apusys_rv_smc_call(struct device *dev, uint32_t smc_id,
@@ -487,7 +518,7 @@ error_put_power_dev:
 	return ret;
 }
 
-static int mt6899_apu_power_off(struct mtk_apu *apu)
+static int mt6899_apu_power_off_locked(struct mtk_apu *apu)
 {
 	struct device *dev = apu->dev;
 	int ret, timeout, i;
@@ -587,9 +618,12 @@ iommu_put_error:
 		goto error_get_power_dev;
 	}
 
-	/* clear status & cancel timeout worker */
+	/* clear status & cancel timeout worker; rodin 2026-11-05: 改异步取消 —
+	 * 本函数可由 timeout_work 自身调用(宿主空闲断电), sync 语义会自等死锁,
+	 * 且持 pwr_off_seq_mtx 等待在途 worker 会与该 worker 抢锁形成交叉死锁;
+	 * 在途残留实例由下方幂等守卫吸收 */
 	apu->bypass_pwr_off_chk = false;
-	cancel_delayed_work_sync(&timeout_work);
+	cancel_delayed_work(&timeout_work);
 
 	return 0;
 
@@ -604,9 +638,29 @@ error_get_rv_dev:
 	return ret;
 }
 
+static int mt6899_apu_power_off(struct mtk_apu *apu)
+{
+	int ret;
+
+	/* 固件 PDN_UNLOCK 路径与宿主空闲定时器路径都汇入此处: 幂等守卫使后到
+	 * 方直接成功返回, 防止二次 put 把 runtime 计数压穿 */
+	mutex_lock(&pwr_off_seq_mtx);
+	if (pm_runtime_suspended(apu->dev)) {
+		mutex_unlock(&pwr_off_seq_mtx);
+		return 0;
+	}
+	ret = mt6899_apu_power_off_locked(apu);
+	mutex_unlock(&pwr_off_seq_mtx);
+
+	return ret;
+}
+
 static int mt6899_ipi_send_post(struct mtk_apu *apu)
 {
-	cancel_delayed_work_sync(&timeout_work);
+	/* rodin 2026-11-05: 异步取消 — timeout_work 现已承担宿主空闲断电, sync 等
+	 * 待会与本 worker 的 power_off/apu_ipi_unlock 形成交叉死锁; 重排语义由
+	 * 下方 queue_delayed_work 保持 */
+	cancel_delayed_work(&timeout_work);
 
 	/* bypass SAPU case */
 	if (apu->ipi_id == APU_IPI_SAPU_LOCK)
