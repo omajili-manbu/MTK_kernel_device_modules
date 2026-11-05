@@ -101,7 +101,7 @@ enum P61_DEBUG_LEVEL {
 /* Variable to store current debug level request by ioctl */
 static unsigned char debug_level;
 
-#define P61_DBG_MSG(msg...)	printk(KERN_ERR "[NXP-P61] :  " msg);
+#define P61_DBG_MSG(msg...)	no_printk(KERN_ERR "[NXP-P61] :  " msg);
 
 #define P61_ERR_MSG(msg...)	printk(KERN_ERR "[NFC-P61] : " msg);
 
@@ -153,14 +153,14 @@ static void nfc_spi_clk_enable(struct p61_dev *nfc_dev, u8 bonoff)
 
 	if (bonoff) {
 		if (count == 0) {
-			pr_err("%s line:%d enable spi clk\n", __func__, __LINE__);
+			no_printk("%s line:%d enable spi clk\n", __func__, __LINE__);
 			mt_spi_enable_master_clk(nfc_dev->spi);
 		}
 		count++;
 	} else {
 		count--;
 		if (count == 0) {
-			pr_err("%s line:%d disable spi clk\n", __func__, __LINE__);
+			no_printk("%s line:%d disable spi clk\n", __func__, __LINE__);
 			mt_spi_disable_master_clk(nfc_dev->spi);
 		} else if (count < 0) {
 			count = 0;
@@ -248,10 +248,10 @@ static void p61_stop_throughput_measurement(unsigned int type, int no_of_bytes)
 static int ese_dev_release(struct inode *inode, struct file *filp)
 {
 	struct p61_dev *p61_dev = NULL;
-	printk(KERN_ALERT "Enter %s: ESE driver release \n", __func__);
+	no_printk(KERN_ALERT "Enter %s: ESE driver release \n", __func__);
 	p61_dev = filp->private_data;
 	nfc_ese_pwr(p61_dev->nfcc_data, ESE_RST_PROT_DIS);
-	printk(KERN_ALERT "Exit %s: ESE driver release \n", __func__);
+	no_printk(KERN_ALERT "Exit %s: ESE driver release \n", __func__);
 	return 0;
 }
 
@@ -317,7 +317,7 @@ static long p61_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 
 	unsigned char buf[100];
 
-	pr_info("p61_dev_ioctl-Enter %x arg = %ld\n", cmd, arg);
+	no_printk("p61_dev_ioctl-Enter %x arg = %ld\n", cmd, arg);
 	p61_dev = filp->private_data;
 
 	switch (cmd) {
@@ -325,7 +325,7 @@ static long p61_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		if (arg == 2) {
 
 		} else if (arg == 1) {
-			P61_DBG_MSG(KERN_ALERT " Soft Reset");
+			pr_info("[NXP-P61] : Soft Reset\n");
 			ret = spi_read(p61_dev->spi, (void *)buf, sizeof(buf));
 			msleep(50);
 		}
@@ -408,7 +408,7 @@ static long p61_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		ret = -EINVAL;
 	}
 
-	pr_info("p61_dev_ioctl-exit %u arg = %lu\n", cmd, arg);
+	no_printk("p61_dev_ioctl-exit %u arg = %lu\n", cmd, arg);
 	return ret;
 }
 

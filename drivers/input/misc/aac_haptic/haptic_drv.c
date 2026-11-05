@@ -38,6 +38,9 @@
 #include "rt6010.h"
 #include "../haptic_probe_wq.h"
 
+bool ics_haptic_log_en;
+module_param(ics_haptic_log_en, bool, 0644);
+
 #ifdef  ENABLE_PIN_CONTROL
 static const char *const pctl_names[] = {
         "ics_reset_reset",

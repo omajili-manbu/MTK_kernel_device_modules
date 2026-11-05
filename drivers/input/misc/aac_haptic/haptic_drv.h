@@ -23,14 +23,16 @@
 #define AAC_RICHTAP_SUPPORT
 //#define ENABLE_PIN_CONTROL
 
+extern bool ics_haptic_log_en;
+
 #define ics_err(format, ...) \
     pr_info("[ics_haptic]" format, ##__VA_ARGS__)
 
 #define ics_info(format, ...) \
-    pr_info("[ics_haptic]" format, ##__VA_ARGS__)
+    do { if (ics_haptic_log_en) pr_info("[ics_haptic]" format, ##__VA_ARGS__); } while (0)
 
 #define ics_dbg(format, ...) \
-    pr_info("[ics_haptic]" format, ##__VA_ARGS__)
+    do { if (ics_haptic_log_en) pr_info("[ics_haptic]" format, ##__VA_ARGS__); } while (0)
 
 #define check_error_return(ret)     \
     if (ret < 0) {                  \

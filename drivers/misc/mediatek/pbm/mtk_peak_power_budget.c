@@ -187,7 +187,7 @@ static void __used ppb_write_sram(unsigned int val, int offset)
 static int dbg_read(void __iomem *reg_base, int offset)
 {
 	if (!reg_base) {
-		pr_info("reg_base error %p, offset %d\n", reg_base, offset);
+		pr_info_once("reg_base error %p, offset %d\n", reg_base, offset);
 		return 0;
 	}
 

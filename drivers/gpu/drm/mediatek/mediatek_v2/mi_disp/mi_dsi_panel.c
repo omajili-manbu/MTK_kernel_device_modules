@@ -1558,6 +1558,7 @@ int mi_dsi_panel_get_brightness(struct mtk_dsi *dsi,
 /* feature 下发是用户态周期行为，未知 feature 与 DBI 回显按周期重复打印，限速 */
 static DEFINE_RATELIMIT_STATE(rs_invalid_feature, 1 * HZ, 1);
 static DEFINE_RATELIMIT_STATE(rs_dbi_info, 1 * HZ, 1);
+static DEFINE_RATELIMIT_STATE(rs_param_echo, 1 * HZ, 1);
 
 int mi_dsi_panel_set_disp_param(struct mtk_dsi *dsi, struct disp_feature_ctl *ctl)
 {
@@ -1579,8 +1580,9 @@ int mi_dsi_panel_set_disp_param(struct mtk_dsi *dsi, struct disp_feature_ctl *ct
 	panel = dsi->panel;
 	mi_cfg = &dsi->mi_cfg;
 
-	DISP_UTC_INFO("panel feature: %s, value: %d\n",
-		get_disp_feature_id_name(ctl->feature_id), ctl->feature_val);
+	if (__ratelimit(&rs_param_echo))
+		DISP_UTC_INFO("panel feature: %s, value: %d\n",
+			get_disp_feature_id_name(ctl->feature_id), ctl->feature_val);
 
 	if (!(panel_ext && panel_ext->funcs)) {
 		pr_info("panel_ext func not defined\n");

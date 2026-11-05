@@ -1040,7 +1040,7 @@ static int lcm_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 		return 0;
 	}
 
-	pr_info("%s: level %d = 0x%02X, 0x%02X\n", __func__, level, bl_tb0[1], bl_tb0[2]);
+	no_printk("%s: level %d = 0x%02X, 0x%02X\n", __func__, level, bl_tb0[1], bl_tb0[2]);
 
 	mutex_lock(&ctx->panel_lock);
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));

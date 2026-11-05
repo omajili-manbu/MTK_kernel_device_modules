@@ -116,7 +116,7 @@ static int validate_cold_reset_protection_request(struct cold_reset *cold_reset,
 		} else if (IS_CLD_RST_REQ(arg) && IS_SRC_VALID(arg)) {
 			pr_debug("%s: cold reset\n", __func__);
 		} else if (IS_RST_PROT_DIS_REQ(arg) && IS_SRC_VALID_PROT(arg)) {
-			pr_debug("%s: reset protection already disable\n",
+			no_printk("%s: reset protection already disable\n",
 				 __func__);
 			ret = -EINVAL;
 		} else {
@@ -295,7 +295,7 @@ int nfc_ese_pwr(struct nfc_dev *nfc_dev, unsigned long arg)
 				 __func__);
 			gpio_set_ven(nfc_dev, 0);
 		} else {
-			pr_debug("%s: keep ven high as nfc is enabled\n",
+			no_printk("%s: keep ven high as nfc is enabled\n",
 				 __func__);
 		}
 	} else if (arg == ESE_POWER_STATE) {
