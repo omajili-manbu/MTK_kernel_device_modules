@@ -6572,7 +6572,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	else
         usb_sysfs_create_group(info->usb_psy);
 
-	info->log_level = CHRLOG_INFO_LEVEL;
+	info->log_level = CHRLOG_ERROR_LEVEL;
 	mtk_adapter_protocol_init(info);
 
 	for (i = 0;i < MAX_TA_IDX;i++) {

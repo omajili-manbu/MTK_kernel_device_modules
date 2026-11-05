@@ -4584,7 +4584,7 @@ _mtk_crtc_wb_addon_module_connect(
 			addon_config.addon_wdma_config.is_secure = mtk_drm_fb_is_secure(fb);
 			addon_config.addon_wdma_config.p_golden_setting_context
 				= __get_golden_setting_context(mtk_crtc);
-			DDPMSG("S+/PL12/e1/id%d/mva0x%08llx/size0x%08lx/sec%d\n",
+			DDPFENCE("S+/PL12/e1/id%d/mva0x%08llx/size0x%08lx/sec%d\n",
 				(unsigned int)state->prop_val[CRTC_PROP_OUTPUT_FENCE_IDX],
 				mtk_fb_get_dma(fb), mtk_fb_get_size(fb), mtk_drm_fb_is_secure(fb));
 

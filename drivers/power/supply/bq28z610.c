@@ -43,7 +43,7 @@ enum product_name {
 	RODIN_IN,
 };
 
-static int log_level = 1;
+static int log_level = 0;
 static int product_name = PRODUCT_NO;
 static ktime_t probe_time = -1;
 

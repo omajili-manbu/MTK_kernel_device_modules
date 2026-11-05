@@ -11,6 +11,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/rtc.h>
+#include <linux/ratelimit.h>
 #include <video/mipi_display.h>
 #include <linux/fs.h>
 #include "../../../../kernel/irq/internals.h"
@@ -1554,6 +1555,10 @@ int mi_dsi_panel_get_brightness(struct mtk_dsi *dsi,
 	return 0;
 }
 
+/* feature 下发是用户态周期行为，未知 feature 与 DBI 回显按周期重复打印，限速 */
+static DEFINE_RATELIMIT_STATE(rs_invalid_feature, 1 * HZ, 1);
+static DEFINE_RATELIMIT_STATE(rs_dbi_info, 1 * HZ, 1);
+
 int mi_dsi_panel_set_disp_param(struct mtk_dsi *dsi, struct disp_feature_ctl *ctl)
 {
 	int rc = 0;
@@ -1884,9 +1889,11 @@ int mi_dsi_panel_set_disp_param(struct mtk_dsi *dsi, struct disp_feature_ctl *ct
 	case DISP_FEATURE_PEAK_HDR_MODE:
                 break;
 	case DISP_FEATURE_DBI:
-		DISP_INFO("gray_level:%x\n", ctl->feature_val);
+		if (__ratelimit(&rs_dbi_info))
+			DISP_INFO("gray_level:%x\n", ctl->feature_val);
 		if (mi_cfg->feature_val[DISP_FEATURE_DBI] == ctl->feature_val) {
-			DISP_INFO("gray_level is the same, return\n");
+			if (__ratelimit(&rs_dbi_info))
+				DISP_INFO("gray_level is the same, return\n");
 			break;
 		}
 		if (panel_ext->funcs->set_gray_by_temperature) {
@@ -1905,7 +1912,8 @@ int mi_dsi_panel_set_disp_param(struct mtk_dsi *dsi, struct disp_feature_ctl *ct
 		mi_dsi_panel_set_cur_dolby_status(ctl->feature_val);
 		break;
 	default:
-		DISP_ERROR("invalid feature argument: %d\n", ctl->feature_id);
+		if (__ratelimit(&rs_invalid_feature))
+			DISP_ERROR("invalid feature argument: %d\n", ctl->feature_id);
 		break;
 	}
 

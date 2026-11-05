@@ -306,7 +306,7 @@ extern void apu_deepidle_exit(struct mtk_apu *apu);
 {                                                \
 	static DEFINE_RATELIMIT_STATE(_rs,           \
 					  HZ * 5,                    \
-					  50);                       \
+					  10);                       \
 	if (__ratelimit(&_rs))                       \
 		dev_info(dev, fmt, ##__VA_ARGS__);       \
 }
