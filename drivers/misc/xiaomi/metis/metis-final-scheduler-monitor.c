@@ -98,6 +98,33 @@ void metis_final_preempt_wakeup_policy(struct rq *rq, struct task_struct *task,
 	*preempt = old_priority < new_priority;
 }
 
+/* rodin 6.18（2026-11-05）：stock 经 metis-stock-entries.S 机器 ABI 蹦床进
+ * 上面的 policy（arg11 即 skip-MTK-VIP 输出）；6.18 无 stock provider，改为
+ * 原生 android_rvh_check_preempt_wakeup_fair 直调本适配入口。fair.c 调用点
+ * （check_preempt_wakeup_fair）初值 preempt=false/ignore=false，preempt 置位
+ * 即抢占、nopreempt（ignore）置位即放弃原生判定，映射原则 = dash stock 语义：
+ * policy 的 preempt/nopreempt 原样透传，两输出皆不动时原生判定照走。常
+ * 态快判：0x268=0 且无恢复计时（0x270）时 policy 无判定亦无副作用，一次
+ * per-cpu 读即返；恢复计时在场仍进 policy，prio_sched_check 的到期复活
+ * 语义不因本钩快判而失。skip-MTK-VIP 输出无 6.18 通道，本地消化。 */
+void metis_final_check_preempt_wakeup_hook(void *unused, struct rq *rq,
+		struct task_struct *p, bool *preempt, bool *nopreempt, int wake_flags,
+		struct sched_entity *se, struct sched_entity *pse)
+{
+	bool skip_mtk_vip = false;
+	struct metis_rq *state;
+
+	/* 核心明令 delayed curr 不可强抢（违背 EEVDF 纳入不合格任务）：
+	 * rvh 调用点在核心 pse->sched_delayed 守卫之前，本钩置 preempt
+	 * 即绕过该守卫，故 delayed 在场时本钩整体退位交还原生判定。 */
+	if (pse->sched_delayed)
+		return;
+	state = per_cpu_ptr(&metis_runqueues, cpu_of(rq));
+	if (!MI_FIELD(state, u8, 0x268) && !MI_FIELD(state, u64, 0x270))
+		return;
+	metis_final_preempt_wakeup_policy(rq, p, preempt, nopreempt, &skip_mtk_vip);
+}
+
 /* Algorithm only: 00125d2c / .text+0x1d304..0x1d434. Real scheduler.ko
  * caller passes task,mask,int-found,int*lowest,NULL. Fifth ignored formal
  * type remains UNKNOWN; this carrier is not a guessed original entry. */

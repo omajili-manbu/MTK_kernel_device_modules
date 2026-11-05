@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* PARTIAL: fifteen stock VIP queue/consumer bodies. No queue state owners,
- * module lifecycle, exports, hook registration or build/package wiring. */
+/* PARTIAL: fifteen stock VIP queue/consumer bodies plus the rodin 6.18
+ * android_rvh_replace_next_task_fair pick adapter (2026-11-05). Queue state
+ * owners: the 0x1b8 list and 0x170 count enter/leave through the live
+ * enqueue/dequeue_entity hooks (mi_rb_enqueue_entity_hook /
+ * mi_rb_dequeue_entity_hook, attached by fas_init); metis-deadline.c owns
+ * the 0x1e0 tree via metis_deadline_{en,de}queue_task; rebalance_vip_tasks
+ * pulls nodes cross-cpu; the sched-doctor mi_schedule_hook toggles the
+ * 0x268/0x270 gate. Module lifecycle, hook registration and exports live
+ * in metis-final-module.c and metis-final-exports.c. */
 #include <linux/jiffies.h>
 #include <linux/ktime.h>
 #include <linux/rbtree.h>
@@ -14,10 +21,6 @@
 #include "metis-lowlt-trace.h"
 
 #include "metis-final-trace.h"
-
-/* rodin 6.18：set_next_entity 增 bool first 参（fair.c:5749，EXPORT 符号在）；
- * metis repick 循环即 pick 语境，传 true 与 fair.c 内部调用一致。 */
-extern void set_next_entity(struct cfs_rq *cfs, struct sched_entity *entity, bool first);
 
 static __always_inline void vip_stock_cpu_bound(unsigned int cpu)
 {
@@ -362,54 +365,55 @@ void unregister_mi_enqueue_entity_hook(void)
 	mi_enqueue_entity_hooks = NULL;
 }
 
-struct task_struct *mi_pick_task_fair(unsigned int cpu)
-{
-	struct mi_rq *rq;
-	struct metis_rq *state;
-	struct rb_node *first;
-	struct mi_task_struct *task_state;
-
-	vip_stock_cpu_bound(cpu);
-	rq = per_cpu_ptr(&mi_runqueues, cpu);
-	first = vip_root(rq)->rb_leftmost;
-	state = per_cpu_ptr(&metis_runqueues, cpu);
-	/* Stock captures the cached first node BEFORE checking/re-enabling. */
-	prio_sched_check(cpu_rq(cpu));
-	if (!MI_FIELD(state, u8, 0x268) || !first)
-		return NULL;
-	task_state = rb_entry(first, struct mi_task_struct, rb_node_258);
-	return task_state ? task_state->task : NULL;
-}
-
-void mi_pick_next_task_fair_hook(void *unused, struct rq *rq,
-		struct task_struct **task, struct sched_entity **entity,
-		bool *repick, bool simple, struct task_struct *prev)
+/* rodin 6.18（2026-11-05）：pick 选侧优先改挂 android_rvh_replace_next_task_fair
+ * （fair.c pick_next_task_fair 的 pick_task_fair 之后、put/set 之前；mtk vip.c
+ * 同钩面已让位退役，metis 单属主）。stock pick_next_task_fair 钩的
+ * *entity、*repick、simple 面随 6.18 载体消失：本入口只改 *p，put_prev/
+ * set_next 层级由 fair.c 原生收尾。挑选序（deadline → VIP → prev 保护 →
+ * lowlt → uid 让位）与 stock 一致：deadline 面自带 deadline_enable 门、不受
+ * 0x268 门控，命中时即跳过 VIP 面与其 prio_sched_check；VIP 面快判 =
+ * prio_sched_check 通过 + 0x170 计数非零 + 0x1b8 链非空。替换动作不摘链，
+ * 链与 0x1e0/0x160 两树的进出场仍由 enqueue/dequeue_entity 活钩维护。 */
+void metis_vip_replace_next_task_fair(void *unused, struct rq *rq,
+		struct task_struct **p, struct task_struct *prev)
 {
 	unsigned int cpu = cpu_of(rq);
+	struct metis_rq *state;
+	struct mi_rq *mi_rq = per_cpu_ptr(&mi_runqueues, cpu);
+	struct rb_node *first;
 	struct task_struct *picked, *lowlt;
-	struct mi_task_struct *state;
+	struct mi_task_struct *task_state;
 	s32 uid;
 
 	picked = metis_deadline_pick_next_task(cpu);
 	if (!picked) {
-		picked = mi_pick_task_fair(cpu);
-		/* Stock task+0x30 is __state, not on_cpu; +0x80 is on_rq. */
-		if (prev && prev->on_rq && !prev->__state &&
-		    !test_tsk_thread_flag(prev, TIF_NEED_RESCHED)) {
-			if (cold_start_ui_task(prev) || cold_start_link_task(prev))
-				picked = prev;
-			else if (!picked && task_in_cs_protect(prev))
-				picked = prev;
+		first = vip_root(mi_rq)->rb_leftmost;
+		state = per_cpu_ptr(&metis_runqueues, cpu);
+		/* Stock captures the cached first node BEFORE checking/re-enabling. */
+		prio_sched_check(rq);
+		if (MI_FIELD(state, u8, 0x268) && first &&
+		    MI_FIELD(mi_rq, u32, 0x170) &&
+		    !list_empty(&MI_FIELD(mi_rq, struct list_head, 0x1b8))) {
+			task_state = rb_entry(first, struct mi_task_struct, rb_node_258);
+			picked = task_state ? task_state->task : NULL;
+			/* Stock task+0x30 is __state, not on_cpu; +0x80 is on_rq. */
+			if (prev && prev->on_rq && !prev->__state &&
+			    !test_tsk_thread_flag(prev, TIF_NEED_RESCHED)) {
+				if (cold_start_ui_task(prev) || cold_start_link_task(prev))
+					picked = prev;
+				else if (!picked && task_in_cs_protect(prev))
+					picked = prev;
+			}
 		}
 	}
 	/* Stock calls this even when deadline/VIP already supplied a task. */
 	lowlt = lowlt_list_first_task(cpu);
 	if (!picked && lowlt && lowlt_tsk_preempt_normal(lowlt))
 		picked = lowlt;
-	if (*task) {
-		state = get_mi_task_struct(*task);
-		if (state) {
-			uid = mi_task_uid(state);
+	if (*p) {
+		task_state = get_mi_task_struct(*p);
+		if (task_state) {
+			uid = mi_task_uid(task_state);
 			if ((uid == 1000 || uid == 0) &&
 			    (!picked || !preempt_sysprocess))
 				return;
@@ -417,19 +421,15 @@ void mi_pick_next_task_fair_hook(void *unused, struct rq *rq,
 	}
 	if (!picked)
 		return;
-	*task = picked;
-	*entity = &picked->se;
-	if (simple) {
-		while (*entity) {
-			set_next_entity(cfs_rq_of(*entity), *entity, true);
-#ifdef CONFIG_FAIR_GROUP_SCHED
-			*entity = (*entity)->parent;
-#else
-			*entity = NULL;
-#endif
-		}
-	}
-	*repick = true;
+	/* 6.18 DELAY_DEQUEUE：阻塞且不 eligible 的任务以 sched_delayed=1 滞留
+	 * cfs 树，entity 级 en/dequeue 钩对此不触发，0x258/0x1b8/0x1e0 与
+	 * lowlt 各结构仍持其节点；核心对 delayed 实体的消化只在上游
+	 * pick_next_entity，本钩提交路径（put_prev/set_next_entity）无兜底，
+	 * 提交睡着的任务即伪唤醒再阻塞并失配 h_nr_runnable。delayed/睡眠/
+	 * 离队任务一律放弃替换交还原生判定，delayed 头滞留期间本面安全降级。 */
+	if (picked->se.sched_delayed || picked->__state || !picked->on_rq)
+		return;
+	*p = picked;
 	trace_mi_pick_next_vip_task(picked, "pick vip task");
 }
 
@@ -537,4 +537,30 @@ void mi_rb_dequeue_entity_hook(void *unused, struct cfs_rq *cfs,
 	cpu = cpu_of(rq_of(cfs));
 	vip_stock_task_of_warning(entity);
 	metis_deadline_dequeue_task(cpu, task);
+}
+
+/* rodin 6.18（2026-11-05）：DELAY_DEQUEUE 下阻塞且不 eligible 的任务以
+ * sched_delayed=1 滞留 cfs 树，entity 级 en/dequeue 钩对此不触发，0x258/
+ * 0x1b8/0x1e0 与 lowlt 各结构会滞留睡着的节点。metis 持有的任务在此豁免
+ * delayed：睡眠即真出队、队列钩照常进出场，各树与 cfs 树严格镜像，选侧
+ * 不再有 delayed 头滞留窗口；未持有任务不豁免，主线 DELAY_DEQUEUE 语义
+ * 与快速重唤醒收益全保留。 */
+void metis_dequeue_entity_delayed_hook(void *unused, struct cfs_rq *cfs,
+				       struct sched_entity *se, bool *delay)
+{
+	struct task_struct *task;
+	struct mi_task_struct *state;
+
+	if (!delay || !*delay || !entity_is_task(se))
+		return;
+	task = container_of(se, struct task_struct, se);
+	state = get_mi_task_struct(task);
+	if (!state)
+		return;
+	/* 成员判据与低延迟链入链门一致：VIP 树魔数 / deadline 0x300 / 低延迟
+	 * 候选位。node_2c0 零值态 list_empty 恒假，禁作成员判据。 */
+	if (state->rb_magic_270 == 0xbadc ||
+	    MI_FIELD(state, u8, 0x300) ||
+	    (protect_cs && (state->flags_0xc0 & 0x40000)))
+		*delay = false;
 }
