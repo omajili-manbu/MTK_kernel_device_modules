@@ -912,6 +912,9 @@ int tgid_vip_on(void)
 /* basic vip interace */
 void set_task_basic_vip_and_throttle(int pid, unsigned int throttle_time)
 {
+	/* rodin 6.18（2026-11-05）：尾部载体不足 ⇒ 本入口 no-op（原因已在 init 报出）*/
+	if (MTK_TASK_DATA_ABSENT())
+		return;
 	struct task_struct *p;
 	struct vip_task_struct *vts;
 	int done = 0;
