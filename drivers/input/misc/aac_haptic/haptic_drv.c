@@ -36,6 +36,7 @@
 #include "richtap_drv.h"
 #include "input_drv.h"
 #include "rt6010.h"
+#include "../haptic_probe_wq.h"
 
 #ifdef  ENABLE_PIN_CONTROL
 static const char *const pctl_names[] = {
@@ -1805,7 +1806,8 @@ static struct i2c_driver ics_haptic_driver =
 };
 
 /* rodin 6.18（2026-10-21 慢单元异步化）：本单元三地址 probe（1 成功 + 2 无器件 fail），
- * 真机 ~3ms，与 aw/si 同簇统一后置（vseq 序列每省一段串行 i2c 等待即收益，
+ * 真机 ~3ms，与 aw/si 同簇统一后置到马达共享串行注册队列（位序保持表序 aw→si→aac；
+ * vseq 序列每省一段串行 i2c 等待即收益，
  * 且保持马达三供应商驱动装载语义一体）；无下游依赖。 */
 static void ics_async_register_workfn(struct work_struct *work)
 {
@@ -1818,7 +1820,7 @@ static DECLARE_WORK(ics_async_register_work, ics_async_register_workfn);
 
 static int __init ics_async_init(void)
 {
-	schedule_work(&ics_async_register_work);
+	haptic_probe_queue_work(&ics_async_register_work);
 	return 0;
 }
 

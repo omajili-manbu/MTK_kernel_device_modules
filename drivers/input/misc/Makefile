@@ -8,3 +8,6 @@
 obj-$(CONFIG_INPUT_AW_HAPTIC)  += aw_haptic/
 obj-$(CONFIG_SIH_VIBRATOR)  += si_haptic/
 obj-$(CONFIG_AAC_VIBRATOR)  += aac_haptic/
+
+# 马达三驱动共享探针注册串行队列
+obj-y += haptic_probe_wq.o
