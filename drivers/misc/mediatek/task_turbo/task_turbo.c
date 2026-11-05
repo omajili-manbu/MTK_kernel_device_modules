@@ -117,7 +117,16 @@ static uint32_t latency_turbo = SUB_FEAT_LOCK | SUB_FEAT_BINDER |
 				SUB_FEAT_SCHED;
 static uint32_t launch_turbo =  SUB_FEAT_LOCK | SUB_FEAT_BINDER |
 				SUB_FEAT_SCHED | SUB_FEAT_FLAVOR_BIGCORE;
-static DEFINE_SPINLOCK(TURBO_SPIN_LOCK);
+/*
+ * rodin 6.18（2026-11-05）：本锁保护 turbo_pid 名单与落账。名单增删四口
+ * （cgroup attach、exec comm、sysfs turbo_pid 写入/清除）落账含跨 CPU
+ * task_rq_lock（set_user_nice），自旋持锁临界区达数十微秒量级，feats=15
+ * 启动窗内高频触发；改互斥锁让等待方睡眠。全部取用点均为进程上下文
+ * （cgroup attach 持 threadgroup 读写信号量、exec comm 点无锁、sysfs
+ * 参数写），无原子上下文取用者；落账与名单变更保持同一临界区，语义
+ * 与自旋锁形态逐位等价。
+ */
+static DEFINE_MUTEX(TURBO_LOCK);
 static DEFINE_SPINLOCK(RWSEM_SPIN_LOCK);
 static DEFINE_SPINLOCK(check_lock);
 static DEFINE_MUTEX(cpu_lock);
@@ -344,10 +353,10 @@ static int enable_tt_vip(const char *buf, const struct kernel_param *kp)
 		 * 无再挂窗口。enforced_qualified_mask 是外部 caller 的 enforce
 		 * 状态记忆，不随开关清零。
 		 */
-		spin_lock(&TURBO_SPIN_LOCK);
+		mutex_lock(&TURBO_LOCK);
 		for (i = 0; i < TURBO_PID_COUNT; i++)
 			turbo_pid_snap[i] = turbo_pid[i];
-		spin_unlock(&TURBO_SPIN_LOCK);
+		mutex_unlock(&TURBO_LOCK);
 		for (i = 0; i < TURBO_PID_COUNT; i++) {
 			if (turbo_pid_snap[i])
 				unset_task_vvip(turbo_pid_snap[i]);
@@ -1936,7 +1945,7 @@ static int set_task_turbo_feats(const char *buf,
 	if (ret)
 		return ret;
 
-	spin_lock(&TURBO_SPIN_LOCK);
+	mutex_lock(&TURBO_LOCK);
 	if (val == latency_turbo ||
 	    val == launch_turbo  || val == 0)
 		ret = param_set_uint(buf, kp);
@@ -1950,12 +1959,13 @@ static int set_task_turbo_feats(const char *buf,
 			turbo_pid[i] = 0;
 		}
 	}
-	spin_unlock(&TURBO_SPIN_LOCK);
+	mutex_unlock(&TURBO_LOCK);
 
 	/*
 	 * rodin 6.18（2026-11-03）：unset_turbo_task → unset_scheduler_tuning
-	 * → set_user_nice 内含跨 CPU task_rq_lock，挪到锁外落账以免持模块锁
-	 * 连发跨核锁拉长临界区。TURBO_SPIN_LOCK 为模块私锁、与调度器锁链无
+	 * → set_user_nice 内含跨 CPU task_rq_lock，锁外落账缩小持锁窗；
+	 * 2026-11-05 起本锁为互斥锁（见锁定义处注记），持锁落账已合法，
+	 * 锁外化仅余缩窗收益。TURBO_LOCK 为模块私锁、与调度器锁链无
 	 * 交叉，锁外化不引入反序面；feats 已清零后 add_turbo_list_by_pid、
 	 * cgroup attach、exec 三个入口均被 task_turbo_feats 门死，无并发添桩。
 	 */
@@ -1997,13 +2007,13 @@ static int add_turbo_list_by_pid(pid_t pid)
 	if (pid < 0 || pid > PID_MAX_DEFAULT)
 		return retval;
 
-	spin_lock(&TURBO_SPIN_LOCK);
+	mutex_lock(&TURBO_LOCK);
 	if (!add_turbo_list_locked(pid))
 		goto unlock;
 
 	retval = set_turbo_task(pid, TURBO_ENABLE);
 unlock:
-	spin_unlock(&TURBO_SPIN_LOCK);
+	mutex_unlock(&TURBO_LOCK);
 	return retval;
 }
 
@@ -2041,10 +2051,10 @@ static int unset_turbo_list_by_pid(pid_t pid)
 	if (pid < 0 || pid > PID_MAX_DEFAULT)
 		return retval;
 
-	spin_lock(&TURBO_SPIN_LOCK);
+	mutex_lock(&TURBO_LOCK);
 	remove_turbo_list_locked(pid);
 	retval = unset_turbo_task(pid);
-	spin_unlock(&TURBO_SPIN_LOCK);
+	mutex_unlock(&TURBO_LOCK);
 	return retval;
 }
 
@@ -2142,7 +2152,7 @@ static void add_turbo_list(struct task_struct *p)
 {
 	struct task_turbo_t *turbo_data;
 
-	spin_lock(&TURBO_SPIN_LOCK);
+	mutex_lock(&TURBO_LOCK);
 	if (add_turbo_list_locked(p->pid)) {
 		turbo_data = get_task_turbo_t(p);
 		turbo_data->turbo = TURBO_ENABLE;
@@ -2150,7 +2160,7 @@ static void add_turbo_list(struct task_struct *p)
 		set_scheduler_tuning(p);
 		trace_turbo_set(p);
 	}
-	spin_unlock(&TURBO_SPIN_LOCK);
+	mutex_unlock(&TURBO_LOCK);
 }
 
 /*
@@ -2172,13 +2182,13 @@ static void remove_turbo_list(struct task_struct *p)
 {
 	struct task_turbo_t *turbo_data;
 
-	spin_lock(&TURBO_SPIN_LOCK);
+	mutex_lock(&TURBO_LOCK);
 	turbo_data = get_task_turbo_t(p);
 	remove_turbo_list_locked(p->pid);
 	turbo_data->turbo = TURBO_DISABLE;
 	unset_scheduler_tuning(p);
 	trace_turbo_set(p);
-	spin_unlock(&TURBO_SPIN_LOCK);
+	mutex_unlock(&TURBO_LOCK);
 }
 
 /* rodin 6.18：6.6 的 android_vh_cgroup_set_task(ret, task) 在 6.18 上游扩为
