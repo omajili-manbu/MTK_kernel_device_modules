@@ -6,6 +6,7 @@
  * this registration glue; the framework functions are imported from
  * miwill.ko, so no private framework copy is compiled here.
  */
+#include <linux/vseq.h>
 #include "miwill.h"
 #include "redudancy.inc"
 
@@ -17,7 +18,7 @@ static void __exit miwill_red_cleanup_module(void)
 {
 	miwill_mode_unregister(&red_mode);
 }
-module_init(miwill_red_init_module);
+vseq_module_init(miwill_red_init_module);
 module_exit(miwill_red_cleanup_module);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Minjun Xi <ximinjun@xiaomi.com> ");

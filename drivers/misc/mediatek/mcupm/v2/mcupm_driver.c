@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
+#include <linux/vseq.h>
 
 #include "mcupm_driver.h"
 #include "mcupm_plt.h"
@@ -724,5 +725,5 @@ static void __exit mcupm_module_exit(void)
 MODULE_DESCRIPTION("MEDIATEK Module MCUPM driver");
 MODULE_LICENSE("GPL v2");
 
-module_init(mcupm_module_init);
+vseq_module_init(mcupm_module_init);
 module_exit(mcupm_module_exit);

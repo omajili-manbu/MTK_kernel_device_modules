@@ -10,6 +10,7 @@
 #include <linux/netlink.h>
 #include <linux/random.h>
 #include <linux/unaligned.h>
+#include <linux/vseq.h>
 #include <net/genetlink.h>
 #include <net/rtnetlink.h>
 #include <net/sch_generic.h>
@@ -633,7 +634,7 @@ EXPORT_SYMBOL(miwill_change_mode);
 EXPORT_SYMBOL(miwill_mode_register);
 EXPORT_SYMBOL(miwill_mode_unregister);
 EXPORT_SYMBOL(miwill_modeop_port_enter);
-module_init(miwill_init_module);
+vseq_module_init(miwill_init_module);
 module_exit(miwill_cleanup_module);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Minjun Xi <ximinjun@xiaomi.com> ");
