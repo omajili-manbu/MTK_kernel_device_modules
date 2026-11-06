@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 config MINET
 	tristate "Xiaomi minet flow monitor and idle notifications"
 	depends on NETFILTER && NF_CONNTRACK && INET && IPV6
