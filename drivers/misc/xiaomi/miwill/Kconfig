@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config XIAOMI_MIWiLL
+	tristate "Xiaomi MiWiLL virtual network device"
+	depends on NET && INET && IPV6 && NETFILTER
+	default n
+	help
+	  Stock MiWiLL virtual network device with its embedded application
+	  flow monitor, rebuilt against the rodin vendor_dlkm 6.6.77 blob
+	  (vendor_dlkm modules.load line 240).  Log face, extack texts and
+	  the miwill_cnt parameter follow the blob generation; minetd
+	  resolves the miwill_genl family through this device.
+
+config XIAOMI_MIWiLL_REDUDANCY
+	tristate "Xiaomi MiWiLL redudancy mode"
+	depends on XIAOMI_MIWiLL
+	default n
+	help
+	  Stock redudancy mode module rebuilt against the same blob
+	  (modules.load line 241, depends = miwill, zero module params).
+	  It carries only its private mode ops and registers them with
+	  the framework exported by XIAOMI_MIWiLL.
