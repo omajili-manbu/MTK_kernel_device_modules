@@ -102,6 +102,16 @@ static const struct snd_soc_dapm_route mtk_dai_hostless_routes[] = {
 	{"PCM_1_PB_CH2", "ADDA_UL_CH2", "Hostless Speech DL"},
 	{"PCM_1_PB_CH2", "ADDA_UL_CH3", "Hostless Speech DL"},
 	{"PCM_1_PB_CH3", "ADDA_UL_CH3", "Hostless Speech DL"},
+	/*
+	 * rodin 6.18: modem 语音桥的 DPCM 走查依赖 mixer 路径连通态，而 HAL 的
+	 * modemPcmOpen 先于 ADDA_UL_TO_MD1/MD2 序列执行，FE playback 打开时
+	 * 上行边缘尚未连通，走查零路径即 EINVAL，语音桥起不来（听筒与上行同断）。
+	 * 补恒连拓扑边供走查与上电；数据面仍由 AFE_CONN 寄存器按序列编程。
+	 */
+	{"PCM_0_PB_CH1", NULL, "Hostless Speech DL"},
+	{"PCM_0_PB_CH2", NULL, "Hostless Speech DL"},
+	{"PCM_1_PB_CH1", NULL, "Hostless Speech DL"},
+	{"PCM_1_PB_CH2", NULL, "Hostless Speech DL"},
 	{"PCM_1_PB_CH1", "HW_SRC_0_OUT_CH1", "Hostless_HW_SRC_0_IN_DL"},
 	{"PCM_1_PB_CH2", "HW_SRC_0_OUT_CH2", "Hostless_HW_SRC_0_IN_DL"},
 	{"PCM_1_PB_CH4", "HW_SRC_1_OUT_CH1", "Hostless Speech DL"},
