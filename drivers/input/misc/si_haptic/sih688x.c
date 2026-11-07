@@ -308,7 +308,11 @@ static void sih688x_set_play_mode(sih_haptic_t *sih_haptic,
 		break;
 	case SIH_RAM_MODE:
 		sih_haptic->chip_ipara.play_mode = SIH_RAM_MODE;
-		sih688x_upload_f0(sih_haptic, SIH_F0_CALI_LRA);
+		/* TRIM1 stays zero: the chip auto-tracks the real LRA resonance.
+		 * Applying the f0_pre-anchored trim here pulls the drive base
+		 * away from the measured resonance and detunes the LRA; the
+		 * vendor si_haptic V1.0.3.691 build never writes it on play. */
+		sih688x_upload_f0(sih_haptic, SIH_WRITE_ZERO);
 		sih688x_set_boost_mode(sih_haptic, true);
 		break;
 	case SIH_RTP_MODE:
@@ -324,7 +328,7 @@ static void sih688x_set_play_mode(sih_haptic_t *sih_haptic,
 		break;
 	case SIH_RAM_LOOP_MODE:
 		sih_haptic->chip_ipara.play_mode = SIH_RAM_LOOP_MODE;
-		sih688x_upload_f0(sih_haptic, SIH_F0_CALI_LRA);
+		sih688x_upload_f0(sih_haptic, SIH_WRITE_ZERO);
 		sih688x_set_boost_mode(sih_haptic, false);
 		haptic_regmap_update_bits(sih_haptic->regmapp.regmapping,
 			SIH688X_REG_WAVELOOP1, SIH_WAVELOOP1_BIT_SEQ1_MASK,
