@@ -38,6 +38,7 @@
 #include <linux/mman.h>
 #include "ringbuffer.h"
 #include "haptic_mid.h"
+#include <linux/rodin_vendor_fw.h>
 #include "haptic_regmap.h"
 #include "haptic.h"
 #include "haptic_misc.h"
@@ -792,6 +793,47 @@ static void get_ram_num(sih_haptic_t *sih_haptic)
 	/* RAMINIT Disable */
 	sih_haptic->hp_func->ram_init(sih_haptic, false);
 	mutex_unlock(&sih_haptic->lock);
+}
+
+static void sih_ram_load(const struct firmware *cont, void *context);
+
+#define SIH_FW_FALLBACK_RETRY		3
+#define SIH_FW_FALLBACK_RETRY_MS	200
+
+/* rodin 6.18: the driver is built-in and probes before first-stage init
+ * mounts /vendor, so a firmware request made in probe ends -ENOENT and
+ * the RAM wave library never reaches the chip. Load it from a delayed
+ * work behind the shared vendor firmware gate, same shape as the
+ * goodix cfg-bin latch: gate first, one synchronous request, bounded
+ * retries only while the gate is open. */
+static void sih_fw_load_work(struct work_struct *work)
+{
+	sih_haptic_t *sih_haptic = container_of(work, sih_haptic_t,
+		ram.fw_load_work.work);
+	const struct firmware *fw = NULL;
+	const char *name = awinic_ram_name_sih[sih_haptic->ram.lib_index];
+	int try_cnt;
+	int ret = -1;
+	bool gate_open;
+
+	hp_info("%s:enter\n", __func__);
+
+	gate_open = (rodin_vendor_fw_wait() == 0);
+	try_cnt = gate_open ? SIH_FW_FALLBACK_RETRY : 1;
+
+	while (try_cnt--) {
+		ret = request_firmware(&fw, name, sih_haptic->dev);
+		if (!ret)
+			break;
+		hp_info("%s:request %s retry:[%d]\n", __func__, name,
+			SIH_FW_FALLBACK_RETRY - try_cnt);
+		msleep(SIH_FW_FALLBACK_RETRY_MS);
+	}
+	if (ret) {
+		hp_err("%s:failed to read %s\n", __func__, name);
+		return;
+	}
+	sih_ram_load(fw, sih_haptic);
 }
 
 static void sih_ram_load(const struct firmware *cont, void *context)
@@ -3343,17 +3385,14 @@ static void vibrator_init(sih_haptic_t *sih_haptic)
 
 static int ram_work_init(sih_haptic_t *sih_haptic)
 {
-	int ret = -1;
-
 	hp_info("%s:enter\n", __func__);
 
 	sih_haptic->ram.ram_init = false;
+	INIT_DELAYED_WORK(&sih_haptic->ram.fw_load_work, sih_fw_load_work);
+	schedule_delayed_work(&sih_haptic->ram.fw_load_work,
+		msecs_to_jiffies(2000));
 
-	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_UEVENT,
-		awinic_ram_name_sih[sih_haptic->ram.lib_index], sih_haptic->dev,
-		GFP_KERNEL, sih_haptic, sih_ram_load);
-
-	return ret;
+	return 0;
 }
 
 static int sih_i2c_probe(struct i2c_client *i2c)
@@ -3493,6 +3532,7 @@ err_destroy_ff:
 	input_ff_destroy(&sih_haptic->soft_frame.vib_dev);
 err_input_ff:
 err_dev_sysfs:
+	cancel_delayed_work_sync(&sih_haptic->ram.fw_load_work);
 	sih_haptic->stream_func->stream_rtp_work_release(sih_haptic);
 	devm_free_irq(&i2c->dev, gpio_to_irq(sih_haptic->chip_attr.irq_gpio), sih_haptic);
 err_irq:
@@ -3512,6 +3552,7 @@ static void sih_i2c_remove(struct i2c_client *i2c)
 	hp_info("%s:enter\n", __func__);
 
 	/* work_struct release */
+	cancel_delayed_work_sync(&sih_haptic->ram.fw_load_work);
 	cancel_work_sync(&sih_haptic->ram.ram_work);
 	cancel_work_sync(&sih_haptic->rtp.rtp_work);
 

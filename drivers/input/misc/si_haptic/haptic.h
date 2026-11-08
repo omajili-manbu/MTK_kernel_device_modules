@@ -199,6 +199,7 @@ typedef struct sih_ram_para {
 	uint8_t ram_vbat_comp;
 	struct work_struct ram_work;
 	struct work_struct gain_work;	
+	struct delayed_work fw_load_work;
 } sih_ram_para_t;
 
 typedef struct sih_detect_para {
