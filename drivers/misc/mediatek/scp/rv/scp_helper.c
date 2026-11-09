@@ -3443,6 +3443,19 @@ static int __init scp_init(void)
 		goto err;
 	}
 
+	/*
+	 * rodin 6.18 (2026-11-10): SCP_TCM comes from devm_ioremap_resource()
+	 * and must stay in the vmalloc range. A linear-map address means the
+	 * sram pointer was corrupted by something outside this driver and may
+	 * land in a no-map reserved region; every consumer below (region info,
+	 * awake loader, exception dump, params) would fault on it, so bail out
+	 * before initializing any of them.
+	 */
+	if (!is_vmalloc_addr(SCP_TCM)) {
+		pr_notice("[SCP] scp sram pointer invalid, skip platform init\n");
+		goto err;
+	}
+
 #if SCP_BOOT_TIME_OUT_MONITOR
 	scp_ready_timer[SCP_A_ID].tid = SCP_A_TIMER;
 	timer_setup(&(scp_ready_timer[SCP_A_ID].tl), scp_wait_ready_timeout, 0);
