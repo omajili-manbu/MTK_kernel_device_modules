@@ -1784,6 +1784,17 @@ static void gpufreq_init_external_callback(void)
 #endif /* CONFIG_DEVAPC_ARCH_MULTI */
 }
 
+/*
+ * rodin 6.18 (2026-11-10): readiness probe for platform drivers whose
+ * probe path would dereference the shared status set by the wrapper
+ * driver; NULL means the wrapper has not completed (e.g. recovery boot).
+ */
+bool gpufreq_shared_status_ready(void)
+{
+	return g_shared_status != NULL;
+}
+EXPORT_SYMBOL(gpufreq_shared_status_ready);
+
 void gpufreq_register_gpufreq_fp(struct gpufreq_platform_fp *platform_fp)
 {
 	if (!platform_fp) {

@@ -686,6 +686,7 @@ void gpufreq_pdca_config(enum gpufreq_power_state power);
 void gpufreq_fake_mtcmos_control(enum gpufreq_power_state power);
 void gpufreq_register_gpufreq_fp(struct gpufreq_platform_fp *platform_fp);
 void gpufreq_register_gpuppm_fp(struct gpuppm_platform_fp *platform_fp);
+bool gpufreq_shared_status_ready(void);
 
 /* Debug */
 int gpufreq_update_debug_opp_info(void);

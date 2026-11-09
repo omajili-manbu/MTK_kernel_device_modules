@@ -968,6 +968,18 @@ static int __gpufreq_pdrv_probe(struct platform_device *pdev)
 		goto done;
 	}
 
+	/*
+	 * rodin 6.18 (2026-11-10): shared memory init is owned by the wrapper
+	 * driver and only completes after ghpm is ready; probing without it
+	 * would run debug init on a null shared status and hit BUG_ON, so
+	 * defer the same way the wrapper does.
+	 */
+	if (!gpufreq_shared_status_ready()) {
+		GPUFREQ_LOGE("gpufreq shared memory not ready, defer platform driver probe");
+		ret = -EPROBE_DEFER;
+		goto done;
+	}
+
 	/* init footprint */
 	__gpufreq_reset_footprint();
 
