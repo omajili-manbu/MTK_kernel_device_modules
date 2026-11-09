@@ -174,6 +174,7 @@ char *core_ids_scp[SCP_CORE_TOTAL] = {"SCP A"};
 DEFINE_SPINLOCK(scp_awake_spinlock);
 /* set flag after driver initial done */
 static bool driver_init_done;
+static bool scp_probe_done;
 struct scp_ipi_irq {
 	const char *name;
 	int order;
@@ -2364,6 +2365,12 @@ int scp_check_resource(void)
 void scp_region_info_init(void)
 {
 	/*get scp loader/firmware info from scp sram*/
+	/* rodin 6.18 (2026-11-10): validate at the point of use; the sram
+	 * pointer has been observed to be corrupted after earlier checks */
+	if (!is_vmalloc_addr(SCP_TCM)) {
+		pr_notice("[SCP] scp sram pointer invalid, skip region info copy\n");
+		return;
+	}
 	scp_region_info = (SCP_TCM + SCP_REGION_INFO_OFFSET);
 	pr_debug("[SCP] scp_region_info = %px\n", scp_region_info);
 	memcpy_from_scp(&scp_region_info_copy,
@@ -3280,6 +3287,8 @@ static int scp_device_probe(struct platform_device *pdev)
 		}
 	}
 
+	if (!ret)
+		scp_probe_done = true;
 	return ret;
 }
 
@@ -3427,6 +3436,18 @@ static int __init scp_init(void)
 	if (ret) {
 		pr_notice("[SCP] scp probe fail %d\n", ret);
 		goto err_without_unregister;
+	}
+
+	/*
+	 * rodin 6.18 (2026-11-10): probe failure (-EINVAL, e.g. missing
+	 * scp-mem-key reserved node) leaves the device unbound while
+	 * platform_driver_register() still returns 0; the reserve memory
+	 * table stays empty and the loader data is invalid, so skip the
+	 * platform bring-up entirely.
+	 */
+	if (!scp_probe_done) {
+		pr_notice("[SCP] scp probe not completed, skip platform init\n");
+		goto err;
 	}
 
 	if (!scpreg.scpsys_regmap_en) {
