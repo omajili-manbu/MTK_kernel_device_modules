@@ -8,11 +8,13 @@
  * （err -2），init 加载失败 exit(127) 触发 panic。本文件按 6.6 ko 反汇编
  * 逐指令还原该 ABI 面，不引入任何桩：
  *
- *  - get_ufs_xiaomi()：返回 &ufs_xiaomi（1168 字节 .data 单例）。mi_memory
- *    读 +0x68（u64）与 +0x70..+0x1a0（10×32 字节），6.6 上无人写入恒为零值；
- *    +0x470 是静态初始化的 struct completion（done=0、等待队列自指），6.6
- *    上同样无人 complete，mi_memory 的工作项在 system_wq 上永久停靠——按
- *    6.6 原样保留，不补 signal 以免凭空改变行为。
+ *  - get_ufs_xiaomi()：返回 &ufs_xiaomi（1168 字节 .data 单例）。6.6 机器码
+ *    普查：单例是闭源子树的全局状态银行——ufshcd_init 存 hba（+0x0）、
+ *    ufshcd_update_err_state/ufshcd_err_handler 写 err_state（+0x68）与
+ *    err_reason（+0x70..+0x1af）、ufshcd_update_uic_error_cnt 写计数
+ *    （+0xc/+0x24/+0x64）、ufsfbo_* 与 ufseua_* 写各自状态；本树未复刻这些
+ *    镜像，mi_memory 读面相应呈现恒零。+0x470 是静态初始化的 struct
+ *    completion（done=0、等待队列自指）。
  *
  *  - ufshcd_query_descriptor_retry_xm()：与 stock ufshcd_query_descriptor_retry
  *    逐字同构（3 次尝试，0 / -EINVAL 即止），直接转发。
@@ -128,3 +130,18 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ufshcd_read_desc_param_sel);
+
+/*
+ * 6.6 stock ufshcd_slave_configure 末尾的三段同守卫块（机器码还原为单守卫）：
+ * 仅 lun 2 的 scsi_device 触发——scan 按 lun 升序，配到 lun 2 时 lun 0 已在
+ * host 链上，mi_memory 随后的 scsi_device_lookup(SCSI_LUN=0) 必中。complete
+ * 一次性唤醒停靠的 ufs_info_init_work，completion 粘滞，此后零常驻开销。
+ */
+void ufshcd_xiaomi_config_sdev(struct scsi_device *sdev)
+{
+	if (sdev->lun == 2) {
+		ufs_xiaomi.lun2_sdev = sdev;
+		ufs_xiaomi.lun2_sdev_shadow = sdev;
+		complete(&ufs_xiaomi.ready);
+	}
+}
