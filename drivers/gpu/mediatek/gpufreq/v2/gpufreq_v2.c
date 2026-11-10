@@ -1924,8 +1924,13 @@ static int gpufreq_gpueb_init(void)
 	gpueb_gpr_addr = gpueb_get_gpr_addr(GPUEB_SRAM_GPR13);
 	g_ipi_magic = readl(gpueb_gpr_addr);
 	if (unlikely(!g_ipi_magic)) {
+		/*
+		 * rodin 6.18 (2026-11-10): a zero magic means the GPUEB
+		 * firmware never ran (e.g. recovery boot, where the firmware
+		 * load is skipped); fail the probe instead of aborting the
+		 * whole system, the caller already handles the error return.
+		 */
 		GPUFREQ_LOGE("fail to init ipi magic number");
-		gpufreq_abort();
 		ret = GPUFREQ_EINVAL;
 		goto done;
 	}
