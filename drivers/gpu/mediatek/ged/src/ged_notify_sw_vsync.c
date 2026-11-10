@@ -1588,8 +1588,6 @@ GED_ERROR ged_notify_sw_vsync_system_init(void)
 	mutex_init(&gsVsyncStampLock);
 	mutex_init(&gsVsyncModeLock);
 
-	hrtimer_setup(&g_HT_hwvsync_emu, ged_sw_vsync_check_cb, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-
 #if IS_ENABLED(CONFIG_MTK_GPU_APO_SUPPORT)
 	ged_gpu_apo_init_nolock();
 	ged_gpu_predict_apo_init_nolock();
@@ -1636,3 +1634,18 @@ void ged_notify_sw_vsync_system_exit(void)
 	mutex_destroy(&gsVsyncModeLock);
 	mutex_destroy(&gsVsyncStampLock);
 }
+
+/*
+ * rodin 6.18 (2026-11-10): initialize the vsync emulation timer at
+ * early_initcall instead of the probe-time system init. The ged probe can
+ * fail (e.g. recovery boot, where the gpufreq stack is absent) while the
+ * exported notify paths still arm this timer; an uninitialized hrtimer
+ * kills the boot on hrtimer_start.
+ */
+static int __init ged_vsync_timer_early_init(void)
+{
+	hrtimer_setup(&g_HT_hwvsync_emu, ged_sw_vsync_check_cb,
+		CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	return 0;
+}
+early_initcall(ged_vsync_timer_early_init);
