@@ -1579,15 +1579,6 @@ EXPORT_SYMBOL(dump_pm_callback_kbase_info);
 
 GED_ERROR ged_notify_sw_vsync_system_init(void)
 {
-	g_psNotifyWorkQueue = alloc_ordered_workqueue("ged_notify_sw_vsync",
-						WQ_HIGHPRI | WQ_FREEZABLE | WQ_MEM_RECLAIM);
-
-	if (g_psNotifyWorkQueue == NULL)
-		return GED_ERROR_OOM;
-
-	mutex_init(&gsVsyncStampLock);
-	mutex_init(&gsVsyncModeLock);
-
 #if IS_ENABLED(CONFIG_MTK_GPU_APO_SUPPORT)
 	ged_gpu_apo_init_nolock();
 	ged_gpu_predict_apo_init_nolock();
@@ -1636,14 +1627,23 @@ void ged_notify_sw_vsync_system_exit(void)
 }
 
 /*
- * rodin 6.18 (2026-11-10): initialize the vsync emulation timer at
- * early_initcall instead of the probe-time system init. The ged probe can
- * fail (e.g. recovery boot, where the gpufreq stack is absent) while the
- * exported notify paths still arm this timer; an uninitialized hrtimer
- * kills the boot on hrtimer_start.
+ * rodin 6.18 (2026-11-10): initialize the notify subsystem's timer,
+ * workqueue and locks at early_initcall instead of the probe-time system
+ * init. The ged probe can fail (e.g. recovery boot, where the gpufreq
+ * stack is absent) while exported notify paths still arm this timer and
+ * its callback queues work on the shared workqueue; an uninitialized
+ * hrtimer or a NULL workqueue kills the boot.
  */
 static int __init ged_vsync_timer_early_init(void)
 {
+	g_psNotifyWorkQueue = alloc_ordered_workqueue("ged_notify_sw_vsync",
+						WQ_HIGHPRI | WQ_FREEZABLE | WQ_MEM_RECLAIM);
+	if (g_psNotifyWorkQueue == NULL)
+		pr_warn("[GED_K] fail to alloc ged_notify_sw_vsync workqueue\n");
+
+	mutex_init(&gsVsyncStampLock);
+	mutex_init(&gsVsyncModeLock);
+
 	hrtimer_setup(&g_HT_hwvsync_emu, ged_sw_vsync_check_cb,
 		CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	return 0;
