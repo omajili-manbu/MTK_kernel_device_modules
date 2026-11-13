@@ -1541,19 +1541,22 @@ static int pdm_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* 内建形态下依赖设备/psy/votable 可能晚于本驱动注册就绪（如 bms psy
+	 * 由 gauge i2c probe 异步落地），延期重试而非一次失败永死；依赖
+	 * bind 事件会自动重踢 deferred 队列。 */
 	if (!pdm_check_cp_dev(pdpm)) {
 		pdm_err("failed to check charger device\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	if (!pdm_check_psy(pdpm)) {
 		pdm_err("failed to check psy\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
     if (!pdm_check_votable(pdpm)) {
 		pdm_err("failed to check votable\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	if (gpio_is_valid(pdpm->vbus_control_gpio))
